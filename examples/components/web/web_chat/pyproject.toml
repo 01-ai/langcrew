@@ -1,0 +1,35 @@
+[project]
+name = "web-chat-example"
+version = "0.1.0"
+description = "Web Chat API Example using LangCrew Web Components"
+authors = [
+    { name = "LangCrew Team", email = "team@langcrew.ai" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "langcrew",
+    "langcrew-tools",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0",
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+web_chat_server = "web_chat.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+langcrew = { path = "../../../../libs/langcrew", editable = true }
+langcrew-tools = { path = "../../../../libs/langcrew-tools", editable = true } 
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/web_chat"]
+
+[tool.hatch.metadata]
+allow-direct-references = true

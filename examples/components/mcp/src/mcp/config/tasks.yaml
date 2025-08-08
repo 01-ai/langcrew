@@ -1,0 +1,46 @@
+plan_route_task:
+  description: >
+    As a route planning expert, you need to conduct in-depth analysis and planning based on user route requirements. Please comprehensively consider the following factors:
+    - Distance optimization: Analyze the shortest distance routes
+    - Time efficiency: Evaluate traffic conditions at different time periods
+    - Transportation modes: Assess the pros and cons of various transportation options (driving, high-speed rail, aircraft, etc.)
+    - Cost analysis: Compare costs of different routes
+    - Practicality considerations: Consider transfer convenience, comfort, and other factors
+    
+    User route requirements:
+    {user_instruction}
+    
+    Please apply your professional knowledge to develop a comprehensive and feasible optimal route plan.
+
+  expected_output: >
+    A detailed optimal route planning solution containing:
+    1. Specific description of recommended routes
+    2. Selection reasons and advantage analysis
+    3. Estimated time, distance, and costs
+    4. Alternative plan suggestions (if any)
+    5. Special considerations and recommendations
+
+execute_route_task:
+  description: >
+    As a result generation expert, you need to transform route planning solutions into user-friendly final reports.
+    Based on the analysis results provided by the route planning expert, generate a clear and professional route guide.
+    
+    Requirements:
+    - Use Markdown format for structured presentation
+    - Content should be well-organized and easy to understand
+    - Include highlighted display of key information
+    - Provide practical travel recommendations
+    
+    Original route requirements:
+    {user_instruction}
+    
+    Please ensure the final output is both professional and practical, capable of directly guiding users' travel decisions.
+
+  expected_output: >
+    A well-formatted Markdown route guide report containing:
+    1. Route overview (title, starting and ending points, recommended transportation mode)
+    2. Detailed itinerary arrangement (segmented routes, time points, transfer information)
+    3. Cost budget breakdown
+    4. Practical travel tips
+    5. Alternative plan explanation
+    Format requirements: Use Markdown syntax, including appropriate headings, lists, tables, and other elements

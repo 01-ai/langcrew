@@ -1,0 +1,39 @@
+[project]
+name = "recruitment"
+version = "0.1.0"
+description = "Recruitment using LangCrew"
+authors = [
+    { name = "Your Name", email = "you@example.com" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0",
+    "dotenv>=0.9.9",
+    "selenium>=4.21.0",
+    "langcrew-tools>=0.1.0",
+    "langcrew>=0.1.0",
+    "fastmcp>=2.11.2",
+]
+
+[tool.uv]
+extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+prerelease = "allow"
+index-strategy = "unsafe-best-match"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp"]
+
+[project.scripts]
+recruitment = "mcp.main:run"
+train = "mcp.main:train"
+run_crew = "mcp.main:run"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"

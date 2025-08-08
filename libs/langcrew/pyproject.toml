@@ -1,0 +1,138 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["langcrew"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project]
+name = "langcrew"
+version = "0.1.0"
+description = "A LangChain-based crew management system"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+authors = [
+    {name = "BTM Team", email = "btm@langcrew.ai"},
+]
+keywords = ["langchain", "agents", "multi-agent", "orchestration", "ai", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    # Core data validation and environment management
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    # LangChain framework and integrations
+    "langchain>=0.1.0",
+    "langchain-core>=0.3.72",
+    "langchain-anthropic>=0.1.0",
+    "langchain-openai>=0.2.1,<0.3.0",
+    "langchain-community>=0.3.24",
+    # LangGraph for workflow management
+    "langgraph>=0.6.0",
+    "langgraph-supervisor>=0.0.27",
+    "langgraph-checkpoint-sqlite>=2.0.10",
+    # Multi-agent communication protocol
+    "mcp>=0.1.0",
+    "langchain-mcp-adapters>=0.1.7",
+    # Agent orchestration framework
+    "crewai<0.150.0",
+    # Web API and HTTP utilities
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "httpx>=0.25.0",
+    # AWS
+    "langchain-aws>=0.2.30",
+    "boto3>=1.39.7,<2.0.0",
+    "aiobotocore>=2.23.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/langcrew/langcrew"
+Repository = "https://github.com/langcrew/langcrew"
+Documentation = "https://langcrew.readthedocs.io"
+Issues = "https://github.com/langcrew/langcrew/issues"
+
+[project.optional-dependencies]
+redis = ["langgraph-checkpoint-redis>=0.0.8"]
+mongodb = [
+    "langgraph-checkpoint-mongodb>=0.1.4",
+    "langgraph-store-mongodb>=0.0.1",
+]
+mysql = ["langgraph-checkpoint-mysql>=2.0.15"]
+postgres = ["langgraph-checkpoint-postgres>=2.0.23"]
+all-backends = [
+    "langgraph-checkpoint-redis>=0.0.8",
+    "langgraph-checkpoint-mongodb>=0.1.4",
+    "langgraph-checkpoint-mysql>=2.0.15",
+    "langgraph-checkpoint-postgres>=2.0.23",
+    "langgraph-store-mongodb>=0.0.1",
+]
+
+[tool.uv]
+prerelease = "allow"
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-dotenv>=0.5.0",
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "types-requests>=2.31.0",
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--full-trace --strict-markers --strict-config --durations=5"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "asyncio: marks tests as asyncio tests",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.ruff]
+lint.select = ["E", "F", "I", "TID251", "UP"]
+lint.ignore = ["E501"]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["UP006", "UP007"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.coverage.run]
+source = ["langcrew"]
+omit = ["tests/*", "langcrew/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == '__main__':",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

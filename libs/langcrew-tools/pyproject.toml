@@ -1,0 +1,185 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "langcrew-tools"
+version = "0.1.0"
+description = "Tool collection for LangCrew - Building multi-agent applications"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "MIT"
+license-files = ['LICENSE']
+authors = [
+    {name = "BTM Team", email = "btm@langcrew.ai"},
+]
+keywords = ["langchain", "agents", "multi-agent", "tools", "ai", "llm", "orchestration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    # Core data validation and modeling
+    "pydantic>=2.7.4",
+    # LangChain framework and components
+    "langchain>=0.3.27",
+    "langchain-core>=0.3.72",
+    "langchain-text-splitters>=0.3.9",
+    "langcrew>=0.1.0",
+    "langgraph>=0.6.3",
+    # HTTP and API clients
+    "aiohttp>=3.12.15",
+    "httpx>=0.28.1",
+    "requests>=2.32.4",
+    # AWS integration
+    "aiobotocore>=2.23.1",
+    # Database and storage
+    "sqlalchemy>=2.0.42",
+    # Browser automation
+    "browser-use>=0.5.5",
+    # Execution environments
+    "e2b==1.2.0b6",
+    "e2b-desktop==1.7.1b2",
+    # Agent frameworks
+    "agentbox-python-sdk>=0.1.5",
+    "playwright==1.54.0",
+    "browser-use>=0.5.5",
+    "pytest-dotenv>=0.5.2",
+]
+
+
+[project.urls]
+Homepage = "https://github.com/langcrew/langcrew-tools"
+Repository = "https://github.com/langcrew/langcrew-tools"
+Documentation = "https://langcrew-tools.readthedocs.io"
+Issues = "https://github.com/langcrew/langcrew-tools/issues"
+
+[project.optional-dependencies]
+testing = [
+    "pytest>=7.0.0",
+    "pytest-cov",
+    "pytest-dotenv>=0.5.0",
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-xdist[psutil]",
+]
+development = [
+    "pytest-watcher",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "codespell",
+    "types-requests>=2.31.0",
+]
+all = [
+    "pytest>=7.0.0",
+    "pytest-cov",
+    "pytest-dotenv>=0.5.0",
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-xdist[psutil]",
+    "pytest-watcher",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "codespell",
+    "types-requests>=2.31.0",
+]
+
+[tool.uv]
+extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+prerelease = "allow"
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov",
+    "pytest-dotenv>=0.5.0",
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-xdist[psutil]",
+    "pytest-watcher",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "codespell",
+    "types-requests>=2.31.0",
+]
+
+[tool.ruff]
+lint.select = ["E", "F", "I", "TID251", "UP"]
+lint.ignore = ["E501"]
+line-length = 88
+indent-width = 4
+extend-include = ["*.ipynb"]
+target-version = "py311"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["UP006", "UP007"]
+
+[tool.ruff.format]
+preview = true
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+explicit_package_bases = true
+warn_no_return = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+allow_redefinition = true
+disable_error_code = "typeddict-item, return-value, override, has-type"
+
+[tool.coverage.run]
+source = ["langcrew_tools"]
+omit = ["tests/*", "langcrew_tools/__pycache__/*"]
+
+[tool.pytest-watcher]
+now = true
+delay = 0.1
+patterns = ["*.py"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["langcrew_tools"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--full-trace --strict-markers --strict-config --durations=5"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "asyncio: marks tests as asyncio tests",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == '__main__':",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.codespell]
+skip = "*.lock,*.css,*.js,*.json,*.svg,*.ico,*.png,*.jpg,*.jpeg"
+ignore-words-list = "te,edn"

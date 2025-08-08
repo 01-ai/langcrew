@@ -1,0 +1,29 @@
+[project]
+name = "game_builder_crew"
+version = "0.1.0"
+description = "game-builder-crew using LangCrew"
+authors = [
+    { name = "Your Name", email = "you@example.com" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0",
+    "dotenv>=0.9.9",
+    "langcrew>=0.1.0",
+]
+
+[tool.uv]
+extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+
+[project.scripts]
+game_builder_crew = "game_builder_crew.main:run_agents_crew"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"

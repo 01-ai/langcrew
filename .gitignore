@@ -1,0 +1,37 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.coverage
+agent_history.gif
+
+# Virtual environments
+.venv
+libs/**/uv.lock
+libs/**/.ruff_cache
+
+# Environment variables
+# .env
+.vscode/
+.lingma/
+
+.DS_Store
+.env
+
+.idea/
+CLAUDE.md
+CREDITS.md
+.cursor/rules/my-custom-rule.mdc
+checkpoints.db*
+
+# 忽略 examples 目录下所有任务文件夹中的 .venv 目录
+examples/**/.venv/
+examples/**/.venv
+examples/**/uv.lock
+
+libs/crewAI
+libs/langgraph
+libs/langchain

@@ -1,0 +1,16 @@
+calculator_task:
+  description: >
+    Analyze user mathematical calculation requirements, identify operation types and values, and use calculation tools to complete precise calculations.
+    Support basic operations: addition (+), subtraction (-), multiplication (*), division (/) and compound expressions.
+    
+    Calculation request:
+    {user_instruction}
+    
+    Please call the appropriate calculation tools to ensure accurate results.
+
+  expected_output: >
+    A report containing detailed calculation process and final results:
+    1. Parsing of calculation expressions
+    2. Description of calculation tools used
+    3. Calculation steps (if necessary)
+    4. Final accurate results
