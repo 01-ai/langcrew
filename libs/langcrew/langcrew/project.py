@@ -294,11 +294,12 @@ def CrewBase(cls: T) -> T:
             agents = []
             
             for agent_name, agent_config in self.agents_config.items():
-                # Extract basic agent properties
+                # Extract all possible agent parameters, let Agent class handle validation
+                name = agent_config.get('name', agent_name)
                 role = agent_config.get('role')
                 goal = agent_config.get('goal')
                 backstory = agent_config.get('backstory')
-                name = agent_config.get('name', agent_name)
+                prompt = agent_config.get('prompt')
                 
                 # Process tools configuration
                 tools = []
@@ -310,12 +311,13 @@ def CrewBase(cls: T) -> T:
                 if 'llm' in agent_config:
                     llm = self._create_llm_from_config(agent_config['llm'])
                 
-                # Create agent instance
+                # Create agent instance - Agent.__init__ handles mutual exclusivity validation
                 agent_instance = Agent(
                     name=name,
                     role=role,
                     goal=goal,
                     backstory=backstory,
+                    prompt=prompt,
                     tools=tools,
                     llm=llm,
                     config=agent_config  # Pass full config for other properties

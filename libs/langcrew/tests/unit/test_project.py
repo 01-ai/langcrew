@@ -307,6 +307,72 @@ class TestAgentManagement:
                     assert len(agents) == 1
                     assert agents[0].role == "Researcher"
 
+    def test_agents_from_yaml_with_native_prompt(self):
+        """Test creating agents from YAML with native prompt parameter."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            config_dir = base_dir / "config"
+            config_dir.mkdir()
+
+            agents_config = {
+                "analyst": {
+                    "prompt": "You are an expert data analyst with 10 years of experience.",
+                    "tools": ["data_tool"],
+                }
+            }
+
+            (config_dir / "agents.yaml").write_text(yaml.dump(agents_config))
+            test_file = base_dir / "test_crew.py"
+            test_file.write_text("")
+
+            with patch("inspect.getfile") as mock_getfile:
+                mock_getfile.return_value = str(test_file)
+
+                @CrewBase
+                class TestCrew:
+                    agents_config = "config/agents.yaml"
+
+                with patch.object(TestCrew, "_load_tools_from_config") as mock_load_tools:
+                    mock_load_tools.return_value = []
+
+                    instance = TestCrew()
+                    agents = instance.agents
+                    assert len(agents) == 1
+                    assert agents[0].prompt == "You are an expert data analyst with 10 years of experience."
+                    assert agents[0].role is None  # CrewAI attributes should be None in native mode
+
+    def test_agents_yaml_prompt_mutual_exclusivity(self):
+        """Test that YAML configuration with both prompt and CrewAI attributes raises error."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            config_dir = base_dir / "config"
+            config_dir.mkdir()
+
+            # This should cause Agent.__init__ to raise ValueError
+            agents_config = {
+                "bad_agent": {
+                    "prompt": "You are an expert",
+                    "role": "Expert",  # Should cause error
+                    "goal": "Be helpful",
+                }
+            }
+
+            (config_dir / "agents.yaml").write_text(yaml.dump(agents_config))
+            test_file = base_dir / "test_crew.py"
+            test_file.write_text("")
+
+            with patch("inspect.getfile") as mock_getfile:
+                mock_getfile.return_value = str(test_file)
+
+                @CrewBase
+                class TestCrew:
+                    agents_config = "config/agents.yaml"
+
+                with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
+                    instance = TestCrew()
+                    # Trigger agent creation by accessing agents property
+                    _ = instance.agents
+
     def test_duplicate_agent_roles_handling(self):
         """Test handling of duplicate agent roles."""
 

@@ -113,6 +113,16 @@ class Agent:
                 is_entry = config.get("is_entry", False)
             # Other config options can be added here as needed
 
+        # Mutual exclusivity check: cannot use both custom prompt and CrewAI-style attributes
+        if prompt is not None:
+            if role is not None or goal is not None or backstory is not None:
+                raise ValueError(
+                    "Cannot use both custom 'prompt' and CrewAI-style attributes (role/goal/backstory). "
+                    "Choose either:\n"
+                    "1. Custom prompt mode: only set 'prompt' parameter\n"
+                    "2. CrewAI mode: only set role/goal/backstory parameters"
+                )
+
         # Save original values (might be None)
         self.role = role
         self.goal = goal
@@ -368,19 +378,24 @@ class Agent:
         ):
             response_format = task.output_json
 
-        # Generate initial prompt based on task_spec
-        prompt_builder = PromptBuilder()
-        prompt_messages = prompt_builder.format_prompt(
-            agent=self, task=task_spec, context=state.get("context") if state else None
-        )
-        initial_prompt = prompt_messages[0]  # SystemMessage
+        # Decide which prompt to use based on whether custom prompt is provided
+        if self.prompt is not None:
+            # User provided custom prompt, use it directly
+            executor_prompt = self.prompt
+        else:
+            # Use PromptBuilder to generate CrewAI-style prompt
+            prompt_builder = PromptBuilder()
+            prompt_messages = prompt_builder.format_prompt(
+                agent=self, task=task_spec, context=state.get("context") if state else None
+            )
+            executor_prompt = prompt_messages[0]  # SystemMessage
 
         self.executor = ExecutorFactory.create_executor(
             executor_type=self.executor_type,
             llm=self.llm,
             task_spec=task_spec,
             tools=self.tools,
-            prompt=initial_prompt,  # Use generated prompt instead of self.prompt
+            prompt=executor_prompt,  # Use the decided prompt
             checkpointer=self.checkpointer,
             store=self.store,
             pre_model_hook=self.pre_model_hook,
@@ -395,23 +410,21 @@ class Agent:
     def _prepare_executor_input(
         self, input: dict[str, Any] | None, task=None
     ) -> dict[str, Any] | None:
-        """Prepare executor input by building and handling prompt messages.
+        """Prepare executor input by building and handling user messages.
 
         Logic flow:
         1. Get task_spec from executor or create default
         2. Ensure input is a dictionary (create empty dict if None)
-        3. Build prompt messages using PromptBuilder with context
-        4. Handle messages based on input state:
-           - No input/messages: use HumanMessage from prompt
-           - Has messages with HumanMessage at end: keep existing messages
-           - Has messages without HumanMessage at end: append HumanMessage with task
+        3. Based on prompt mode:
+           - Native prompt: Create minimal HumanMessage with task details
+           - CrewAI mode: Use PromptBuilder to generate HumanMessage content
 
         Args:
             input: Input dictionary for execution (CrewState or other)
             task: Optional Task instance for task-specific processing
 
         Returns:
-            Modified input dictionary with prompt messages applied
+            Modified input dictionary with appropriate user messages
 
         Raises:
             ValueError: If task_spec is not found in executor
@@ -428,26 +441,47 @@ class Agent:
         if input is None:
             input = {}
 
-        # Extract context from input (may come from Task)
-        context = input.get("context", "")
-
-        # Build prompt messages
-        prompt_builder = PromptBuilder()
-        prompt_messages = prompt_builder.format_prompt(
-            agent=self, task=task_spec, context=context
-        )
-
-        # Handle messages based on input state
-        if "messages" not in input or not input["messages"]:
-            # No messages or empty list - use HumanMessage from prompt
-            input["messages"] = [prompt_messages[1]]
+        if self.prompt is not None:
+            # Native prompt mode: minimal framework intervention
+            # Only ensure messages exist, let LangGraph's prompt mechanism handle the rest
+            
+            # Build task message once
+            task_message = task_spec.description
+            if task_spec.expected_output:
+                task_message += f"\n\nExpected Output: {task_spec.expected_output}"
+            context = input.get("context", "")
+            if context:
+                task_message += f"\n\nContext: {context}"
+            
+            if "messages" not in input or not input["messages"]:
+                # Create new messages list with task message
+                input["messages"] = [HumanMessage(content=task_message)]
+            else:
+                # Messages exist - check if we need to add task as HumanMessage
+                last_message = input["messages"][-1]
+                if not isinstance(last_message, HumanMessage):
+                    # Last message is not HumanMessage - add task as HumanMessage
+                    input["messages"].append(HumanMessage(content=task_message))
+            # Don't do additional processing, let user's prompt fully control behavior
         else:
-            # Messages exist - check the last message type
-            last_message = input["messages"][-1]
+            # CrewAI mode: use PromptBuilder to build complete messages
+            context = input.get("context", "")
+            prompt_builder = PromptBuilder()
+            prompt_messages = prompt_builder.format_prompt(
+                agent=self, task=task_spec, context=context
+            )
 
-            if not isinstance(last_message, HumanMessage):
-                # Last message is not HumanMessage - we need to add task as HumanMessage
-                input["messages"].append(prompt_messages[1])
+            # Handle messages based on input state
+            if "messages" not in input or not input["messages"]:
+                # No messages or empty list - use HumanMessage from prompt
+                input["messages"] = [prompt_messages[1]]
+            else:
+                # Messages exist - check the last message type
+                last_message = input["messages"][-1]
+
+                if not isinstance(last_message, HumanMessage):
+                    # Last message is not HumanMessage - we need to add task as HumanMessage
+                    input["messages"].append(prompt_messages[1])
 
         return input
 

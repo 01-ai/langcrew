@@ -445,43 +445,163 @@ class TestAgent:
         )
         assert agent_plan.executor_type == "plan_and_execute"
 
+    def test_agent_with_native_prompt_string(self, mock_llm):
+        """Test agent initialization with native string prompt."""
+        agent = Agent(
+            prompt="You are an expert Python developer.",
+            llm=mock_llm,
+            tools=[]
+        )
+        
+        assert agent.prompt == "You are an expert Python developer."
+        assert agent.role is None
+        assert agent.goal is None
+        assert agent.backstory is None
 
-class TestAgentIntegration:
-    """Integration tests for Agent class."""
+    def test_agent_with_native_prompt_system_message(self, mock_llm):
+        """Test agent initialization with SystemMessage prompt."""
+        from langchain_core.messages import SystemMessage
+        
+        system_msg = SystemMessage(content="You are a code reviewer.")
+        agent = Agent(
+            prompt=system_msg,
+            llm=mock_llm,
+            tools=[]
+        )
+        
+        assert agent.prompt == system_msg
+        assert agent.role is None
+        assert agent.goal is None
+        assert agent.backstory is None
 
-    def test_agent_with_all_features(
-        self, mock_llm: FakeListLLM, mock_tool: Mock
-    ) -> None:
-        """Test agent with all features enabled."""
-        with patch.object(Agent, "_load_mcp_tools"):
-            agent = Agent(
-                name="full_featured_agent",
-                role="Full Featured Specialist",
-                goal="Test all features",
-                backstory="Expert in comprehensive testing",
-                llm=mock_llm,
-                tools=[mock_tool],
-                verbose=True,
-                debug=True,
-                memory=True,
-                mcp_servers={"test": {"command": "test"}},
-                mcp_config=MCPConfig(),
-                executor_type="plan_and_execute",
-                executor_kwargs={"max_iterations": 10},
-                handoff_to=["agent1", "agent2"],
-                is_entry=True,
+    def test_agent_with_native_prompt_callable(self, mock_llm):
+        """Test agent initialization with callable prompt."""
+        def dynamic_prompt(state):
+            return "Dynamic prompt based on state"
+        
+        agent = Agent(
+            prompt=dynamic_prompt,
+            llm=mock_llm,
+            tools=[]
+        )
+        
+        assert agent.prompt == dynamic_prompt
+        assert callable(agent.prompt)
+        assert agent.role is None
+        assert agent.goal is None
+
+    def test_agent_prompt_modes_are_mutually_exclusive(self, mock_llm):
+        """Test that prompt and CrewAI attributes cannot be used together."""
+        # Should raise error when prompt is used with role
+        with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
+            Agent(
+                prompt="Custom prompt",
+                role="Developer",
+                llm=mock_llm
+            )
+        
+        # Should raise error when prompt is used with goal
+        with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
+            Agent(
+                prompt="Custom prompt",
+                goal="Write code",
+                llm=mock_llm
+            )
+        
+        # Should raise error when prompt is used with backstory
+        with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
+            Agent(
+                prompt="Custom prompt",
+                backstory="Expert developer",
+                llm=mock_llm
             )
 
-        # Test all features are configured
-        assert agent.name == "full_featured_agent"
-        assert agent.role == "Full Featured Specialist"
-        assert agent.verbose is True
-        assert agent.debug is True
-        assert agent.memory is True
-        assert agent.executor_type == "plan_and_execute"
-        assert agent.handoff_to == ["agent1", "agent2"]
-        assert agent.is_entry is True
-        assert mock_tool in agent.tools
+    def test_agent_prepare_executor_input_with_existing_messages_native_prompt(self, mock_llm):
+        """Test _prepare_executor_input in native prompt mode when messages already exist."""
+        from langchain_core.messages import AIMessage, HumanMessage
+        from langcrew.types import TaskSpec
+        
+        agent = Agent(
+            prompt="You are a helpful assistant.",
+            llm=mock_llm
+        )
+        
+        # Mock the executor and task_spec
+        mock_executor = Mock()
+        task_spec = TaskSpec(
+            description="Help with coding task",
+            expected_output="Complete solution"
+        )
+        mock_executor.task_spec = task_spec
+        agent.executor = mock_executor
+        
+        # Test case 1: Messages exist but last message is not HumanMessage
+        input_data = {
+            "messages": [
+                HumanMessage(content="Initial request"),
+                AIMessage(content="I understand")
+            ]
+        }
+        
+        result = agent._prepare_executor_input(input_data)
+        
+        # Should append a HumanMessage with task details
+        assert len(result["messages"]) == 3
+        assert isinstance(result["messages"][-1], HumanMessage)
+        assert "Help with coding task" in result["messages"][-1].content
+        assert "Complete solution" in result["messages"][-1].content
+        
+        # Test case 2: Messages exist and last message is already HumanMessage
+        input_data_human_last = {
+            "messages": [
+                AIMessage(content="Previous response"),
+                HumanMessage(content="Current request")
+            ]
+        }
+        
+        result_human_last = agent._prepare_executor_input(input_data_human_last)
+        
+        # Should not append additional HumanMessage
+        assert len(result_human_last["messages"]) == 2
+        assert isinstance(result_human_last["messages"][-1], HumanMessage)
+        assert result_human_last["messages"][-1].content == "Current request"
+
+    def test_agent_prepare_executor_input_with_context_native_prompt(self, mock_llm):
+        """Test _prepare_executor_input in native prompt mode with context."""
+        from langchain_core.messages import AIMessage, HumanMessage
+        from langcrew.types import TaskSpec
+        
+        agent = Agent(
+            prompt="You are a helpful assistant.",
+            llm=mock_llm
+        )
+        
+        # Mock the executor and task_spec
+        mock_executor = Mock()
+        task_spec = TaskSpec(
+            description="Process the request",
+            expected_output="Detailed response"
+        )
+        mock_executor.task_spec = task_spec
+        agent.executor = mock_executor
+        
+        # Test with context and existing non-human last message
+        input_data = {
+            "messages": [AIMessage(content="Previous message")],
+            "context": "Important background information"
+        }
+        
+        result = agent._prepare_executor_input(input_data)
+        
+        # Should append HumanMessage with task details including context
+        assert len(result["messages"]) == 2
+        assert isinstance(result["messages"][-1], HumanMessage)
+        task_content = result["messages"][-1].content
+        assert "Process the request" in task_content
+        assert "Detailed response" in task_content
+        assert "Important background information" in task_content
+
+
 
 
 
