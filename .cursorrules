@@ -1,0 +1,40 @@
+# Cursor Project Rules
+
+## Commit Message Rules
+
+- Always write commit messages in English
+- Use conventional commit format: `<type>(<scope>): <description>`
+- Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert
+- Keep commit messages concise and descriptive
+- Use imperative mood ("add" not "added")
+
+## Code Style Rules
+
+- Follow existing code style and patterns
+- Use TypeScript for type safety
+- Prefer functional components with hooks
+- Use meaningful variable and function names
+- Add comments for complex logic
+
+## File Organization
+
+- Keep related files together
+- Use consistent file naming conventions
+- Group imports logically (React, third-party, local)
+- Maintain clear component hierarchy
+
+## Best Practices
+
+- Write self-documenting code
+- Avoid magic numbers and strings
+- Handle errors gracefully
+- Test critical functionality
+- Keep functions small and focused
+
+## Language Preferences
+
+- Code comments: English
+- Variable names: English
+- Function names: English
+- File names: English
+- Documentation: English
