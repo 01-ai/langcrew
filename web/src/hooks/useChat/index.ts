@@ -4,6 +4,7 @@ import {
   KnowledgeBaseItem,
   MCPToolItem,
   MessageChunk,
+  SessionIdChunk,
   SessionInfo,
   UserInputChunk,
 } from '@/types';
@@ -16,11 +17,11 @@ import { useNavigate } from 'react-router-dom';
 import { useChunksProcessor } from '../useChunksProcessor';
 import { sessionApi } from '@/services/api';
 import { isJsonString } from '@/utils/json';
-import { getCsrfToken } from '@/services/request';
 import { devLog } from '@/utils';
 import { isSandboxToolItem } from '@/components/Agent/Chatbot/Sender/components/ToolItem';
 import eventBus from '@/utils/eventBus';
 import { getLanguage } from '../useTranslation';
+import { message } from 'antd';
 
 export interface SendOptions {
   content: string;
@@ -89,6 +90,8 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
     }
     const data = JSON.parse(chunk) as MessageChunk;
 
+    devLog('handleChunk', data);
+
     // 如果send返回了user消息，说明是add_message的返回，此时需要设置senderLoading为false
     if (data.role === 'user') {
       // 把loading为true的chunk过滤掉
@@ -111,6 +114,27 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
       });
       return;
     }
+    if (data.type === 'session_init') {
+      const {
+        detail: { session_id, title },
+      } = data;
+
+      const finalSessionId = session_id;
+
+      useAgentStore.getState().setSessionInfo({
+        session_id,
+        title,
+      } as any);
+      //   useAgentStore.getState().setChunks([]);
+
+      //   // 设置导航标志，避免触发 loadSessionData
+      useAgentStore.getState().setIsNavigating(true);
+      useAgentStore.getState().setPreviousSessionId(finalSessionId);
+      navigate(`${basePathRef.current}/${agentIdRef.current}/${finalSessionId}`);
+      //   // 立即更新 ref
+      sessionIdRef.current = finalSessionId;
+      return;
+    }
     useAgentStore.getState().addChunk(data);
   }, []);
 
@@ -125,10 +149,10 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
     if (useAgentStore.getState().senderStopping) {
       useAgentStore.getState().setSenderStopping(false);
     }
-    if (chunkTimer.current) {
-      clearTimeout(chunkTimer.current);
-      chunkTimer.current = null;
-    }
+    // if (chunkTimer.current) {
+    //   clearTimeout(chunkTimer.current);
+    //   chunkTimer.current = null;
+    // }
   }, []);
 
   const chunkTimer = useRef(null);
@@ -139,36 +163,36 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
   const handleResponse = useCallback(
     async (response: Response, onTimeout: () => void, onComplete: () => void) => {
       // 如果send，不计时（因为没chunk，没法send-continue），如果是send-continue，则计时
-      if (useAgentStore.getState().chunks.length > 1) {
-        if (chunkTimer.current) {
-          clearTimeout(chunkTimer.current);
-          chunkTimer.current = null;
-        }
-        chunkTimer.current = setTimeout(() => {
-          // 如果两个chunk之间的时间超过CHUNK_TIMEOUT，则抛出错误，触发send-continue
-          devLog('Chunk timeout 1');
-          // throw new Error('Chunk timeout');
-          useAgentStore.getState().abortController?.abort();
-          useAgentStore.getState().setSenderSending(false);
-          onTimeout();
-        }, CHUNK_TIMEOUT);
-      }
+      // if (useAgentStore.getState().chunks.length > 1) {
+      //   if (chunkTimer.current) {
+      //     clearTimeout(chunkTimer.current);
+      //     chunkTimer.current = null;
+      //   }
+      //   chunkTimer.current = setTimeout(() => {
+      //     // 如果两个chunk之间的时间超过CHUNK_TIMEOUT，则抛出错误，触发send-continue
+      //     devLog('Chunk timeout 1');
+      //     // throw new Error('Chunk timeout');
+      //     useAgentStore.getState().abortController?.abort();
+      //     useAgentStore.getState().setSenderSending(false);
+      //     onTimeout();
+      //   }, CHUNK_TIMEOUT);
+      // }
 
       for await (const chunk of XStream({
         readableStream: response.body,
       })) {
-        if (chunkTimer.current) {
-          clearTimeout(chunkTimer.current);
-          chunkTimer.current = null;
-        }
-        chunkTimer.current = setTimeout(() => {
-          // 如果两个chunk之间的时间超过CHUNK_TIMEOUT，则抛出错误，触发send-continue
-          devLog('Chunk timeout 2');
-          // throw new Error('Chunk timeout');
-          useAgentStore.getState().abortController?.abort();
-          useAgentStore.getState().setSenderSending(false);
-          onTimeout();
-        }, CHUNK_TIMEOUT);
+        // if (chunkTimer.current) {
+        //   clearTimeout(chunkTimer.current);
+        //   chunkTimer.current = null;
+        // }
+        // chunkTimer.current = setTimeout(() => {
+        //   // 如果两个chunk之间的时间超过CHUNK_TIMEOUT，则抛出错误，触发send-continue
+        //   devLog('Chunk timeout 2');
+        //   // throw new Error('Chunk timeout');
+        //   useAgentStore.getState().abortController?.abort();
+        //   useAgentStore.getState().setSenderSending(false);
+        //   onTimeout();
+        // }, CHUNK_TIMEOUT);
         handleChunk(chunk.data);
       }
       onComplete();
@@ -207,7 +231,6 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
             method: 'POST',
             headers: {
               accept: 'text/event-stream',
-              'csrf-token': getCsrfToken(),
               'Content-Type': 'application/json',
               language: getLanguage(),
             },
@@ -296,50 +319,49 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
 
   const send = useCallback(
     async ({ content, files = [], mcpTools = [], knowledgeBases = [] }: SendOptions) => {
-      let finalSessionId = sessionIdRef.current;
+      // let finalSessionId = sessionIdRef.current;
 
-      if (useAgentStore.getState().senderSending) {
-        useAgentStore.getState().setSenderLoading(true);
-        try {
-          await sessionApi.addNewMessage(sessionIdRef.current, content);
-          useAgentStore.getState().addChunk({
-            id: Date.now().toString(),
-            role: 'user',
-            type: 'text',
-            content,
-            loading: true,
-            timestamp: Date.now(),
-          });
-        } catch (error) {
-          console.error('Failed to add new message:', error);
-        } finally {
-          useAgentStore.getState().setSenderLoading(false);
-        }
-        return;
-      }
+      // if (useAgentStore.getState().senderSending) {
+      //   useAgentStore.getState().setSenderLoading(true);
+      //   try {
+      //     await sessionApi.addNewMessage(sessionIdRef.current, content);
+      //     useAgentStore.getState().addChunk({
+      //       id: Date.now().toString(),
+      //       role: 'user',
+      //       type: 'text',
+      //       content,
+      //       loading: true,
+      //       timestamp: Date.now(),
+      //     });
+      //   } catch (error) {
+      //     console.error('Failed to add new message:', error);
+      //     useAgentStore.getState().setSenderLoading(false);
+      //   }
+      //   return;
+      // }
 
       // 如果sessionId为空，则创建新的sessionId
-      if (!finalSessionId) {
-        const session = await createSession({
-          content,
-          kb_ids: knowledgeBases.map((item) => item.knowledge_id),
-          agent_tool_items: mcpTools.map((item) => ({
-            agent_tool_id: isSandboxToolItem(item) ? item.agent_tool_id : item.id,
-            agent_tool_type: isSandboxToolItem(item) ? item.tool_type : 'MCP',
-          })),
-          super_employee_id: agentIdRef.current === '01' ? '' : agentIdRef.current,
-        });
-        finalSessionId = session.session_id;
-        useAgentStore.getState().setSessionInfo(session);
-        useAgentStore.getState().setChunks([]);
+      // if (!finalSessionId) {
+      //   const session = await createSession({
+      //     content,
+      //     kb_ids: knowledgeBases.map((item) => item.knowledge_id),
+      //     agent_tool_items: mcpTools.map((item) => ({
+      //       agent_tool_id: isSandboxToolItem(item) ? item.agent_tool_id : item.id,
+      //       agent_tool_type: isSandboxToolItem(item) ? item.tool_type : 'MCP',
+      //     })),
+      //     super_employee_id: agentIdRef.current === '01' ? '' : agentIdRef.current,
+      //   });
+      //   finalSessionId = session.session_id;
+      //   useAgentStore.getState().setSessionInfo(session);
+      //   useAgentStore.getState().setChunks([]);
 
-        // 设置导航标志，避免触发 loadSessionData
-        useAgentStore.getState().setIsNavigating(true);
-        useAgentStore.getState().setPreviousSessionId(finalSessionId);
-        navigate(`${basePathRef.current}/${agentIdRef.current}/${finalSessionId}`);
-        // 立即更新 ref
-        sessionIdRef.current = finalSessionId;
-      }
+      //   // 设置导航标志，避免触发 loadSessionData
+      //   useAgentStore.getState().setIsNavigating(true);
+      //   useAgentStore.getState().setPreviousSessionId(finalSessionId);
+      //   navigate(`${basePathRef.current}/${agentIdRef.current}/${finalSessionId}`);
+      //   // 立即更新 ref
+      //   sessionIdRef.current = finalSessionId;
+      // }
 
       useAgentStore.getState().setSenderLoading(true);
 
@@ -379,34 +401,30 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
         const abortController = new AbortController();
         useAgentStore.getState().setAbortController(abortController);
         useAgentStore.getState().setSenderSending(true);
-        const response = await fetch(
-          `${useAgentStore.getState().requestPrefix}/api/v1/sessions/${finalSessionId}/send`,
-          {
-            headers: {
-              accept: 'text/event-stream',
-              'csrf-token': getCsrfToken(),
-              'Content-Type': 'application/json',
-              language: getLanguage(),
-            },
-            body: JSON.stringify({
-              content,
-              files,
-              mock: false,
-              // 如果userInputChunk存在，则把userInputChunk的detail.interrupt_data赋值给body
-              ...(userInputChunk?.detail?.interrupt_data
-                ? {
-                    interrupt_data: {
-                      ...userInputChunk.detail.interrupt_data,
-                      content: previousMessage?.content,
-                      files: previousMessage?.detail?.attachments || previousMessage?.detail?.files,
-                    },
-                  }
-                : {}),
-            }),
-            method: 'POST',
-            signal: abortController.signal,
+        const response = await fetch(`${useAgentStore.getState().requestPrefix}/api/v1/chat`, {
+          headers: {
+            accept: 'text/event-stream',
+            'Content-Type': 'application/json',
+            language: getLanguage(),
           },
-        );
+          body: JSON.stringify({
+            session_id: sessionIdRef.current,
+            message: content,
+            files,
+            // 如果userInputChunk存在，则把userInputChunk的detail.interrupt_data赋值给body
+            ...(userInputChunk?.detail?.interrupt_data
+              ? {
+                  interrupt_data: {
+                    ...userInputChunk.detail.interrupt_data,
+                    content: previousMessage?.content,
+                    files: previousMessage?.detail?.attachments || previousMessage?.detail?.files,
+                  },
+                }
+              : {}),
+          }),
+          method: 'POST',
+          signal: abortController.signal,
+        });
         useAgentStore.getState().setSenderLoading(false);
 
         if (!response.ok) {
@@ -420,7 +438,7 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
         }
         // removeFakeChunks();
 
-        handleResponse(response, () => sendContinue(0), onSendComplete);
+        handleResponse(response, () => {}, onSendComplete);
       } catch (error) {
         useAgentStore.getState().setSenderLoading(false);
         // 如果是 AbortError，说明用户主动中断了请求，不需要显示错误
@@ -431,16 +449,19 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
 
         console.error('Send error:', error);
 
-        if (chunkTimer.current) {
-          clearTimeout(chunkTimer.current);
-          chunkTimer.current = null;
-        }
-        chunkTimer.current = setTimeout(() => {
-          sendContinue(0);
-        }, RETRY_DELAY);
+        message.error(error.message);
+        onSendComplete();
+
+        // if (chunkTimer.current) {
+        //   clearTimeout(chunkTimer.current);
+        //   chunkTimer.current = null;
+        // }
+        // chunkTimer.current = setTimeout(() => {
+        //   sendContinue(0);
+        // }, RETRY_DELAY);
       }
     },
-    [handleResponse, navigate, onSendComplete, sendContinue],
+    [handleResponse, onSendComplete],
   );
 
   const stop = useCallback(() => {
@@ -457,15 +478,15 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
     sessionIdRef.current = sessionId;
   }, [basePath, agentId, sessionId]);
 
-  useEffect(() => {
-    return () => {
-      if (chunkTimer.current) {
-        devLog('clear chunkTimer');
-        clearTimeout(chunkTimer.current);
-        chunkTimer.current = null;
-      }
-    };
-  }, []);
+  // useEffect(() => {
+  //   return () => {
+  //     if (chunkTimer.current) {
+  //       devLog('clear chunkTimer');
+  //       clearTimeout(chunkTimer.current);
+  //       chunkTimer.current = null;
+  //     }
+  //   };
+  // }, []);
 
   useEffect(() => {
     const handleUserInputClick = (option: string) => {
@@ -496,7 +517,7 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
     if (sessionId) {
       devLog('加载 session 数据', sessionId);
       // 加载 session 数据
-      loadSessionData(sessionId);
+      // loadSessionData(sessionId);
     } else {
       devLog('没有sessionId, reset store');
       useAgentStore.getState().resetStore();

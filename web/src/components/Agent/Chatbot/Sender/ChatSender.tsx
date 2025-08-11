@@ -284,43 +284,8 @@ const SenderContainer: React.FC = () => {
           const { SendButton } = components;
           return (
             <Flex justify="space-between" align="center">
-              <Flex gap={12} align="center">
-                <Badge dot={senderFiles?.length > 0 && !headerOpen}>
-                  <FileUpload
-                    disabled={!sessionActive}
-                    onStart={handleFileStartUpload}
-                    onFinish={handleFileFinishUpload}
-                  />
-                </Badge>
-                {!!senderKnowledgeBases?.length && (
-                  <>
-                    {renderToolButton({
-                      selectedItems: selectedSenderKnowledgeBases,
-                      iconType: 'database',
-                      onClick: () => setKnowledgeBaseOpen(true),
-                    })}
-                    {knowledgeBaseOpen && <KnowledgeBaseModal onClose={() => setKnowledgeBaseOpen(false)} />}
-                  </>
-                )}
-                {!!senderMCPTools?.length && (
-                  <>
-                    {renderToolButton({
-                      selectedItems: selectedSenderMCPTools,
-                      iconType: 'mcp',
-                      onClick: () => setMcpToolOpen(true),
-                    })}
-                    {mcpToolOpen && <MCPToolModal onClose={() => setMcpToolOpen(false)} />}
-                  </>
-                )}
-                {senderContent.length > 500 && (
-                  <div className="text-[12px] text-[#999] leading-[12px] flex items-center">
-                    <div className={senderContent.length > MAX_CONTENT_LENGTH ? 'text-[#f5222d]' : ''}>
-                      {senderContent.length}
-                    </div>
-                    /{MAX_CONTENT_LENGTH}
-                  </div>
-                )}
-              </Flex>
+              <div>
+              </div>
               <Flex align="center" gap={12}>
                 {senderSending ? (
                   <Tooltip title="Stop">

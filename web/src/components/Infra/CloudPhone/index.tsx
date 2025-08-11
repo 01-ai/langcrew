@@ -2,14 +2,9 @@ import { CustomIcon } from '@/components/Agent/Chatbot/Sender/components';
 import { message, Spin } from 'antd';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { isFunction, set } from 'lodash-es';
-// import { getPhoneAkSk } from '@/components/Console/Popai/services';
-import axios from 'axios';
 import phoneBgTopUrl from '@/assets/svg/phone-bg-top.svg';
 import phoneBgBottomUrl from '@/assets/svg/phone-bg-bottom.svg';
 import phoneHighlightUrl from '@/assets/png/phone-highlight.png';
-import { getLanguage } from '@/hooks/useTranslation';
-import { getCsrfToken } from '@/services/request';
-import { devLog } from '@/utils';
 
 // 动态加载 NzCp SDK
 const loadNzCpSDK = (): Promise<void> => {
@@ -50,21 +45,6 @@ const loadNzCpSDK = (): Promise<void> => {
     document.head.appendChild(script);
   });
 };
-
-// 获取云手机 ak sk
-async function getPhoneAkSk() {
-  const result = await axios.post(
-    '/popai/api/v1/instance/security-token',
-    {},
-    {
-      headers: {
-        'Csrf-Token': getCsrfToken(),
-        language: getLanguage(),
-      },
-    },
-  );
-  return result.data;
-}
 
 interface CloudPhoneProps {
   disabled?: boolean;

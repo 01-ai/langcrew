@@ -57,7 +57,9 @@ export const sessionApi = {
   },
 
   stopTask: (sessionId: string): Promise<any> => {
-    return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/sessions/${sessionId}/stop`, {});
+    return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/chat/stop`, {
+      session_id: sessionId,
+    });
   },
 
   addNewMessage: (sessionId: string, message: string): Promise<any> => {

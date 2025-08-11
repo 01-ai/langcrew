@@ -1,26 +1,26 @@
 # LangCrew UI
+
 ## Author: Wang Zihao, Sheng Qing, Liu Shaoming, Chang Chunxing
 
-
 ## Technique Stack:
-### React 19 + Antd + Antd X + Zustand + Rspack + Tailwind CSS + Pnpm
 
+### React 19 + Antd + Antd X + Zustand + Rspack + Tailwind CSS + Pnpm
 
 ## Local Development:
 
-### Install Dependencies:  pnpm install
+### Install Dependencies: pnpm install
 
-### Start Dev Server:  pnpm dev
-
+### Start Dev Server: pnpm dev
 
 ## Project Usage:
 
-### Install Dependencies:  pnpm add @langcrew-ui
+### Install Dependencies: pnpm add @langcrew-ui
 
 ### Import AgentX Component:
 
 import AgentX from @langcrew-ui
 
+```tsx
 <AgentX
   agentId=""
   sessionId=""
@@ -41,8 +41,10 @@ import AgentX from @langcrew-ui
   language=""
   senderContent=""
 />
+```
 
-* agentId is mandatory and should be obtained from Langcrew backend.
+- agentId is mandatory and should be obtained from Langcrew backend.
 
 ### For More Details, Please Refer to the Documentation:
+
 https://01ai.feishu.cn/docx/LgcTdJtt5osqXYxyXQjczrw6nZd

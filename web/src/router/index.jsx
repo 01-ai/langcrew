@@ -36,8 +36,8 @@ const AppRouter = () => {
     },
     {
       path: '404',
-      element: Fallback,
-      errorElement: Fallback,
+      element: <div>404</div>,
+      errorElement: <div>404</div>,
     },
     {
       path: '*',

@@ -3,9 +3,9 @@ import Agent from '@/components/Agent';
 import Home from '@/components/Home';
 import { useAgentStore } from '@/store';
 import { KnowledgeBaseItem, MCPToolItem, AgentMode } from '@/types';
-import { EmployeeType } from '@/components/Home/mock';
+
 import '@/registry/builtin';
-import { senderMCPTools, senderKnowledgeBases, senderSandboxTools } from './mock';
+
 
 interface AgentProps {
   basePath?: string;
@@ -20,7 +20,7 @@ interface AgentProps {
 }
 
 const Chat = (props: AgentProps) => {
-  const [currentAgent, setCurrentAgent] = useState<EmployeeType | null>(null);
+
   const { basePath = '/chat', headerNode, footerNode, knowledgeBases, mcpTools, extraHeaders, requestPrefix } = props;
 
   const idInfo = {};
@@ -71,16 +71,6 @@ const Chat = (props: AgentProps) => {
       setMode(AgentMode.Replay);
     } else {
       setMode(AgentMode.Chatbot);
-    }
-
-    setSenderKnowledgeBases(senderKnowledgeBases);
-    if (senderKnowledgeBases?.length > 0) {
-      setSelectedSenderKnowledgeBases([]);
-    }
-    setSenderMCPTools(senderMCPTools);
-    setSenderSandboxTools(senderSandboxTools as MCPToolItem[]);
-    if (senderSandboxTools?.length > 0) {
-      setSelectedSenderMCPTools(senderSandboxTools.filter((item) => item.status === 'ACTIVE') as MCPToolItem[]);
     }
   }, []);
 

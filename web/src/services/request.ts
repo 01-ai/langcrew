@@ -25,30 +25,10 @@ const request: AxiosInstance = axios.create({
   withCredentials: true, // 携带 cookies
 });
 
-export const getCsrfToken = () => {
-  let csrfToken = localStorage.getItem('token');
-  if (process.env.NODE_ENV === 'development' && !csrfToken) {
-    csrfToken =
-      'SgCNtfs8LyKOHE7kmkss/yJyAbiEFZLZbBBwT5CQY6dPGxJBD/vzsZAtoUwopcL/z9YOETzDMtBqgFxaJGvIY9z8hdDJC2ziWlgdSBrflEUlxblFT/bCAaPhJDcCJTYyEsaqmdHqj3qj8SqB1AaKLKz37PNX3q/kSmnLsXZIXIWXdH8EOsbcScVnstyemNqa+5VjYSuL77CU1Q==';
-    csrfToken =
-      'SYogKxYWFE7k3ycmOBypzLHA0gIbFvyC97RnY1ZsSU9/0re7w+7fMebOWAHeNx3PSL0oJNO5plkKFM1PyR8otF1Dyo19CAlCAUCgPfSDdsc2nFkGMFx6QKxu/G48NSJDXzX2AjXcP1SHiPUyLJgt9Ais9Sr1nEi1Hf8cdJUEobzpg1BuBAj78A16KsRP3Nx4kIYAAvVxuBEGM54KLSCpxFusJIDVfZ8oJKEKx5jOUZhK0/wYOFG7mniVZGwouT4ylcXUNY4YgLLYa+zvkjzMYKT9OYlE5swwuHg=';
-  }
-  return csrfToken;
-};
-
 // 请求拦截器
 request.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 添加 CSRF token
-    let csrfToken = localStorage.getItem('token');
-
-    if (process.env.NODE_ENV === 'development' && !csrfToken) {
-      csrfToken =
-        'SYogKxYWFE7k3ycmOBypzLHA0gIbFvyC97RnY1ZsSU9/0re7w+7fMebOWAHeNx3PSL0oJNO5plkKFM1PyR8otF1Dyo19CAlCAUCgPfSDdsc2nFkGMFx6QKxu/G48NSJDXzX2AjXcP1SHiPUyLJgt9Ais9Sr1nEi1Hf8cdJUEobzpg1BuBAj78A16KsRP3Nx4kIYAAvVxuBEGM54KLSCpxFusJIDVfZ8oJKEKx5jOUZhK0/wYOFG7mniVZGwouT4ylcXUNY4YgLLYa+zvkjzMYKT9OYlE5swwuHg=';
-    }
-
     // 设置 headers
-    config.headers.set('csrf-token', csrfToken);
     config.headers.set('language', getLanguage());
 
     return config;
