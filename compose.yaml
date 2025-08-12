@@ -1,0 +1,17 @@
+services:
+  web_chat:
+    build:
+      context: .
+      dockerfile: examples/components/web/web_chat/Dockerfile
+    # platform: linux/amd64  # Uncomment if you need to force amd64 on Apple Silicon (not recommended unless necessary)
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - PORT=${PORT:-8000}
+      - MODE=${MODE:-full}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    restart: unless-stopped
+

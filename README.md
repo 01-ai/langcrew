@@ -66,3 +66,110 @@ To get started with LangCrew for local development, you can use the provided `do
 - If you encounter port conflicts, check the `docker-compose.yml` file and modify ports as needed
 - Ensure Docker has sufficient resources allocated (recommended: 4GB RAM, 2 CPU cores)
 - For persistent data, the setup includes volume mounts for databases and application data
+
+
+## Getting Started
+
+### Getting Started With Docker Compose (One‑Command)
+
+Use `compose.yaml` for a more portable, one‑command startup across platforms.
+
+```bash
+# From the repository root
+export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
+# Optional overrides
+export PORT=8000
+export MODE=full      # or simple
+export LOG_LEVEL=info # debug|info|warning|error
+
+docker compose up --build
+```
+
+Then open:
+
+- API Docs: http://localhost:${PORT:-8000}/docs
+- Chat Endpoint: POST http://localhost:${PORT:-8000}/api/v1/chat
+- Health: http://localhost:${PORT:-8000}/api/v1/health
+
+Notes:
+- On Apple Silicon (arm64), if you need to force amd64 images for compatibility, uncomment the `platform: linux/amd64` line in `compose.yaml`. This may reduce performance.
+- To run detached: `docker compose up -d --build`
+- To stop: `docker compose down`
+
+### Getting Started With Code
+
+#### 1. Install uv (if not installed)
+```bash
+# Option 1: Official installer (recommended)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Option 2: Using pip
+pip install uv
+```
+
+#### 2. Configure API Key
+```bash
+cd examples/components/web/web_chat
+cp .env.example .env
+# Edit .env file and add your API key (choose one):
+# OPENAI_API_KEY=your-openai-api-key
+# ANTHROPIC_API_KEY=your-anthropic-api-key  
+# DASHSCOPE_API_KEY=your-dashscope-api-key
+```
+
+#### 3. Run the Server
+```bash
+uv run run_server.py
+```
+
+The server will start on `http://localhost:8000`
+
+#### API Endpoints
+
+- **API Documentation**: `http://localhost:8000/docs`
+- **Chat Endpoint**: `POST http://localhost:8000/api/v1/chat`
+- **Health Check**: `GET http://localhost:8000/api/v1/health`
+
+#### Options
+
+```bash
+# Simple mode (basic features only)
+uv run run_server.py --mode simple
+
+# Custom port
+uv run run_server.py --port 9000
+
+# Debug mode
+uv run run_server.py --log-level debug
+```
+
+#### Troubleshooting
+
+**"No API keys found"** - Make sure you've configured at least one API key in the `.env` file.
+
+**"uv: command not found"** - Install uv using one of the commands in step 1.
+
+### Usage
+
+Send a POST request to `/api/v1/chat`:
+
+```json
+{
+  "message": "What's the weather like in New York?",
+  "thread_id": "optional-thread-id"
+}
+```
+
+### Available Tools
+
+- **Calculator**: Mathematical calculations
+- **Web Search**: Current information search
+- **Weather**: Weather information for any city
+- **Timezone**: Time and timezone information
+
+### Model Selection
+
+The system automatically selects the best available model:
+1. **OpenAI** - `gpt-4o-mini` (recommended)
+2. **Anthropic** - `claude-3-haiku-20240307`
+3. **DashScope** - `qwen-plus` 
