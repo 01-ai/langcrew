@@ -32,7 +32,7 @@ jobs:
               - 'libs/langcrew-tools/**'
             deps:
               - '**/pyproject.toml'
-            - '**/uv.lock'
+              - '**/uv.lock'
   lint:
     needs: changes
     name: cd ${{ matrix.working-directory }}
