@@ -7,7 +7,11 @@ import { Code, Markdown } from '@/components/Infra';
 const DefaultDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
   const { content, contentType } = useToolContent(message as MessageToolChunk);
   if (contentType === 'text/markdown' || contentType === 'markdown') {
-    return <Markdown content={content} />;
+    return (
+      <div className="w-full h-full overflow-y-auto p-2">
+        <Markdown content={content} />
+      </div>
+    );
   }
   return <Code code={content} isDiff={false} />;
 };

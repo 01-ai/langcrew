@@ -1,11 +1,20 @@
 import { MessageToolChunk } from '@/types';
+import { isJsonString } from '@/utils/json';
 
 const useToolContent = (message: MessageToolChunk) => {
   const content = message.detail?.result?.content || '';
-  const contentType = message.detail?.result?.content_type || '';
+  if (isJsonString(content)) {
+    const json = JSON.parse(content);
+    if (json.content && json.content_type) {
+      return {
+        content: json.content,
+        contentType: json.content_type,
+      };
+    }
+  }
   return {
     content,
-    contentType,
+    contentType: '',
   };
 };
 
