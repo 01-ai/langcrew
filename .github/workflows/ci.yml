@@ -9,6 +9,7 @@ on:
       - main
 
 permissions:
+  pull-requests: read
   contents: read
 
 concurrency:
