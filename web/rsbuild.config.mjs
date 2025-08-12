@@ -7,6 +7,8 @@ import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
 
+  const AGENT_API_HOST = process.env.AGENT_API_HOST || env.parsed.AGENT_API_HOST;
+
   return {
     plugins: [
       pluginReact(),
@@ -39,11 +41,11 @@ export default defineConfig(({ mode }) => {
       port: 3600,
       proxy: {
         '/api/': {
-          target: env.parsed.AGENT_API_HOST,
+          target: AGENT_API_HOST,
           changeOrigin: true,
         },
         '/popai': {
-          target: env.parsed.AGENT_API_HOST,
+          target: AGENT_API_HOST,
           changeOrigin: true,
         },
       },

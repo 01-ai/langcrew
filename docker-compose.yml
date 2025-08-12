@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  # langcrew frontend
+  frontend:
+    image: node:18-alpine
+    ports:
+      - "3600:3600"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.pnpm-store
+    working_dir: /app
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - AGENT_API_HOST=http://backend:8000
+    command: >
+      sh -c "
+        npm install -g pnpm &&
+        pnpm install &&
+        pnpm dev
+      "
+    networks:
+      - langcrew-network
+    depends_on:
+      - backend
+
+  # langcrew backend
+  backend:
+    image: python:3.11-slim
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./examples/components/web/web_chat:/app/examples/components/web/web_chat
+      - ./libs:/app/libs
+    working_dir: /app/examples/components/web/web_chat
+    environment:
+      - PYTHONPATH=/app:/app/libs
+    command: >
+      sh -c "
+        pip install uv &&
+        uv run run_server.py
+      "
+    networks:
+      - langcrew-network
+
+networks:
+  langcrew-network:
+    driver: bridge
+
+volumes:
+  node_modules:
+  pnpm_store:

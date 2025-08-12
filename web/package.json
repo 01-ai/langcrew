@@ -14,7 +14,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "rsbuild dev --open",
+    "dev": "rsbuild dev",
     "build": "rsbuild build",
     "preview": "rsbuild preview",
     "serve": "serve -s dist -l 8080",

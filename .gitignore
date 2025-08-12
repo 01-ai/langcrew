@@ -35,3 +35,6 @@ examples/**/uv.lock
 libs/crewAI
 libs/langgraph
 libs/langchain
+
+
+web/.pnpm-store
