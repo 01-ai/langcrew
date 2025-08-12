@@ -244,23 +244,11 @@ class Crew:
             )
             return (state, config)
 
-        def process_agent_result(
-            state: CrewState, result: dict[str, Any], agent: Agent
-        ) -> dict[str, Any]:
-            """Process agent execution result"""
-            continue_execution = True
-            if agent.exit_condition:
-                should_exit = agent.exit_condition(state, result)
-                continue_execution = not should_exit
-
-            result["_continue_execution"] = continue_execution
-            return result
-
         return self._create_generic_node_factory(
             is_async=is_async,
             item_type="agent",
             get_invoke_args_fn=get_agent_invoke_args,
-            process_result_fn=process_agent_result,
+            process_result_fn=None,
         )
 
     def _build_agent_sequential_graph(
