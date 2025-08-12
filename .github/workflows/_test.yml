@@ -1,0 +1,54 @@
+name: test
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: true
+        type: string
+        description: "From which folder this pipeline executes"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+
+    name: "test #${{ matrix.python-version }}"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-suffix: test-${{ inputs.working-directory }}
+
+      - name: Install dependencies
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: uv sync --all-extras --frozen --group dev
+
+      - name: Run tests
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: PYTHONPATH=src uv run pytest -m "not slow" --maxfail=5 
+
+      - name: Ensure the tests did not create any additional files
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          set -eu
+
+          STATUS="$(git status)"
+          echo "$STATUS"
+
+          # grep will exit non-zero if the target message isn't found,
+          # and `set -e` above will cause the step to fail.
+          echo "$STATUS" | grep 'nothing to commit, working tree clean'

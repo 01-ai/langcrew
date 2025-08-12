@@ -14,8 +14,6 @@ from .langchain_tools import (
     WatchDirectoryInput,
     WriteFileInput,
     WriteFileTool,
-    WriteMultipleFilesInput,
-    WriteMultipleFilesTool,
 )
 
 # Export simple class-based interface
@@ -25,7 +23,6 @@ from .langchain_tools import (
 __all__ = [
     # LangChain tools
     "WriteFileTool",
-    "WriteMultipleFilesTool",
     "ReadFileTool",
     "ListFilesTool",
     "DeleteFileTool",
@@ -34,7 +31,6 @@ __all__ = [
     "RenameFileTool",
     # Input schemas
     "WriteFileInput",
-    "WriteMultipleFilesInput",
     "ReadFileInput",
     "ListFilesInput",
     "DeleteFileInput",

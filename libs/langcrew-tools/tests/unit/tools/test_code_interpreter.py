@@ -1,5 +1,7 @@
 """Tests for the code interpreter tool."""
 
+import base64
+import re
 from textwrap import dedent
 
 import pytest
@@ -7,9 +9,78 @@ import pytest
 from langcrew_tools.code_interpreter import CodeInterpreterTool
 
 
+def _decode_code_from_command(command: str) -> str:
+    match = re.search(r"base64\.b64decode\('([^']+)'\)", command)
+    if not match:
+        return ""
+    encoded = match.group(1)
+    try:
+        return base64.b64decode(encoded).decode()
+    except Exception:
+        return ""
+
+
+class _MockResult:
+    def __init__(self, stdout: str = "", stderr: str = "", exit_code: int = 0):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.exit_code = exit_code
+
+
+class _MockCommands:
+    async def run(self, command: str, timeout: int | None = None, **_: object):
+        code = _decode_code_from_command(command)
+
+        # Simulated behaviors based on input code
+        if "print('Hello, World!')" in code:
+            return _MockResult(stdout="Hello, World!\n")
+        if "print(2 + 2)" in code:
+            return _MockResult(stdout="4\n")
+        if "x = 10" in code and "y = 20" in code and "Sum:" in code:
+            return _MockResult(stdout="Sum: 30\n")
+        if "print('unclosed string" in code:
+            return _MockResult(
+                stderr="SyntaxError: EOL while scanning string literal",
+                exit_code=1,
+            )
+        if "1 / 0" in code:
+            return _MockResult(
+                stderr="ZeroDivisionError: division by zero",
+                exit_code=1,
+            )
+        if "undefined_variable" in code:
+            return _MockResult(
+                stderr=("NameError: name 'undefined_variable' is not defined"),
+                exit_code=1,
+            )
+        if "import math" in code and "sqrt(16)" in code:
+            return _MockResult(stdout="Pi: 3.1416\nSquare root of 16: 4.0\n")
+        if "import datetime" in code and "now =" in code:
+            return _MockResult(stdout="Current year: 2025\n")
+        if "import json" in code and 'data = {"name": "test", "value": 123}' in code:
+            return _MockResult(stdout='{"name": "test", "value": 123}\n')
+        if "while True:" in code and timeout is not None and timeout <= 1:
+            return _MockResult(stderr="timed out", exit_code=1)
+        if "for i in range(1000):" in code and "This is a test line" in code:
+            # Large output to trigger truncation in tool
+            return _MockResult(stdout=("X" * 12000))
+        if "for i in range(3):" in code and "Done" in code:
+            return _MockResult(stdout="Line 0\nLine 1\nLine 2\nDone\n")
+
+        # Default: no output
+        return _MockResult(stdout="")
+
+
 @pytest.fixture
 def sandbox_code_tool() -> CodeInterpreterTool:
-    return CodeInterpreterTool()
+    class _MockSandbox:
+        def __init__(self):
+            self.commands = _MockCommands()
+
+    async def provider():
+        return _MockSandbox()
+
+    return CodeInterpreterTool(sandbox_source=provider)
 
 
 def test_code_interpreter_basic(sandbox_code_tool: CodeInterpreterTool) -> None:

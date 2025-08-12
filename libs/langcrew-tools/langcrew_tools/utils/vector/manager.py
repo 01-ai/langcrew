@@ -12,10 +12,10 @@ from datetime import datetime
 from typing import Any
 
 from langchain_core.documents import Document
-from siliconflow import SiliconFlowClient
 from sqlalchemy import text as sql_text
 
-from .config import EmbeddingResult, VectorConfig, VectorFileMeta, default_config
+from ..siliconflow import SiliconFlowClient
+from .config import EmbeddingResult, VectorConfig, VectorFileMeta
 from .exceptions import VectorError
 
 logger = logging.getLogger(__name__)
@@ -48,8 +48,8 @@ class VectorManager:
             siliconflow_client: SiliconFlow client for embedding generation
         """
 
-        self.config = config or default_config
-        self.siliconflow_client = siliconflow_client
+        self.config = config or VectorConfig()
+        self.siliconflow_client = siliconflow_client or SiliconFlowClient()
         self.session_factory = self.config.create_session_factory()
 
         # Validate configuration

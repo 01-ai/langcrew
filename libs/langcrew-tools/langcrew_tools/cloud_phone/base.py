@@ -1,15 +1,15 @@
 import base64
 import logging
+from typing import Any, Final
 
 from agentbox import Sandbox
 from langchain_core.callbacks.manager import dispatch_custom_event
 from langchain_core.tools import BaseTool
-from langcrew.memory.tool_state import ToolStateManager
-from langcrew.tools.shared_state_manager import SharedStateManager
-from langcrew.utils.config import agentbox_config
-from langcrew.utils.s3.sandbox_integration import SandboxS3Toolkit
 from pydantic import Field
 
+from ..utils.env_config import env_config
+from ..utils.s3 import create_s3_client
+from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 from .actions import enable_a11y, get_clickables, take_screenshot
 
 
@@ -19,11 +19,6 @@ class CloudPhoneBaseTool(BaseTool):
     # adb connection configuration
     session_id: str = Field(..., description="session_id")
     sandbox_id: str | None = Field(None, description="session_id")
-
-    # share state manager
-    tool_state_manager: ToolStateManager | None = Field(
-        None, description="Tool state manager"
-    )
 
     sbx: Sandbox | None = Field(None, description="cloud_phone")
 
@@ -41,18 +36,13 @@ class CloudPhoneBaseTool(BaseTool):
 
     async def _get_cloud_phone(self) -> Sandbox:
         """Get the cloud phone sandbox."""
+        config: Final[dict[str, Any]] = env_config.get_dict("AGENTBOX_")
         if self.sbx:
             return self.sbx
         try:
-            if not self.sandbox_id:
-                self.sandbox_id = (
-                    SharedStateManager.get_instance(self.session_id)
-                    .get_state()
-                    .get("agentbox_id")
-                )
             if self.sandbox_id:
                 self.sbx = Sandbox(
-                    api_key=agentbox_config.api_key, sandbox_id=self.sandbox_id
+                    api_key=config["api_key"], sandbox_id=self.sandbox_id
                 )
                 self.sbx.adb_shell.connect()
                 await enable_a11y(self.sbx)
@@ -63,9 +53,9 @@ class CloudPhoneBaseTool(BaseTool):
         if self.sbx is None:
             try:
                 self.sbx = Sandbox(
-                    api_key=agentbox_config.api_key,
-                    template=agentbox_config.template,
-                    timeout=agentbox_config.timeout,
+                    api_key=config["api_key"],
+                    template=config["template"],
+                    timeout=config["timeout"],
                 )
                 # Connect to ADB and set up the sandbox
                 self.sbx.adb_shell.connect()
@@ -79,11 +69,7 @@ class CloudPhoneBaseTool(BaseTool):
                     },
                     config={"configurable": {"thread_id": self.session_id}},
                 )
-
-                if self.session_id:
-                    SharedStateManager.get_instance(self.session_id).update_state({
-                        "agentbox_id": self.sbx.sandbox_id,
-                    })
+                self.sandbox_id = self.sbx.sandbox_id
                 self.logger.info(f"create agentbox {self.sbx.sandbox_id} success.")
                 return self.sbx
             except Exception as e:
@@ -102,11 +88,9 @@ class CloudPhoneBaseTool(BaseTool):
             image_base_64 = base64.b64encode(image_bytes).decode("utf-8")
             if image_base_64:
                 image_url = await SandboxS3Toolkit.upload_base64_image(
+                    create_s3_client(),
                     base64_data=image_base_64,
                 )
-            SharedStateManager.get_instance(self.session_id).update_state({
-                image_url: image_base_64
-            })
             return {
                 "clickable_elements": clickable_elements,
                 "screenshot_url": image_url,
@@ -114,12 +98,3 @@ class CloudPhoneBaseTool(BaseTool):
         except Exception as e:
             logging.error(f"Error getting current state: {e}")
             return {"error": str(e), "clickable_elements": None, "screenshot_url": None}
-
-    @staticmethod
-    async def disconnect(sandbox_id: str) -> None:
-        try:
-            sbx = Sandbox(api_key=agentbox_config.api_key, sandbox_id=sandbox_id)
-            if sbx.adb_shell:
-                sbx.adb_shell.close()
-        except Exception as e:
-            logging.error(f"Error getting current state: {e}")

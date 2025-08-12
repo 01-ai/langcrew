@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: 
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      deps: ${{ steps.filter.outputs.deps }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'libs/langcrew/**'
+              - 'libs/langcrew-tools/**'
+            deps:
+              - '**/pyproject.toml'
+            - '**/uv.lock'
+  lint:
+    needs: changes
+    name: cd ${{ matrix.working-directory }}
+    strategy:
+      matrix:
+        working-directory:
+          [
+            "libs/langcrew",
+            "libs/langcrew-tools",
+          ]
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.deps == 'true'
+    uses: ./.github/workflows/_lint.yml
+    with:
+      working-directory: ${{ matrix.working-directory }}
+    secrets: inherit
+            
+  test:
+    needs: changes
+    name: cd ${{ matrix.working-directory }}
+    strategy:
+      matrix:
+        working-directory: 
+          [
+            "libs/langcrew",
+            "libs/langcrew-tools",
+          ]
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.deps == 'true'
+    uses: ./.github/workflows/_test.yml
+    with:
+      working-directory: ${{ matrix.working-directory }}
+    secrets: inherit

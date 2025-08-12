@@ -91,7 +91,7 @@ class DocumentParserTool(BaseTool):
             self.s3_client = AsyncS3Client(s3_config)
         else:
             # Default S3 configuration - should be provided via environment or config
-            self.s3_client = ClientFactory.get_default_s3_client()
+            self.s3_client = ClientFactory.create_s3_client()
 
     def _run(self, file_md5: str, file_type: str) -> str:
         """Perform document parsing synchronously."""
@@ -166,7 +166,7 @@ class DocumentParserTool(BaseTool):
         """Store parsed document chunks in pgvector database."""
         try:
             # Import vector manager from toolkit
-            from langcrew.utils.vector import create_vector_manager, vector_available
+            from ..utils.vector import create_vector_manager, vector_available
 
             # Check if vector functionality is available
             if not vector_available:
@@ -757,7 +757,7 @@ class ChunkRetrievalTool(BaseTool):
 
         try:
             # Import vector manager from toolkit
-            from langcrew.utils.vector import create_vector_manager, vector_available
+            from ..utils.vector import create_vector_manager, vector_available
 
             # Check if vector functionality is available
             if not vector_available:

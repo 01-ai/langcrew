@@ -22,7 +22,7 @@ class CodeInterpreterInput(BaseModel):
     )
 
 
-class CodeInterpreterTool(BaseTool):
+class CodeInterpreterTool(BaseTool, SandboxMixin):
     """Tool for executing Python code in a safe e2b sandbox environment."""
 
     name: ClassVar[str] = "python_executor"
@@ -61,8 +61,7 @@ class CodeInterpreterTool(BaseTool):
     async def _arun(self, code: str, timeout: int = 30, brief: str = "") -> str:
         """Asynchronously execute the provided Python code."""
         try:
-            sbx = SandboxMixin()
-            sandbox = await sbx.get_sandbox()
+            sandbox = await self.get_sandbox()
 
             command = self._escape_code_for_shell(code)
 

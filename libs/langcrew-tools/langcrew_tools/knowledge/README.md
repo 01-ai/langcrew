@@ -63,7 +63,7 @@ The `PgVectorSearchTool` provides comprehensive knowledge base search capabiliti
 **Usage Example:**
 ```python
 from langcrew_tools.knowledge import PgVectorSearchTool
-from langcrew.utils.vector import VectorConfig
+from ..utils.vector import VectorConfig
 
 # Using default configuration
 tool = PgVectorSearchTool()

@@ -1,3 +1,4 @@
+import asyncio
 from typing import ClassVar
 
 from langchain_core.tools import BaseTool
@@ -116,7 +117,7 @@ class WriteFileTool(BaseTool, SandboxMixin):
         "Provide the file path and content to write."
     )
 
-    async def _arun(self, path: str, content: str, brief: str = "") -> dict:
+    async def _arun(self, path: str, content: str) -> dict:
         """Write content to a file synchronously."""
         try:
             async_sandbox = await self.get_sandbox()
@@ -129,33 +130,8 @@ class WriteFileTool(BaseTool, SandboxMixin):
         except Exception as e:
             return {"error": f"Failed to write to file: {str(e)}"}
 
-
-class WriteMultipleFilesTool(BaseTool, SandboxMixin):
-    """Tool for writing content to multiple files in the sandbox."""
-
-    name: ClassVar[str] = "write_multiple_files"
-    args_schema: type[BaseModel] = WriteMultipleFilesInput
-    description: ClassVar[str] = (
-        "Write content to multiple files in the sandbox. "
-        "Provide a list of files with 'path' and 'data' keys."
-    )
-
-    async def _arun(self, files: list[dict[str, str]]) -> dict:
-        """Write multiple files asynchronously."""
-        try:
-            async_sandbox = await self.get_sandbox()
-            file_entries = [
-                {"path": file_info["path"], "data": file_info["data"]}
-                for file_info in files
-            ]
-            await async_sandbox.files.write(file_entries)
-            return {
-                "message": f"Successfully wrote {len(files)} files",
-                "old_file_content": "",
-                "new_file_content": "",
-            }
-        except Exception as e:
-            return {"error": f"Failed to write files: {str(e)}"}
+    def _run(self, path: str, content: str) -> dict:
+        return asyncio.run(self._arun(path, content))
 
 
 class ReadFileTool(BaseTool, SandboxMixin):
@@ -167,7 +143,7 @@ class ReadFileTool(BaseTool, SandboxMixin):
         "Read only text content from a file in the sandbox. Provide the file path."
     )
 
-    async def _arun(self, path: str, brief: str = "") -> dict:
+    async def _arun(self, path: str) -> dict:
         """Read file content asynchronously."""
         try:
             async_sandbox = await self.get_sandbox()
@@ -183,6 +159,9 @@ class ReadFileTool(BaseTool, SandboxMixin):
             }
         except Exception as e:
             return {"error": f"Failed to read file: {str(e)}"}
+
+    def _run(self, path: str) -> dict:
+        return asyncio.run(self._arun(path))
 
 
 class ListFilesTool(BaseTool, SandboxMixin):
@@ -205,6 +184,9 @@ class ListFilesTool(BaseTool, SandboxMixin):
         except Exception as e:
             return f"Failed to list files: {str(e)}"
 
+    def _run(self, path: str, depth: int = 1) -> str:
+        return asyncio.run(self._arun(path, depth))
+
 
 class DeleteFileTool(BaseTool, SandboxMixin):
     """Tool for deleting a file or directory in the sandbox."""
@@ -216,7 +198,7 @@ class DeleteFileTool(BaseTool, SandboxMixin):
         "Provide the path to the file or directory to delete."
     )
 
-    async def _arun(self, path: str, brief: str = "") -> str:
+    async def _arun(self, path: str) -> str:
         """Delete file asynchronously."""
         try:
             async_sandbox = await self.get_sandbox()
@@ -224,6 +206,9 @@ class DeleteFileTool(BaseTool, SandboxMixin):
             return f"Successfully deleted: {path}"
         except Exception as e:
             return f"Failed to delete file: {str(e)}"
+
+    def _run(self, path: str) -> str:
+        return asyncio.run(self._arun(path))
 
 
 class FileReplaceTextTool(BaseTool, SandboxMixin):
@@ -236,9 +221,7 @@ class FileReplaceTextTool(BaseTool, SandboxMixin):
         "Provide the absolute path to the file /workspace (e.g.'/workspace/report.txt')"
     )
 
-    async def _arun(
-        self, path: str, old_str: str, new_str: str, brief: str = ""
-    ) -> dict:
+    async def _arun(self, path: str, old_str: str, new_str: str) -> dict:
         """Replace text synchronously."""
         try:
             async_sandbox = await self.get_sandbox()
@@ -260,6 +243,9 @@ class FileReplaceTextTool(BaseTool, SandboxMixin):
         except Exception as e:
             return {"error": f"Failed to replace text in file '{path}': {str(e)}"}
 
+    def _run(self, path: str, old_str: str, new_str: str) -> dict:
+        return asyncio.run(self._arun(path, old_str, new_str))
+
 
 class FileAppendTextTool(BaseTool, SandboxMixin):
     """Tool for appending text content to a file in the sandbox."""
@@ -270,11 +256,8 @@ class FileAppendTextTool(BaseTool, SandboxMixin):
         "Append text to file end. Used for logs, document building, data collection etc."
     )
 
-    async def _arun(
-        self, path: str, content: str, append_newline: bool = True, brief: str = ""
-    ) -> dict:
+    async def _arun(self, path: str, content: str, append_newline: bool = True) -> dict:
         """Append text to file asynchronously."""
-        """Append text to file synchronously."""
         try:
             async_sandbox = await self.get_sandbox()
 
@@ -303,6 +286,10 @@ class FileAppendTextTool(BaseTool, SandboxMixin):
         except Exception as e:
             return {"error": f"Failed to append to file '{path}': {str(e)}"}
 
+    def _run(self, path: str, content: str, append_newline: bool = True) -> dict:
+        """Append text to file synchronously."""
+        return asyncio.run(self._arun(path, content, append_newline))
+
 
 class CreateDirectoryTool(BaseTool, SandboxMixin):
     """Tool for creating a directory in the sandbox."""
@@ -323,6 +310,9 @@ class CreateDirectoryTool(BaseTool, SandboxMixin):
         except Exception as e:
             return f"Failed to create directory: {str(e)}"
 
+    def _run(self, path: str) -> str:
+        return asyncio.run(self._arun(path))
+
 
 class FileExistsTool(BaseTool, SandboxMixin):
     """Tool for checking if a file or directory exists in the sandbox."""
@@ -341,6 +331,9 @@ class FileExistsTool(BaseTool, SandboxMixin):
             return f"Path {path} {'exists' if exists else 'does not exist'}"
         except Exception as e:
             return f"Failed to check path: {str(e)}"
+
+    def _run(self, path: str) -> str:
+        return asyncio.run(self._arun(path))
 
 
 class RenameFileTool(BaseTool, SandboxMixin):
@@ -361,3 +354,6 @@ class RenameFileTool(BaseTool, SandboxMixin):
             return f"Successfully renamed {old_path} to {new_path}"
         except Exception as e:
             return f"Failed to rename: {str(e)}"
+
+    def _run(self, old_path: str, new_path: str) -> str:
+        return asyncio.run(self._arun(old_path, new_path))
