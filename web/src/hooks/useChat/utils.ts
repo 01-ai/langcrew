@@ -68,6 +68,16 @@ function hideFutureSteps(message: MessageItem) {
   return message;
 }
 
+// 没children的step不显示
+function hideEmptySteps(message: MessageItem) {
+  message.messages.forEach((msg) => {
+    if (isPlanChunk(msg)) {
+      (msg as MessagePlanChunk).children = (msg as MessagePlanChunk).children.filter((step: PlanStep) => step.children.length > 0);
+    }
+  });
+  return message;
+}
+
 export function isPlanChunk(message: MessageChunk) {
   return message.type === 'plan';
 }
@@ -111,7 +121,7 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
         currentAIMessage = filterLiveStatus(currentAIMessage);
         currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
         currentAIMessage = hideFutureSteps(currentAIMessage);
-
+        currentAIMessage = hideEmptySteps(currentAIMessage);
         newMessages.push(currentAIMessage);
         currentAIMessage = null;
       }
@@ -251,7 +261,7 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
     }
     currentAIMessage = hideFutureSteps(currentAIMessage);
-
+    currentAIMessage = hideEmptySteps(currentAIMessage);
     newMessages.push(currentAIMessage);
   }
 
