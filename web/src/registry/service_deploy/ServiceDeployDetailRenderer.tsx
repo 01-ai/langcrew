@@ -5,7 +5,7 @@ import useToolContent from '../common/useToolContent';
 import { MessageToolChunk } from '@/types';
 
 const ServiceDeployDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  const content = useToolContent(message as unknown as MessageToolChunk);
+  const { content } = useToolContent(message as unknown as MessageToolChunk);
   const data = isJsonString(content) ? JSON.parse(content) : {};
 
   return (

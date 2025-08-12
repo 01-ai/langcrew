@@ -12,6 +12,11 @@ interface FileContentRenderProps {
   fileExtension?: string;
 
   /**
+   * 内容类型 (MIME type)
+   */
+  contentType?: string;
+
+  /**
    * 文件内容
    */
   fileContent?: string;
@@ -26,8 +31,11 @@ interface FileContentRenderProps {
   isDiff?: boolean;
 }
 
-// 后缀名
+// 支持的文件类型（基于扩展名）
 export const fileContentSupportFileTypes = ['html', 'md', 'csv'];
+
+// 支持的内容类型（基于 MIME type）
+export const fileContentSupportContentTypes = ['text/html', 'text/markdown', 'text/csv'];
 
 const fileTypeToLanguage = {
   md: 'markdown',
@@ -51,6 +59,7 @@ const fileTypeToLanguage = {
 
 const FileContentRender: React.FC<FileContentRenderProps> = ({
   fileExtension = '',
+  contentType = '',
   fileContent = '',
   oldFileContent = '',
   isDiff,
@@ -58,22 +67,37 @@ const FileContentRender: React.FC<FileContentRenderProps> = ({
   const [previewType, setPreviewType] = useState<'preview' | 'raw'>('preview');
   const { t } = useTranslation();
 
+  // 从 contentType 中提取文件类型
+  const getTypeFromContentType = (ct: string) => {
+    if (ct.includes('text/markdown') || ct.includes('markdown')) return 'md';
+    if (ct.includes('text/html') || ct.includes('html')) return 'html';
+    if (ct.includes('text/csv') || ct.includes('csv')) return 'csv';
+    if (ct.includes('text/plain') || ct.includes('plain')) return 'txt';
+    return null;
+  };
+
+  const detectedType = getTypeFromContentType(contentType) || fileExtension;
+
   const language =
-    (fileTypeToLanguage[fileExtension as keyof typeof fileTypeToLanguage] as any) || fileExtension || 'plaintext';
+    (fileTypeToLanguage[detectedType as keyof typeof fileTypeToLanguage] as any) || detectedType || 'plaintext';
 
   const renderPreview = () => {
-    if (fileExtension === 'html') {
+    if (detectedType === 'html') {
       return <iframe srcDoc={fileContent} className="w-full h-full" />;
     }
-    if (fileExtension === 'md') {
+    if (detectedType === 'md') {
       return <Markdown content={fileContent} className="w-full h-full" />;
     }
-    if (fileExtension === 'csv') {
+    if (detectedType === 'csv') {
       return <CSVViewer content={fileContent} />;
     }
   };
 
-  if (!fileContentSupportFileTypes.includes(fileExtension)) {
+  // 检查是否支持预览模式（基于检测到的类型）
+  const supportsPreview =
+    fileContentSupportFileTypes.includes(detectedType) || fileContentSupportContentTypes.includes(contentType);
+
+  if (!supportsPreview) {
     return <Code language={language} code={fileContent} originalCode={oldFileContent} isDiff={isDiff} />;
   }
 

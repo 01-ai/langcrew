@@ -5,7 +5,7 @@ import Terminal from '@/components/Infra/Terminal';
 import useToolContent from '../common/useToolContent';
 
 const TerminalDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  const content = useToolContent(message as MessageToolChunk);
+  const { content } = useToolContent(message as MessageToolChunk);
 
   return (
     <div className="w-full h-full">

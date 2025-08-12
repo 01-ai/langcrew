@@ -10,7 +10,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 const MilvusDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
   devLog('message', message);
   const { t } = useTranslation();
-  const content = useToolContent(message as unknown as MessageToolChunk);
+  const { content } = useToolContent(message as unknown as MessageToolChunk);
   const list = content?.split('\n\n');
 
   devLog('list', list);

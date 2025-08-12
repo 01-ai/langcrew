@@ -123,7 +123,12 @@ export interface MessageToolChunk extends MessageChunk {
     // 工具参数
     param?: any;
     // 工具输出
-    result?: any;
+    result?: {
+      content?: string;
+      content_type?: string; // 内容类型，如 'text/plain', 'text/markdown', 'application/json' 等
+      image_url?: string;
+      sandbox_url?: string;
+    };
     status?: TaskStatus;
     run_id?: string;
   };
@@ -273,14 +278,6 @@ export interface ServiceDeployContent {
 export interface EventErrorChunk {
   code?: number;
   message?: string;
-}
-
-export interface SessionInitChunk extends MessageChunk {
-  type: 'session_init';
-  detail: {
-    session_id: string;
-    title: string;
-  };
 }
 
 export interface AntdUploadFile {

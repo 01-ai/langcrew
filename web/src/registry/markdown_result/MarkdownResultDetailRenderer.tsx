@@ -5,8 +5,8 @@ import useToolContent from '../common/useToolContent';
 import { MessageToolChunk } from '@/types';
 
 const MarkdownResultDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  const content = useToolContent(message as unknown as MessageToolChunk);
-  return <FileContentRender fileContent={content} fileExtension="md" />;
+  const { content, contentType } = useToolContent(message as unknown as MessageToolChunk);
+  return <FileContentRender fileContent={content} fileExtension="md" contentType={contentType} />;
 };
 
 export default MarkdownResultDetailRenderer;

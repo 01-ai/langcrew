@@ -6,7 +6,7 @@ import { MessageToolChunk } from '@/types';
 import { CloudPhone } from '@/components/Infra';
 
 const PhoneDetailRenderer: React.FC<DetailRendererProps> = ({ message, isRealTime }) => {
-  const content = useToolContent(message as unknown as MessageToolChunk);
+  const { content } = useToolContent(message as unknown as MessageToolChunk);
   const data = isJsonString(content) ? JSON.parse(content) : {};
 
   const imageUrl = data.current_state?.screenshot_url;

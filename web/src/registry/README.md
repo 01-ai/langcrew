@@ -203,7 +203,7 @@ const MessageList: React.FC<{ messages: MessageChunk[] }> = ({ messages }) => {
     <div className="message-list">
       {messages.map((message, index) => {
         const BriefRenderer = registry.getBriefRenderer(message.type);
-        return <BriefRenderer key={index} message={message} withIcon={true}  />;
+        return <BriefRenderer key={index} message={message} withIcon={true} />;
       })}
     </div>
   );
@@ -260,7 +260,7 @@ import ToolBriefRenderer from '@/registry/common/ToolBriefRenderer';
 import useToolContent from '@/registry/common/useToolContent';
 
 const MyDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  const content = useToolContent(message as MessageToolChunk);
+  const { content } = useToolContent(message as MessageToolChunk);
   return <div>{content}</div>;
 };
 ```
@@ -440,34 +440,34 @@ describe('MessageTypeRegistry', () => {
 
 ## 更新日志
 
-| 日期 | 增加的类型 |
-|------|------------|
-| 2025-06-24 | live_status (实时状态) |
-| 2025-06-24 | plan (计划) |
-| 2025-06-30 | web_search (网页搜索) |
-| 2025-07-01 | run_command (执行命令) |
-| 2025-07-01 | delete_file (删除文件) |
-| 2025-07-01 | file_read_text (文件读取) |
-| 2025-07-01 | write_file (文件写入) |
-| 2025-07-01 | file_append_text (文件追加) |
-| 2025-07-01 | file_replace_text (文件替换) |
-| 2025-07-02 | browser_navigate_to (浏览器导航) |
-| 2025-07-03 | browser_click_element (浏览器点击) |
-| 2025-07-03 | browser_scroll (浏览器滚动) |
-| 2025-07-03 | browser_go_back (浏览器后退) |
-| 2025-07-03 | browser_send_keys (浏览器发送按键) |
+| 日期       | 增加的类型                          |
+| ---------- | ----------------------------------- |
+| 2025-06-24 | live_status (实时状态)              |
+| 2025-06-24 | plan (计划)                         |
+| 2025-06-30 | web_search (网页搜索)               |
+| 2025-07-01 | run_command (执行命令)              |
+| 2025-07-01 | delete_file (删除文件)              |
+| 2025-07-01 | file_read_text (文件读取)           |
+| 2025-07-01 | write_file (文件写入)               |
+| 2025-07-01 | file_append_text (文件追加)         |
+| 2025-07-01 | file_replace_text (文件替换)        |
+| 2025-07-02 | browser_navigate_to (浏览器导航)    |
+| 2025-07-03 | browser_click_element (浏览器点击)  |
+| 2025-07-03 | browser_scroll (浏览器滚动)         |
+| 2025-07-03 | browser_go_back (浏览器后退)        |
+| 2025-07-03 | browser_send_keys (浏览器发送按键)  |
 | 2025-07-03 | browser_input_text (浏览器输入文本) |
 | 2025-07-04 | browser_switch_tab (浏览器切换标签) |
-| 2025-07-04 | service_deploy (服务部署) |
-| 2025-07-05 | code_interpreter (代码解释器) |
-| 2025-07-05 | user_input (用户输入) |
-| 2025-07-07 | finish_reason (完成原因) |
-| 2025-07-09 | file_parser (文件解析) |
-| 2025-07-10 | message_notify_user (用户通知消息) |
-| 2025-07-14 | image_parser (图片解析) |
-| 2025-07-15 | image_generation (图片生成) |
-| 2025-07-18 | mysql (SQL执行) |
-| 2025-07-18 | browser (浏览器) |
-| 2025-07-18 | phone (手机) |
-| 2025-07-25 | markdown_result (Markdown结果) |
-| 2025-07-25 | file_diff (文件差异) |
+| 2025-07-04 | service_deploy (服务部署)           |
+| 2025-07-05 | code_interpreter (代码解释器)       |
+| 2025-07-05 | user_input (用户输入)               |
+| 2025-07-07 | finish_reason (完成原因)            |
+| 2025-07-09 | file_parser (文件解析)              |
+| 2025-07-10 | message_notify_user (用户通知消息)  |
+| 2025-07-14 | image_parser (图片解析)             |
+| 2025-07-15 | image_generation (图片生成)         |
+| 2025-07-18 | mysql (SQL 执行)                    |
+| 2025-07-18 | browser (浏览器)                    |
+| 2025-07-18 | phone (手机)                        |
+| 2025-07-25 | markdown_result (Markdown 结果)     |
+| 2025-07-25 | file_diff (文件差异)                |

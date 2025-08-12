@@ -8,7 +8,7 @@ import { getTranslation } from '@/hooks/useTranslation';
 import ErrorDetailRenderer from '../common/ErrorDetailRenderer';
 
 const ImageGenerationDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  const content = useToolContent(message as MessageToolChunk);
+  const { content } = useToolContent(message as MessageToolChunk);
 
   const { image_url } = isJsonString(content) ? JSON.parse(content) : {};
 

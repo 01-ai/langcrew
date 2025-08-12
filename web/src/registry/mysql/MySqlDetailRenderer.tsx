@@ -2,12 +2,11 @@ import React from 'react';
 import { DetailRendererProps } from '..';
 import { MessageToolChunk } from '@/types';
 import useToolContent from '../common/useToolContent';
-import FileContentRender from '@/components/Infra/FileContentRender';
 import { Code } from '@/components/Infra';
 import { getTranslation } from '@/hooks/useTranslation';
 
 const MySqlDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  const content = useToolContent(message as MessageToolChunk);
+  const { content } = useToolContent(message as MessageToolChunk);
 
   return (
     <div className="w-full h-full p-4 flex flex-col" key={message.id}>

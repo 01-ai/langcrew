@@ -6,7 +6,7 @@ import { isJsonString } from '@/utils/json';
 import useToolContent from '../common/useToolContent';
 
 const WebSearchDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  const content = useToolContent(message as unknown as MessageToolChunk);
+  const { content } = useToolContent(message as unknown as MessageToolChunk);
 
   const data = isJsonString(content) ? JSON.parse(content) : [];
 
