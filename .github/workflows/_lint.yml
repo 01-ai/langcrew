@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         if: steps.changed-files.outputs.all
         working-directory: ${{ inputs.working-directory }}
-        run: uv sync --all-extras --frozen --group dev
+        run: uv sync --all-extras --group dev
 
       - name: Analysing package code with our lint
         if: steps.changed-files.outputs.all

@@ -167,7 +167,6 @@ class TestAgent:
         assert agent._thread_id == "test_thread_id"
         assert agent.use_memory is True
 
-
     def test_agent_executor_kwargs(self, mock_llm):
         """Test agent executor kwargs configuration."""
         executor_kwargs = {"max_iterations": 5, "temperature": 0.7}
@@ -246,16 +245,17 @@ class TestAgent:
             assert "messages" in data
             return True, "OK"
 
-        @output_guard  
+        @output_guard
         def test_output_guard(data):
             nonlocal received_output_data
             received_output_data = data
             # Should receive the executor result
             return True, "OK"
 
-        with patch("langcrew.agent.ExecutorFactory") as mock_factory, \
-             patch("langcrew.agent.PromptBuilder") as mock_prompt_builder:
-
+        with (
+            patch("langcrew.agent.ExecutorFactory") as mock_factory,
+            patch("langcrew.agent.PromptBuilder") as mock_prompt_builder,
+        ):
             mock_executor = Mock()
             mock_executor.invoke.return_value = {"output": "test result"}
             mock_factory.create_executor.return_value = mock_executor
@@ -270,7 +270,7 @@ class TestAgent:
                 backstory="Expert in testing",
                 llm=mock_llm,
                 input_guards=[test_input_guard],
-                output_guards=[test_output_guard]
+                output_guards=[test_output_guard],
             )
 
             # Test with initial input
@@ -281,7 +281,7 @@ class TestAgent:
             assert received_input_data is not None
             assert received_output_data is not None
 
-            # Verify input guard received prepared_input format  
+            # Verify input guard received prepared_input format
             assert "messages" in received_input_data
             assert isinstance(received_input_data["messages"], list)
 
@@ -310,11 +310,14 @@ class TestAgent:
             received_output_data = data
             return True, "OK"
 
-        with patch("langcrew.agent.ExecutorFactory") as mock_factory, \
-             patch("langcrew.agent.PromptBuilder") as mock_prompt_builder:
-
+        with (
+            patch("langcrew.agent.ExecutorFactory") as mock_factory,
+            patch("langcrew.agent.PromptBuilder") as mock_prompt_builder,
+        ):
             mock_executor = Mock()
-            mock_executor.ainvoke = AsyncMock(return_value={"output": "async test result"})
+            mock_executor.ainvoke = AsyncMock(
+                return_value={"output": "async test result"}
+            )
             mock_factory.create_executor.return_value = mock_executor
 
             mock_builder_instance = Mock()
@@ -327,7 +330,7 @@ class TestAgent:
                 backstory="Expert in async testing",
                 llm=mock_llm,
                 input_guards=[test_async_input_guard],
-                output_guards=[test_async_output_guard]
+                output_guards=[test_async_output_guard],
             )
 
             # Test with initial input
@@ -362,11 +365,14 @@ class TestAgent:
                     return True, "Valid LangGraph format"
             return False, "Invalid format"
 
-        with patch("langcrew.agent.ExecutorFactory") as mock_factory, \
-             patch("langcrew.agent.PromptBuilder") as mock_prompt_builder:
-
+        with (
+            patch("langcrew.agent.ExecutorFactory") as mock_factory,
+            patch("langcrew.agent.PromptBuilder") as mock_prompt_builder,
+        ):
             mock_executor = Mock()
-            mock_executor.invoke.return_value = {"messages": [AIMessage(content="Response")]}
+            mock_executor.invoke.return_value = {
+                "messages": [AIMessage(content="Response")]
+            }
             mock_factory.create_executor.return_value = mock_executor
 
             mock_builder_instance = Mock()
@@ -380,7 +386,7 @@ class TestAgent:
                 goal="Test LangGraph message formats",
                 backstory="Expert in message testing",
                 llm=mock_llm,
-                input_guards=[message_format_guard]
+                input_guards=[message_format_guard],
             )
 
             # Test with LangGraph-style input
@@ -396,7 +402,7 @@ class TestAgent:
 
     def test_agent_initialization_with_hitl(self, mock_llm):
         """Test agent initialization with HITL configuration."""
-        hitl_config = HITLConfig(enabled=True, approval_tool_mode="all")
+        hitl_config = HITLConfig(enabled=True, interrupt_tool_mode="all")
 
         agent = Agent(
             role="HITL Specialist",
@@ -407,7 +413,7 @@ class TestAgent:
         )
 
         assert agent.hitl_config.enabled is True
-        assert agent.hitl_config.approval_tool_mode == "all"
+        assert agent.hitl_config.interrupt_tool_mode == "all"
 
     def test_agent_initialization_with_handoff_config(self, mock_llm):
         """Test agent initialization with handoff configuration."""
@@ -448,11 +454,9 @@ class TestAgent:
     def test_agent_with_native_prompt_string(self, mock_llm):
         """Test agent initialization with native string prompt."""
         agent = Agent(
-            prompt="You are an expert Python developer.",
-            llm=mock_llm,
-            tools=[]
+            prompt="You are an expert Python developer.", llm=mock_llm, tools=[]
         )
-        
+
         assert agent.prompt == "You are an expert Python developer."
         assert agent.role is None
         assert agent.goal is None
@@ -461,14 +465,10 @@ class TestAgent:
     def test_agent_with_native_prompt_system_message(self, mock_llm):
         """Test agent initialization with SystemMessage prompt."""
         from langchain_core.messages import SystemMessage
-        
+
         system_msg = SystemMessage(content="You are a code reviewer.")
-        agent = Agent(
-            prompt=system_msg,
-            llm=mock_llm,
-            tools=[]
-        )
-        
+        agent = Agent(prompt=system_msg, llm=mock_llm, tools=[])
+
         assert agent.prompt == system_msg
         assert agent.role is None
         assert agent.goal is None
@@ -476,15 +476,12 @@ class TestAgent:
 
     def test_agent_with_native_prompt_callable(self, mock_llm):
         """Test agent initialization with callable prompt."""
+
         def dynamic_prompt(state):
             return "Dynamic prompt based on state"
-        
-        agent = Agent(
-            prompt=dynamic_prompt,
-            llm=mock_llm,
-            tools=[]
-        )
-        
+
+        agent = Agent(prompt=dynamic_prompt, llm=mock_llm, tools=[])
+
         assert agent.prompt == dynamic_prompt
         assert callable(agent.prompt)
         assert agent.role is None
@@ -493,74 +490,69 @@ class TestAgent:
     def test_agent_prompt_modes_are_mutually_exclusive(self, mock_llm):
         """Test that prompt and CrewAI attributes cannot be used together."""
         # Should raise error when prompt is used with role
-        with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
-            Agent(
-                prompt="Custom prompt",
-                role="Developer",
-                llm=mock_llm
-            )
-        
-        # Should raise error when prompt is used with goal
-        with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
-            Agent(
-                prompt="Custom prompt",
-                goal="Write code",
-                llm=mock_llm
-            )
-        
-        # Should raise error when prompt is used with backstory
-        with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
-            Agent(
-                prompt="Custom prompt",
-                backstory="Expert developer",
-                llm=mock_llm
-            )
+        with pytest.raises(
+            ValueError,
+            match="Cannot use both custom 'prompt' and CrewAI-style attributes",
+        ):
+            Agent(prompt="Custom prompt", role="Developer", llm=mock_llm)
 
-    def test_agent_prepare_executor_input_with_existing_messages_native_prompt(self, mock_llm):
+        # Should raise error when prompt is used with goal
+        with pytest.raises(
+            ValueError,
+            match="Cannot use both custom 'prompt' and CrewAI-style attributes",
+        ):
+            Agent(prompt="Custom prompt", goal="Write code", llm=mock_llm)
+
+        # Should raise error when prompt is used with backstory
+        with pytest.raises(
+            ValueError,
+            match="Cannot use both custom 'prompt' and CrewAI-style attributes",
+        ):
+            Agent(prompt="Custom prompt", backstory="Expert developer", llm=mock_llm)
+
+    def test_agent_prepare_executor_input_with_existing_messages_native_prompt(
+        self, mock_llm
+    ):
         """Test _prepare_executor_input in native prompt mode when messages already exist."""
         from langchain_core.messages import AIMessage, HumanMessage
         from langcrew.types import TaskSpec
-        
-        agent = Agent(
-            prompt="You are a helpful assistant.",
-            llm=mock_llm
-        )
-        
+
+        agent = Agent(prompt="You are a helpful assistant.", llm=mock_llm)
+
         # Mock the executor and task_spec
         mock_executor = Mock()
         task_spec = TaskSpec(
-            description="Help with coding task",
-            expected_output="Complete solution"
+            description="Help with coding task", expected_output="Complete solution"
         )
         mock_executor.task_spec = task_spec
         agent.executor = mock_executor
-        
+
         # Test case 1: Messages exist but last message is not HumanMessage
         input_data = {
             "messages": [
                 HumanMessage(content="Initial request"),
-                AIMessage(content="I understand")
+                AIMessage(content="I understand"),
             ]
         }
-        
+
         result = agent._prepare_executor_input(input_data)
-        
+
         # Should append a HumanMessage with task details
         assert len(result["messages"]) == 3
         assert isinstance(result["messages"][-1], HumanMessage)
         assert "Help with coding task" in result["messages"][-1].content
         assert "Complete solution" in result["messages"][-1].content
-        
+
         # Test case 2: Messages exist and last message is already HumanMessage
         input_data_human_last = {
             "messages": [
                 AIMessage(content="Previous response"),
-                HumanMessage(content="Current request")
+                HumanMessage(content="Current request"),
             ]
         }
-        
+
         result_human_last = agent._prepare_executor_input(input_data_human_last)
-        
+
         # Should not append additional HumanMessage
         assert len(result_human_last["messages"]) == 2
         assert isinstance(result_human_last["messages"][-1], HumanMessage)
@@ -570,29 +562,25 @@ class TestAgent:
         """Test _prepare_executor_input in native prompt mode with context."""
         from langchain_core.messages import AIMessage, HumanMessage
         from langcrew.types import TaskSpec
-        
-        agent = Agent(
-            prompt="You are a helpful assistant.",
-            llm=mock_llm
-        )
-        
+
+        agent = Agent(prompt="You are a helpful assistant.", llm=mock_llm)
+
         # Mock the executor and task_spec
         mock_executor = Mock()
         task_spec = TaskSpec(
-            description="Process the request",
-            expected_output="Detailed response"
+            description="Process the request", expected_output="Detailed response"
         )
         mock_executor.task_spec = task_spec
         agent.executor = mock_executor
-        
+
         # Test with context and existing non-human last message
         input_data = {
             "messages": [AIMessage(content="Previous message")],
-            "context": "Important background information"
+            "context": "Important background information",
         }
-        
+
         result = agent._prepare_executor_input(input_data)
-        
+
         # Should append HumanMessage with task details including context
         assert len(result["messages"]) == 2
         assert isinstance(result["messages"][-1], HumanMessage)
@@ -600,10 +588,6 @@ class TestAgent:
         assert "Process the request" in task_content
         assert "Detailed response" in task_content
         assert "Important background information" in task_content
-
-
-
-
 
 
 class TestAgentExecution:
@@ -686,7 +670,9 @@ class TestAgentExecution:
         """Test agent ainvoke method with mocked executor."""
         with patch("langcrew.agent.ExecutorFactory") as mock_factory:
             mock_executor = Mock()
-            mock_executor.ainvoke = AsyncMock(return_value={"output": "async test result"})
+            mock_executor.ainvoke = AsyncMock(
+                return_value={"output": "async test result"}
+            )
             mock_factory.create_executor.return_value = mock_executor
 
             agent = Agent(
@@ -708,7 +694,9 @@ class TestAgentExecution:
         """Test agent _executor_ainvoke method directly."""
         with patch("langcrew.agent.ExecutorFactory") as mock_factory:
             mock_executor = Mock()
-            mock_executor.ainvoke = AsyncMock(return_value={"output": "async executor result"})
+            mock_executor.ainvoke = AsyncMock(
+                return_value={"output": "async executor result"}
+            )
             mock_factory.create_executor.return_value = mock_executor
 
             agent = Agent(
@@ -733,7 +721,9 @@ class TestAgentExecution:
         """Test agent _executor_ainvoke with config and kwargs."""
         with patch("langcrew.agent.ExecutorFactory") as mock_factory:
             mock_executor = Mock()
-            mock_executor.ainvoke = AsyncMock(return_value={"output": "async configured result"})
+            mock_executor.ainvoke = AsyncMock(
+                return_value={"output": "async configured result"}
+            )
             mock_factory.create_executor.return_value = mock_executor
 
             agent = Agent(
@@ -749,7 +739,9 @@ class TestAgentExecution:
             # Test with config and kwargs
             prepared_input = {"messages": []}
             config = {"configurable": {"thread_id": "async123"}}
-            result = await agent._executor_ainvoke(prepared_input, config, async_param="test")
+            result = await agent._executor_ainvoke(
+                prepared_input, config, async_param="test"
+            )
 
             assert result == {"output": "async configured result"}
             mock_executor.ainvoke.assert_called_once_with(
@@ -758,9 +750,10 @@ class TestAgentExecution:
 
     def test_agent_create_executor_method(self, mock_llm):
         """Test agent _create_executor method."""
-        with patch("langcrew.agent.ExecutorFactory") as mock_factory, \
-             patch("langcrew.agent.PromptBuilder") as mock_prompt_builder:
-
+        with (
+            patch("langcrew.agent.ExecutorFactory") as mock_factory,
+            patch("langcrew.agent.PromptBuilder") as mock_prompt_builder,
+        ):
             mock_executor = Mock()
             mock_factory.create_executor.return_value = mock_executor
 
@@ -794,14 +787,16 @@ class TestAgentExecution:
 
         # Test with user input in messages
         from langchain_core.messages import HumanMessage
-        state = {
-            "messages": [HumanMessage(content="Please help me with this task")]
-        }
+
+        state = {"messages": [HumanMessage(content="Please help me with this task")]}
 
         task_spec = agent._create_default_task_spec(state)
 
         assert "Please help me with this task" in task_spec.description
-        assert task_spec.expected_output == "Complete and accurate response to the user's request"
+        assert (
+            task_spec.expected_output
+            == "Complete and accurate response to the user's request"
+        )
 
         # Test without user input
         empty_state = {"messages": []}
@@ -870,6 +865,7 @@ class TestAgentExecutorErrorHandling:
 
     def test_executor_invoke_with_guardrail_failure(self, mock_llm):
         """Test _executor_invoke when input guardrail fails."""
+
         def failing_input_guard(data):
             return False, "Input validation failed"
 
@@ -882,12 +878,13 @@ class TestAgentExecutorErrorHandling:
                 goal="Test execution",
                 backstory="Expert in testing",
                 llm=mock_llm,
-                input_guards=[failing_input_guard]
+                input_guards=[failing_input_guard],
             )
             agent.executor = mock_executor
 
             # Test should raise GuardrailError
             from langcrew.guardrail import GuardrailError
+
             with pytest.raises(GuardrailError, match="Input validation failed"):
                 agent._executor_invoke({"test": "data"})
 
@@ -896,9 +893,10 @@ class TestAgentExecutorErrorHandling:
 
     def test_executor_invoke_with_output_guardrail_failure(self, mock_llm):
         """Test _executor_invoke when output guardrail fails."""
+
         def passing_input_guard(data):
             return True, "OK"
-            
+
         def failing_output_guard(data):
             return False, "Output validation failed"
 
@@ -913,12 +911,13 @@ class TestAgentExecutorErrorHandling:
                 backstory="Expert in testing",
                 llm=mock_llm,
                 input_guards=[passing_input_guard],
-                output_guards=[failing_output_guard]
+                output_guards=[failing_output_guard],
             )
             agent.executor = mock_executor
 
             # Test should raise GuardrailError
             from langcrew.guardrail import GuardrailError
+
             with pytest.raises(GuardrailError, match="Output validation failed"):
                 agent._executor_invoke({"test": "data"})
 
@@ -928,6 +927,7 @@ class TestAgentExecutorErrorHandling:
     @pytest.mark.asyncio
     async def test_executor_ainvoke_with_guardrail_failure(self, mock_llm):
         """Test _executor_ainvoke when input guardrail fails."""
+
         def failing_input_guard(data):
             return False, "Async input validation failed"
 
@@ -941,12 +941,13 @@ class TestAgentExecutorErrorHandling:
                 goal="Test async execution",
                 backstory="Expert in async testing",
                 llm=mock_llm,
-                input_guards=[failing_input_guard]
+                input_guards=[failing_input_guard],
             )
             agent.executor = mock_executor
 
             # Test should raise GuardrailError
             from langcrew.guardrail import GuardrailError
+
             with pytest.raises(GuardrailError, match="Async input validation failed"):
                 await agent._executor_ainvoke({"test": "data"})
 
@@ -955,6 +956,7 @@ class TestAgentExecutorErrorHandling:
 
     def test_executor_invoke_with_executor_exception(self, mock_llm):
         """Test _executor_invoke when executor raises exception."""
+
         def passing_guard(data):
             return True, "OK"
 
@@ -969,7 +971,7 @@ class TestAgentExecutorErrorHandling:
                 backstory="Expert in testing",
                 llm=mock_llm,
                 input_guards=[passing_guard],
-                output_guards=[passing_guard]
+                output_guards=[passing_guard],
             )
             agent.executor = mock_executor
 
@@ -986,9 +988,9 @@ class TestAgentExecutorErrorHandling:
 
             agent = Agent(
                 role="Test Agent",
-                goal="Test execution", 
+                goal="Test execution",
                 backstory="Expert in testing",
-                llm=mock_llm
+                llm=mock_llm,
             )
             agent.executor = mock_executor
 
@@ -1007,8 +1009,8 @@ class TestAgentExecutorErrorHandling:
             agent = Agent(
                 role="Test Agent",
                 goal="Test execution",
-                backstory="Expert in testing", 
-                llm=mock_llm
+                backstory="Expert in testing",
+                llm=mock_llm,
             )
             agent.executor = mock_executor
 

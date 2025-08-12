@@ -53,9 +53,6 @@ class Agent:
         pre_model_hook: RunnableLike | None = None,
         # Post-model hook
         post_model_hook: RunnableLike | None = None,
-        # LangGraph native interrupt configuration
-        interrupt_before: list[str] | None = None,
-        interrupt_after: list[str] | None = None,
         # HITL support
         hitl: bool | HITLConfig | None = None,
         # Handoff configuration
@@ -86,8 +83,7 @@ class Agent:
             memory: Memory configuration (bool, MemoryConfig instance, or None to disable)
             pre_model_hook: Hook to run before model execution
             post_model_hook: Hook to run after model execution
-            interrupt_before: List of node names to interrupt before execution (LangGraph native)
-            interrupt_after: List of node names to interrupt after execution (LangGraph native)
+
             hitl: HITL configuration (bool, HITLConfig instance, or None to disable)
             config: CrewAI-style configuration dictionary containing role, goal, backstory, etc.
             handoff_to: List of agent names this agent can handoff tasks to
@@ -195,10 +191,6 @@ class Agent:
             self.hitl_config = hitl
         else:
             raise ValueError(f"Invalid hitl parameter type: {type(hitl)}")
-
-        # LangGraph native interrupt configuration (users can set directly, or auto-set via HITL config)
-        self.interrupt_before = interrupt_before or []
-        self.interrupt_after = interrupt_after or []
 
         # Setup HITL configuration
         self._setup_hitl()
@@ -386,9 +378,23 @@ class Agent:
             # Use PromptBuilder to generate CrewAI-style prompt
             prompt_builder = PromptBuilder()
             prompt_messages = prompt_builder.format_prompt(
-                agent=self, task=task_spec, context=state.get("context") if state else None
+                agent=self,
+                task=task_spec,
+                context=state.get("context") if state else None,
             )
             executor_prompt = prompt_messages[0]  # SystemMessage
+
+        # Get interrupt configuration from HITL config
+        interrupt_before = (
+            self.hitl_config.get_interrupt_before_nodes()
+            if self.hitl_config.enabled
+            else []
+        )
+        interrupt_after = (
+            self.hitl_config.get_interrupt_after_nodes()
+            if self.hitl_config.enabled
+            else []
+        )
 
         self.executor = ExecutorFactory.create_executor(
             executor_type=self.executor_type,
@@ -400,8 +406,8 @@ class Agent:
             store=self.store,
             pre_model_hook=self.pre_model_hook,
             post_model_hook=self.post_model_hook,
-            interrupt_before=self.interrupt_before,
-            interrupt_after=self.interrupt_after,
+            interrupt_before=interrupt_before,  # LangGraph native node-level interrupt
+            interrupt_after=interrupt_after,  # LangGraph native node-level interrupt
             response_format=response_format,
             debug=self.debug,
             **self.executor_kwargs,
@@ -444,7 +450,7 @@ class Agent:
         if self.prompt is not None:
             # Native prompt mode: minimal framework intervention
             # Only ensure messages exist, let LangGraph's prompt mechanism handle the rest
-            
+
             # Build task message once
             task_message = task_spec.description
             if task_spec.expected_output:
@@ -452,7 +458,7 @@ class Agent:
             context = input.get("context", "")
             if context:
                 task_message += f"\n\nContext: {context}"
-            
+
             if "messages" not in input or not input["messages"]:
                 # Create new messages list with task message
                 input["messages"] = [HumanMessage(content=task_message)]

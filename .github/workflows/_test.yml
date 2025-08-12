@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         working-directory: ${{ inputs.working-directory }}
-        run: uv sync --all-extras --frozen --group dev
+        run: uv sync --all-extras --group dev
 
       - name: Run tests
         shell: bash

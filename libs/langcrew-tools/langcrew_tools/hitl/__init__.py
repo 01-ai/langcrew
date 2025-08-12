@@ -9,7 +9,7 @@ Usage example:
 
     agent = Agent(
         tools=[WebSearchTool(), UserInputTool()],
-        hitl=HITLConfig(approval_tools=["web_search"])  # Tool approval through static interrupt
+        hitl=HITLConfig(interrupt_before_tools=["web_search"])  # Tool interrupt before execution
     )
 """
 

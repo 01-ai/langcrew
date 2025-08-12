@@ -187,13 +187,25 @@ class LangGraphAdapter:
                 input=input_data, config=config, version="v2"
             ):
                 event_type = event.get("event")
+                event_data = event.get("data", {})
+
+                # TODO: Handle LangGraph native node interrupts
+                # Check for node-level interrupts that don't have custom events
+                if "__interrupt__" in event_data:
+                    # TODO: Implement node-level interrupt handling
+                    # - Parse interrupt_obj.value to determine interrupt type
+                    # - Skip tool-level and user_input interrupts (already handled by custom events)
+                    # - Handle pure node-level interrupts from interrupt_before_nodes/interrupt_after_nodes
+                    # - Generate appropriate StreamMessage for frontend using MessageType.USER_INPUT
+                    pass
 
                 # Resume mode: check for completed events
                 if execution_input.is_resume and event_type == "on_custom_event":
                     event_name = event.get("name")
                     if event_name in [
                         "on_langcrew_user_input_completed",
-                        "on_langcrew_tool_approval_completed",
+                        "on_langcrew_tool_interrupt_before_completed",
+                        "on_langcrew_tool_interrupt_after_completed",
                     ]:
                         logger.info(
                             f"{event_name} for session {execution_input.session_id}. "
@@ -755,35 +767,83 @@ class LangGraphAdapter:
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
                 )
-            elif event_name == "on_langcrew_tool_approval_required":
-                # Tool approval required event from HITL tools
+            elif event_name == "on_langcrew_tool_interrupt_before":
+                # Tool before interrupt event from HITL tools
                 approval_data = data
                 tool_info = approval_data.get("tool", {})
 
                 # Use current task language for content
                 is_chinese = self._display_language == "zh"
                 if is_chinese:
-                    content = f"需要审批工具: {tool_info.get('name', 'unknown')}"
+                    content = f"工具执行前中断: {tool_info.get('name', 'unknown')}"
                 else:
                     content = (
-                        f"Tool approval required: {tool_info.get('name', 'unknown')}"
+                        f"Tool before interrupt: {tool_info.get('name', 'unknown')}"
                     )
 
                 return StreamMessage(
                     id=message_id,
-                    type=MessageType.TOOL_APPROVAL_REQUEST,
+                    type=MessageType.USER_INPUT,
                     content=content,
                     detail={
+                        "interaction_type": "tool_approval",
+                        "approval_type": "before_execution",
                         "tool_name": tool_info.get("name"),
                         "tool_args": tool_info.get("args", {}),
                         "tool_description": tool_info.get("description", ""),
-                        "approval_type": "tool_execution",
                         "interrupt_data": approval_data,
+                        "supports_modification": True,
+                        "modification_hint": "You can approve/deny or provide modified parameters",
+                        "options": ["批准", "拒绝"]
+                        if is_chinese
+                        else ["Approve", "Deny"],
                     },
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
                 )
+            elif event_name == "on_langcrew_tool_interrupt_after":
+                # Tool after interrupt event from HITL tools
+                review_data = data
+                tool_info = review_data.get("tool", {})
+
+                # Use current task language for content
+                is_chinese = self._display_language == "zh"
+                if is_chinese:
+                    content = f"工具执行后审查: {tool_info.get('name', 'unknown')}"
+                else:
+                    content = (
+                        f"Tool after interrupt: {tool_info.get('name', 'unknown')}"
+                    )
+
+                return StreamMessage(
+                    id=message_id,
+                    type=MessageType.USER_INPUT,
+                    content=content,
+                    detail={
+                        "interaction_type": "tool_approval",
+                        "approval_type": "after_execution",
+                        "tool_name": tool_info.get("name"),
+                        "tool_args": tool_info.get("args", {}),
+                        "tool_result": tool_info.get("result"),
+                        "tool_description": tool_info.get("description", ""),
+                        "interrupt_data": review_data,
+                        "supports_modification": True,
+                        "modification_hint": "You can approve/deny or provide modified result",
+                        "options": ["确认", "拒绝"]
+                        if is_chinese
+                        else ["Confirm", "Deny"],
+                    },
+                    role="assistant",
+                    timestamp=int(time.time() * 1000),
+                    session_id=session_id,
+                )
+            elif event_name == "on_langcrew_tool_interrupt_before_completed":
+                logger.info(f"Tool before interrupt completed: {data.get('tool_name')}")
+                return None  # Do not send to frontend, just log
+            elif event_name == "on_langcrew_tool_interrupt_after_completed":
+                logger.info(f"Tool after interrupt completed: {data.get('tool_name')}")
+                return None  # Do not send to frontend, just log
             elif event_name == "on_langcrew_new_message":
                 new_message = data.get("new_message", "")
                 return StreamMessage(

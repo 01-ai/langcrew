@@ -1,14 +1,23 @@
 """
 Human-in-the-Loop (HITL) Integration Examples
 
-This example demonstrates how to integrate human approval and input into AI workflows:
+This example demonstrates advanced HITL integration with intelligent user interaction:
 
-1. Configuration Examples: Different ways to set up HITL
-2. Tool Approval Workflow: Pause execution to get human approval for critical actions
-3. User Input Workflow: Collect user input during AI execution
-4. Complete Implementation: Real working examples with proper interrupt/resume handling
+1. Configuration Examples: 9 comprehensive HITL configuration patterns
+2. Tool Approval Workflow: Smart approval system with parameter/result modification
+3. Bilingual Support: Chinese/English keyword recognition and UI options
+4. Advanced Response Handling: Support for complex user feedback and modifications
+5. Complete Implementation: Production-ready examples with proper interrupt/resume handling
 
-Perfect for: Content moderation, financial transactions, sensitive operations, and interactive AI assistants.
+Perfect for: Content moderation, financial transactions, sensitive operations, interactive AI assistants, and international deployment.
+
+New Features:
+- Bilingual user interface (Chinese/English)
+- Smart keyword recognition for natural language responses
+- Parameter modification support (interrupt_before)
+- Result modification support (interrupt_after)
+- Frontend-ready options integration
+- Advanced error handling with user feedback
 """
 
 import tempfile
@@ -94,19 +103,21 @@ def show_hitl_configurations():
 
     print("🔧 Pattern 1: Approval for Critical Operations")
     print("   Perfect for: Financial transactions, data deletion, system changes")
-    config1 = HITLConfig(approval_tools=["file_write", "send_email"])
-    print(f"   ✓ Requires approval for: {config1.approval_tools}")
-    print("   �� Usage: HITLConfig(approval_tools=['file_write', 'send_email'])")
+    config1 = HITLConfig(interrupt_before_tools=["file_write", "send_email"])
+    print(f"   ✓ Requires approval for: {config1.interrupt_before_tools}")
+    print(
+        "   📝 Usage: HITLConfig(interrupt_before_tools=['file_write', 'send_email'])"
+    )
     print()
 
     print("🔧 Pattern 2: Approval for Everything (with safe exceptions)")
     print("   Perfect for: High-security environments, content moderation")
     config2 = HITLConfig(
-        approval_tool_mode="all", excluded_tools=["calculator", "web_search"]
+        interrupt_tool_mode="all", excluded_tools=["calculator", "web_search"]
     )
     print(f"   ✓ Approval required for all tools except: {config2.excluded_tools}")
     print(
-        "   📝 Usage: HITLConfig(approval_tool_mode='all', excluded_tools=['calculator', 'web_search'])"
+        "   📝 Usage: HITLConfig(interrupt_tool_mode='all', excluded_tools=['calculator', 'web_search'])"
     )
     print()
 
@@ -117,7 +128,73 @@ def show_hitl_configurations():
         "   📝 Usage: Simply add # UserInputTool() # temporarily disabled to your agent's tools"
     )
     print()
-    print("🔧 Pattern 4: No Approval Required")
+    print("🔧 Pattern 4: After-Execution Review")
+    print("   Perfect for: Content review, audit trails, quality checks")
+    config4 = HITLConfig(interrupt_after_tools=["report_generator", "email_sender"])
+    print(f"   ✓ Review required after: {config4.interrupt_after_tools}")
+    print(
+        "   📝 Usage: HITLConfig(interrupt_after_tools=['report_generator', 'email_sender'])"
+    )
+    print("   ⚠️  Note: interrupt_after only works within single execution session")
+    print("      (not across workflow restarts from checkpointed state)")
+    print()
+
+    print("🔧 Pattern 5: Before + After Interrupts")
+    print("   Perfect for: Critical workflows with full oversight")
+    config5 = HITLConfig(
+        interrupt_before_tools=["data_processor"],
+        interrupt_after_tools=["report_generator"],
+        interrupt_tool_mode="specified",
+    )
+    print(f"   ✓ Before approval: {config5.interrupt_before_tools}")
+    print(f"   ✓ After review: {config5.interrupt_after_tools}")
+    print(
+        "   📝 Usage: HITLConfig(interrupt_before_tools=[...], interrupt_after_tools=[...])"
+    )
+    print()
+
+    print("🔧 Pattern 6: Node-level Interrupts (LangGraph Native)")
+    print("   Perfect for: Workflow control, decision points, validation steps")
+    config6 = HITLConfig(
+        interrupt_before_nodes=["decision_node"],
+        interrupt_after_nodes=["validation_node"],
+    )
+    print(f"   ✓ Node interrupts before: {config6.interrupt_before_nodes}")
+    print(f"   ✓ Node interrupts after: {config6.interrupt_after_nodes}")
+    print(
+        "   📝 Usage: HITLConfig(interrupt_before_nodes=['decision_node'], interrupt_after_nodes=['validation_node'])"
+    )
+    print()
+
+    print("🔧 Pattern 7: Comprehensive Configuration")
+    print("   Perfect for: Production systems with full HITL coverage")
+    config7 = HITLConfig(
+        # Tool-level interrupts
+        interrupt_before_tools=["critical_operation"],
+        interrupt_after_tools=["data_export"],
+        interrupt_tool_mode="specified",
+        excluded_tools=["calculator", "user_input"],
+        # Node-level interrupts (LangGraph native)
+        interrupt_before_nodes=["decision_node"],
+        interrupt_after_nodes=["validation_node"],
+    )
+    print(
+        f"   ✓ Tool interrupts: {config7.interrupt_before_tools} (before), {config7.interrupt_after_tools} (after)"
+    )
+    print(
+        f"   ✓ Node interrupts: {config7.interrupt_before_nodes} (before), {config7.interrupt_after_nodes} (after)"
+    )
+    print("   📝 Usage: Combines all interrupt types for maximum control")
+    print()
+
+    print("🔧 Pattern 8: Explicit No Interrupts")
+    print("   Perfect for: Explicitly disable interrupts with HITL config")
+    config8 = HITLConfig(enabled=False)
+    print(f"   ✓ HITL explicitly disabled: {not config8.enabled}")
+    print("   📝 Usage: HITLConfig(enabled=False)")
+    print()
+
+    print("🔧 Pattern 9: No Interrupts (Default)")
     print("   Perfect for: Development, testing, low-risk operations")
     print("   ✓ All tools execute automatically")
     print("   📝 Usage: Simply don't add hitl parameter to Agent()")
@@ -144,7 +221,7 @@ def detect_interrupt(stream_result) -> tuple[bool, dict]:
 
 
 def execute_with_human_approval(crew, inputs, thread_id, description):
-    """Execute workflow with proper human approval handling"""
+    """Execute workflow with advanced human approval handling"""
     print(f"🚀 {description}")
     print("-" * 60)
 
@@ -166,6 +243,19 @@ def execute_with_human_approval(crew, inputs, thread_id, description):
                 print(
                     f"💭 Request: {info.get('value', {}).get('description', 'Approval needed')}"
                 )
+
+                # Display interrupt details
+                interrupt_type = info.get("value", {}).get("type", "unknown")
+                print(f"🔍 Interrupt Type: {interrupt_type}")
+
+                if "tool" in info.get("value", {}):
+                    tool_info = info["value"]["tool"]
+                    print(f"🔧 Tool: {tool_info.get('name', 'unknown')}")
+                    if "args" in tool_info:
+                        print(f"📝 Parameters: {tool_info['args']}")
+                    if "result" in tool_info:
+                        print(f"📊 Result: {tool_info.get('result', '')[:200]}...")
+
                 interrupted = True
                 interrupt_info = info
                 # Stream will naturally end when interrupted - no need for manual break
@@ -176,14 +266,66 @@ def execute_with_human_approval(crew, inputs, thread_id, description):
         print("✅ Workflow completed without requiring approval")
         return True
 
-    # Step 2: Simulate human decision
-    print("\n🤔 Step 2: Human decision process...")
-    print("💡 In real applications, this would show a UI for human approval")
+    # Step 2: Simulate advanced human decision
+    print("\n🤔 Step 2: Advanced human decision process...")
+    print("💡 In real applications, this would show a bilingual UI with options:")
+    print("   Chinese: [批准] [拒绝]  English: [Approve] [Deny]")
+    print("   Plus advanced options for parameter/result modification")
     time.sleep(1)
 
-    # Simulate approval
-    decision = "approved"  # In reality: get from user interface
+    # Simulate different types of decisions based on interrupt type
+    interrupt_type = interrupt_info.get("value", {}).get("type", "unknown")
+
+    if interrupt_type == "tool_interrupt_before":
+        print("🔧 Before-execution approval:")
+        print("   Options: Approve, Deny, or Modify Parameters")
+
+        # Simulate smart approval with possible parameter modification
+        decision_options = [
+            "批准",  # Simple approval
+            {
+                "approved": True,
+                "modified_args": {"max_results": 10},
+            },  # Parameter modification
+            "拒绝",  # Denial
+        ]
+        decision = decision_options[0]  # Use simple approval for demo
+
+    elif interrupt_type == "tool_interrupt_after":
+        print("📊 After-execution review:")
+        print("   Options: Confirm, Deny, or Modify Result")
+
+        # Simulate smart confirmation with possible result modification
+        decision_options = [
+            "确认",  # Simple confirmation
+            {
+                "approved": True,
+                "modified_result": "Enhanced result with user feedback",
+            },  # Result modification
+            {
+                "approved": False,
+                "reason": "Result quality insufficient",
+            },  # Denial with reason
+        ]
+        decision = decision_options[0]  # Use simple confirmation for demo
+
+    else:
+        decision = "approved"  # Fallback
+
     print(f"✅ Human decision: {decision}")
+
+    # Show what the system understands
+    if isinstance(decision, str):
+        if decision in ["批准", "同意", "确认", "通过"]:
+            print("🧠 System interpretation: Approved (Chinese keyword recognized)")
+        elif decision in ["approve", "approved", "yes", "ok"]:
+            print("🧠 System interpretation: Approved (English keyword recognized)")
+        elif decision in ["拒绝", "不同意", "不通过"]:
+            print("🧠 System interpretation: Denied (Chinese keyword recognized)")
+        elif decision in ["deny", "denied", "no", "reject"]:
+            print("🧠 System interpretation: Denied (English keyword recognized)")
+    elif isinstance(decision, dict):
+        print("🧠 System interpretation: Advanced response with modifications")
 
     # Step 3: Resume workflow
     print("\n🔄 Step 3: Resuming workflow...")
@@ -230,7 +372,7 @@ def demo_tool_approval_workflow():
     print(f"📁 Target file: {target_file}")
 
     # Configure HITL: only file_write needs approval
-    hitl_config = HITLConfig(approval_tools=["file_write"])
+    hitl_config = HITLConfig(interrupt_before_tools=["file_write"])
     print("🔒 HITL: Only file_write requires approval")
     print("✅ calculator executes normally")
 
@@ -269,6 +411,7 @@ def demo_tool_approval_workflow():
         - Recommendations for next quarter
         
         IMPORTANT: You MUST use the calculator tool first, then the file_write tool.
+        For file_write, use: file_write(file_path="{target_file}", content="your_report_content")
         """,
         expected_output="A comprehensive business report with calculated Q4 revenue saved to file",
         agent=agent,
@@ -276,7 +419,11 @@ def demo_tool_approval_workflow():
 
     # Create crew with checkpointer (required for interrupts)
     crew = Crew(
-        agents=[agent], tasks=[task], verbose=True, checkpointer=InMemorySaver()
+        agents=[agent],
+        tasks=[task],
+        verbose=True,
+        hitl=hitl_config,
+        checkpointer=InMemorySaver(),
     )
 
     print("🚢 Workflow ready with human approval checkpoints")
@@ -408,21 +555,35 @@ def main():
             print("✅ All demonstrations completed successfully!")
             print()
             print("🚀 Key Features Demonstrated:")
-            print("• Tool approval with human oversight")
+            print("• Advanced tool approval with parameter/result modification")
+            print("• Bilingual user interface (Chinese/English)")
+            print("• Smart keyword recognition for natural language responses")
             print("• Interactive user input collection")
             print("• Proper interrupt/resume handling")
             print("• State persistence with checkpointing")
+            print("• Frontend-ready options integration")
         else:
             print("⚠️  Some demonstrations had issues:")
             print(f"   Tool Approval: {'✅ Success' if success1 else '❌ Failed'}")
             print(f"   User Input: {'✅ Success' if success2 else '❌ Failed'}")
 
         print()
+        print("🌟 New HITL Features:")
+        print("• Bilingual Support: 批准/拒绝 ↔ Approve/Deny")
+        print("• Smart Recognition: Natural language → structured responses")
+        print("• Parameter Modification: Edit tool parameters before execution")
+        print("• Result Modification: Edit tool results after execution")
+        print("• Error Feedback: Provide reasons for denials")
+        print("• UI Integration: Ready-made options for frontend components")
+
+        print()
         print("📖 Next Steps:")
-        print("• Review the configuration patterns above")
-        print("• Try different approval_tool_mode settings")
+        print("• Review the 9 configuration patterns above")
+        print("• Try different interrupt_tool_mode settings")
+        print("• Experiment with advanced response formats")
         print("• Integrate HITL into your own workflows")
-        print("• Build custom approval UIs for production use")
+        print("• Build rich approval UIs with bilingual support")
+        print("• Implement parameter/result modification features")
 
     except Exception as e:
         print(f"❌ Demo failed: {str(e)}")

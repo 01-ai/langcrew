@@ -9,10 +9,9 @@ For tool-related functionality, please import from langcrew.tools.hitl.
 """
 
 from .config import HITLConfig
-from .tool_wrapper import HITLToolWrapper, ToolApprovalDenied
+from .tool_wrapper import HITLToolWrapper
 
 __all__ = [
     "HITLConfig",
     "HITLToolWrapper",
-    "ToolApprovalDenied",
 ]
