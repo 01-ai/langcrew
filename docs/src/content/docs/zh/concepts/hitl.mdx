@@ -33,6 +33,18 @@ hitl_config = HITLConfig(
 ### HITLConfig
 统一配置所有中断和审批设置。
 
+#### 配置参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|------|------|------|--------|
+| `enabled` | bool | 启用/禁用 HITL 功能 | True |
+| `interrupt_before_tools` | List[str] | 执行前需要审批的工具 | [] |
+| `interrupt_after_tools` | List[str] | 执行后需要审查的工具 | [] |
+| `interrupt_tool_mode` | str | 中断模式："specified"、"all" | "specified" |
+| `excluded_tools` | List[str] | 在"all"模式下排除的工具 | [] |
+| `interrupt_before_nodes` | List[str] | 前置中断的节点 | [] |
+| `interrupt_after_nodes` | List[str] | 后置中断的节点 | [] |
+
 ### 工具级中断
 通过人工审批工作流控制工具执行。
 

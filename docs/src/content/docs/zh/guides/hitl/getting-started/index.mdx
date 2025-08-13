@@ -12,7 +12,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 HITL 包含在 langcrew 中 - 无需额外安装：
 
 ```bash
-pip install langcrew
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
 ```
 
 ## 基础示例
@@ -189,9 +189,8 @@ result = crew.kickoff(inputs={"task": "创建一个测试文件"})
 现在您已经让 HITL 工作了：
 
 - **[配置指南](/zh/guides/hitl/configuration)** - 学习所有配置选项
-- **[高级用法](/zh/guides/hitl/advanced-usage)** - 复杂场景和模式  
-- **[生产部署](/zh/guides/hitl/production)** - 在生产环境中安全部署 HITL
-- **[双语支持](/zh/guides/hitl/bilingual-support)** - 设置多语言界面
+- **[HITL 概念](/zh/concepts/hitl)** - 理解 HITL 架构和组件
+- **示例** - 查看 `examples/components/hitl/` 了解实际实现案例
 
 ## 故障排除
 

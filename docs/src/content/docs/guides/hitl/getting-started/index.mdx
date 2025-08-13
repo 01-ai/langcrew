@@ -12,7 +12,7 @@ Get up and running with Human-in-the-Loop (HITL) in langcrew in just 5 minutes.
 HITL is included with langcrew - no additional installation required:
 
 ```bash
-pip install langcrew
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
 ```
 
 ## Basic Example
@@ -189,9 +189,8 @@ result = crew.kickoff(inputs={"task": "Create a test file"})
 Now that you have HITL working:
 
 - **[Configuration Guide](/guides/hitl/configuration)** - Learn all configuration options
-- **[Advanced Usage](/guides/hitl/advanced-usage)** - Complex scenarios and patterns  
-- **[Production Deployment](/guides/hitl/production)** - Deploy HITL safely in production
-- **[Bilingual Support](/guides/hitl/bilingual-support)** - Set up multilingual interfaces
+- **[HITL Concepts](/concepts/hitl)** - Understand HITL architecture and components
+- **Examples** - Check `examples/components/hitl/` for real-world implementations
 
 ## Troubleshooting
 
