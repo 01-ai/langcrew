@@ -7,7 +7,7 @@ from typing import Any
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 
-from .base import MemoryConfig
+from .config import MemoryConfig
 
 
 class LongTermMemory:

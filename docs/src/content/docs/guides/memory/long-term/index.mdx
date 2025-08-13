@@ -1,0 +1,346 @@
+---
+title: Long-term Memory
+description: Persistent knowledge storage using LangGraph's Store system
+---
+
+Long-term memory provides persistent knowledge storage using LangGraph's Store system for cross-session information retention and learning.
+
+## What is Long-term Memory?
+
+Long-term memory stores important knowledge, insights, and learnings that should persist across sessions. It's perfect for:
+
+- **Knowledge accumulation** - Build up expertise over time
+- **Cross-session learning** - Remember important facts and insights
+- **Semantic search** - Find relevant information from past interactions
+
+## Quick Start
+
+### Basic Usage
+
+```python
+from langcrew import Agent
+from langcrew.memory import MemoryConfig
+
+# Enable long-term memory
+agent = Agent(
+    role="Research Assistant",
+    goal="Accumulate and use knowledge effectively",
+    backstory="I build up knowledge over time and remember important insights",
+    memory=MemoryConfig(
+        long_term={
+            "enabled": True,
+            "chunk_size": 1000,
+            "search_k": 5
+        }
+    )
+)
+
+# Knowledge will be automatically stored from conversations
+response = agent.execute_task("Research AI trends in healthcare")
+```
+
+### Manual Knowledge Storage
+
+```python
+from langcrew.memory import LongTermMemory, MemoryConfig
+
+# Create long-term memory instance
+config = MemoryConfig(provider="sqlite", connection_string="sqlite:///knowledge.db")
+ltm = LongTermMemory(config=config)
+
+# Store important knowledge manually
+ltm.save(
+    value="AI adoption in healthcare increased 40% in 2024",
+    metadata={
+        "task": "healthcare_research",
+        "quality": 0.9,
+        "learnings": ["healthcare", "AI adoption", "2024 trends"]
+    },
+    agent="research_assistant"
+)
+
+# Search for relevant knowledge
+results = ltm.search("healthcare AI trends", limit=5, min_quality=0.7)
+```
+
+## Configuration Options
+
+### Long-term Memory Parameters
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enabled` | bool | Enable long-term memory | True |
+| `embedding_model` | str \| None | Embedding model for semantic search | None |
+| `chunk_size` | int | Text chunk size for storage | 500 |
+| `search_k` | int | Number of relevant items to retrieve | 5 |
+| `min_quality` | float | Minimum quality threshold for storage | 0.7 |
+
+### Quality-based Storage
+
+```python
+# Store only high-quality knowledge
+memory_config = MemoryConfig(
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # Higher threshold
+        "chunk_size": 1500,  # Larger chunks for better context
+        "search_k": 10       # More search results
+    }
+)
+```
+
+### Custom Embedding Models
+
+```python
+# Use specific embedding model
+memory_config = MemoryConfig(
+    long_term={
+        "embedding_model": "text-embedding-ada-002",
+        "chunk_size": 1000,
+        "search_k": 8
+    }
+)
+```
+
+## Storage Backends
+
+### SQLite for Knowledge Base
+```python
+knowledge_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///knowledge_base.db",
+    long_term={
+        "chunk_size": 2000,  # Larger chunks for knowledge
+        "search_k": 15,      # More comprehensive search
+        "min_quality": 0.6   # Include more knowledge
+    }
+)
+```
+
+### PostgreSQL for Production
+```python
+production_config = MemoryConfig(
+    provider="postgres", 
+    connection_string="postgresql://user:pass@host/knowledge_db",
+    long_term={
+        "embedding_model": "text-embedding-ada-002",
+        "chunk_size": 1500,
+        "search_k": 20,
+        "min_quality": 0.7
+    }
+)
+```
+
+## Use Cases
+
+### Research Assistant
+```python
+# Accumulate research knowledge over time
+research_memory = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///research_knowledge.db",
+    long_term={
+        "chunk_size": 2000,  # Larger chunks for research content
+        "search_k": 20,      # Comprehensive search
+        "min_quality": 0.6,  # Include more research findings
+        "embedding_model": "text-embedding-ada-002"
+    }
+)
+
+research_agent = Agent(
+    role="Senior Researcher",
+    memory=research_memory
+)
+```
+
+### Customer Knowledge Base
+```python
+# Build customer interaction knowledge
+customer_memory = MemoryConfig(
+    provider="postgres",
+    connection_string=DATABASE_URL,
+    long_term={
+        "chunk_size": 1000,
+        "search_k": 10,
+        "min_quality": 0.8,  # High-quality interactions only
+    }
+)
+```
+
+### Learning Agent
+```python
+# Agent that learns from experience
+learning_memory = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///agent_learning.db", 
+    long_term={
+        "chunk_size": 800,
+        "search_k": 12,
+        "min_quality": 0.7
+    }
+)
+
+learning_agent = Agent(
+    role="Learning Assistant",
+    goal="Continuously improve through experience",
+    memory=learning_memory
+)
+```
+
+## Advanced Features
+
+### Knowledge Quality Management
+
+```python
+from langcrew.memory import LongTermMemory
+
+# Create memory with quality filtering
+ltm = LongTermMemory(config=config)
+
+# Store high-quality knowledge
+ltm.save(
+    value="Important research finding...",
+    metadata={
+        "quality": 0.95,  # High quality score
+        "task": "research",
+        "learnings": ["key_insight", "important_finding"],
+        "source": "peer_reviewed_paper"
+    }
+)
+
+# Search with quality threshold
+high_quality_results = ltm.search(
+    query="research findings",
+    min_quality=0.8,  # Only high-quality results
+    limit=10
+)
+```
+
+### Semantic Search
+
+```python
+# Configure for better semantic search
+semantic_config = MemoryConfig(
+    long_term={
+        "embedding_model": "text-embedding-ada-002",
+        "chunk_size": 1200,  # Balanced chunk size
+        "search_k": 15,      # More results for better matching
+        "min_quality": 0.7
+    }
+)
+
+# Search will use semantic similarity
+results = ltm.search("machine learning applications", limit=10)
+```
+
+### Knowledge Categorization
+
+```python
+# Organize knowledge by categories
+ltm.save(
+    value="Neural networks excel at pattern recognition...",
+    metadata={
+        "task": "ml_research",
+        "category": "deep_learning",
+        "quality": 0.9,
+        "learnings": ["neural_networks", "pattern_recognition"]
+    }
+)
+
+# Search within specific categories
+ml_results = ltm.search("pattern recognition", min_quality=0.8)
+```
+
+## Best Practices
+
+### Chunk Size Optimization
+```python
+# For detailed knowledge (research, documentation)
+detailed_config = MemoryConfig(
+    long_term={
+        "chunk_size": 2000,  # Larger chunks
+        "search_k": 10
+    }
+)
+
+# For quick facts and insights
+quick_config = MemoryConfig(
+    long_term={
+        "chunk_size": 800,   # Smaller chunks
+        "search_k": 15       # More results
+    }
+)
+```
+
+### Quality Thresholds
+```python
+# Strict quality for production
+production_config = MemoryConfig(
+    long_term={
+        "min_quality": 0.8,  # High threshold
+        "search_k": 8        # Fewer, better results
+    }
+)
+
+# Inclusive for learning
+learning_config = MemoryConfig(
+    long_term={
+        "min_quality": 0.6,  # Lower threshold
+        "search_k": 15       # More results for learning
+    }
+)
+```
+
+### Storage Optimization
+```python
+# Optimize for search performance
+search_optimized = MemoryConfig(
+    provider="postgres",  # Better for complex queries
+    long_term={
+        "chunk_size": 1000,
+        "search_k": 12,
+        "embedding_model": "text-embedding-ada-002"
+    }
+)
+```
+
+## Troubleshooting
+
+### Poor Search Results
+```python
+# Increase search scope
+memory_config = MemoryConfig(
+    long_term={
+        "search_k": 20,      # More results
+        "min_quality": 0.5,  # Lower threshold
+        "chunk_size": 1200   # Better context chunks
+    }
+)
+```
+
+### Storage Issues
+```python
+# Ensure proper storage configuration
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///knowledge.db",  # Persistent storage
+    long_term={"enabled": True}
+)
+```
+
+### Embedding Problems
+```python
+# Specify embedding model explicitly
+memory_config = MemoryConfig(
+    long_term={
+        "embedding_model": "text-embedding-ada-002",
+        "chunk_size": 1000
+    }
+)
+```
+
+## Next Steps
+
+- **[Short-term Memory](/guides/memory/short-term)** - Session-based conversation history
+- **[Entity Memory](/guides/memory/entity)** - Track people, organizations, concepts
+- **[Memory Storage](/guides/memory/storage)** - Configure storage backends

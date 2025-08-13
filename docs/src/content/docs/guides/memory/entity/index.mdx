@@ -1,0 +1,419 @@
+---
+title: Entity Memory
+description: Track entities like people, organizations, and concepts across conversations
+---
+
+Entity memory tracks and remembers entities (people, organizations, concepts) across conversations using structured storage for relationship management.
+
+## What is Entity Memory?
+
+Entity memory automatically extracts and stores information about entities mentioned in conversations. It's perfect for:
+
+- **Relationship tracking** - Remember connections between people and organizations
+- **Entity profiles** - Build detailed profiles of important entities
+- **Context enrichment** - Provide relevant entity information in conversations
+
+## Quick Start
+
+### Basic Usage
+
+```python
+from langcrew import Agent
+from langcrew.memory import MemoryConfig
+
+# Enable entity memory
+agent = Agent(
+    role="Relationship Manager",
+    goal="Track and remember important people and organizations",
+    backstory="I excel at remembering details about people and their relationships",
+    memory=MemoryConfig(
+        entity={
+            "enabled": True,
+            "extract_entities": True,
+            "entity_types": ["person", "organization", "location"]
+        }
+    )
+)
+
+# Entities will be automatically extracted and stored
+response = agent.execute_task(
+    "John Smith from Acme Corp called about the partnership with TechStart Inc."
+)
+```
+
+### Manual Entity Management
+
+```python
+from langcrew.memory import EntityMemory, MemoryConfig
+
+# Create entity memory instance
+config = MemoryConfig(provider="sqlite", connection_string="sqlite:///entities.db")
+entity_memory = EntityMemory(config=config)
+
+# Store entity information manually
+entity_memory.save(
+    value="Senior Software Engineer with 10 years experience in AI",
+    metadata={
+        "entity_name": "John Smith",
+        "entity_type": "person",
+        "attributes": {
+            "role": "Senior Software Engineer",
+            "experience": "10 years",
+            "expertise": ["AI", "Machine Learning"]
+        },
+        "relationships": [
+            {"type": "works_at", "entity": "Acme Corp"},
+            {"type": "collaborates_with", "entity": "Jane Doe"}
+        ]
+    },
+    agent="relationship_manager"
+)
+```
+
+## Configuration Options
+
+### Entity Memory Parameters
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enabled` | bool | Enable entity memory | True |
+| `extract_entities` | bool | Auto-extract entities from conversations | True |
+| `entity_types` | List[str] | Types of entities to track | ["person", "organization", "location", "concept"] |
+
+### Entity Types
+
+```python
+# Track specific entity types
+memory_config = MemoryConfig(
+    entity={
+        "enabled": True,
+        "extract_entities": True,
+        "entity_types": [
+            "person",       # People
+            "organization", # Companies, institutions
+            "location",     # Places, addresses
+            "product",      # Products, services
+            "concept",      # Ideas, technologies
+            "event"         # Meetings, conferences
+        ]
+    }
+)
+```
+
+### Custom Entity Types
+
+```python
+# Define custom entity types for specific domains
+crm_entities = MemoryConfig(
+    entity={
+        "entity_types": [
+            "customer",
+            "prospect", 
+            "partner",
+            "competitor",
+            "product",
+            "deal"
+        ]
+    }
+)
+```
+
+## Use Cases
+
+### Customer Relationship Management
+```python
+# Track customer entities and relationships
+crm_memory = MemoryConfig(
+    provider="postgres",
+    connection_string=DATABASE_URL,
+    entity={
+        "entity_types": [
+            "customer",
+            "contact_person", 
+            "company",
+            "deal",
+            "product"
+        ],
+        "extract_entities": True
+    }
+)
+
+crm_agent = Agent(
+    role="CRM Specialist",
+    memory=crm_memory
+)
+```
+
+### Research and Knowledge Management
+```python
+# Track research entities
+research_memory = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///research_entities.db",
+    entity={
+        "entity_types": [
+            "researcher",
+            "institution", 
+            "publication",
+            "concept",
+            "methodology",
+            "dataset"
+        ]
+    }
+)
+```
+
+### Sales and Business Development
+```python
+# Track business entities
+sales_memory = MemoryConfig(
+    entity={
+        "entity_types": [
+            "prospect",
+            "decision_maker",
+            "company",
+            "opportunity",
+            "competitor",
+            "product"
+        ],
+        "extract_entities": True
+    }
+)
+
+sales_agent = Agent(
+    role="Sales Representative",
+    goal="Build and maintain business relationships",
+    memory=sales_memory
+)
+```
+
+## Entity Relationships
+
+### Defining Relationships
+
+```python
+# Store entity with relationships
+entity_memory.save(
+    value="CEO of TechStart Inc, former VP at Google",
+    metadata={
+        "entity_name": "Sarah Johnson",
+        "entity_type": "person",
+        "attributes": {
+            "current_role": "CEO",
+            "previous_role": "VP at Google"
+        },
+        "relationships": [
+            {"type": "leads", "entity": "TechStart Inc"},
+            {"type": "former_employee", "entity": "Google"},
+            {"type": "partner_with", "entity": "Acme Corp"}
+        ]
+    }
+)
+```
+
+### Relationship Types
+
+```python
+# Common relationship types
+relationship_types = [
+    "works_at",
+    "leads", 
+    "reports_to",
+    "collaborates_with",
+    "partner_with",
+    "competitor_of",
+    "customer_of",
+    "supplier_to",
+    "located_in",
+    "owns",
+    "invested_in"
+]
+```
+
+## Advanced Features
+
+### Entity Profiles
+
+```python
+# Build comprehensive entity profiles
+def create_person_profile(name, role, company, skills, contacts):
+    entity_memory.save(
+        value=f"{role} at {company} with expertise in {', '.join(skills)}",
+        metadata={
+            "entity_name": name,
+            "entity_type": "person",
+            "attributes": {
+                "role": role,
+                "company": company,
+                "skills": skills,
+                "contact_info": contacts
+            },
+            "mentions": 1
+        }
+    )
+
+# Example usage
+create_person_profile(
+    name="Alice Chen",
+    role="Data Scientist",
+    company="AI Research Lab",
+    skills=["Machine Learning", "Python", "Statistics"],
+    contacts={"email": "alice@ailab.com", "linkedin": "alice-chen"}
+)
+```
+
+### Entity Updates
+
+```python
+# Entities are automatically updated when mentioned again
+# Each mention increases the mention count and updates last_updated timestamp
+
+# First mention
+agent.execute_task("Met with John Smith from Acme Corp")
+
+# Second mention - will update existing entity
+agent.execute_task("John Smith mentioned the new AI project")
+```
+
+### Entity Search and Retrieval
+
+```python
+# Search for entities by type
+def get_entities_by_type(entity_memory, entity_type):
+    # This would use the underlying store to search
+    # Implementation depends on storage backend
+    return entity_memory._get_entities_by_type(entity_type)
+
+# Get all people
+people = get_entities_by_type(entity_memory, "person")
+
+# Get all organizations
+organizations = get_entities_by_type(entity_memory, "organization")
+```
+
+## Storage and Persistence
+
+### SQLite for Entity Database
+```python
+entity_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///entity_database.db",
+    entity={
+        "entity_types": ["person", "organization", "product"],
+        "extract_entities": True
+    }
+)
+```
+
+### PostgreSQL for Production
+```python
+production_entity_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@host/entity_db",
+    entity={
+        "entity_types": [
+            "customer", "prospect", "partner", 
+            "product", "deal", "contact"
+        ]
+    }
+)
+```
+
+## Best Practices
+
+### Entity Type Design
+```python
+# Design entity types for your domain
+healthcare_entities = [
+    "patient",
+    "doctor", 
+    "hospital",
+    "treatment",
+    "medication",
+    "diagnosis"
+]
+
+financial_entities = [
+    "client",
+    "advisor",
+    "institution",
+    "investment",
+    "portfolio",
+    "transaction"
+]
+```
+
+### Relationship Modeling
+```python
+# Model meaningful relationships
+def store_business_relationship(person, company, role, start_date=None):
+    entity_memory.save(
+        value=f"{person} works as {role} at {company}",
+        metadata={
+            "entity_name": person,
+            "entity_type": "person",
+            "relationships": [
+                {
+                    "type": "works_at",
+                    "entity": company,
+                    "role": role,
+                    "start_date": start_date
+                }
+            ]
+        }
+    )
+```
+
+### Entity Maintenance
+```python
+# Regular entity cleanup and consolidation
+def cleanup_entities():
+    # Remove low-mention entities
+    # Merge duplicate entities
+    # Update stale information
+    pass
+```
+
+## Troubleshooting
+
+### Entities Not Being Extracted
+```python
+# Ensure extraction is enabled
+memory_config = MemoryConfig(
+    entity={
+        "enabled": True,
+        "extract_entities": True,  # ← Make sure this is True
+        "entity_types": ["person", "organization"]
+    }
+)
+```
+
+### Missing Entity Types
+```python
+# Add relevant entity types for your domain
+memory_config = MemoryConfig(
+    entity={
+        "entity_types": [
+            "person", "organization",  # Basic types
+            "product", "service",      # Business types
+            "location", "event"        # Additional types
+        ]
+    }
+)
+```
+
+### Storage Issues
+```python
+# Use persistent storage
+memory_config = MemoryConfig(
+    provider="sqlite",  # Not "memory"
+    connection_string="sqlite:///entities.db",
+    entity={"enabled": True}
+)
+```
+
+## Next Steps
+
+- **[Short-term Memory](/guides/memory/short-term)** - Session-based conversation history
+- **[Long-term Memory](/guides/memory/long-term)** - Persistent knowledge storage
+- **[Memory Storage](/guides/memory/storage)** - Configure storage backends

@@ -1165,7 +1165,7 @@ class Crew:
             self._replace_all_placeholders(inputs)
 
         # Use provided thread_id or generate new one
-        self._thread_id = thread_id or self.memory_config.thread_id or str(uuid.uuid4())
+        self._thread_id = thread_id or str(uuid.uuid4())
 
         # Setup agents with memory if enabled
         if self.memory_config.enabled and self._short_term_memory:
@@ -1204,7 +1204,7 @@ class Crew:
             self._replace_all_placeholders(inputs)
 
         # Use provided thread_id or generate new one
-        self._thread_id = thread_id or self.memory_config.thread_id or str(uuid.uuid4())
+        self._thread_id = thread_id or str(uuid.uuid4())
 
         # Ensure async components are set up
         if self.memory_config.enabled:

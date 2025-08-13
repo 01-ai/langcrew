@@ -1,0 +1,423 @@
+---
+title: Memory Storage
+description: Configure storage backends for persistent memory
+---
+
+Memory storage provides flexible backend options for persisting memory data across different environments and scale requirements.
+
+## Storage Providers
+
+Memory supports multiple storage backends through a unified interface:
+
+- **Memory** - In-memory storage for development
+- **SQLite** - File-based storage for single-node deployments
+- **PostgreSQL** - Production-grade relational database
+- **Redis** - High-performance caching and session storage
+- **MongoDB** - Document-based storage for flexible schemas
+- **MySQL** - Traditional relational database option
+
+## Quick Start
+
+### Development Setup (In-Memory)
+
+```python
+from langcrew.memory import MemoryConfig
+
+# Fastest setup for development and testing
+dev_config = MemoryConfig(
+    provider="memory"  # No persistence, fastest performance
+)
+```
+
+### Production Setup (PostgreSQL)
+
+```python
+# Recommended for production
+production_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:password@host:5432/langcrew_memory"
+)
+```
+
+## Storage Configuration
+
+### SQLite Configuration
+
+Perfect for single-node applications and development:
+
+```python
+# Basic SQLite setup
+sqlite_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///langcrew_memory.db"
+)
+
+# SQLite with custom settings
+sqlite_advanced = MemoryConfig(
+    provider="sqlite", 
+    connection_string="sqlite:///memory.db?timeout=20&journal_mode=WAL"
+)
+
+# SQLite in specific directory
+sqlite_custom_path = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///./data/memory.db"
+)
+```
+
+### PostgreSQL Configuration
+
+Recommended for production and multi-node deployments:
+
+```python
+# Basic PostgreSQL
+postgres_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db"
+)
+
+# PostgreSQL with connection pooling
+postgres_pooled = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@host:5432/db?pool_size=10&max_overflow=20"
+)
+
+# PostgreSQL with SSL
+postgres_ssl = MemoryConfig(
+    provider="postgres", 
+    connection_string="postgresql://user:pass@host:5432/db?sslmode=require"
+)
+```
+
+### Redis Configuration
+
+High-performance option for caching and sessions:
+
+```python
+# Basic Redis
+redis_config = MemoryConfig(
+    provider="redis",
+    connection_string="redis://localhost:6379/0"
+)
+
+# Redis with authentication
+redis_auth = MemoryConfig(
+    provider="redis",
+    connection_string="redis://:password@localhost:6379/0"
+)
+
+# Redis Cluster
+redis_cluster = MemoryConfig(
+    provider="redis",
+    connection_string="redis://node1:6379,node2:6379,node3:6379/0"
+)
+```
+
+### MongoDB Configuration
+
+Document-based storage for flexible schemas:
+
+```python
+# Basic MongoDB
+mongo_config = MemoryConfig(
+    provider="mongodb",
+    connection_string="mongodb://localhost:27017/langcrew_memory"
+)
+
+# MongoDB with authentication
+mongo_auth = MemoryConfig(
+    provider="mongodb", 
+    connection_string="mongodb://user:pass@localhost:27017/memory_db"
+)
+
+# MongoDB Atlas (cloud)
+mongo_atlas = MemoryConfig(
+    provider="mongodb",
+    connection_string="mongodb+srv://user:pass@cluster.mongodb.net/memory_db"
+)
+```
+
+### MySQL Configuration
+
+Traditional relational database option:
+
+```python
+# Basic MySQL
+mysql_config = MemoryConfig(
+    provider="mysql",
+    connection_string="mysql://user:password@localhost:3306/langcrew_memory"
+)
+
+# MySQL with custom settings
+mysql_custom = MemoryConfig(
+    provider="mysql",
+    connection_string="mysql://user:pass@host:3306/db?charset=utf8mb4&autocommit=true"
+)
+```
+
+## Storage Selection Guide
+
+### Development
+```python
+# Fast iteration, no persistence needed
+dev_config = MemoryConfig(provider="memory")
+```
+
+### Single Application
+```python
+# Simple deployment, file-based persistence
+single_app_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///app_memory.db"
+)
+```
+
+### Production Web Application
+```python
+# Scalable, reliable, ACID compliant
+web_app_config = MemoryConfig(
+    provider="postgres",
+    connection_string=DATABASE_URL
+)
+```
+
+### High-Performance Caching
+```python
+# Fast access, session management
+cache_config = MemoryConfig(
+    provider="redis",
+    connection_string=REDIS_URL
+)
+```
+
+### Microservices Architecture
+```python
+# Flexible schema, document-based
+microservices_config = MemoryConfig(
+    provider="mongodb",
+    connection_string=MONGODB_URL
+)
+```
+
+## Environment-Specific Configurations
+
+### Docker Compose Setup
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  app:
+    build: .
+    environment:
+      - MEMORY_PROVIDER=postgres
+      - MEMORY_CONNECTION_STRING=postgresql://postgres:password@db:5432/langcrew
+    depends_on:
+      - db
+  
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=langcrew
+      - POSTGRES_USER=postgres  
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+### Kubernetes Configuration
+
+```yaml
+# k8s-memory-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: memory-config
+data:
+  MEMORY_PROVIDER: "postgres"
+  MEMORY_CONNECTION_STRING: "postgresql://user:pass@postgres-service:5432/langcrew"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: memory-secrets
+data:
+  database-password: <base64-encoded-password>
+```
+
+### Environment Variables
+
+```python
+import os
+from langcrew.memory import MemoryConfig
+
+# Configure from environment
+memory_config = MemoryConfig(
+    provider=os.getenv("MEMORY_PROVIDER", "sqlite"),
+    connection_string=os.getenv("MEMORY_CONNECTION_STRING", "sqlite:///memory.db")
+)
+```
+
+## Advanced Storage Features
+
+### Connection Pooling
+
+```python
+# PostgreSQL with connection pooling
+pooled_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@host/db?pool_size=20&max_overflow=30"
+)
+```
+
+### Read Replicas
+
+```python
+# Use read replicas for better performance
+read_replica_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@read-replica:5432/db"
+)
+```
+
+### Backup and Recovery
+
+```python
+# Configure backup-friendly settings
+backup_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@host/db?backup_enabled=true"
+)
+```
+
+## Performance Optimization
+
+### SQLite Optimization
+```python
+sqlite_optimized = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db?journal_mode=WAL&synchronous=NORMAL&cache_size=10000"
+)
+```
+
+### PostgreSQL Optimization
+```python
+postgres_optimized = MemoryConfig(
+    provider="postgres", 
+    connection_string="postgresql://user:pass@host/db?pool_size=20&statement_timeout=30000"
+)
+```
+
+### Redis Optimization
+```python
+redis_optimized = MemoryConfig(
+    provider="redis",
+    connection_string="redis://host:6379/0?socket_timeout=30&socket_connect_timeout=30"
+)
+```
+
+## Migration Between Providers
+
+### Development to Production
+```python
+# Development
+dev_config = MemoryConfig(provider="memory")
+
+# Staging
+staging_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///staging_memory.db"
+)
+
+# Production
+prod_config = MemoryConfig(
+    provider="postgres",
+    connection_string=DATABASE_URL
+)
+```
+
+### Data Migration Script
+```python
+from langcrew.memory import get_storage, get_checkpointer
+
+def migrate_memory_data(source_config, target_config):
+    """Migrate memory data between storage providers"""
+    source_store = get_storage(source_config.provider, source_config)
+    target_store = get_storage(target_config.provider, target_config)
+    
+    # Migrate store data
+    # Implementation depends on specific requirements
+    
+    source_checkpointer = get_checkpointer(source_config.provider, source_config)
+    target_checkpointer = get_checkpointer(target_config.provider, target_config)
+    
+    # Migrate checkpoint data
+    # Implementation depends on specific requirements
+```
+
+## Troubleshooting
+
+### Connection Issues
+```python
+# Test connection
+from langcrew.memory import get_storage
+
+try:
+    storage = get_storage("postgres", {"connection_string": DATABASE_URL})
+    print("Connection successful")
+except Exception as e:
+    print(f"Connection failed: {e}")
+```
+
+### Performance Issues
+```python
+# Monitor connection pool
+postgres_monitored = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@host/db?pool_size=10&pool_timeout=30"
+)
+```
+
+### Storage Space Issues
+```python
+# Implement cleanup strategies
+def cleanup_old_memories(storage, days_old=30):
+    """Remove memories older than specified days"""
+    # Implementation depends on storage provider
+    pass
+```
+
+## Best Practices
+
+### Security
+- Use environment variables for connection strings
+- Enable SSL/TLS for production databases
+- Implement proper authentication and authorization
+- Regular security updates for database systems
+
+### Performance
+- Use connection pooling for high-traffic applications
+- Implement read replicas for read-heavy workloads
+- Monitor and optimize database queries
+- Regular maintenance and vacuuming
+
+### Reliability
+- Implement backup and recovery procedures
+- Use replication for high availability
+- Monitor database health and performance
+- Plan for disaster recovery scenarios
+
+### Scalability
+- Start with simple solutions (SQLite) and scale up
+- Use horizontal scaling when needed
+- Implement caching layers (Redis) for performance
+- Consider sharding for very large datasets
+
+## Next Steps
+
+- **[Short-term Memory](/guides/memory/short-term)** - Session-based conversation history
+- **[Long-term Memory](/guides/memory/long-term)** - Persistent knowledge storage
+- **[Entity Memory](/guides/memory/entity)** - Track people, organizations, concepts

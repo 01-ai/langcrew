@@ -11,7 +11,7 @@ langcrew 中的内存管理提供：
 - **短期记忆**：使用 LangGraph Checkpointer 的基于会话的对话历史
 - **长期记忆**：使用 LangGraph Store 系统的持久知识存储
 - **实体记忆**：跨对话跟踪和记住实体（人员、组织、概念）
-- **多提供商支持**：内存、SQLite、PostgreSQL、Redis、MongoDB、MySQL 后端
+- **多提供商支持**：内存、SQLite、PostgreSQL 后端（已测试）；Redis、MongoDB、MySQL（实验性）
 
 ## 核心架构
 
@@ -42,8 +42,7 @@ memory_config = MemoryConfig(
 | `short_term` | dict | 短期记忆配置 | 见下文 |
 | `long_term` | dict | 长期记忆配置 | 见下文 |
 | `entity` | dict | 实体记忆配置 | 见下文 |
-| `shared_namespaces` | List[str] | 跨项目命名空间 | [] |
-| `thread_id` | str \| None | 固定线程标识符 | None |
+
 
 ### 短期记忆
 管理对话历史和近期上下文。
@@ -53,9 +52,7 @@ memory_config = MemoryConfig(
 memory_config = MemoryConfig(
     short_term={
         "enabled": True,
-        "auto_inject": True,
         "max_history": 20,
-        "relevance_threshold": 0.7
     }
 )
 ```
@@ -68,9 +65,6 @@ memory_config = MemoryConfig(
 memory_config = MemoryConfig(
     long_term={
         "enabled": True,
-        "embedding_model": "text-embedding-ada-002",
-        "chunk_size": 500,
-        "search_k": 5,
         "min_quality": 0.7
     }
 )
@@ -84,8 +78,6 @@ memory_config = MemoryConfig(
 memory_config = MemoryConfig(
     entity={
         "enabled": True,
-        "extract_entities": True,
-        "entity_types": ["person", "organization", "location", "concept"]
     }
 )
 ```

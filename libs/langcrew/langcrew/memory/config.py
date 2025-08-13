@@ -1,4 +1,4 @@
-"""Base configuration for LangCrew Memory System"""
+"""Memory configuration for LangCrew Memory System"""
 
 from dataclasses import dataclass, field
 from typing import Any
@@ -19,35 +19,29 @@ class MemoryConfig:
     short_term: dict[str, Any] = field(
         default_factory=lambda: {
             "enabled": True,
-            "auto_inject": True,  # Auto inject context
             "max_history": 20,
-            "relevance_threshold": 0.7,
+            # "auto_inject": True,  # Auto inject context - reserved for future use
+            # "relevance_threshold": 0.7,  # Relevance threshold - reserved for future use
         }
     )
 
     long_term: dict[str, Any] = field(
         default_factory=lambda: {
             "enabled": True,
-            "embedding_model": None,  # Use default
-            "chunk_size": 500,
-            "search_k": 5,
             "min_quality": 0.7,
+            # "embedding_model": None,  # Use default embedding model - reserved for future use
+            # "chunk_size": 500,  # Text chunk size for storage - reserved for future use
+            # "search_k": 5,  # Number of relevant items to retrieve - reserved for future use
         }
     )
 
     entity: dict[str, Any] = field(
         default_factory=lambda: {
             "enabled": True,
-            "extract_entities": True,
-            "entity_types": ["person", "organization", "location", "concept"],
+            # "extract_entities": True,  # Auto-extract entities - reserved for future use
+            # "entity_types": ["person", "organization", "location", "concept"],  # Entity types - reserved for future use
         }
     )
-
-    # Shared namespaces for cross-project access
-    shared_namespaces: list = field(default_factory=list)
-
-    # Thread management
-    thread_id: str | None = None  # Fixed thread_id if specified
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "MemoryConfig":

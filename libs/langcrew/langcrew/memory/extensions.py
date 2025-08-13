@@ -1,1 +1,0 @@
-# This file has been removed. Extension functionality may be added in future versions.

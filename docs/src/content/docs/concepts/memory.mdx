@@ -11,7 +11,7 @@ Memory in langcrew provides:
 - **Short-term memory**: Session-based conversation history using LangGraph's Checkpointer
 - **Long-term memory**: Persistent knowledge storage using LangGraph's Store system
 - **Entity memory**: Track and remember entities (people, organizations, concepts) across conversations
-- **Multi-provider support**: In-memory, SQLite, PostgreSQL, Redis, MongoDB, MySQL backends
+- **Multi-provider support**: In-memory, SQLite, PostgreSQL backends (tested); Redis, MongoDB, MySQL (experimental)
 
 ## Core Architecture
 
@@ -42,8 +42,6 @@ Unified configuration for all memory types and providers.
 | `short_term` | dict | Short-term memory configuration | See below |
 | `long_term` | dict | Long-term memory configuration | See below |
 | `entity` | dict | Entity memory configuration | See below |
-| `shared_namespaces` | List[str] | Cross-project namespaces | [] |
-| `thread_id` | str \| None | Fixed thread identifier | None |
 
 ### Short-term Memory
 Session-based conversation history using LangGraph's Checkpointer system for immediate context retention.
@@ -53,9 +51,7 @@ Session-based conversation history using LangGraph's Checkpointer system for imm
 memory_config = MemoryConfig(
     short_term={
         "enabled": True,
-        "auto_inject": True,  # Auto-inject context into prompts
         "max_history": 20,    # Maximum conversation turns to remember
-        "relevance_threshold": 0.7
     }
 )
 ```
@@ -68,9 +64,6 @@ Persistent knowledge storage using LangGraph's Store system for cross-session in
 memory_config = MemoryConfig(
     long_term={
         "enabled": True,
-        "embedding_model": None,  # Use default embedding model
-        "chunk_size": 500,        # Text chunk size for storage
-        "search_k": 5,           # Number of relevant items to retrieve
         "min_quality": 0.7       # Minimum quality threshold for storage
     }
 )
@@ -84,8 +77,6 @@ Tracks entities (people, organizations, concepts) across conversations using str
 memory_config = MemoryConfig(
     entity={
         "enabled": True,
-        "extract_entities": True,  # Auto-extract entities from conversations
-        "entity_types": ["person", "organization", "location", "concept"]
     }
 )
 ```

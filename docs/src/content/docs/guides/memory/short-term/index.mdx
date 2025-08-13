@@ -1,0 +1,245 @@
+---
+title: Short-term Memory
+description: Session-based conversation history using LangGraph's Checkpointer
+---
+
+Short-term memory manages conversation history and session context using LangGraph's Checkpointer system for immediate context retention.
+
+## What is Short-term Memory?
+
+Short-term memory stores recent conversation turns and session context, automatically injecting relevant history into agent prompts. It's perfect for:
+
+- **Conversation continuity** - Remember what was discussed
+- **Session management** - Maintain context across interactions  
+- **Context injection** - Automatically provide relevant history to agents
+
+## Quick Start
+
+### Basic Usage
+
+```python
+from langcrew import Agent
+from langcrew.memory import MemoryConfig
+
+# Enable short-term memory
+agent = Agent(
+    role="Assistant",
+    goal="Help users with context awareness",
+    backstory="I remember our conversation history",
+    memory=MemoryConfig(
+        short_term={
+            "enabled": True,
+            "max_history": 10,
+            "auto_inject": True
+        }
+    )
+)
+
+# Test conversation continuity
+response1 = agent.execute_task("My name is Alice")
+response2 = agent.execute_task("What's my name?")  # Should remember Alice
+```
+
+### With Custom Thread ID
+
+```python
+# Fixed thread for specific user
+user_memory = MemoryConfig(
+    thread_id="user_12345",
+    short_term={
+        "max_history": 20,
+        "relevance_threshold": 0.8
+    }
+)
+
+agent = Agent(
+    role="Personal Assistant",
+    memory=user_memory
+)
+```
+
+## Configuration Options
+
+### Short-term Memory Parameters
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enabled` | bool | Enable short-term memory | True |
+| `auto_inject` | bool | Auto-inject context into prompts | True |
+| `max_history` | int | Maximum conversation turns to remember | 20 |
+| `relevance_threshold` | float | Minimum relevance score for context | 0.7 |
+
+### Thread Management
+
+```python
+# Automatic thread management (default)
+memory_config = MemoryConfig(
+    short_term={"max_history": 15}
+)
+
+# Fixed thread for user sessions
+memory_config = MemoryConfig(
+    thread_id="session_abc123",
+    short_term={"max_history": 50}
+)
+
+# Dynamic thread creation
+import uuid
+memory_config = MemoryConfig(
+    thread_id=f"user_{uuid.uuid4().hex[:8]}",
+    short_term={"auto_inject": True}
+)
+```
+
+## Storage Backends
+
+Short-term memory works with different storage providers:
+
+### In-Memory (Development)
+```python
+memory_config = MemoryConfig(
+    provider="memory",
+    short_term={"max_history": 10}
+)
+```
+
+### SQLite (Single Node)
+```python
+memory_config = MemoryConfig(
+    provider="sqlite", 
+    connection_string="sqlite:///conversations.db",
+    short_term={
+        "max_history": 100,
+        "relevance_threshold": 0.7
+    }
+)
+```
+
+### PostgreSQL (Production)
+```python
+memory_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@host/db",
+    short_term={
+        "max_history": 200,
+        "auto_inject": True
+    }
+)
+```
+
+## Use Cases
+
+### Customer Support
+```python
+# Remember customer context across support sessions
+support_memory = MemoryConfig(
+    provider="postgres",
+    connection_string=DATABASE_URL,
+    thread_id=f"customer_{customer_id}",
+    short_term={
+        "max_history": 50,  # Long conversation history
+        "auto_inject": True,
+        "relevance_threshold": 0.6  # Include more context
+    }
+)
+```
+
+### Chatbot Conversations
+```python
+# Conversational AI with context awareness
+chatbot_memory = MemoryConfig(
+    short_term={
+        "max_history": 15,  # Recent conversation focus
+        "auto_inject": True,
+        "relevance_threshold": 0.8  # High relevance only
+    }
+)
+```
+
+### Multi-turn Tasks
+```python
+# Complex tasks requiring multiple interactions
+task_memory = MemoryConfig(
+    thread_id=f"task_{task_id}",
+    short_term={
+        "max_history": 30,  # Extended context for complex tasks
+        "auto_inject": True
+    }
+)
+```
+
+## Best Practices
+
+### Memory Size Management
+```python
+# Balance context and performance
+memory_config = MemoryConfig(
+    short_term={
+        "max_history": 20,  # Reasonable limit
+        "relevance_threshold": 0.7  # Filter irrelevant content
+    }
+)
+```
+
+### Context Quality
+```python
+# Optimize for relevant context
+memory_config = MemoryConfig(
+    short_term={
+        "auto_inject": True,  # Let system decide
+        "relevance_threshold": 0.8,  # High quality context
+        "max_history": 15  # Focus on recent interactions
+    }
+)
+```
+
+### Session Continuity
+```python
+# Ensure session persistence
+memory_config = MemoryConfig(
+    provider="sqlite",  # Persistent storage
+    connection_string="sqlite:///sessions.db",
+    thread_id=session_id,  # Fixed session ID
+    short_term={"max_history": 25}
+)
+```
+
+## Troubleshooting
+
+### Context Not Injected
+```python
+# Ensure auto_inject is enabled
+memory_config = MemoryConfig(
+    short_term={
+        "enabled": True,
+        "auto_inject": True  # ← Make sure this is True
+    }
+)
+```
+
+### Memory Not Persisting
+```python
+# Use persistent storage provider
+memory_config = MemoryConfig(
+    provider="sqlite",  # Not "memory"
+    connection_string="sqlite:///persistent.db",
+    short_term={"max_history": 20}
+)
+```
+
+### Poor Context Quality
+```python
+# Adjust relevance threshold
+memory_config = MemoryConfig(
+    short_term={
+        "relevance_threshold": 0.6,  # Lower for more context
+        "max_history": 25  # Increase history size
+    }
+)
+```
+
+## Next Steps
+
+- **[Long-term Memory](/guides/memory/long-term)** - Persistent knowledge storage
+- **[Entity Memory](/guides/memory/entity)** - Track people, organizations, concepts
+- **[Memory Storage](/guides/memory/storage)** - Configure storage backends

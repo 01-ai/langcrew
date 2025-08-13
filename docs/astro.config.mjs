@@ -124,17 +124,31 @@ export default defineConfig({
 							},
 							items: [
 								{
-									label: '快速开始',
-									link: '/guides/memory/getting-started',
+									label: '短期记忆',
+									link: '/guides/memory/short-term',
 									translations: {
-										en: 'Getting Started'
+										en: 'Short-term Memory'
 									}
 								},
 								{
-									label: '配置指南',
-									link: '/guides/memory/configuration',
+									label: '长期记忆',
+									link: '/guides/memory/long-term',
 									translations: {
-										en: 'Configuration'
+										en: 'Long-term Memory'
+									}
+								},
+								{
+									label: '实体记忆',
+									link: '/guides/memory/entity',
+									translations: {
+										en: 'Entity Memory'
+									}
+								},
+								{
+									label: '存储配置',
+									link: '/guides/memory/storage',
+									translations: {
+										en: 'Storage'
 									}
 								},
 							]
@@ -150,6 +164,13 @@ export default defineConfig({
 									link: '/guides/web/getting-started',
 									translations: {
 										en: 'Getting Started'
+									}
+								},
+								{
+									label: '生产部署',
+									link: '/guides/web/deployment',
+									translations: {
+										en: 'Deployment'
 									}
 								},
 								{
@@ -197,10 +218,17 @@ export default defineConfig({
 									}
 								},
 								{
-									label: '配置指南',
+									label: '实用示例',
+									link: '/guides/utils/examples',
+									translations: {
+										en: 'Examples'
+									}
+								},
+								{
+									label: '高级配置',
 									link: '/guides/utils/configuration',
 									translations: {
-										en: 'Configuration'
+										en: 'Advanced Configuration'
 									}
 								},
 							]

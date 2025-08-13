@@ -76,7 +76,7 @@ server = create_langgraph_server(
 )
 
 # Start server
-server.start()
+server.run()
 ```
 
 ## Streaming Example
@@ -101,7 +101,7 @@ server = AdapterServer(
     port=8000
 )
 
-server.start()
+server.run()
 ```
 
 ## Testing Your Setup
@@ -120,22 +120,29 @@ curl -X POST http://localhost:8000/execute \
   -d '{"task": "research_topic", "input": {"topic": "AI trends"}}'
 ```
 
-### Test with WebSocket
+### Test with SSE (Server-Sent Events)
 
 ```javascript
-// Connect to streaming endpoint
-const ws = new WebSocket('ws://localhost:8000/stream');
+// Connect to streaming endpoint using SSE
+const eventSource = new EventSource('http://localhost:8000/api/v1/chat', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        message: 'Hello from SSE!',
+        session_id: 'test-session'
+    })
+});
 
-ws.onmessage = function(event) {
+eventSource.onmessage = function(event) {
     const data = JSON.parse(event.data);
     console.log('Received:', data);
 };
 
-// Send message
-ws.send(JSON.stringify({
-    type: 'chat',
-    message: 'Hello from WebSocket!'
-}));
+eventSource.onerror = function(error) {
+    console.error('SSE error:', error);
+};
 ```
 
 ### Run the Complete Example
