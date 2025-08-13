@@ -4,24 +4,14 @@
 
 ## What is this?
 
-`langcrew-tools` is the official toolbox in the LangCrew ecosystem, providing production‑ready tools specifically designed for agent workflows:
-- Compatible with LangChain `BaseTool` interface
-- Built‑in streaming events (astream) with timeout/interrupt handling
-- Sandbox execution (e2b), browser and mobile automation
-- Human‑in‑the‑loop (HITL) hooks and observability‑friendly events
+`langcrew-tools` is the official toolbox in the LangCrew ecosystem, providing production‑ready tools specifically designed for agent workflows with streaming events, sandbox execution, and human‑in‑the‑loop support.
 
-## System Requirements
+## Core Benefits
 
-### External Dependencies
-
-#### Core Services (Optional but Recommended)
-- **E2B Sandbox**: Required for browser automation, code interpreter, command execution, and filesystem operations
-- **PostgreSQL 15+**: Required for vector storage operations (with pgvector extension)
-- **S3-Compatible Storage**: For file persistence and data exchange
-
-#### Browser Automation Requirements
-- **Chrome/Chromium**: Installed and accessible in PATH
-- **Playwright**: Automatically managed by the package
+- **LangChain Integration**: All tools inherit from `langchain_core.tools.BaseTool` with consistent interfaces and Pydantic validation
+- **Streaming Events**: Built-in support for intermediate event dispatching during tool execution
+- **Timeout & Interruption**: Clear policies for handling timeouts and user interruptions
+- **HITL Support**: Production-grade human-in-the-loop extension points
 
 ## Quick Install
 
@@ -29,55 +19,34 @@
 pip install langcrew-tools
 ```
 
+> Most tools require additional setup (API keys, services). See individual tool documentation for specific requirements.
+
 ## Tool Catalog
 
 ### E2B Sandbox Tools
-- **Browser Automation** - Streaming events, HITL support
-  - [Browser Tools](./langcrew_tools/browser/README.md)
-- **Code Interpreter** - Safe Python execution with isolation
-  - [Code Interpreter](./langcrew_tools/code_interpreter/README.md)
-- **Terminal Commands** - Command execution and session management
-  - [Command Tools](./langcrew_tools/commands/README.md)
-- **Filesystem Operations** - Comprehensive file and directory management
-  - [Filesystem Tools](./langcrew_tools/filesystem/README.md)
+- **[Browser Automation](./langcrew_tools/browser/README.md)** - Streaming events, HITL support
+- **[Code Interpreter](./langcrew_tools/code_interpreter/README.md)** - Safe Python execution with isolation
+- **[Terminal Commands](./langcrew_tools/commands/README.md)** - Command execution and session management
+- **[Filesystem Operations](./langcrew_tools/filesystem/README.md)** - Comprehensive file and directory management
 
 ### Information & Data Collection
-- **Cloud Phone Automation** - Control Android devices in the cloud
-  - [Cloud Phone Tools](./langcrew_tools/cloud_phone/README.md)
-- **Data Fetching** - External data integration
-  - [Fetch Tools](./langcrew_tools/fetch/README.md)
-- **File Parsing** - Content extraction and processing
-- **Knowledge Management** - Information storage and retrieval
-- **Search Operations** - Advanced search capabilities
+- **[Cloud Phone Automation](./langcrew_tools/cloud_phone/README.md)** - Control Android devices in the cloud
+- **[Data Fetching](./langcrew_tools/fetch/README.md)** - External data integration
+- **[File Parsing](./langcrew_tools/file_parser/README.md)** - Content extraction and processing
+- **[Knowledge Management](./langcrew_tools/knowledge/README.md)** - Information storage and retrieval
+- **[Search Operations](./langcrew_tools/search/README.md)** - Advanced search capabilities
 
 ### Infrastructure & Utilities
-- **Image Generation** - AI-powered image creation
-- **Image Processing** - Image analysis and manipulation
-- **HITL Support** - Human-in-the-loop interactions
-- **Utils & Helpers** - Core infrastructure and sandbox management
-  - [Utils Module](./langcrew_tools/utils/README.md)
-
-## Environment Setup
-
-Most tools require some environment configuration. Core dependencies include:
-
-- **E2B Sandbox**: Required for sandbox-based tools (browser, code interpreter, commands, filesystem)
-- **External Services**: Individual tools may require API keys or service endpoints
-
-For detailed configuration instructions, see the specific tool documentation in the [Tool Catalog](#tool-catalog).
+- **[Image Generation](./langcrew_tools/image_gen/README.md)** - AI-powered image creation
+- **[Image Processing](./langcrew_tools/image_parser/README.md)** - Image analysis and manipulation
+- **[HITL Support](./langcrew_tools/hitl/README.md)** - Human-in-the-loop interactions
+- **[Utils & Helpers](./langcrew_tools/utils/README.md)** - Core infrastructure and sandbox management
 
 ## Integration with LangCrew
 
 - Fully compatible with `langcrew`, inject tools into Agent via `tools=[...]`
 - Supports LangGraph astream event flow for UI visualization and HITL approvals
 - Combine with the main project example `examples/components/web/web_chat` to visualize tool activity in a web UI
-
-## Design Principles
-
-- Consistent Tool interfaces and input validation (Pydantic)
-- Clear timeout, interrupt, and error‑handling policies
-- Production‑grade HITL extension points
-- Observability‑friendly (standardized streaming events)
 
 ## Contributing
 
