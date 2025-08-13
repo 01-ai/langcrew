@@ -688,7 +688,7 @@ export const mockPhoneStartApp = [
 export const mockPhoneChunk = {
   id: '1753758497627_83863269',
   role: 'assistant',
-  type: 'message_notify_user',
+  type: 'message_to_user',
   content: '已成功进入小红书的手机号登录页面，请在手机界面输入您的手机号并完成登录操作。如需验证码或遇到问题请告知我。',
   detail: {
     attachments: [],

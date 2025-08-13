@@ -262,7 +262,7 @@ class LangGraphAdapter:
                                 "Tool approval needed due to TOOL_APPROVAL_REQUEST message"
                             )
                         elif (
-                            message.type == MessageType.MESSAGE_NOTIFY_USER
+                            message.type == MessageType.MESSAGE_TO_USER
                             and message.detail.get("intent_type") == "asking_user"
                         ):
                             need_user_input = True
@@ -351,9 +351,9 @@ class LangGraphAdapter:
             run_id = event.get("run_id")  # Use run_id as correlation ID
             tool_name = event.get("name", None)
 
-            # Skip sending tool_start message for message_notify_user tool
-            # We'll only send the final result with MessageType.MESSAGE_NOTIFY_USER
-            if tool_name == "message_notify_user":
+            # Skip sending tool_start message for message_to_user tool
+            # We'll only send the final result with MessageType.MESSAGE_TO_USER
+            if tool_name == "message_to_user":
                 return None
 
             # Skip sending tool_start message for user_input tool
@@ -470,7 +470,7 @@ class LangGraphAdapter:
                         if (
                             len(input_messages) >= 1
                             and isinstance(input_messages[0][-1], ToolMessage)
-                            and input_messages[0][-1].name == "message_notify_user"
+                            and input_messages[0][-1].name == "message_to_user"
                         ):
                             return None
 
@@ -932,7 +932,7 @@ class LangGraphAdapter:
             content = "\n".join(goal_lines)
             return StreamMessage(
                 id=message_id,
-                type=MessageType.MESSAGE_NOTIFY_USER,
+                type=MessageType.MESSAGE_TO_USER,
                 content=content,
                 detail={},
                 role="assistant",

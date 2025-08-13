@@ -73,7 +73,7 @@ src/registry/
 ├── live_status/                # 实时状态类型
 ├── user_input/                 # 用户输入类型
 ├── finish_reason/              # 完成原因类型
-├── message_notify_user/        # 用户通知类型
+├── message_to_user/        # 用户通知类型
 ├── knowledge_search/           # 知识库搜索类型
 ├── chunk_retrieval/            # 块检索类型
 └── service_deploy/             # 服务部署类型
@@ -161,7 +161,7 @@ export interface DetailRendererProps {
 | `chunk_retrieval`     | 块检索     | ❌            | ✅             | 🔍   |
 | `user_input`          | 用户输入   | ✅            | ❌             | -    |
 | `finish_reason`       | 完成原因   | ✅            | ❌             | -    |
-| `message_notify_user` | 用户通知   | ✅            | ❌             | -    |
+| `message_to_user` | 用户通知   | ✅            | ❌             | -    |
 
 ## 使用指南
 
@@ -463,7 +463,7 @@ describe('MessageTypeRegistry', () => {
 | 2025-07-05 | user_input (用户输入)               |
 | 2025-07-07 | finish_reason (完成原因)            |
 | 2025-07-09 | file_parser (文件解析)              |
-| 2025-07-10 | message_notify_user (用户通知消息)  |
+| 2025-07-10 | message_to_user (用户通知消息)  |
 | 2025-07-14 | image_parser (图片解析)             |
 | 2025-07-15 | image_generation (图片生成)         |
 | 2025-07-18 | mysql (SQL 执行)                    |

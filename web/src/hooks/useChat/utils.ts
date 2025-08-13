@@ -18,7 +18,7 @@ import { getTranslation } from '../useTranslation';
 export const ignoreToolChunks = [
   'agent_update_plan',
   'agent_advance_phase',
-  // 'message_notify_user',
+  // 'message_to_user',
   'agent_end_task',
   'config',
   'ask_user',

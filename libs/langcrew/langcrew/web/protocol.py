@@ -31,7 +31,7 @@ class MessageType(str, Enum):
     PLAN = "plan"
     PLAN_UPDATE = "plan_update"
 
-    MESSAGE_NOTIFY_USER = "message_notify_user"
+    MESSAGE_TO_USER = "message_to_user"
 
     # HITL related message types
     USER_INPUT = "user_input"  # User input request
