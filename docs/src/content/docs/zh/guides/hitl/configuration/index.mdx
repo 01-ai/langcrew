@@ -1,0 +1,486 @@
+---
+title: HITL 配置指南
+description: 配置人机协作工作流的完整指南
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+本指南涵盖所有 HITL 配置选项和模式，用于构建强大的审批工作流。
+
+## HITLConfig 概述
+
+`HITLConfig` 类是配置 HITL 行为的主要接口：
+
+```python
+from langcrew.hitl import HITLConfig
+
+config = HITLConfig(
+    enabled=True,                              # 启用/禁用 HITL
+    interrupt_before_tools=["tool1", "tool2"], # 需要预批准的工具
+    interrupt_after_tools=["tool3"],           # 需要后审查的工具
+    interrupt_tool_mode="specified",           # 控制模式
+    excluded_tools=["safe_tool"],              # 要排除的工具
+    interrupt_before_nodes=["node1"],          # LangGraph 节点中断
+    interrupt_after_nodes=["node2"]            # LangGraph 节点中断
+)
+```
+
+## 配置模式
+
+### 指定工具模式
+
+针对特定工具进行中断：
+
+<Tabs>
+<TabItem label="执行前">
+
+```python
+# 执行前批准参数
+hitl_config = HITLConfig(
+    interrupt_before_tools=[
+        "web_search",      # 审查搜索查询
+        "file_write",      # 批准文件操作
+        "send_email",      # 确认邮件发送
+        "database_query",  # 验证数据库访问
+        "external_api"     # 审查 API 调用
+    ],
+    interrupt_tool_mode="specified"  # 仅指定工具
+)
+```
+
+</TabItem>
+<TabItem label="执行后">
+
+```python
+# 执行后审查结果
+hitl_config = HITLConfig(
+    interrupt_after_tools=[
+        "data_analysis",    # 审查分析结果
+        "content_generator", # 检查生成内容
+        "report_writer",    # 验证报告
+        "image_processor"   # 审查处理的图像
+    ],
+    interrupt_tool_mode="specified"
+)
+
+# ⚠️ 注意：后置中断仅在单个执行会话内有效
+```
+
+</TabItem>
+</Tabs>
+
+### 所有工具模式
+
+对所有工具要求审批，但有例外：
+
+```python
+# 高安全性配置
+hitl_config = HITLConfig(
+    interrupt_tool_mode="all",  # 所有工具都需要审批
+    excluded_tools=[
+        "calculator",       # 安全的数学运算
+        "date_time",        # 简单的日期/时间查询
+        "user_input",       # 用户交互工具
+        "text_formatter"    # 安全的文本操作
+    ]
+)
+```
+
+### 无中断模式
+
+完全禁用 HITL：
+
+```python
+# 开发/测试模式
+hitl_config = HITLConfig(enabled=False)
+
+# 或简单省略 HITL 配置
+agent = Agent(role="开发者", tools=[...])  # 无 HITL
+```
+
+## 智能体级配置
+
+### 个人智能体设置
+
+```python
+from langcrew import Agent
+from langcrew.hitl import HITLConfig
+
+# 高权限智能体，最少中断
+admin_agent = Agent(
+    role="系统管理员",
+    tools=[SystemTool(), FileManagerTool()],
+    hitl=HITLConfig(
+        interrupt_before_tools=["system_shutdown"]  # 仅关键操作
+    )
+)
+
+# 普通智能体，标准审批
+worker_agent = Agent(
+    role="数据工作者",
+    tools=[DataProcessorTool(), FileWriteTool()],
+    hitl=HITLConfig(
+        interrupt_before_tools=["file_write", "data_export"]
+    )
+)
+
+# 面向公众的智能体，最大监督
+public_agent = Agent(
+    role="公共助手", 
+    tools=[WebSearchTool(), CalculatorTool()],
+    hitl=HITLConfig(
+        interrupt_tool_mode="all",
+        excluded_tools=["calculator"]
+    )
+)
+```
+
+### 上下文感知配置
+
+```python
+def create_context_aware_hitl(user_role, data_sensitivity):
+    """根据上下文创建 HITL 配置"""
+    
+    if user_role == "admin":
+        return HITLConfig(
+            interrupt_before_tools=["system_operation"]
+        )
+    elif data_sensitivity == "high":
+        return HITLConfig(
+            interrupt_tool_mode="all",
+            excluded_tools=["calculator", "date_time"]
+        )
+    else:
+        return HITLConfig(
+            interrupt_before_tools=["file_write", "external_api"]
+        )
+
+# 在智能体创建中使用
+agent = Agent(
+    role="数据处理器",
+    hitl=create_context_aware_hitl(
+        user_role=current_user.role,
+        data_sensitivity=data_classification
+    )
+)
+```
+
+## 团队级配置
+
+### 统一策略
+
+将 HITL 策略应用于多个智能体：
+
+```python
+from langcrew import Crew
+
+# 没有 HITL 配置的个人智能体
+researcher = Agent(role="研究员", tools=[WebSearchTool()])
+writer = Agent(role="作家", tools=[FileWriteTool()])
+reviewer = Agent(role="审核员", tools=[EmailTool()])
+
+# 团队级统一策略
+crew = Crew(
+    agents=[researcher, writer, reviewer],
+    hitl=HITLConfig(
+        interrupt_before_tools=["web_search", "file_write", "send_email"]
+    )
+)
+```
+
+### 混合配置
+
+结合智能体级和团队级 HITL：
+
+```python
+# 有特定 HITL 配置的智能体
+critical_agent = Agent(
+    role="关键操作",
+    tools=[DatabaseTool()],
+    hitl=HITLConfig(interrupt_tool_mode="all")  # 智能体特定策略
+)
+
+# 没有 HITL 配置的智能体（将从团队继承）
+regular_agent = Agent(
+    role="常规工作者",
+    tools=[FileWriteTool()]
+)
+
+# 带回退策略的团队
+crew = Crew(
+    agents=[critical_agent, regular_agent],
+    hitl=HITLConfig(
+        interrupt_before_tools=["file_write"]  # 仅应用于 regular_agent
+    )
+)
+```
+
+## 节点级中断
+
+与 LangGraph 的原生中断系统集成：
+
+```python
+from langcrew.hitl import HITLConfig
+
+# 结合工具和节点中断
+hitl_config = HITLConfig(
+    # 工具级中断（LangCrew HITL 系统）
+    interrupt_before_tools=["critical_operation"],
+    interrupt_after_tools=["data_export"],
+    
+    # 节点级中断（LangGraph 原生）
+    interrupt_before_nodes=["decision_node"],
+    interrupt_after_nodes=["validation_node"]
+)
+
+agent = Agent(
+    role="全面智能体",
+    tools=[CriticalTool(), DataExportTool()],
+    hitl=hitl_config
+)
+```
+
+## 响应处理
+
+### 简单响应
+
+HITL 接受自然语言响应：
+
+```python
+# 这些都表示"批准"：
+responses = [
+    "yes", "approve", "ok", "confirm", "accept", "agreed",  # 英文
+    "批准", "同意", "确认", "通过", "好的", "可以",              # 中文
+    True,                                                    # 布尔值
+    {"approved": True}                                       # 结构化
+]
+
+# 这些都表示"拒绝"：
+responses = [
+    "no", "deny", "reject", "refuse", "cancel", "disagree", # 英文
+    "拒绝", "不同意", "不通过", "取消", "否", "不要",            # 中文
+    False,                                                   # 布尔值
+    {"approved": False}                                      # 结构化
+]
+```
+
+### 高级响应
+
+#### 参数修改（前置中断）
+
+```python
+# 用户可以修改工具参数
+user_response = {
+    "approved": True,
+    "modified_args": {
+        "query": "带有更多上下文的增强搜索查询",
+        "max_results": 10,
+        "language": "zh",
+        "safe_search": True
+    }
+}
+```
+
+#### 结果增强（后置中断）
+
+```python
+# 用户可以修改工具结果
+user_response = {
+    "approved": True,
+    "modified_result": """
+    原始分析增强内容：
+    - 来自领域专业知识的额外上下文
+    - 基于最新更新的修正数据点
+    - 用户洞察和建议
+    """
+}
+```
+
+#### 带原因的拒绝
+
+```python
+# 提供详细的拒绝原因
+user_response = {
+    "approved": False,
+    "reason": "查询参数过于宽泛，可能返回敏感数据"
+}
+```
+
+## 基于环境的配置
+
+### 开发 vs 生产
+
+```python
+import os
+
+def get_hitl_config():
+    """获取适合环境的 HITL 配置"""
+    
+    env = os.getenv("ENVIRONMENT", "development")
+    
+    if env == "development":
+        # 最少中断以加快开发
+        return HITLConfig(enabled=False)
+    
+    elif env == "staging":
+        # 仅关键操作
+        return HITLConfig(
+            interrupt_before_tools=["database_write", "external_api", "file_delete"]
+        )
+    
+    elif env == "production":
+        # 全面监督
+        return HITLConfig(
+            interrupt_tool_mode="all",
+            excluded_tools=["calculator", "date_time", "text_formatter"]
+        )
+    
+    else:
+        # 默认为安全配置
+        return HITLConfig(
+            interrupt_before_tools=["file_write", "database_query", "external_api"]
+        )
+
+# 在智能体创建中使用
+agent = Agent(
+    role="环境感知智能体",
+    hitl=get_hitl_config()
+)
+```
+
+## 最佳实践
+
+### 1. 安全优先方法
+
+```python
+# 从严格开始，然后根据需要放宽
+initial_config = HITLConfig(
+    interrupt_tool_mode="all",
+    excluded_tools=["calculator"]  # 仅明显安全的工具
+)
+
+# 基于经验逐渐添加到 excluded_tools
+mature_config = HITLConfig(
+    interrupt_tool_mode="all", 
+    excluded_tools=[
+        "calculator", "date_time", "text_formatter",
+        "unit_converter", "weather_info"  # 经过验证的安全工具
+    ]
+)
+```
+
+### 2. 基于角色的配置
+
+```python
+def get_role_based_hitl(user_role):
+    """基于用户角色的 HITL 配置"""
+    
+    role_configs = {
+        "admin": HITLConfig(
+            interrupt_before_tools=["system_shutdown", "user_delete"]
+        ),
+        "manager": HITLConfig(
+            interrupt_before_tools=["data_export", "report_send", "file_delete"]
+        ),
+        "analyst": HITLConfig(
+            interrupt_before_tools=["database_write", "external_api"]
+        ),
+        "viewer": HITLConfig(
+            interrupt_tool_mode="all",
+            excluded_tools=["calculator", "date_time"]
+        )
+    }
+    
+    return role_configs.get(user_role, role_configs["viewer"])
+```
+
+### 3. 工具分类
+
+```python
+# 按风险级别分类工具
+SAFE_TOOLS = ["calculator", "date_time", "text_formatter", "unit_converter"]
+MODERATE_TOOLS = ["web_search", "file_read", "data_query"]  
+DANGEROUS_TOOLS = ["file_write", "file_delete", "database_write", "send_email"]
+
+# 基于风险的配置
+low_risk_config = HITLConfig(
+    interrupt_before_tools=DANGEROUS_TOOLS
+)
+
+high_risk_config = HITLConfig(
+    interrupt_before_tools=DANGEROUS_TOOLS + MODERATE_TOOLS
+)
+
+maximum_security_config = HITLConfig(
+    interrupt_tool_mode="all",
+    excluded_tools=SAFE_TOOLS
+)
+```
+
+## 故障排除
+
+### 常见问题
+
+#### 1. 中断未触发
+
+```python
+# ❌ 问题：工具名称不匹配
+hitl_config = HITLConfig(interrupt_before_tools=["file_writer"])
+agent = Agent(tools=[FileWriteTool()])  # 实际工具名称："file_write"
+
+# ✅ 解决方案：使用确切的工具名称
+hitl_config = HITLConfig(interrupt_before_tools=["file_write"])
+
+# 调试：打印工具名称
+for tool in agent.tools:
+    print(f"工具名称：{tool.name}")
+```
+
+#### 2. 后置中断不工作
+
+```python
+# ❌ 问题：跨会话使用后置中断
+result1 = crew.kickoff(thread_id="session1")  # 工具执行，触发后置中断
+# 系统重启...
+result2 = crew.kickoff(thread_id="session1")  # 后置中断不会再次触发
+
+# ✅ 解决方案：使用前置中断进行持久审批
+hitl_config = HITLConfig(
+    interrupt_before_tools=["critical_tool"]  # 总是触发
+)
+```
+
+#### 3. 响应解析错误
+
+```python
+# ❌ 问题：格式错误的响应
+user_response = "批准并修改：query=new_query"
+
+# ✅ 解决方案：使用结构化响应
+user_response = {
+    "approved": True,
+    "modified_args": {"query": "new_query"}
+}
+```
+
+### 调试模式
+
+启用详细日志以进行故障排除：
+
+```python
+import logging
+
+# 启用 HITL 调试日志
+logging.getLogger("langcrew.hitl").setLevel(logging.DEBUG)
+
+# 创建智能体并运行
+agent = Agent(hitl=hitl_config, verbose=True)
+result = crew.kickoff(inputs=data)
+```
+
+## 下一步
+
+- **[HITL 概念](/zh/concepts/hitl)** - 理解 HITL 架构
+- **[快速开始](/zh/guides/hitl/getting-started)** - 快速入门指南
+- **示例** - 查看 `examples/components/hitl/` 了解实际实现案例
+- **[社区论坛](https://github.com/01-ai/langcrew/discussions)** - 获取帮助和分享经验

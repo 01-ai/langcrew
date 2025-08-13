@@ -1,0 +1,221 @@
+---
+title: HITL Quick Start
+description: Get started with Human-in-the-Loop in 5 minutes
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Get up and running with Human-in-the-Loop (HITL) in langcrew in just 5 minutes.
+
+## Installation
+
+HITL is included with langcrew - no additional installation required:
+
+```bash
+pip install langcrew
+```
+
+## Basic Example
+
+Here's a simple example that requires approval before writing files:
+
+```python
+from langcrew import Agent, Crew
+from langcrew.hitl import HITLConfig
+from langcrew_tools import FileWriteTool
+
+# Configure HITL for file operations
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write"]
+)
+
+# Create agent with HITL
+agent = Agent(
+    role="File Manager",
+    goal="Manage files with human approval",
+    backstory="Careful file manager who asks before writing",
+    tools=[FileWriteTool()],
+    hitl=hitl_config
+)
+
+# Create crew
+crew = Crew(agents=[agent])
+
+# This will pause for approval when trying to write files
+result = crew.kickoff(inputs={"task": "Create a summary file"})
+```
+
+## What Happens
+
+1. **Agent starts**: The agent receives the task
+2. **Tool call**: Agent tries to use `file_write` tool
+3. **Interrupt**: System pauses and asks for approval
+4. **User response**: You approve or deny the operation
+5. **Continuation**: Agent continues based on your decision
+
+## User Responses
+
+<Tabs>
+<TabItem label="Simple Approval">
+
+```python
+# Simple responses that work:
+"yes"        # Approve
+"no"         # Deny  
+"approve"    # Approve
+"deny"       # Deny
+True         # Approve
+False        # Deny
+"批准"       # Approve (Chinese)
+"拒绝"       # Deny (Chinese)
+```
+
+</TabItem>
+<TabItem label="Advanced Response">
+
+```python
+# Modify parameters before execution
+{
+    "approved": True,
+    "modified_args": {
+        "file_path": "/tmp/better_filename.txt",
+        "content": "Enhanced content with user input"
+    }
+}
+```
+
+</TabItem>
+</Tabs>
+
+## Common Patterns
+
+### Approve Dangerous Operations
+
+```python
+from langcrew.hitl import HITLConfig
+
+# Require approval for potentially dangerous tools
+hitl_config = HITLConfig(
+    interrupt_before_tools=[
+        "file_delete",
+        "database_write", 
+        "send_email",
+        "external_api"
+    ]
+)
+```
+
+### Review Generated Content
+
+```python
+# Review results after content generation
+hitl_config = HITLConfig(
+    interrupt_after_tools=[
+        "content_generator",
+        "report_writer",
+        "data_analyzer"
+    ]
+)
+```
+
+### Crew-Level Policy
+
+```python
+# Apply HITL policy to entire crew
+crew = Crew(
+    agents=[researcher, writer, reviewer],
+    hitl=HITLConfig(
+        interrupt_before_tools=["web_search", "file_write"]
+    )
+)
+```
+
+## Testing Your Setup
+
+### Run the Complete Example
+
+The easiest way to test HITL is to run our comprehensive example:
+
+```bash
+# Set your OpenAI API key
+export OPENAI_API_KEY=your_api_key_here
+
+# Run from the HITL example directory
+cd examples/components/hitl
+uv run hitl_example.py
+```
+
+This example demonstrates:
+- 9 different HITL configuration patterns
+- Tool approval workflows with bilingual support
+- Parameter and result modification
+- Complete interrupt/resume cycles
+
+## More Examples
+
+For additional HITL examples and patterns, check out:
+
+- **📁 `examples/components/hitl/`** - Complete HITL implementation with 9 configuration patterns
+- **📄 `examples/components/hitl/README.md`** - Detailed setup and usage instructions  
+- **🐍 `examples/components/hitl/hitl_example.py`** - Full runnable example (600+ lines)
+
+Navigate to these files in your local copy or view them in the repository to explore different HITL scenarios.
+
+### Simple Test Code
+
+For a minimal test, you can also try:
+
+```python
+from langcrew import Agent
+from langcrew.hitl import HITLConfig
+from langcrew_tools import FileWriteTool
+
+# Simple test agent
+test_agent = Agent(
+    role="File Tester",
+    goal="Test HITL file operations", 
+    backstory="Testing agent for file operations",
+    tools=[FileWriteTool()],
+    hitl=HITLConfig(interrupt_before_tools=["file_write"])
+)
+
+# This should trigger an interrupt when trying to write files
+crew = Crew(agents=[test_agent])
+result = crew.kickoff(inputs={"task": "Create a test file"})
+```
+
+## Next Steps
+
+Now that you have HITL working:
+
+- **[Configuration Guide](/guides/hitl/configuration)** - Learn all configuration options
+- **[Advanced Usage](/guides/hitl/advanced-usage)** - Complex scenarios and patterns  
+- **[Production Deployment](/guides/hitl/production)** - Deploy HITL safely in production
+- **[Bilingual Support](/guides/hitl/bilingual-support)** - Set up multilingual interfaces
+
+## Troubleshooting
+
+### Interrupts Not Triggering
+
+Check that tool names match exactly:
+```python
+# ❌ Wrong - tool name mismatch
+hitl_config = HITLConfig(interrupt_before_tools=["file_writer"])
+agent = Agent(tools=[FileWriteTool()])  # Tool name is "file_write"
+
+# ✅ Correct - exact match
+hitl_config = HITLConfig(interrupt_before_tools=["file_write"])
+```
+
+### Import Errors
+
+Make sure you're importing from the correct modules:
+```python
+# Core HITL configuration
+from langcrew.hitl import HITLConfig
+
+# User input tool
+from langcrew.tools.hitl import UserInputTool
+```
+
+Need help? Check the [configuration guide](/guides/hitl/configuration) or ask in the [community forum](https://github.com/01-ai/langcrew/discussions).

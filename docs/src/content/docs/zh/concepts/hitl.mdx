@@ -1,0 +1,145 @@
+---
+title: 人机协作 (HITL)
+description: 理解 HITL - 为 AI 工作流添加人工监督
+---
+
+人机协作（HITL）为 AI 智能体工作流提供人工监督和控制，包括审批机制、参数修改和质量保证。
+
+## 什么是 HITL？
+
+langcrew 中的 HITL 提供战略控制点，让人类可以：
+- **批准或拒绝** 工具执行
+- **修改参数** 在工具执行前
+- **审查和编辑** 工具执行后的结果
+- **实施安全策略** 用于生产环境
+
+## 核心架构
+
+HITL 基于 [LangGraph 的原生中断系统](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/)，增强了审批工作流：
+
+```python
+from langcrew.hitl import HITLConfig
+
+# 基本配置
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write", "database_query"],
+    interrupt_after_tools=["data_analysis"],
+    interrupt_tool_mode="specified"
+)
+```
+
+## 关键组件
+
+### HITLConfig
+统一配置所有中断和审批设置。
+
+### 工具级中断
+通过人工审批工作流控制工具执行。
+
+```python
+# 在特定工具前/后中断
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write", "web_search"],
+    interrupt_after_tools=["data_analysis"]
+)
+```
+
+- **前置中断**：参数审批和修改
+- **后置中断**：结果审查和编辑
+
+### 节点级中断
+与 [LangGraph 原生中断系统](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) 的集成，用于工作流控制。
+
+```python
+# 在特定工作流节点前/后中断
+hitl_config = HITLConfig(
+    interrupt_before_nodes=["decision_node"],
+    interrupt_after_nodes=["validation_node"]
+)
+```
+
+节点级中断为工作流执行提供精细控制，允许在智能体工作流的特定决策点或验证步骤进行人工干预。
+
+### UserInputTool
+用于智能体主动请求输入的动态用户交互工具。
+
+```python
+from langcrew.tools.hitl import UserInputTool
+
+# 智能体可在执行过程中请求用户输入
+user_input_tool = UserInputTool()
+agent = Agent(tools=[user_input_tool, ...])
+```
+
+使智能体能够在工作流执行期间动态收集用户信息。
+
+## 与 langcrew 的集成
+
+HITL 与所有 langcrew 组件无缝集成：
+
+- **[智能体](/zh/concepts/agents)**：为智能体工具添加审批工作流
+- **[任务](/zh/concepts/tasks)**：任务从其分配的智能体继承 HITL 设置
+- **[团队](/zh/concepts/crews)**：在团队中应用统一的 HITL 策略
+
+```python
+# HITL 在智能体级别配置
+agent = Agent(
+    role="数据分析师", 
+    tools=[web_search, file_write],
+    hitl=HITLConfig(interrupt_before_tools=["file_write"])
+)
+
+# 任务自动从其智能体继承 HITL 设置
+task = Task(
+    agent=agent,
+    description="分析数据并保存报告"
+)
+
+# 团队也可以对所有智能体应用 HITL 策略
+crew = Crew(
+    agents=[agent], 
+    tasks=[task],
+    hitl=HITLConfig(interrupt_before_tools=["web_search"])
+)
+```
+
+## 中断类型
+
+### 前置中断
+```python
+# 用户在执行前批准/修改参数
+hitl_config = HITLConfig(
+    interrupt_before_tools=["web_search", "file_write"]
+)
+```
+
+### 后置中断
+```python
+# 用户在执行后审查/编辑结果
+hitl_config = HITLConfig(
+    interrupt_after_tools=["data_analysis", "report_generator"]
+)
+```
+
+## 何时使用 HITL
+
+- **生产环境** 需要人工监督
+- **敏感操作** 如文件修改或 API 调用
+- **质量保证** 需要人工验证的工作流
+- **合规场景** 需要审计跟踪
+
+## 双语支持
+
+HITL 提供内置的双语界面支持：
+
+```python
+# 自动语言检测
+# 英文: "approve", "deny", "yes", "no"
+# 中文: "批准", "拒绝", "同意", "不同意"
+```
+
+## 下一步
+
+- **[HITL 快速开始](/zh/guides/hitl/getting-started)** - 5分钟快速上手
+- **[HITL 配置指南](/zh/guides/hitl/configuration)** - 完整配置指南
+- **示例** - 查看 `examples/components/hitl/` 了解实际实现案例

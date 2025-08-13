@@ -1,0 +1,221 @@
+---
+title: HITL 快速开始
+description: 5分钟内开始使用人机协作功能
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+在 langcrew 中快速上手人机协作（HITL）功能，仅需 5 分钟。
+
+## 安装
+
+HITL 包含在 langcrew 中 - 无需额外安装：
+
+```bash
+pip install langcrew
+```
+
+## 基础示例
+
+这是一个在写入文件前需要审批的简单示例：
+
+```python
+from langcrew import Agent, Crew
+from langcrew.hitl import HITLConfig
+from langcrew_tools import FileWriteTool
+
+# 为文件操作配置 HITL
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write"]
+)
+
+# 创建带 HITL 的智能体
+agent = Agent(
+    role="文件管理器",
+    goal="在人工批准下管理文件",
+    backstory="谨慎的文件管理器，写入前会询问",
+    tools=[FileWriteTool()],
+    hitl=hitl_config
+)
+
+# 创建团队
+crew = Crew(agents=[agent])
+
+# 在尝试写入文件时会暂停等待审批
+result = crew.kickoff(inputs={"task": "创建一个摘要文件"})
+```
+
+## 执行流程
+
+1. **智能体启动**：智能体接收任务
+2. **工具调用**：智能体尝试使用 `file_write` 工具
+3. **中断**：系统暂停并请求审批
+4. **用户响应**：您批准或拒绝操作
+5. **继续执行**：智能体根据您的决定继续
+
+## 用户响应
+
+<Tabs>
+<TabItem label="简单审批">
+
+```python
+# 有效的简单响应：
+"yes"        # 批准
+"no"         # 拒绝  
+"approve"    # 批准
+"deny"       # 拒绝
+True         # 批准
+False        # 拒绝
+"批准"       # 批准（中文）
+"拒绝"       # 拒绝（中文）
+```
+
+</TabItem>
+<TabItem label="高级响应">
+
+```python
+# 执行前修改参数
+{
+    "approved": True,
+    "modified_args": {
+        "file_path": "/tmp/更好的文件名.txt",
+        "content": "包含用户输入的增强内容"
+    }
+}
+```
+
+</TabItem>
+</Tabs>
+
+## 常见模式
+
+### 批准危险操作
+
+```python
+from langcrew.hitl import HITLConfig
+
+# 需要批准潜在危险的工具
+hitl_config = HITLConfig(
+    interrupt_before_tools=[
+        "file_delete",
+        "database_write", 
+        "send_email",
+        "external_api"
+    ]
+)
+```
+
+### 审查生成的内容
+
+```python
+# 内容生成后审查结果
+hitl_config = HITLConfig(
+    interrupt_after_tools=[
+        "content_generator",
+        "report_writer",
+        "data_analyzer"
+    ]
+)
+```
+
+### 团队级策略
+
+```python
+# 将 HITL 策略应用到整个团队
+crew = Crew(
+    agents=[researcher, writer, reviewer],
+    hitl=HITLConfig(
+        interrupt_before_tools=["web_search", "file_write"]
+    )
+)
+```
+
+## 测试您的设置
+
+### 运行完整示例
+
+测试 HITL 最简单的方法是运行我们的综合示例：
+
+```bash
+# 设置您的 OpenAI API 密钥
+export OPENAI_API_KEY=your_api_key_here
+
+# 从 HITL 示例目录运行
+cd examples/components/hitl
+uv run hitl_example.py
+```
+
+这个示例演示了：
+- 9 种不同的 HITL 配置模式
+- 带双语支持的工具审批工作流
+- 参数和结果修改
+- 完整的中断/恢复循环
+
+## 更多示例
+
+要了解更多 HITL 示例和模式，请查看：
+
+- **📁 `examples/components/hitl/`** - 包含9种配置模式的完整 HITL 实现
+- **📄 `examples/components/hitl/README.md`** - 详细的设置和使用说明
+- **🐍 `examples/components/hitl/hitl_example.py`** - 完整可运行示例（600+行代码）
+
+在您的本地副本中导航到这些文件或在仓库中查看它们，以探索不同的 HITL 场景。
+
+### 简单测试代码
+
+对于最小测试，您也可以尝试：
+
+```python
+from langcrew import Agent
+from langcrew.hitl import HITLConfig
+from langcrew_tools import FileWriteTool
+
+# 简单的测试智能体
+test_agent = Agent(
+    role="文件测试员",
+    goal="测试 HITL 文件操作", 
+    backstory="用于文件操作的测试智能体",
+    tools=[FileWriteTool()],
+    hitl=HITLConfig(interrupt_before_tools=["file_write"])
+)
+
+# 这应该在尝试写入文件时触发中断
+crew = Crew(agents=[test_agent])
+result = crew.kickoff(inputs={"task": "创建一个测试文件"})
+```
+
+## 下一步
+
+现在您已经让 HITL 工作了：
+
+- **[配置指南](/zh/guides/hitl/configuration)** - 学习所有配置选项
+- **[高级用法](/zh/guides/hitl/advanced-usage)** - 复杂场景和模式  
+- **[生产部署](/zh/guides/hitl/production)** - 在生产环境中安全部署 HITL
+- **[双语支持](/zh/guides/hitl/bilingual-support)** - 设置多语言界面
+
+## 故障排除
+
+### 中断未触发
+
+检查工具名称是否完全匹配：
+```python
+# ❌ 错误 - 工具名称不匹配
+hitl_config = HITLConfig(interrupt_before_tools=["file_writer"])
+agent = Agent(tools=[FileWriteTool()])  # 工具名称是 "file_write"
+
+# ✅ 正确 - 完全匹配
+hitl_config = HITLConfig(interrupt_before_tools=["file_write"])
+```
+
+### 导入错误
+
+确保您从正确的模块导入：
+```python
+# 核心 HITL 配置
+from langcrew.hitl import HITLConfig
+
+# 用户输入工具
+from langcrew.tools.hitl import UserInputTool
+```
+
+需要帮助？查看我们的[故障排除指南](/zh/guides/hitl/configuration#troubleshooting)或在[社区论坛](https://github.com/01-ai/langcrew/discussions)提问。

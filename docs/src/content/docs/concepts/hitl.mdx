@@ -1,0 +1,145 @@
+---
+title: Human-in-the-Loop (HITL)
+description: Understanding HITL - adding human oversight to AI workflows
+---
+
+Human-in-the-Loop (HITL) enables human oversight and control in AI agent workflows, providing approval mechanisms, parameter modification, and quality assurance.
+
+## What is HITL?
+
+HITL in langcrew provides strategic control points where humans can:
+- **Approve or deny** tool executions
+- **Modify parameters** before tool execution  
+- **Review and edit** tool results after execution
+- **Implement safety policies** for production environments
+
+## Core Architecture
+
+HITL is built on [LangGraph's native interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) with enhanced approval workflows:
+
+```python
+from langcrew.hitl import HITLConfig
+
+# Basic configuration
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write", "database_query"],
+    interrupt_after_tools=["data_analysis"],
+    interrupt_tool_mode="specified"
+)
+```
+
+## Key Components
+
+### HITLConfig
+Unified configuration for all interrupt and approval settings.
+
+### Tool-Level Interrupts
+Control tool execution with human approval workflows.
+
+```python
+# Interrupt before/after specific tools
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write", "web_search"],
+    interrupt_after_tools=["data_analysis"]
+)
+```
+
+- **Before interrupts**: Parameter approval and modification
+- **After interrupts**: Result review and editing
+
+### Node-Level Interrupts  
+Integration with [LangGraph's native interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) for workflow control.
+
+```python
+# Interrupt before/after specific workflow nodes
+hitl_config = HITLConfig(
+    interrupt_before_nodes=["decision_node"],
+    interrupt_after_nodes=["validation_node"]
+)
+```
+
+Node-level interrupts provide granular control over workflow execution, allowing human intervention at specific decision points or validation steps in your agent workflows.
+
+### UserInputTool
+Dynamic user interaction tool for agent-initiated input requests.
+
+```python
+from langcrew.tools.hitl import UserInputTool
+
+# Agent can request user input during execution
+user_input_tool = UserInputTool()
+agent = Agent(tools=[user_input_tool, ...])
+```
+
+Enables agents to dynamically collect information from users during workflow execution.
+
+## Integration with langcrew
+
+HITL integrates seamlessly with all langcrew components:
+
+- **[Agents](/concepts/agents)**: Add approval workflows to agent tools
+- **[Tasks](/concepts/tasks)**: Tasks inherit HITL settings from their assigned agents
+- **[Crews](/concepts/crews)**: Apply unified HITL policies across teams
+
+```python
+# HITL is configured at the Agent level
+agent = Agent(
+    role="Data Analyst", 
+    tools=[web_search, file_write],
+    hitl=HITLConfig(interrupt_before_tools=["file_write"])
+)
+
+# Tasks automatically inherit HITL settings from their agent
+task = Task(
+    agent=agent,
+    description="Analyze data and save report"
+)
+
+# Crew can also apply HITL policies to all agents
+crew = Crew(
+    agents=[agent], 
+    tasks=[task],
+    hitl=HITLConfig(interrupt_before_tools=["web_search"])
+)
+```
+
+## Interrupt Types
+
+### Before Interrupt
+```python
+# User approves/modifies parameters before execution
+hitl_config = HITLConfig(
+    interrupt_before_tools=["web_search", "file_write"]
+)
+```
+
+### After Interrupt
+```python
+# User reviews/edits results after execution
+hitl_config = HITLConfig(
+    interrupt_after_tools=["data_analysis", "report_generator"]
+)
+```
+
+## When to Use HITL
+
+- **Production environments** requiring human oversight
+- **Sensitive operations** like file modifications or API calls
+- **Quality assurance** workflows needing human validation
+- **Compliance scenarios** requiring audit trails
+
+## Bilingual Support
+
+HITL provides built-in bilingual interface support:
+
+```python
+# Automatic language detection
+# English: "approve", "deny", "yes", "no"
+# Chinese: "批准", "拒绝", "同意", "不同意"
+```
+
+## Next Steps
+
+- **[HITL Quick Start](/guides/hitl/getting-started)** - Get started in 5 minutes
+- **[HITL Configuration](/guides/hitl/configuration)** - Complete configuration guide
+- **Examples** - Check `examples/components/hitl/` for real-world implementations

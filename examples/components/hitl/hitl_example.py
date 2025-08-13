@@ -30,10 +30,6 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../libs/langcrew"))
-
 from langcrew.agent import Agent
 from langcrew.crew import Crew
 from langcrew.hitl import HITLConfig

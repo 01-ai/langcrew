@@ -31,22 +31,22 @@ export default defineConfig({
 						en: 'Getting Started'
 					},
 					items: [
-						{ 
-							label: '介绍', 
+						{
+							label: '介绍',
 							link: '/guides/introduction',
 							translations: {
 								en: 'Introduction'
 							}
 						},
-						{ 
-							label: '安装', 
+						{
+							label: '安装',
 							link: '/guides/installation',
 							translations: {
 								en: 'Installation'
 							}
 						},
-						{ 
-							label: '快速开始', 
+						{
+							label: '快速开始',
 							link: '/guides/quickstart',
 							translations: {
 								en: 'Quick Start'
@@ -60,26 +60,64 @@ export default defineConfig({
 						en: 'Core Concepts'
 					},
 					items: [
-						{ 
-							label: '智能体', 
+						{
+							label: '智能体',
 							link: '/concepts/agents',
 							translations: {
 								en: 'Agents'
 							}
 						},
-						{ 
-							label: '任务', 
+						{
+							label: '任务',
 							link: '/concepts/tasks',
 							translations: {
 								en: 'Tasks'
 							}
 						},
-						{ 
-							label: '团队', 
+						{
+							label: '团队',
 							link: '/concepts/crews',
 							translations: {
 								en: 'Crews'
 							}
+						},
+						{
+							label: '人机协作',
+							link: '/concepts/hitl',
+							translations: {
+								en: 'Human-in-the-Loop'
+							}
+						},
+					],
+				},
+				{
+					label: '实践指南',
+					translations: {
+						en: 'Guides'
+					},
+					items: [
+						{
+							label: '人机协作',
+							translations: {
+								en: 'Human-in-the-Loop'
+							},
+							items: [
+								{
+									label: '快速开始',
+									link: '/guides/hitl/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '配置指南',
+									link: '/guides/hitl/configuration',
+									translations: {
+										en: 'Configuration'
+									}
+								},
+
+							]
 						},
 					],
 				},
