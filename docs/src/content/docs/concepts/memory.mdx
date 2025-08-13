@@ -3,15 +3,15 @@ title: Memory
 description: Understanding Memory - persistent state management for AI workflows
 ---
 
-Memory enables persistent state management in AI agent workflows, providing short-term, long-term, and entity-based memory capabilities for context-aware conversations.
+Memory provides persistent state and context management for AI agent workflows using LangGraph's Store and Checkpointer systems, enabling agents to maintain conversation history, knowledge, and entity information across sessions.
 
 ## What is Memory?
 
 Memory in langcrew provides:
-- **Short-term memory**: Conversation history and recent context
-- **Long-term memory**: Persistent knowledge storage with embeddings  
-- **Entity memory**: Track and remember entities across conversations
-- **Multi-provider support**: Memory, SQLite, PostgreSQL, Redis, MongoDB, MySQL
+- **Short-term memory**: Session-based conversation history using LangGraph's Checkpointer
+- **Long-term memory**: Persistent knowledge storage using LangGraph's Store system
+- **Entity memory**: Track and remember entities (people, organizations, concepts) across conversations
+- **Multi-provider support**: In-memory, SQLite, PostgreSQL, Redis, MongoDB, MySQL backends
 
 ## Core Architecture
 
@@ -46,45 +46,45 @@ Unified configuration for all memory types and providers.
 | `thread_id` | str \| None | Fixed thread identifier | None |
 
 ### Short-term Memory
-Manages conversation history and recent context.
+Session-based conversation history using LangGraph's Checkpointer system for immediate context retention.
 
 ```python
-# Short-term memory configuration
+# Short-term memory using checkpointer
 memory_config = MemoryConfig(
     short_term={
         "enabled": True,
-        "auto_inject": True,
-        "max_history": 20,
+        "auto_inject": True,  # Auto-inject context into prompts
+        "max_history": 20,    # Maximum conversation turns to remember
         "relevance_threshold": 0.7
     }
 )
 ```
 
 ### Long-term Memory
-Persistent knowledge storage with semantic search.
+Persistent knowledge storage using LangGraph's Store system for cross-session information retention.
 
 ```python
-# Long-term memory configuration  
+# Long-term memory using store system
 memory_config = MemoryConfig(
     long_term={
         "enabled": True,
-        "embedding_model": "text-embedding-ada-002",
-        "chunk_size": 500,
-        "search_k": 5,
-        "min_quality": 0.7
+        "embedding_model": None,  # Use default embedding model
+        "chunk_size": 500,        # Text chunk size for storage
+        "search_k": 5,           # Number of relevant items to retrieve
+        "min_quality": 0.7       # Minimum quality threshold for storage
     }
 )
 ```
 
 ### Entity Memory
-Tracks and remembers entities across conversations.
+Tracks entities (people, organizations, concepts) across conversations using structured storage.
 
 ```python
 # Entity memory configuration
 memory_config = MemoryConfig(
     entity={
         "enabled": True,
-        "extract_entities": True,
+        "extract_entities": True,  # Auto-extract entities from conversations
         "entity_types": ["person", "organization", "location", "concept"]
     }
 )
@@ -121,11 +121,11 @@ crew = Crew(
 
 ## When to Use Memory
 
-- **Conversational agents** requiring context awareness
-- **Long-running workflows** needing state persistence
-- **Multi-session applications** requiring continuity
-- **Team collaboration** with shared knowledge
-- **Customer service** with interaction history
+- **Conversational agents** needing to remember user preferences and conversation history
+- **Multi-session applications** requiring continuity across user interactions
+- **Knowledge-intensive workflows** that need to accumulate and retrieve information
+- **Team collaboration** scenarios with shared context and entity tracking
+- **Customer service** applications requiring interaction history and customer profiles
 
 ## Next Steps
 

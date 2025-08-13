@@ -3,15 +3,15 @@ title: 内存管理
 description: 理解内存管理 - AI 工作流的持久状态管理
 ---
 
-内存管理为 AI 智能体工作流提供持久状态管理，包括短期、长期和实体记忆功能，实现上下文感知的对话。
+内存管理使用 LangGraph 的 Store 和 Checkpointer 系统为 AI 智能体工作流提供持久状态和上下文管理，使智能体能够跨会话维护对话历史、知识和实体信息。
 
 ## 什么是内存管理？
 
 langcrew 中的内存管理提供：
-- **短期记忆**：对话历史和近期上下文
-- **长期记忆**：基于嵌入的持久知识存储
-- **实体记忆**：跨对话跟踪和记住实体
-- **多提供商支持**：内存、SQLite、PostgreSQL、Redis、MongoDB、MySQL
+- **短期记忆**：使用 LangGraph Checkpointer 的基于会话的对话历史
+- **长期记忆**：使用 LangGraph Store 系统的持久知识存储
+- **实体记忆**：跨对话跟踪和记住实体（人员、组织、概念）
+- **多提供商支持**：内存、SQLite、PostgreSQL、Redis、MongoDB、MySQL 后端
 
 ## 核心架构
 

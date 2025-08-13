@@ -3,15 +3,15 @@ title: Utils
 description: Understanding Utils - utility functions and helpers for AI workflows
 ---
 
-Utils provides essential utility functions and helpers for AI workflows, including file detection, token counting, language processing, and message utilities.
+Utils provides essential utility functions and helpers that support AI workflows, offering practical tools for file handling, token management, language processing, and message operations.
 
 ## What is Utils?
 
 Utils in langcrew provides:
-- **File detection**: Automatic file type detection and content analysis
-- **Token counting**: Accurate token counting for various LLM models
-- **Language processing**: Language detection and text processing utilities
-- **Message utilities**: Helper functions for message formatting and ID generation
+- **File detection**: Intelligent file type detection with content analysis and binary/text classification
+- **Token counting**: Precise token counting for OpenAI, Anthropic, and other LLM models
+- **Language detection**: Simple language identification for text processing
+- **Message utilities**: Helper functions for message ID generation and formatting
 
 ## Core Architecture
 
@@ -33,16 +33,17 @@ language = detect_language("Hello, how are you?")
 ## Key Components
 
 ### File Detection
-Automatically detect file types and extract metadata.
+Intelligent file type detection using binary signatures, content analysis, and encoding detection.
 
 ```python
-from langcrew.utils import detect_file_type
+from langcrew.utils.file_detect import detect_file_type
 
-# Detect file type and metadata
-file_info = detect_file_type("path/to/file.pdf")
-print(file_info.file_type)  # "pdf"
-print(file_info.mime_type)  # "application/pdf"
-print(file_info.size)       # File size in bytes
+# Detect file type with content analysis
+file_info = detect_file_type("document.pdf")
+print(file_info.file_type)    # File extension
+print(file_info.mime_type)    # MIME type
+print(file_info.is_binary)    # True/False for binary detection
+print(file_info.size)         # File size in bytes
 ```
 
 #### File Detection Parameters
@@ -54,21 +55,23 @@ print(file_info.size)       # File size in bytes
 | `extract_metadata` | bool | Extract detailed metadata | True |
 
 ### Token Counter
-Count tokens for various LLM models with high accuracy.
+Precise token counting using tiktoken for GPT models and approximation for other models.
 
 ```python
-from langcrew.utils import count_tokens
+from langcrew.utils.token_counter import TokenCounter
 
-# Count tokens for different models
-gpt4_tokens = count_tokens("Hello, world!", model="gpt-4")
-claude_tokens = count_tokens("Hello, world!", model="claude-3")
+# Create token counter for specific model
+counter = TokenCounter(model_name="gpt-4")
 
-# Count tokens in messages
+# Count tokens in text
+tokens = counter.count_text("Hello, world!")
+
+# Count tokens in messages (with exact/approximate indicator)
 messages = [
     {"role": "user", "content": "Hello"},
     {"role": "assistant", "content": "Hi there!"}
 ]
-total_tokens = count_tokens(messages, model="gpt-4")
+token_count, is_exact = counter.count_messages(messages)
 ```
 
 #### Token Counter Parameters
@@ -80,18 +83,18 @@ total_tokens = count_tokens(messages, model="gpt-4")
 | `include_metadata` | bool | Include token breakdown | False |
 
 ### Language Detection
-Detect language and process text for internationalization.
+Simple language detection focusing on Chinese vs. non-Chinese text classification.
 
 ```python
-from langcrew.utils import detect_language, normalize_text
+from langcrew.utils.language import detect_language, detect_chinese
 
-# Detect language
-lang = detect_language("Bonjour, comment allez-vous?")
-print(lang)  # "fr"
+# Basic language detection (primarily Chinese vs. English)
+lang = detect_language("你好，世界！")
+print(lang)  # "zh"
 
-# Normalize text
-normalized = normalize_text("  Hello,   World!  ")
-print(normalized)  # "Hello, World!"
+# Specific Chinese detection
+is_chinese = detect_chinese("Hello, 世界！")
+print(is_chinese)  # True (if >30% Chinese characters)
 ```
 
 #### Language Detection Parameters
@@ -103,20 +106,23 @@ print(normalized)  # "Hello, World!"
 | `return_confidence` | bool | Return confidence score | False |
 
 ### Message Utilities
-Helper functions for message processing and formatting.
+Helper functions for generating unique message IDs and handling message operations.
 
 ```python
-from langcrew.utils import generate_message_id, format_message
+from langcrew.utils.message_utils import generate_message_id
 
-# Generate unique message ID
+# Generate unique message ID with timestamp and random suffix
 msg_id = generate_message_id()
+print(msg_id)  # Example: "1748438204041_a7k9"
 
-# Format message for display
-formatted = format_message(
-    content="Hello, world!",
-    role="user",
-    timestamp=True
-)
+# Use in web applications for message tracking
+def create_message(content: str, role: str):
+    return {
+        "id": generate_message_id(),
+        "content": content,
+        "role": role,
+        "timestamp": time.time()
+    }
 ```
 
 ## Integration with langcrew

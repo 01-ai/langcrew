@@ -3,15 +3,16 @@ title: Web
 description: Understanding Web - HTTP server and adapters for AI workflows
 ---
 
-Web enables HTTP server capabilities and web-based interfaces for AI agent workflows, providing REST APIs, streaming responses, and LangGraph integration.
+Web is the HTTP server component that exposes AI agents as web services, providing REST APIs, real-time streaming, and web-based interfaces for agent interaction. It transforms your AI workflows into production-ready web applications.
 
 ## What is Web?
 
 Web in langcrew provides:
-- **HTTP server**: RESTful API endpoints for agent interaction
-- **LangGraph adapter**: Seamless integration with LangGraph workflows
-- **Streaming support**: Real-time response streaming and tool execution
-- **Tool display**: Rich visualization of tool calls and results
+- **HTTP server**: Production-ready FastAPI server for hosting AI agents
+- **LangGraph adapter**: Direct integration with LangGraph's streaming capabilities  
+- **Real-time streaming**: Server-Sent Events (SSE) for live agent responses
+- **Tool visualization**: Rich display of tool calls, parameters, and results
+- **Frontend UI**: Complete web interface (available in `/web` directory)
 
 ## Core Architecture
 
@@ -31,32 +32,36 @@ server = create_server(
 ## Key Components
 
 ### AdapterServer
-HTTP server for hosting agent workflows with REST API endpoints.
+Production-ready FastAPI server that hosts AI agents as HTTP services with CORS, middleware, and lifecycle management.
 
 ```python
-from langcrew.web import AdapterServer
+from langcrew.web import AdapterServer, LangGraphAdapter
 
-# Create server instance
+# Create adapter and server
+adapter = LangGraphAdapter(crew=crew, enable_streaming=True)
 server = AdapterServer(
+    adapter=adapter,
     host="0.0.0.0",
     port=8000,
-    cors_origins=["*"],
-    debug=True
+    cors_origins=["http://localhost:3000"],  # Frontend UI origin
+    debug=False  # Production setting
 )
 ```
 
 ### LangGraphAdapter
-Adapter for integrating LangCrew agents with LangGraph workflows.
+Core adapter that bridges LangCrew agents with LangGraph's streaming execution engine, enabling real-time web interactions.
 
 ```python
 from langcrew.web import LangGraphAdapter
 from langcrew import Agent, Crew
 
-# Create adapter
+# Create crew and adapter
+crew = Crew(agents=[agent], tasks=[task])
 adapter = LangGraphAdapter(
     crew=crew,
-    enable_streaming=True,
-    tool_display=True
+    enable_streaming=True,      # Enable real-time streaming
+    stream_tool_calls=True,     # Stream individual tool executions
+    tool_display=True          # Rich tool visualization
 )
 ```
 
@@ -117,13 +122,24 @@ server = create_langgraph_server(
 server.start()
 ```
 
+## Frontend UI Integration
+
+Web comes with a complete frontend UI built with modern React technology stack:
+
+- **Location**: Available in the `/web` directory of the langcrew repository
+- **Technology**: React 19 + Antd + Tailwind CSS + Rspack
+- **Features**: AgentX component, real-time streaming UI, tool visualization
+- **Documentation**: The frontend has its own comprehensive documentation
+
+The frontend UI connects seamlessly with the Web server to provide a complete web application experience.
+
 ## When to Use Web
 
-- **Web applications** requiring AI agent backends
-- **API services** for mobile or frontend applications  
-- **Microservices** architecture with AI capabilities
-- **Real-time interfaces** with streaming responses
-- **Multi-user platforms** with concurrent access
+- **Production web applications** needing AI agent backends with UI
+- **API services** for mobile applications or custom frontends
+- **Real-time chat interfaces** with streaming agent responses  
+- **Multi-user platforms** with concurrent agent interactions
+- **Enterprise applications** requiring web-based AI workflows
 
 ## API Endpoints
 

@@ -82,13 +82,6 @@ export default defineConfig({
 							}
 						},
 						{
-							label: '人机协作',
-							link: '/concepts/hitl',
-							translations: {
-								en: 'Human-in-the-Loop'
-							}
-						},
-						{
 							label: '内存管理',
 							link: '/concepts/memory',
 							translations: {
@@ -100,6 +93,13 @@ export default defineConfig({
 							link: '/concepts/web',
 							translations: {
 								en: 'Web'
+							}
+						},
+						{
+							label: '人机协作',
+							link: '/concepts/hitl',
+							translations: {
+								en: 'Human-in-the-Loop'
 							}
 						},
 						{
@@ -117,29 +117,6 @@ export default defineConfig({
 						en: 'Guides'
 					},
 					items: [
-						{
-							label: '人机协作',
-							translations: {
-								en: 'Human-in-the-Loop'
-							},
-							items: [
-								{
-									label: '快速开始',
-									link: '/guides/hitl/getting-started',
-									translations: {
-										en: 'Getting Started'
-									}
-								},
-								{
-									label: '配置指南',
-									link: '/guides/hitl/configuration',
-									translations: {
-										en: 'Configuration'
-									}
-								},
-
-							]
-						},
 						{
 							label: '内存管理',
 							translations: {
@@ -178,6 +155,28 @@ export default defineConfig({
 								{
 									label: '配置指南',
 									link: '/guides/web/configuration',
+									translations: {
+										en: 'Configuration'
+									}
+								},
+							]
+						},
+						{
+							label: '人机协作',
+							translations: {
+								en: 'Human-in-the-Loop'
+							},
+							items: [
+								{
+									label: '快速开始',
+									link: '/guides/hitl/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '配置指南',
+									link: '/guides/hitl/configuration',
 									translations: {
 										en: 'Configuration'
 									}
