@@ -60,6 +60,15 @@ hitl_config = HITLConfig(
 - **Before interrupts**: Parameter approval and modification
 - **After interrupts**: Result review and editing
 
+:::caution[Session-Level Limitation]
+**`interrupt_after_tools` only works within a single execution session.** The interrupt occurs during tool node execution, before the next checkpoint is saved. After workflow restarts, the system cannot resume from the interrupt point and must restart from the last checkpoint, potentially causing duplicate tool executions.
+
+For tools that need post-execution review across restarts, consider:
+- Using `interrupt_before_tools` for critical operations
+- Implementing re-entrant tools that can handle multiple review cycles
+- Using node-level interrupts for workflow-level control points
+:::
+
 ### Node-Level Interrupts  
 Integration with [LangGraph's native interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) for workflow control.
 

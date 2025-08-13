@@ -63,7 +63,83 @@ hitl_config = HITLConfig(
     interrupt_tool_mode="specified"
 )
 
-# ⚠️ 注意：后置中断仅在单个执行会话内有效
+# ⚠️ 重要：后置中断仅在单个执行会话内有效
+# 工作流重启或从检查点恢复后将不会触发，除非工具支持可重入执行
+```
+
+</TabItem>
+</Tabs>
+
+## 会话级别限制
+
+### 理解 `interrupt_after_tools` 行为
+
+`interrupt_after_tools` 有一个影响生产部署的重要限制：
+
+```python
+# 此配置仅在单个执行会话内有效
+hitl_config = HITLConfig(
+    interrupt_after_tools=["data_analysis", "report_generator"]
+)
+
+# 场景 1：单会话执行 ✅
+# 1. 工具执行 → 2. 用户审查结果 → 3. 工作流继续
+
+# 场景 2：工作流重启 ❌  
+# 1. 工具执行 → 2. interrupt_after 触发 → 3. 系统重启 → 4. 工具再次执行（重复）
+```
+
+**发生原因：**
+- `interrupt_after_tools` 发生在工具节点执行过程中，在下一个检查点保存之前
+- 系统重启时，无法从中断点恢复，必须从最后一个检查点重新开始
+- 工具节点会重新从头开始执行，导致工具再次运行
+- 这可能导致工具重复执行和潜在的副作用
+
+### 跨重启审查的解决方案
+
+<Tabs>
+<TabItem label="使用前置中断">
+
+```python
+# 对关键操作更可靠
+hitl_config = HITLConfig(
+    interrupt_before_tools=["critical_operation"],  # 总是触发
+    # interrupt_after_tools=["critical_operation"]  # 重启后可能被跳过
+)
+```
+
+</TabItem>
+<TabItem label="可重入工具">
+
+```python
+from langchain_core.tools import tool
+
+@tool
+def reentrant_analysis_tool(data: str, review_count: int = 0) -> str:
+    """支持多次审查周期的分析工具"""
+    if review_count == 0:
+        # 首次执行 - 进行分析
+        result = perform_analysis(data)
+        return f"分析完成 (审查 #{review_count + 1}): {result}"
+    else:
+        # 重启后重新执行 - 允许重新审查
+        return f"重新审查分析 (审查 #{review_count + 1}): {cached_result}"
+
+# 配置前置中断以确保审查发生
+hitl_config = HITLConfig(
+    interrupt_before_tools=["reentrant_analysis_tool"]
+)
+```
+
+</TabItem>
+<TabItem label="节点级控制">
+
+```python
+# 使用工作流级中断而非工具级
+hitl_config = HITLConfig(
+    interrupt_after_nodes=["analysis_node"],  # 跨重启有效
+    # interrupt_after_tools=["analysis_tool"]  # 会话级限制
+)
 ```
 
 </TabItem>

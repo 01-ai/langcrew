@@ -63,7 +63,84 @@ hitl_config = HITLConfig(
     interrupt_tool_mode="specified"
 )
 
-# ⚠️ Note: After interrupts only work within single execution session
+# ⚠️ IMPORTANT: After interrupts only work within single execution session
+# They will NOT trigger after workflow restarts or checkpointed state recovery
+# unless the tool supports re-entrant execution
+```
+
+</TabItem>
+</Tabs>
+
+## Session-Level Limitations
+
+### Understanding `interrupt_after_tools` Behavior
+
+`interrupt_after_tools` has an important limitation that affects production deployments:
+
+```python
+# This configuration works ONLY within a single execution session
+hitl_config = HITLConfig(
+    interrupt_after_tools=["data_analysis", "report_generator"]
+)
+
+# Scenario 1: Single session execution ✅
+# 1. Tool executes → 2. User reviews result → 3. Workflow continues
+
+# Scenario 2: Workflow restart ❌  
+# 1. Tool executes → 2. interrupt_after triggered → 3. System restarts → 4. Tool executes again (duplicate)
+```
+
+**Why this happens:**
+- `interrupt_after_tools` occurs during tool node execution, before the next checkpoint is saved
+- When system restarts, it cannot resume from the interrupt point and must restart from the last checkpoint
+- The tool node will re-execute from the beginning, causing the tool to run again
+- This can lead to duplicate tool executions and potential side effects
+
+### Solutions for Cross-Restart Review
+
+<Tabs>
+<TabItem label="Use Before Interrupts">
+
+```python
+# More reliable for critical operations
+hitl_config = HITLConfig(
+    interrupt_before_tools=["critical_operation"],  # Always triggers
+    # interrupt_after_tools=["critical_operation"]  # May be skipped after restart
+)
+```
+
+</TabItem>
+<TabItem label="Re-entrant Tools">
+
+```python
+from langchain_core.tools import tool
+
+@tool
+def reentrant_analysis_tool(data: str, review_count: int = 0) -> str:
+    """Analysis tool that supports multiple review cycles"""
+    if review_count == 0:
+        # First execution - do analysis
+        result = perform_analysis(data)
+        return f"Analysis complete (review #{review_count + 1}): {result}"
+    else:
+        # Re-execution after restart - allow re-review
+        return f"Re-reviewing analysis (review #{review_count + 1}): {cached_result}"
+
+# Configure for before-interrupt to ensure review happens
+hitl_config = HITLConfig(
+    interrupt_before_tools=["reentrant_analysis_tool"]
+)
+```
+
+</TabItem>
+<TabItem label="Node-Level Control">
+
+```python
+# Use workflow-level interrupts instead of tool-level
+hitl_config = HITLConfig(
+    interrupt_after_nodes=["analysis_node"],  # Works across restarts
+    # interrupt_after_tools=["analysis_tool"]  # Session-limited
+)
 ```
 
 </TabItem>
