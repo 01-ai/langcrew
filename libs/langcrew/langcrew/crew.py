@@ -84,10 +84,16 @@ class Crew:
         self._async_checkpointer = async_checkpointer
         self._async_compiled_graph = None
 
+        # Async memory instances
+        self._async_short_term_memory = None
+        self._async_long_term_memory = None
+        self._async_entity_memory = None
+        self._async_tool_state_manager = None
+        self._async_components_initialized = False
+
         # Context managers for async components
         self._async_store_cm = None
         self._async_checkpointer_cm = None
-
 
         # HITL configuration
         if hitl is None:
@@ -782,6 +788,10 @@ class Crew:
         if not self.memory_config.enabled:
             return
 
+        # Skip if already initialized
+        if self._async_components_initialized:
+            return
+
         config = {"connection_string": self.memory_config.connection_string}
 
         # Create async checkpointer if not already created
@@ -840,6 +850,40 @@ class Crew:
                 else:
                     self._async_store.setup()
 
+        # Create async memory instances using async components (only if not already created)
+        if (
+            self.memory_config.short_term.get("enabled", True)
+            and not self._async_short_term_memory
+        ):
+            self._async_short_term_memory = ShortTermMemory(
+                checkpointer=self._async_checkpointer, config=self.memory_config
+            )
+
+        if (
+            self.memory_config.long_term.get("enabled", True)
+            and not self._async_long_term_memory
+        ):
+            self._async_long_term_memory = LongTermMemory(
+                store=self._async_store, config=self.memory_config
+            )
+
+        if (
+            self.memory_config.entity.get("enabled", True)
+            and not self._async_entity_memory
+        ):
+            self._async_entity_memory = EntityMemory(
+                store=self._async_store, config=self.memory_config
+            )
+
+        # Create async tool state manager (only if not already created)
+        if not self._async_tool_state_manager:
+            self._async_tool_state_manager = ToolStateManager(
+                checkpointer=self._async_checkpointer
+            )
+
+        # Mark async components as initialized
+        self._async_components_initialized = True
+
     def invoke(
         self,
         input: dict[str, Any] | None = None,
@@ -878,7 +922,6 @@ class Crew:
             interrupt_after=interrupt_after,
             **kwargs,
         )
-
 
         return result
 
@@ -920,7 +963,6 @@ class Crew:
             interrupt_after=interrupt_after,
             **kwargs,
         )
-
 
         return result
 
@@ -1164,10 +1206,14 @@ class Crew:
         # Use provided thread_id or generate new one
         self._thread_id = thread_id or self.memory_config.thread_id or str(uuid.uuid4())
 
-        # Setup agents with memory if enabled
-        if self.memory_config.enabled and self._short_term_memory:
+        # Ensure async components are set up
+        if self.memory_config.enabled:
+            await self._setup_async_components()
+
+        # Setup agents with async memory if enabled
+        if self.memory_config.enabled and self._async_short_term_memory:
             for agent in self.agents:
-                agent._setup_with_memory(self._short_term_memory, self._thread_id)
+                agent._setup_with_memory(self._async_short_term_memory, self._thread_id)
 
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})
@@ -1233,7 +1279,11 @@ class Crew:
         return result
 
     def search_memory(
-        self, query: str, memory_type: str = "all", limit: int = 5
+        self,
+        query: str,
+        memory_type: str = "all",
+        limit: int = 5,
+        is_async: bool = False,
     ) -> list[dict[str, Any]]:
         """Search through crew memories
 
@@ -1241,28 +1291,37 @@ class Crew:
             query: Search query
             memory_type: Type of memory to search ("short_term", "long_term", "entity", "all")
             limit: Maximum number of results
+            is_async: Whether to use async memory instances (for internal use)
 
         Returns:
             List of memory items
         """
         results = []
 
-        if memory_type in ["short_term", "all"] and self._short_term_memory:
-            short_term_results = self._short_term_memory.search(
-                query, self._thread_id, limit
-            )
+        # Select memory instances based on execution mode
+        if is_async:
+            stm = self.async_short_term_memory
+            ltm = self.async_long_term_memory
+            em = self.async_entity_memory
+        else:
+            stm = self._short_term_memory
+            ltm = self._long_term_memory
+            em = self._entity_memory
+
+        if memory_type in ["short_term", "all"] and stm:
+            short_term_results = stm.search(query, self._thread_id, limit)
             for item in short_term_results:
                 item["memory_type"] = "short_term"
                 results.append(item)
 
-        if memory_type in ["long_term", "all"] and self._long_term_memory:
-            long_term_results = self._long_term_memory.search(query, limit)
+        if memory_type in ["long_term", "all"] and ltm:
+            long_term_results = ltm.search(query, limit)
             for item in long_term_results:
                 item["memory_type"] = "long_term"
                 results.append(item)
 
-        if memory_type in ["entity", "all"] and self._entity_memory:
-            entity_results = self._entity_memory.search(query, limit=limit)
+        if memory_type in ["entity", "all"] and em:
+            entity_results = em.search(query, limit=limit)
             for item in entity_results:
                 item["memory_type"] = "entity"
                 results.append(item)
@@ -1272,6 +1331,26 @@ class Crew:
             results = results[:limit]
 
         return results
+
+    async def asearch_memory(
+        self, query: str, memory_type: str = "all", limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """Async version of search_memory
+
+        Args:
+            query: Search query
+            memory_type: Type of memory to search ("short_term", "long_term", "entity", "all")
+            limit: Maximum number of results
+
+        Returns:
+            List of memory items
+        """
+        # Ensure async components are set up
+        if self.memory_config.enabled:
+            await self._setup_async_components()
+
+        # Use the unified search_memory with async flag
+        return self.search_memory(query, memory_type, limit, is_async=True)
 
     def _setup_hitl(self):
         """Setup HITL (Human-in-the-Loop) for all agents"""
@@ -1307,6 +1386,49 @@ class Crew:
     def entity_memory(self):
         """Access entity memory instance"""
         return self._entity_memory
+
+    # Async memory access properties
+    @property
+    def async_short_term_memory(self):
+        """Access async short-term memory instance
+
+        Returns:
+            ShortTermMemory instance if async components are initialized, None otherwise.
+
+        Note:
+            This property returns None if async components haven't been initialized.
+            Use async methods like akickoff() or asearch_memory() to trigger initialization,
+            or manually call await crew._setup_async_components().
+        """
+        return self._async_short_term_memory
+
+    @property
+    def async_long_term_memory(self):
+        """Access async long-term memory instance
+
+        Returns:
+            LongTermMemory instance if async components are initialized, None otherwise.
+
+        Note:
+            This property returns None if async components haven't been initialized.
+            Use async methods like akickoff() or asearch_memory() to trigger initialization,
+            or manually call await crew._setup_async_components().
+        """
+        return self._async_long_term_memory
+
+    @property
+    def async_entity_memory(self):
+        """Access async entity memory instance
+
+        Returns:
+            EntityMemory instance if async components are initialized, None otherwise.
+
+        Note:
+            This property returns None if async components haven't been initialized.
+            Use async methods like akickoff() or asearch_memory() to trigger initialization,
+            or manually call await crew._setup_async_components().
+        """
+        return self._async_entity_memory
 
     def get_agent_by_name(self, name: str) -> Agent:
         """Get an agent by name
