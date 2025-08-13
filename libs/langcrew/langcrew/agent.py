@@ -17,7 +17,7 @@ from .executors.base import BaseExecutor
 from .executors.factory import ExecutorFactory
 from .guardrail import GuardrailFunc, with_guardrails
 from .hitl import HITLConfig
-from .mcp import MCPToolAdapter
+from .tools.mcp import MCPToolAdapter
 from .memory import MemoryConfig
 from .prompt_builder import PromptBuilder
 from .types import TaskSpec
