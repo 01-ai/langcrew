@@ -4,11 +4,14 @@
 
 ## What is this?
 
-`langcrew-tools` is the official toolbox in the LangCrew ecosystem, providing production‑ready tools specifically designed for agent workflows:
-- Compatible with LangChain `BaseTool` interface
-- Built‑in streaming events (astream) with timeout/interrupt handling
-- Sandbox execution (e2b), browser and mobile automation
-- Human‑in‑the‑loop (HITL) hooks and observability‑friendly events
+`langcrew-tools` is the official toolbox in the LangCrew ecosystem, providing production‑ready tools specifically designed for agent workflows with streaming events, sandbox execution, and human‑in‑the‑loop support.
+
+## Core Benefits
+
+- **LangChain Integration**: All tools inherit from `langchain_core.tools.BaseTool` with consistent interfaces and Pydantic validation
+- **Streaming Events**: Built-in support for intermediate event dispatching during tool execution
+- **Timeout & Interruption**: Clear policies for handling timeouts and user interruptions
+- **HITL Support**: Production-grade human-in-the-loop extension points
 
 ## Quick Install
 
@@ -44,13 +47,6 @@ pip install langcrew-tools
 - Fully compatible with `langcrew`, inject tools into Agent via `tools=[...]`
 - Supports LangGraph astream event flow for UI visualization and HITL approvals
 - Combine with the main project example `examples/components/web/web_chat` to visualize tool activity in a web UI
-
-## Design Principles
-
-- **LangChain Integration**: All tools inherit from `langchain_core.tools.BaseTool` with consistent interfaces and Pydantic validation
-- **Streaming Events**: Built-in support for intermediate event dispatching during tool execution
-- **Timeout & Interruption**: Clear policies for handling timeouts and user interruptions
-- **HITL Support**: Production-grade human-in-the-loop extension points
 
 ## Contributing
 
