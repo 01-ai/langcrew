@@ -1,0 +1,66 @@
+---
+title: 工具库指南
+description: 使用 LangCrew 工具库函数
+---
+
+LangCrew 包含常见开发任务的工具库函数。这些主要是内部函数，但在高级用例中可能有用。
+
+## 可用工具
+
+### 文件检测
+检查文件是二进制还是文本：
+
+```python
+from langcrew.utils import is_binary_file, is_text_file
+
+with open('document.pdf', 'rb') as f:
+    data = f.read()
+    if is_binary_file(data):
+        print("二进制文件")
+    elif is_text_file(data):
+        print("文本文件")
+```
+
+### Token计数
+为LLM模型计算token：
+
+```python
+from langcrew.utils import TokenCounter
+from langchain_core.messages import HumanMessage
+
+counter = TokenCounter("gpt-4")
+messages = [HumanMessage(content="你好世界")]
+token_count, is_exact = counter.count_messages(messages)
+print(f"Tokens: {token_count}")
+```
+
+### 语言检测
+简单的中英文检测：
+
+```python
+from langcrew.utils import detect_language, detect_chinese
+
+# 检测语言
+lang = detect_language("你好世界")  # "zh"
+lang = detect_language("Hello")    # "en"
+
+# 检查中文
+is_chinese = detect_chinese("你好世界")  # True
+```
+
+### 消息ID生成
+生成唯一的消息ID：
+
+```python
+from langcrew.utils import generate_message_id
+
+msg_id = generate_message_id()  # "1748438204041_a7k9"
+```
+
+## 何时使用
+
+大多数用户不会直接需要这些工具。它们主要由LangCrew组件内部使用。专注于主要的[代理](/zh/concepts/agents)、[任务](/zh/concepts/tasks)和[团队](/zh/concepts/crews)概念。
+
+## API 参考
+
+完整的API详情，请参阅 `langcrew.utils` 模块的源码文档。

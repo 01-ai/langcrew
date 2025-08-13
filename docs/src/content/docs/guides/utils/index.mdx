@@ -1,0 +1,66 @@
+---
+title: Utils Guide
+description: Using LangCrew utility functions
+---
+
+LangCrew includes utility functions for common development tasks. These are primarily internal functions, but can be useful for advanced use cases.
+
+## Available Utilities
+
+### File Detection
+Check if files are binary or text:
+
+```python
+from langcrew.utils import is_binary_file, is_text_file
+
+with open('document.pdf', 'rb') as f:
+    data = f.read()
+    if is_binary_file(data):
+        print("Binary file")
+    elif is_text_file(data):
+        print("Text file")
+```
+
+### Token Counting
+Count tokens for LLM models:
+
+```python
+from langcrew.utils import TokenCounter
+from langchain_core.messages import HumanMessage
+
+counter = TokenCounter("gpt-4")
+messages = [HumanMessage(content="Hello world")]
+token_count, is_exact = counter.count_messages(messages)
+print(f"Tokens: {token_count}")
+```
+
+### Language Detection
+Simple Chinese/English detection:
+
+```python
+from langcrew.utils import detect_language, detect_chinese
+
+# Detect language
+lang = detect_language("你好世界")  # "zh"
+lang = detect_language("Hello")    # "en"
+
+# Check for Chinese
+is_chinese = detect_chinese("你好世界")  # True
+```
+
+### Message ID Generation
+Generate unique message IDs:
+
+```python
+from langcrew.utils import generate_message_id
+
+msg_id = generate_message_id()  # "1748438204041_a7k9"
+```
+
+## When to Use
+
+Most users won't need these utilities directly. They're primarily used internally by LangCrew components. Focus on the main [Agent](/concepts/agents), [Task](/concepts/tasks), and [Crew](/concepts/crews) concepts instead.
+
+## API Reference
+
+For complete API details, see the source code documentation in the `langcrew.utils` module.

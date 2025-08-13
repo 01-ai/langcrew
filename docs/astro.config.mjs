@@ -96,17 +96,17 @@ export default defineConfig({
 							}
 						},
 						{
+							label: '工具系统',
+							link: '/concepts/tools',
+							translations: {
+								en: 'Tools'
+							}
+						},
+						{
 							label: 'Web服务',
 							link: '/concepts/web',
 							translations: {
 								en: 'Web'
-							}
-						},
-						{
-							label: '工具库',
-							link: '/concepts/utils',
-							translations: {
-								en: 'Utils'
 							}
 						},
 					],
@@ -144,7 +144,42 @@ export default defineConfig({
 										en: 'Long-term Memory'
 									}
 								},
-
+								{
+									label: '实体记忆',
+									link: '/guides/memory/entity',
+									translations: {
+										en: 'Entity Memory'
+									}
+								},
+								{
+									label: '存储配置',
+									link: '/guides/memory/storage',
+									translations: {
+										en: 'Storage'
+									}
+								},
+							]
+						},
+						{
+							label: '人机协作',
+							translations: {
+								en: 'Human-in-the-Loop'
+							},
+							items: [
+								{
+									label: '快速开始',
+									link: '/guides/hitl/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '配置指南',
+									link: '/guides/hitl/configuration',
+									translations: {
+										en: 'Configuration'
+									}
+								},
 							]
 						},
 						{
@@ -172,28 +207,6 @@ export default defineConfig({
 									link: '/guides/tools/tool-mcp',
 									translations: {
 										en: 'MCP Integration'
-									}
-								},
-							]
-						},
-						{
-							label: '内存管理',
-							translations: {
-								en: 'Memory'
-							},
-							items: [
-								{
-									label: '实体记忆',
-									link: '/guides/memory/entity',
-									translations: {
-										en: 'Entity Memory'
-									}
-								},
-								{
-									label: '存储配置',
-									link: '/guides/memory/storage',
-									translations: {
-										en: 'Storage'
 									}
 								},
 							]
@@ -235,62 +248,11 @@ export default defineConfig({
 							]
 						},
 						{
-							label: '人机协作',
-							translations: {
-								en: 'Human-in-the-Loop'
-							},
-							items: [
-								{
-									label: '快速开始',
-									link: '/guides/hitl/getting-started',
-									translations: {
-										en: 'Getting Started'
-									}
-								},
-								{
-									label: '配置指南',
-									link: '/guides/hitl/configuration',
-									translations: {
-										en: 'Configuration'
-									}
-								},
-							]
-						},
-						{
 							label: '工具库',
+							link: '/guides/utils',
 							translations: {
 								en: 'Utils'
-							},
-							items: [
-								{
-									label: '文件检测',
-									link: '/guides/utils/file-detection',
-									translations: {
-										en: 'File Detection'
-									}
-								},
-								{
-									label: 'Token计数',
-									link: '/guides/utils/token-counting',
-									translations: {
-										en: 'Token Counting'
-									}
-								},
-								{
-									label: '语言检测',
-									link: '/guides/utils/language-detection',
-									translations: {
-										en: 'Language Detection'
-									}
-								},
-								{
-									label: '消息工具',
-									link: '/guides/utils/message-utilities',
-									translations: {
-										en: 'Message Utilities'
-									}
-								},
-							]
+							}
 						},
 					],
 				},
