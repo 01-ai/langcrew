@@ -3,15 +3,9 @@
 ## Introduction
 This project leverages the LangCrew framework to automate intelligent matching between CVs (resumes) and job positions. By orchestrating multiple AI agents, it deeply analyzes candidate resumes and matches them with a job database, outputting structured recommendation reports.
 
-- [LangCrew Framework](#langcrew-framework)
 - [Running the Script](#running-the-script)
 - [Details & Explanation](#details--explanation)
 - [Input & Output Examples](#input--output-examples)
-- [Contributing](#contributing)
-- [License](#license)
-
-## LangCrew Framework
-LangCrew is an agent orchestration framework built on top of CrewAI, supporting automatic agent and task creation via configuration files. In this project, agents collaborate to analyze CVs and job information, enabling precise job recommendations.
 
 ## Running the Script
 - **Environment Setup**: Python 3.11-3.12 is recommended. Activate your virtual environment before installing dependencies.
@@ -65,9 +59,3 @@ Frontend Architect,"JavaScript,React,Vue.js,TypeScript,Node.js","Frontend archit
 - **agents.yaml**: Customize agent roles, goals, LLM parameters, and available tools
 - **tasks.yaml**: Customize task descriptions, agent assignment, and output requirements
 - **cv.md / jobs.csv**: Replace with any candidate resume and job database as needed
-
-## Contributing
-Contributions are welcome! Please submit issues or pull requests to help improve the project.
-
-## License
-This project is released under the MIT License. 

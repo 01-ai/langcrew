@@ -1,0 +1,101 @@
+---
+title: Tool Converter
+description: Complete guide to LangCrew's tool format conversion system
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Overview
+
+The `ToolConverter` automatically detects tool formats and converts them to unified interfaces:
+
+```python
+from langcrew.tools import ToolConverter, convert_tools
+
+# Convert any tool
+converted = ToolConverter.convert_tool(any_tool)
+
+# Batch convert different formats
+unified = convert_tools([crewai_tool, langchain_tool, my_function])
+```
+
+## Supported Conversions
+
+<Tabs>
+<TabItem label="CrewAI to LangChain">
+
+Convert CrewAI tools to LangChain format:
+
+```python
+from crewai_tools import ScrapeWebsiteTool
+from langcrew.tools import ToolConverter
+
+# Convert CrewAI tool
+crewai_tool = ScrapeWebsiteTool()
+langchain_tool = ToolConverter.convert_crewai_tool(crewai_tool)
+
+# Use with any LangChain-compatible agent
+result = langchain_tool.run("https://example.com")
+```
+
+</TabItem>
+<TabItem label="LangChain to CrewAI">
+
+Convert LangChain tools to CrewAI format:
+
+```python
+from langchain_core.tools import BaseTool
+from langcrew.tools import convert_langchain_tool
+
+class LangChainCalculator(BaseTool):
+    name = "calculator"
+    description = "Mathematical calculations"
+    
+    def _run(self, expression: str) -> str:
+        return str(eval(expression))
+
+# Convert to CrewAI
+langchain_tool = LangChainCalculator()
+crewai_tool = convert_langchain_tool(langchain_tool)
+```
+
+</TabItem>
+<TabItem label="Function to Tool">
+
+Convert functions to tool formats:
+
+```python
+from langcrew.tools import ToolConverter
+
+def calculate_interest(principal: float, rate: float, time: int) -> float:
+    """Calculate compound interest."""
+    return principal * (1 + rate) ** time
+
+# Convert to LangChain tool
+tool = ToolConverter.convert_callable_tool(calculate_interest)
+result = tool.run({"principal": 1000, "rate": 0.05, "time": 10})
+```
+
+</TabItem>
+</Tabs>
+
+## Batch Conversion
+
+Convert multiple tools of different formats at once:
+
+```python
+from langcrew.tools import convert_tools
+
+# Mix different tool types
+tools = [crewai_tool, langchain_tool, my_function]
+unified_tools = convert_tools(tools)  # All become LangChain tools
+```
+
+
+## Next Steps
+
+- **[Tool Registry](/guides/tools/tool-registry)** - Learn about tool discovery and management
+- **[MCP Integration](/guides/tools/tool-mcp)** - Connect external tools via Model Context Protocol
+- **[Core Concepts](/concepts/)** - Understand how tools work with agents and crews
+
+The Tool Converter provides seamless interoperability between different tool formats, enabling you to use tools from any source in your LangCrew applications without compatibility concerns.

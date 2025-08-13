@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from langcrew import Agent, Crew, Task
 from langcrew.project import CrewBase, agent, crew, task
 from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew.tools.tool_converter import ToolConverter
+from langcrew.tools.converter import ToolConverter
 from dotenv import load_dotenv
 
 load_dotenv()

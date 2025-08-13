@@ -7,17 +7,12 @@ This project demonstrates the use of the LangCrew framework to automate the recr
 
 Based on [@joaomdmoura](https://x.com/joaomdmoura)'s CrewAI example, enhanced with LangCrew.
 
-- [LangCrew Framework](#langcrew-framework)
 - [Running the Script](#running-the-script)
 - [Details & Explanation](#details--explanation)
-- [Contributing](#contributing)
 - [License](#license)
 
-## LangCrew Framework
-LangCrew is an enhanced framework built on top of CrewAI, designed to facilitate the collaboration of role-playing AI agents. In this example, these agents work together to streamline the recruitment process, ensuring the best fit between candidates and job roles.
-
 ## Running the Script
-It uses GPT-4o by default so you should have access to that to run it.
+It uses gpt-4o-mini by default so you should have access to that to run it.
 
 ***DISCLAIMER:** This example uses cookies to authenticate to LinkedIn, and it's meant only as an example for the selenium tool. Using this for real-world applications may violate LinkedIn's terms of service and could lead to your account being banned. We do not endorse or encourage the use of this tool for any real-world applications.*
 

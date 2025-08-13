@@ -5,21 +5,18 @@ This project demonstrates the use of the LangCrew framework to automate the crea
 
 Based on [@joaomdmoura](https://x.com/joaomdmoura)'s CrewAI example, enhanced with LangCrew.
 
-- [LangCrew Framework](#langcrew-framework)
 - [Running the Script](#running-the-script)
 - [Details & Explanation](#details--explanation)
-- [Contributing](#contributing)
 - [License](#license)
 
-## LangCrew Framework
-LangCrew is an enhanced framework built on top of CrewAI, designed to facilitate the collaboration of role-playing AI agents. In this example, these agents work together to create a comprehensive surprise travel plan, ensuring a seamless and exciting travel experience.
-
 ## Running the Script
-It uses GPT-4 by default so you should have access to that to run it.
+It uses GPT-4o-mini by default.
 
-***Disclaimer:** This will use gpt-4 unless you change it to use a different model, and by doing so it may incur different costs.*
+***Disclaimer:** This will use gpt-4o-mini unless you change it to use a different model, and by doing so it may incur different costs.*
 
-- **Configure Environment**: Set up the environment variables for [OpenAI](https://platform.openai.com/api-keys) and other tools as needed.
+- **Configure Environment**: Copy `.env.example` to `.env` and set up the environment variables:
+  - `OPENAI_API_KEY`: Your [OpenAI API key](https://platform.openai.com/api-keys) 
+  - Web Search and Web Fetch tools configuration (optional, see `.env.example` for details)
 - **Install Dependencies**: Run `uv sync --prerelease=allow` to install all dependencies.
 - **Customize**: Modify `src/surprise_travel/main.py` to add custom inputs for your agents and tasks.
 - **Customize Further**: Check `src/surprise_travel/config/agents.yaml` to update your agents and `src/surprise_travel/config/tasks.yaml` to update your tasks.
@@ -33,10 +30,6 @@ It uses GPT-4 by default so you should have access to that to run it.
   - `src/surprise_travel/config/agents.yaml`: Configuration file for defining agents (Activity Planner, Restaurant Scout, Itinerary Compiler).
   - `src/surprise_travel/config/tasks.yaml`: Configuration file for defining tasks.
   - `src/surprise_travel/tools/custom_tool.py`: Contains custom tool classes used by the agents.
-- **Agent Roles**:
-  - **Activity Planner**: Research and find cool things to do at the destination, including activities and events that match the traveler's interests and age group.
-  - **Restaurant Scout**: Find highly-rated restaurants and dining experiences at the destination, and recommend scenic locations and fun activities.
-  - **Itinerary Compiler**: Compile all researched information into a comprehensive day-by-day itinerary, ensuring the integration of flights and hotel information.
 
 ## License
 This project is released under the MIT License.
