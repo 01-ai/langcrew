@@ -1,0 +1,517 @@
+---
+title: LangGraph Integration
+description: Direct integration with LangGraph's streaming execution engine
+---
+
+LangCrew's LangGraph adapter (`LangGraphAdapter`) provides direct integration with LangGraph's streaming execution engine, enabling seamless conversion of LangGraph applications into HTTP services.
+
+## Overview
+
+The LangGraph integration (`langcrew.web.langgraph_adapter`) offers:
+- **Direct LangGraph Support**: Native integration with compiled LangGraph applications
+- **Streaming Execution**: Real-time streaming of LangGraph execution steps
+- **State Management**: Automatic state persistence and checkpointing
+- **Interrupt Handling**: Built-in support for human-in-the-loop workflows
+
+## Basic Usage
+
+### From LangGraph to HTTP Service
+
+```python
+from langcrew.web import create_langgraph_server, LangGraphAdapter
+from langgraph import Graph, StateGraph
+
+# Your existing LangGraph application
+def create_my_graph():
+    graph = StateGraph(...)
+    # ... define your graph
+    return graph.compile()
+
+# Create HTTP server directly from LangGraph
+compiled_graph = create_my_graph()
+server = create_langgraph_server(compiled_graph)
+server.run(host="0.0.0.0", port=8000)
+```
+
+### Custom LangGraph Adapter
+
+```python
+from langcrew.web import LangGraphAdapter, AdapterServer
+
+# Create custom adapter
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph,
+    config={
+        "max_concurrent_requests": 20,
+        "request_timeout": 600,
+        "enable_interrupts": True,
+        "checkpoint_frequency": 10
+    }
+)
+
+# Create server with custom adapter
+server = AdapterServer(adapter=adapter)
+server.run()
+```
+
+## Configuration Options
+
+### Adapter Configuration
+
+```python
+from langcrew.web import LangGraphAdapter
+
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph,
+    config={
+        # Execution settings
+        "max_concurrent_requests": 10,    # Max parallel executions
+        "request_timeout": 300,           # Request timeout in seconds
+        "step_timeout": 30,               # Individual step timeout
+        
+        # State management
+        "enable_checkpoints": True,       # Enable state persistence
+        "checkpoint_frequency": 5,        # Steps between checkpoints
+        "max_checkpoint_history": 100,    # Max checkpoints to keep
+        
+        # Interrupt handling
+        "enable_interrupts": True,        # Enable HITL interrupts
+        "interrupt_before": ["human_step"], # Interrupt before these nodes
+        "interrupt_after": ["approval"],   # Interrupt after these nodes
+        
+        # Streaming settings
+        "stream_mode": "values",          # "values", "updates", or "debug"
+        "include_metadata": True,         # Include execution metadata
+        "buffer_size": 1000,             # Stream buffer size
+    }
+)
+```
+
+## State Management
+
+### Persistent State with Checkpointing
+
+```python
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langcrew.web import LangGraphAdapter
+
+# Create checkpointer
+checkpointer = SqliteSaver.from_conn_string("checkpoints.db")
+
+# Compile graph with checkpointer
+compiled_graph = graph.compile(checkpointer=checkpointer)
+
+# Create adapter
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph,
+    config={"enable_checkpoints": True}
+)
+```
+
+### Thread-based Sessions
+
+```python
+# Each HTTP session maps to a LangGraph thread
+# Session ID becomes thread ID for state persistence
+
+# Request 1: session_id="user_123" -> thread_id="user_123"
+POST /chat
+{
+    "message": "Start analysis",
+    "session_id": "user_123"
+}
+
+# Request 2: Same session continues from previous state
+POST /chat  
+{
+    "message": "Continue with next step",
+    "session_id": "user_123"  # Same thread, continues state
+}
+```
+
+## Streaming Integration
+
+### Stream Modes
+
+```python
+# Different streaming modes for different use cases
+
+# 1. Values mode - Stream node outputs
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph,
+    config={"stream_mode": "values"}
+)
+
+# 2. Updates mode - Stream state updates
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph, 
+    config={"stream_mode": "updates"}
+)
+
+# 3. Debug mode - Stream detailed execution info
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph,
+    config={"stream_mode": "debug"}
+)
+```
+
+### Custom Stream Processing
+
+```python
+from langcrew.web import LangGraphAdapter
+from langcrew.web.protocol import StreamMessage, MessageType
+
+class CustomLangGraphAdapter(LangGraphAdapter):
+    """Custom adapter with specialized stream processing"""
+    
+    async def process_stream_chunk(self, chunk, session_id: str):
+        """Custom processing of LangGraph stream chunks"""
+        
+        # Handle different chunk types
+        if "node" in chunk:
+            # Node execution
+            yield StreamMessage(
+                id=generate_message_id(),
+                role="assistant",
+                type=MessageType.LIVE_STATUS,
+                content=f"Executing {chunk['node']}",
+                detail={"node": chunk["node"], "step": chunk.get("step")},
+                timestamp=int(time.time() * 1000),
+                session_id=session_id
+            )
+        
+        if "output" in chunk:
+            # Node output
+            yield StreamMessage(
+                id=generate_message_id(),
+                role="assistant", 
+                type=MessageType.TEXT,
+                content=chunk["output"],
+                detail={"node": chunk.get("node")},
+                timestamp=int(time.time() * 1000),
+                session_id=session_id
+            )
+        
+        if "error" in chunk:
+            # Execution error
+            yield StreamMessage(
+                id=generate_message_id(),
+                role="assistant",
+                type=MessageType.ERROR,
+                content=f"Error: {chunk['error']}",
+                detail={"error_type": type(chunk["error"]).__name__},
+                timestamp=int(time.time() * 1000),
+                session_id=session_id
+            )
+```
+
+## Interrupt Handling
+
+### HITL Integration
+
+```python
+from langgraph import StateGraph
+from langcrew.web import LangGraphAdapter
+
+# Define graph with interrupt points
+def create_hitl_graph():
+    graph = StateGraph(MyState)
+    
+    # Add nodes
+    graph.add_node("analyze", analyze_node)
+    graph.add_node("human_review", human_review_node)  # HITL node
+    graph.add_node("finalize", finalize_node)
+    
+    # Add edges
+    graph.add_edge("analyze", "human_review")
+    graph.add_edge("human_review", "finalize")
+    
+    # Set entry point
+    graph.set_entry_point("analyze")
+    
+    return graph.compile(checkpointer=checkpointer)
+
+# Configure adapter with interrupts
+adapter = LangGraphAdapter(
+    compiled_graph=create_hitl_graph(),
+    config={
+        "enable_interrupts": True,
+        "interrupt_before": ["human_review"],  # Pause before human review
+        "interrupt_after": ["analyze"]         # Pause after analysis
+    }
+)
+```
+
+### Resume from Interrupts
+
+```python
+# Client can resume interrupted execution
+POST /chat
+{
+    "message": "approved",  # User approval
+    "session_id": "user_123",
+    "interrupt_data": {
+        "action": "resume",
+        "approval": true,
+        "modifications": {}
+    }
+}
+```
+
+## Advanced Patterns
+
+### Multi-Agent LangGraph
+
+```python
+from langgraph import StateGraph
+from langcrew.web import LangGraphAdapter
+
+def create_multi_agent_graph():
+    """Create graph with multiple specialized agents"""
+    
+    graph = StateGraph(MultiAgentState)
+    
+    # Add agent nodes
+    graph.add_node("researcher", research_agent)
+    graph.add_node("analyst", analysis_agent) 
+    graph.add_node("writer", writing_agent)
+    graph.add_node("reviewer", review_agent)
+    
+    # Add conditional routing
+    graph.add_conditional_edges(
+        "researcher",
+        route_after_research,
+        {"analyze": "analyst", "write": "writer"}
+    )
+    
+    graph.add_edge("analyst", "writer")
+    graph.add_edge("writer", "reviewer")
+    
+    return graph.compile(checkpointer=checkpointer)
+
+# Adapter automatically handles multi-agent streaming
+adapter = LangGraphAdapter(
+    compiled_graph=create_multi_agent_graph(),
+    config={
+        "stream_mode": "values",
+        "include_metadata": True  # Include agent info in streams
+    }
+)
+```
+
+### Parallel Execution
+
+```python
+def create_parallel_graph():
+    """Graph with parallel execution branches"""
+    
+    graph = StateGraph(ParallelState)
+    
+    # Parallel branches
+    graph.add_node("branch_a", process_branch_a)
+    graph.add_node("branch_b", process_branch_b)
+    graph.add_node("branch_c", process_branch_c)
+    graph.add_node("merge", merge_results)
+    
+    # Fan-out to parallel branches
+    graph.add_edge("START", "branch_a")
+    graph.add_edge("START", "branch_b") 
+    graph.add_edge("START", "branch_c")
+    
+    # Fan-in to merge
+    graph.add_edge("branch_a", "merge")
+    graph.add_edge("branch_b", "merge")
+    graph.add_edge("branch_c", "merge")
+    
+    return graph.compile()
+
+# Adapter handles parallel streaming
+adapter = LangGraphAdapter(
+    compiled_graph=create_parallel_graph(),
+    config={
+        "max_concurrent_requests": 50,  # Higher limit for parallel execution
+        "stream_mode": "updates"        # Stream all updates
+    }
+)
+```
+
+## Monitoring and Debugging
+
+### Execution Monitoring
+
+```python
+from langcrew.web import LangGraphAdapter
+
+class MonitoredLangGraphAdapter(LangGraphAdapter):
+    """Adapter with execution monitoring"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.execution_stats = {}
+    
+    async def execute_graph(self, input_data, session_id: str):
+        """Execute with monitoring"""
+        start_time = time.time()
+        
+        try:
+            # Execute graph
+            async for chunk in super().execute_graph(input_data, session_id):
+                # Track execution progress
+                self.update_execution_stats(session_id, chunk)
+                yield chunk
+                
+        except Exception as e:
+            # Log execution error
+            self.log_execution_error(session_id, e)
+            raise
+        finally:
+            # Record execution time
+            execution_time = time.time() - start_time
+            self.record_execution_time(session_id, execution_time)
+    
+    def update_execution_stats(self, session_id: str, chunk):
+        """Update execution statistics"""
+        if session_id not in self.execution_stats:
+            self.execution_stats[session_id] = {
+                "nodes_executed": [],
+                "total_steps": 0,
+                "start_time": time.time()
+            }
+        
+        if "node" in chunk:
+            self.execution_stats[session_id]["nodes_executed"].append(chunk["node"])
+            self.execution_stats[session_id]["total_steps"] += 1
+```
+
+### Debug Mode
+
+```python
+# Enable debug mode for detailed execution info
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph,
+    config={
+        "stream_mode": "debug",
+        "include_metadata": True,
+        "log_level": "DEBUG"
+    }
+)
+
+# Debug streams include:
+# - Node entry/exit
+# - State changes
+# - Execution metadata
+# - Performance metrics
+```
+
+## Performance Optimization
+
+### Connection Pooling
+
+```python
+from langcrew.web import LangGraphAdapter
+import asyncio
+
+class PooledLangGraphAdapter(LangGraphAdapter):
+    """Adapter with connection pooling for high throughput"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.execution_pool = asyncio.Semaphore(20)  # Max 20 concurrent
+    
+    async def execute_graph(self, input_data, session_id: str):
+        """Execute with pooling"""
+        async with self.execution_pool:
+            async for chunk in super().execute_graph(input_data, session_id):
+                yield chunk
+```
+
+### Caching
+
+```python
+from functools import lru_cache
+from langcrew.web import LangGraphAdapter
+
+class CachedLangGraphAdapter(LangGraphAdapter):
+    """Adapter with result caching"""
+    
+    @lru_cache(maxsize=1000)
+    def get_cached_result(self, input_hash: str):
+        """Cache results for identical inputs"""
+        # Implementation depends on your caching strategy
+        pass
+    
+    async def execute_graph(self, input_data, session_id: str):
+        """Execute with caching"""
+        input_hash = hash(str(input_data))
+        
+        # Check cache first
+        cached = self.get_cached_result(input_hash)
+        if cached:
+            yield cached
+            return
+        
+        # Execute and cache
+        result = []
+        async for chunk in super().execute_graph(input_data, session_id):
+            result.append(chunk)
+            yield chunk
+        
+        # Cache result
+        self.cache_result(input_hash, result)
+```
+
+## Testing
+
+### Unit Testing
+
+```python
+import pytest
+from langcrew.web import LangGraphAdapter
+
+@pytest.fixture
+def test_adapter():
+    """Create test adapter"""
+    # Create simple test graph
+    graph = create_test_graph()
+    return LangGraphAdapter(compiled_graph=graph)
+
+@pytest.mark.asyncio
+async def test_graph_execution(test_adapter):
+    """Test graph execution"""
+    input_data = {"message": "test input"}
+    session_id = "test_session"
+    
+    results = []
+    async for chunk in test_adapter.execute_graph(input_data, session_id):
+        results.append(chunk)
+    
+    assert len(results) > 0
+    assert any("output" in chunk for chunk in results)
+
+@pytest.mark.asyncio 
+async def test_interrupt_handling(test_adapter):
+    """Test interrupt handling"""
+    # Configure interrupts
+    test_adapter.config["enable_interrupts"] = True
+    test_adapter.config["interrupt_before"] = ["test_node"]
+    
+    # Execute until interrupt
+    input_data = {"message": "test interrupt"}
+    session_id = "test_interrupt_session"
+    
+    results = []
+    async for chunk in test_adapter.execute_graph(input_data, session_id):
+        results.append(chunk)
+        if chunk.get("type") == "interrupt":
+            break
+    
+    # Verify interrupt occurred
+    assert any(chunk.get("type") == "interrupt" for chunk in results)
+```
+
+## Next Steps
+
+- **[HTTP Server](/guides/web/http-server)** - FastAPI server setup and configuration
+- **[Streaming](/guides/web/streaming)** - Server-Sent Events and message types
+- **[Tool Display](/guides/web/tool-display)** - Rich tool call visualization
+- **[Web Concepts](/concepts/web)** - Understanding web architecture

@@ -1,0 +1,413 @@
+---
+title: Language Detection
+description: Simple and efficient text language detection
+---
+
+LangCrew's language detection utilities provide simple and efficient language identification, primarily focused on Chinese vs English detection with extensible patterns.
+
+## Overview
+
+The language detection module (`langcrew.utils.language`) offers:
+- **Chinese Detection**: Reliable Chinese text identification using Unicode ranges
+- **Language Classification**: Simple binary classification (Chinese/English)
+- **Character Ratio Analysis**: Statistical approach based on character patterns
+- **Lightweight**: No external dependencies, fast performance
+
+## Basic Usage
+
+### Detect Chinese Text
+
+```python
+from langcrew.utils.language import detect_chinese
+
+# Test Chinese text
+chinese_text = "这是中文文本"
+is_chinese = detect_chinese(chinese_text)
+print(f"Is Chinese: {is_chinese}")  # True
+
+# Test English text
+english_text = "This is English text"
+is_chinese = detect_chinese(english_text)
+print(f"Is Chinese: {is_chinese}")  # False
+
+# Test mixed text
+mixed_text = "Hello 你好 World"
+is_chinese = detect_chinese(mixed_text)
+print(f"Is Chinese: {is_chinese}")  # True (>30% Chinese characters)
+```
+
+### General Language Detection
+
+```python
+from langcrew.utils.language import detect_language
+
+# Detect language
+text = "机器学习是人工智能的一个分支"
+language = detect_language(text)
+print(f"Detected language: {language}")  # "zh" for Chinese
+
+text = "Machine learning is a branch of AI"
+language = detect_language(text)
+print(f"Detected language: {language}")  # "en" for English
+```
+
+## Detection Logic
+
+### Chinese Character Recognition
+
+The module uses Unicode ranges to identify Chinese characters:
+
+```python
+def detect_chinese(text: str) -> bool:
+    """Detect if text is primarily Chinese"""
+    if not text:
+        return False
+    
+    # Count Chinese characters (Unicode range: U+4E00 to U+9FFF)
+    chinese_chars = sum(1 for char in text if "\u4e00" <= char <= "\u9fff")
+    total_chars = len(text.strip())
+    
+    if total_chars == 0:
+        return False
+    
+    # Consider Chinese if >30% Chinese characters
+    chinese_ratio = chinese_chars / total_chars
+    return chinese_ratio >= 0.3
+```
+
+### Threshold-Based Classification
+
+```python
+# The 30% threshold handles mixed-language scenarios:
+
+examples = {
+    "纯中文": 1.0,           # 100% Chinese
+    "Pure English": 0.0,    # 0% Chinese
+    "Hello 你好": 0.33,      # 33% Chinese -> Classified as Chinese
+    "Hi 朋友们": 0.25,       # 25% Chinese -> Classified as English
+}
+```
+
+## Advanced Usage
+
+### Custom Threshold Detection
+
+```python
+from langcrew.utils.language import detect_chinese
+
+def custom_chinese_detection(text: str, threshold: float = 0.3) -> dict:
+    """Custom Chinese detection with configurable threshold"""
+    if not text:
+        return {"is_chinese": False, "ratio": 0.0, "confidence": "high"}
+    
+    chinese_chars = sum(1 for char in text if "\u4e00" <= char <= "\u9fff")
+    total_chars = len(text.strip())
+    
+    if total_chars == 0:
+        return {"is_chinese": False, "ratio": 0.0, "confidence": "high"}
+    
+    ratio = chinese_chars / total_chars
+    is_chinese = ratio >= threshold
+    
+    # Determine confidence
+    if ratio >= 0.8 or ratio <= 0.1:
+        confidence = "high"
+    elif ratio >= 0.6 or ratio <= 0.2:
+        confidence = "medium"
+    else:
+        confidence = "low"
+    
+    return {
+        "is_chinese": is_chinese,
+        "ratio": ratio,
+        "confidence": confidence,
+        "chinese_chars": chinese_chars,
+        "total_chars": total_chars
+    }
+
+# Example usage
+result = custom_chinese_detection("Hello 世界 World")
+print(result)
+# {
+#     "is_chinese": False,
+#     "ratio": 0.18,
+#     "confidence": "medium",
+#     "chinese_chars": 2,
+#     "total_chars": 11
+# }
+```
+
+### Batch Language Detection
+
+```python
+def detect_languages_batch(texts: list[str]) -> list[dict]:
+    """Detect languages for multiple texts"""
+    from langcrew.utils.language import detect_chinese, detect_language
+    
+    results = []
+    for i, text in enumerate(texts):
+        result = {
+            "index": i,
+            "text": text[:50] + "..." if len(text) > 50 else text,
+            "is_chinese": detect_chinese(text),
+            "language": detect_language(text),
+            "length": len(text)
+        }
+        results.append(result)
+    
+    return results
+
+# Example usage
+texts = [
+    "机器学习很有趣",
+    "Machine learning is fascinating",
+    "AI人工智能 is the future",
+    "Hello world"
+]
+
+results = detect_languages_batch(texts)
+for result in results:
+    print(f"Text: {result['text']} -> Language: {result['language']}")
+```
+
+## Integration Examples
+
+### With Agent Localization
+
+```python
+from langcrew import Agent
+from langcrew.utils.language import detect_chinese
+
+def create_multilingual_agent():
+    """Create agent that adapts to user language"""
+    
+    def get_response_language(user_input: str) -> str:
+        """Determine response language based on input"""
+        if detect_chinese(user_input):
+            return "zh"
+        return "en"
+    
+    def multilingual_tool(user_input: str) -> str:
+        """Tool that responds in appropriate language"""
+        language = get_response_language(user_input)
+        
+        if language == "zh":
+            return f"您的输入是中文：{user_input}"
+        else:
+            return f"Your input in English: {user_input}"
+    
+    return Agent(
+        role="Multilingual Assistant",
+        goal="Respond in the user's preferred language",
+        backstory="You automatically detect and respond in Chinese or English",
+        tools=[multilingual_tool]
+    )
+```
+
+### With Content Routing
+
+```python
+from langcrew.utils.language import detect_language
+
+class ContentRouter:
+    """Route content based on detected language"""
+    
+    def __init__(self):
+        self.handlers = {
+            "zh": self.handle_chinese,
+            "en": self.handle_english
+        }
+    
+    def route_content(self, content: str) -> dict:
+        """Route content to appropriate handler"""
+        language = detect_language(content)
+        handler = self.handlers.get(language, self.handle_english)
+        
+        return {
+            "language": language,
+            "content": content,
+            "result": handler(content)
+        }
+    
+    def handle_chinese(self, content: str) -> str:
+        """Handle Chinese content"""
+        return f"处理中文内容：{len(content)} 个字符"
+    
+    def handle_english(self, content: str) -> str:
+        """Handle English content"""
+        return f"Processing English content: {len(content)} characters"
+
+# Example usage
+router = ContentRouter()
+
+contents = [
+    "这是一个测试文本",
+    "This is a test text",
+    "混合 mixed content"
+]
+
+for content in contents:
+    result = router.route_content(content)
+    print(f"Language: {result['language']}, Result: {result['result']}")
+```
+
+### With Message Processing
+
+```python
+from langcrew.utils.language import detect_chinese
+
+def process_user_messages(messages: list[str]) -> dict:
+    """Process and categorize user messages by language"""
+    chinese_messages = []
+    english_messages = []
+    mixed_messages = []
+    
+    for msg in messages:
+        if not msg.strip():
+            continue
+            
+        # Calculate Chinese ratio for classification
+        chinese_chars = sum(1 for char in msg if "\u4e00" <= char <= "\u9fff")
+        total_chars = len(msg.strip())
+        ratio = chinese_chars / total_chars if total_chars > 0 else 0
+        
+        if ratio >= 0.8:
+            chinese_messages.append(msg)
+        elif ratio <= 0.1:
+            english_messages.append(msg)
+        else:
+            mixed_messages.append(msg)
+    
+    return {
+        "chinese": chinese_messages,
+        "english": english_messages,
+        "mixed": mixed_messages,
+        "total": len(messages),
+        "stats": {
+            "chinese_count": len(chinese_messages),
+            "english_count": len(english_messages),
+            "mixed_count": len(mixed_messages)
+        }
+    }
+```
+
+## Performance Considerations
+
+### Efficient Detection for Large Texts
+
+```python
+def quick_language_detection(text: str, sample_size: int = 500) -> str:
+    """Quick language detection using text sample"""
+    from langcrew.utils.language import detect_language
+    
+    # For very long texts, sample the beginning
+    if len(text) > sample_size:
+        sample = text[:sample_size]
+    else:
+        sample = text
+    
+    return detect_language(sample)
+```
+
+### Caching for Repeated Detection
+
+```python
+from functools import lru_cache
+from langcrew.utils.language import detect_chinese
+
+@lru_cache(maxsize=1000)
+def cached_detect_chinese(text: str) -> bool:
+    """Cached Chinese detection for repeated texts"""
+    return detect_chinese(text)
+
+# Useful for processing many similar messages
+def process_similar_messages(messages: list[str]) -> list[bool]:
+    """Process messages with caching"""
+    return [cached_detect_chinese(msg) for msg in messages]
+```
+
+## Limitations and Extensions
+
+### Current Limitations
+
+1. **Binary Classification**: Only Chinese vs English detection
+2. **Simple Heuristic**: Based on character ratios, not linguistic analysis
+3. **No Dialect Support**: Doesn't distinguish Chinese variants (Simplified/Traditional)
+4. **Limited Languages**: Doesn't detect other languages (Japanese, Korean, etc.)
+
+### Extension Examples
+
+```python
+def extended_language_detection(text: str) -> str:
+    """Extended detection for more languages"""
+    if not text:
+        return "unknown"
+    
+    # Chinese detection (existing logic)
+    chinese_chars = sum(1 for char in text if "\u4e00" <= char <= "\u9fff")
+    
+    # Japanese detection (Hiragana, Katakana)
+    japanese_chars = sum(1 for char in text if 
+                        ("\u3040" <= char <= "\u309f") or  # Hiragana
+                        ("\u30a0" <= char <= "\u30ff"))    # Katakana
+    
+    # Korean detection (Hangul)
+    korean_chars = sum(1 for char in text if "\uac00" <= char <= "\ud7af")
+    
+    total_chars = len(text.strip())
+    if total_chars == 0:
+        return "unknown"
+    
+    ratios = {
+        "chinese": chinese_chars / total_chars,
+        "japanese": japanese_chars / total_chars,
+        "korean": korean_chars / total_chars
+    }
+    
+    # Find dominant language
+    max_ratio = max(ratios.values())
+    if max_ratio >= 0.3:
+        return max(ratios.keys(), key=ratios.get)
+    
+    return "english"  # Default to English
+```
+
+## Error Handling
+
+```python
+from langcrew.utils.language import detect_chinese, detect_language
+
+def safe_language_detection(text: str) -> dict:
+    """Safe language detection with error handling"""
+    try:
+        if not isinstance(text, str):
+            return {
+                "success": False,
+                "error": "Input must be string",
+                "language": "unknown"
+            }
+        
+        is_chinese = detect_chinese(text)
+        language = detect_language(text)
+        
+        return {
+            "success": True,
+            "is_chinese": is_chinese,
+            "language": language,
+            "text_length": len(text)
+        }
+    
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "language": "unknown"
+        }
+```
+
+## Next Steps
+
+- **[File Detection](/guides/utils/file-detection)** - Intelligent file type detection
+- **[Token Counting](/guides/utils/token-counting)** - Precise token counting for LLMs
+- **[Message Utilities](/guides/utils/message-utilities)** - Message ID generation
+- **[Utils Concepts](/concepts/utils)** - Understanding utility functions

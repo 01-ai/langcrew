@@ -1,171 +1,218 @@
 ---
 title: Web
-description: Understanding Web - HTTP server and adapters for AI workflows
+description: Understanding Web - HTTP server for AI agents with streaming support
 ---
 
-Web is the HTTP server component that exposes AI agents as web services, providing REST APIs, real-time streaming, and web-based interfaces for agent interaction. It transforms your AI workflows into production-ready web applications.
+Web provides HTTP server capabilities for exposing AI agents as web services with real-time streaming communication, built on FastAPI and integrated with LangGraph's execution engine.
 
 ## What is Web?
 
 Web in langcrew provides:
-- **HTTP server**: Production-ready FastAPI server for hosting AI agents
-- **LangGraph adapter**: Direct integration with LangGraph's streaming capabilities  
-- **Real-time streaming**: Server-Sent Events (SSE) for live agent responses
-- **Tool visualization**: Rich display of tool calls, parameters, and results
-- **Frontend UI**: Complete web interface (available in `/web` directory)
+- **HTTP Server**: FastAPI-based server (AdapterServer) for agent communication
+- **Streaming Communication**: Real-time agent responses via SSE (Server-Sent Events)
+- **LangGraph Integration**: Direct integration with LangGraph's streaming capabilities
+- **Protocol Communication**: Structured message protocols for frontend integration
+- **Tool Display Management**: Rich visualization of tool calls in web interfaces
+- **Frontend UI Integration**: Accompanying React-based UI components
 
 ## Core Architecture
 
-Web is built on FastAPI with LangGraph integration for robust web interfaces:
+Web is built around a minimal HTTP server that bridges AI agents with web clients:
 
 ```python
-from langcrew.web import create_server, LangGraphAdapter
+from langcrew import Agent, Crew
+from langcrew.web import create_server
 
-# Basic server setup
-server = create_server(
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["http://localhost:3000"]
+# Create agents
+agent = Agent(
+    role="Web Assistant",
+    goal="Help users through web interface",
+    backstory="You are a helpful web-based AI assistant"
 )
+
+# Create HTTP server
+server = create_server(crew=Crew(agents=[agent]))
+server.run(host="0.0.0.0", port=8000)
 ```
 
 ## Key Components
 
 ### AdapterServer
-Production-ready FastAPI server that hosts AI agents as HTTP services with CORS, middleware, and lifecycle management.
+FastAPI-based HTTP server that handles client requests and converts them to agent executions.
+
+**Key Features:**
+- Minimal, focused design
+- Built-in CORS support
+- Health check endpoints
+- Graceful error handling
+- Custom route extensibility
 
 ```python
 from langcrew.web import AdapterServer, LangGraphAdapter
 
-# Create adapter and server
-adapter = LangGraphAdapter(crew=crew, enable_streaming=True)
-server = AdapterServer(
-    adapter=adapter,
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["http://localhost:3000"],  # Frontend UI origin
-    debug=False  # Production setting
-)
+# Custom server configuration
+adapter = LangGraphAdapter(crew=crew)
+server = AdapterServer(adapter=adapter)
+
+# Add custom routes
+@server.app.get("/custom")
+async def custom_endpoint():
+    return {"message": "Custom endpoint"}
+
+server.run()
 ```
 
 ### LangGraphAdapter
-Core adapter that bridges LangCrew agents with LangGraph's streaming execution engine, enabling real-time web interactions.
+Streaming adapter that bridges LangCrew agents with LangGraph's execution engine.
+
+**Key Features:**
+- Direct LangGraph streaming integration
+- Session state management
+- Event filtering and conversion
+- Stop signal handling
+- Tool execution tracking
 
 ```python
 from langcrew.web import LangGraphAdapter
-from langcrew import Agent, Crew
 
-# Create crew and adapter
-crew = Crew(agents=[agent], tasks=[task])
+# Advanced adapter configuration
 adapter = LangGraphAdapter(
     crew=crew,
-    enable_streaming=True,      # Enable real-time streaming
-    stream_tool_calls=True,     # Stream individual tool executions
-    tool_display=True          # Rich tool visualization
+    # Session management handled automatically
+)
+
+# Use with pure LangGraph
+from langcrew.web import create_langgraph_server
+server = create_langgraph_server(compiled_graph)
+```
+
+### Protocol Communication
+Structured message protocols for consistent frontend-backend communication.
+
+**Core Message Types:**
+- `SESSION_INIT` - Session initialization
+- `TEXT` / `MARKDOWN` - Text content
+- `TOOL_CALL` / `TOOL_RESULT` - Tool execution
+- `USER_INPUT` - HITL user input requests
+- `FINISH_REASON` - Execution completion
+
+```python
+from langcrew.web.protocol import StreamMessage, MessageType
+
+# Example message structure
+message = StreamMessage(
+    id="msg_123",
+    role="assistant",
+    type=MessageType.TEXT,
+    content="Hello, how can I help you?",
+    session_id="session_456"
 )
 ```
 
-### Protocol Types
-Type definitions for HTTP communication.
-
-| Type | Description | Usage |
-|------|-------------|-------|
-| `ChatRequest` | Chat message request | Client → Server |
-| `StreamMessage` | Streaming response | Server → Client |
-| `ExecutionInput` | Workflow execution input | Agent execution |
-| `ToolResult` | Tool execution result | Tool display |
-| `TaskExecutionStatus` | Task status updates | Progress tracking |
-
-### ToolDisplayManager
-Manages rich visualization of tool calls and results.
+### Tool Display Management
+Manages how tool calls are visualized in web frontends with multi-language support.
 
 ```python
 from langcrew.web import ToolDisplayManager
 
-# Configure tool display
-display_manager = ToolDisplayManager(
-    show_parameters=True,
-    show_results=True,
-    format_json=True
+# Register tool display
+ToolDisplayManager.register(
+    tool_name="web_search",
+    display_names={
+        "en": "Searching the web",
+        "zh": "正在搜索网页"
+    },
+    display_content_param="query"
 )
 ```
 
-## Integration with langcrew
+## Communication Protocol
 
-Web integrates seamlessly with all langcrew components:
+Web uses **SSE (Server-Sent Events)** for real-time streaming, not WebSocket:
 
-- **[Agents](/concepts/agents)**: Expose agents via HTTP endpoints
-- **[Tasks](/concepts/tasks)**: Execute tasks through web interfaces
-- **[Crews](/concepts/crews)**: Host entire crews as web services
+```javascript
+// Frontend integration with SSE
+const eventSource = new EventSource('/api/v1/chat', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        message: 'Hello!',
+        session_id: 'session_123'
+    })
+});
 
-```python
-from langcrew import Agent, Crew
-from langcrew.web import create_langgraph_server
-
-# Create agent and crew
-agent = Agent(
-    role="Web Assistant",
-    goal="Help users through web interface",
-    backstory="Expert web-based AI assistant"
-)
-
-crew = Crew(agents=[agent])
-
-# Create web server
-server = create_langgraph_server(
-    crew=crew,
-    host="0.0.0.0",
-    port=8000
-)
-
-# Start server
-server.start()
+eventSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    console.log('Received:', data);
+};
 ```
 
 ## Frontend UI Integration
 
-Web comes with a complete frontend UI built with modern React technology stack:
+Web includes a complete React-based frontend UI located in the `/web` directory:
 
-- **Location**: Available in the `/web` directory of the langcrew repository
-- **Technology**: React 19 + Antd + Tailwind CSS + Rspack
-- **Features**: AgentX component, real-time streaming UI, tool visualization
-- **Documentation**: The frontend has its own comprehensive documentation
+**Tech Stack:**
+- React 19 with modern hooks
+- Ant Design (Antd) components
+- Tailwind CSS for styling
+- Rspack for fast bundling
 
-The frontend UI connects seamlessly with the Web server to provide a complete web application experience.
+**Features:**
+- Real-time chat interface
+- Tool call visualization
+- File upload/preview support
+- Multi-language support
+- Responsive design
+
+**Note:** The frontend UI has its own documentation and can be used independently.
+
+## Server Deployment Options
+
+### Development Server
+```python
+# Quick development setup
+server = create_server(crew)
+server.run(host="127.0.0.1", port=8000, reload=True)
+```
+
+### Production Server
+```python
+# Production configuration
+server = create_server(crew)
+server.run(
+    host="0.0.0.0", 
+    port=8000,
+    workers=4,
+    access_log=True
+)
+```
+
+### Pure LangGraph Server
+```python
+# Direct LangGraph integration
+from langgraph.graph import StateGraph
+
+# Build your graph
+compiled_graph = builder.compile(checkpointer=checkpointer)
+
+# Create server
+server = create_langgraph_server(compiled_graph)
+server.run()
+```
 
 ## When to Use Web
 
-- **Production web applications** needing AI agent backends with UI
-- **API services** for mobile applications or custom frontends
-- **Real-time chat interfaces** with streaming agent responses  
-- **Multi-user platforms** with concurrent agent interactions
-- **Enterprise applications** requiring web-based AI workflows
-
-## API Endpoints
-
-### Standard Endpoints
-
-- `POST /chat` - Send chat messages to agents
-- `POST /execute` - Execute specific tasks
-- `GET /status` - Check server and agent status
-- `WebSocket /stream` - Real-time streaming interface
-
-### Example API Usage
-
-```bash
-# Send chat message
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello, how can you help me?"}'
-
-# Execute specific task
-curl -X POST http://localhost:8000/execute \
-  -H "Content-Type: application/json" \
-  -d '{"task": "analyze_data", "input": {"data": "sample"}}'
-```
+- **Interactive AI applications** requiring real-time user interaction
+- **Agent-based web services** needing HTTP API endpoints
+- **Streaming applications** with real-time response requirements
+- **Multi-session applications** with conversation continuity
+- **Tool-rich agents** requiring visual tool call feedback
+- **HITL workflows** needing human approval interfaces
 
 ## Next Steps
 
 - **[Web Quick Start](/guides/web/getting-started)** - Get started in 5 minutes
-- **[Web Configuration](/guides/web/configuration)** - Complete configuration guide
-- **Examples** - Check `examples/components/web/` for real-world implementations
+- **[Deployment Guide](/guides/web/deployment)** - Production deployment strategies
+- **[Configuration Guide](/guides/web/configuration)** - Server and adapter configuration

@@ -248,9 +248,8 @@ agent = Agent(
     goal="Make important business decisions",
     hitl=HITLConfig(
         enabled=True,
-        interrupt_before=["decision_node"],
-        interrupt_after=["analysis_node"],
-        approval_required=True
+        interrupt_before_tools=["decision_tool", "database_tool"],
+        interrupt_after_tools=["analysis_tool"]
     )
 )
 ```

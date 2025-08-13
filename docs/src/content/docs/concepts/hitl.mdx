@@ -3,19 +3,20 @@ title: Human-in-the-Loop (HITL)
 description: Understanding HITL - adding human oversight to AI workflows
 ---
 
-Human-in-the-Loop (HITL) enables human oversight and control in AI agent workflows, providing approval mechanisms, parameter modification, and quality assurance.
+Human-in-the-Loop (HITL) is LangCrew's **high-level human oversight component** built on top of [LangGraph's native interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/). It provides an easy-to-use interface for adding human approval workflows to AI agent executions.
 
 ## What is HITL?
 
-HITL in langcrew provides strategic control points where humans can:
-- **Approve or deny** tool executions
+HITL is a high-level abstraction that wraps [LangGraph's interrupt mechanisms](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) to provide strategic control points where humans can:
+- **Approve or deny** tool executions before they run
 - **Modify parameters** before tool execution  
 - **Review and edit** tool results after execution
 - **Implement safety policies** for production environments
+- **Multi-language support** with Chinese and English UI elements
 
 ## Core Architecture
 
-HITL is built on [LangGraph's native interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) with enhanced approval workflows:
+HITL provides a high-level wrapper around [LangGraph's interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) with enhanced approval workflows:
 
 ```python
 from langcrew.hitl import HITLConfig

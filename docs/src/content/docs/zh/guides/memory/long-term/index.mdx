@@ -1,0 +1,208 @@
+---
+title: 长期记忆
+description: 跨会话的持久知识存储
+---
+
+# 长期记忆
+
+长期记忆使用LangGraph的Store系统提供持久知识存储。它跨会话存储重要信息，帮助代理随时间积累知识。
+
+## 概述
+
+长期记忆适用于：
+- **知识积累**跨多个会话
+- **从经验中学习**并存储见解
+- **跨会话连续性**重要事实
+- **质量过滤的信息**存储
+
+## 配置
+
+### 基本设置
+
+```python
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///long_term.db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.7,  # 仅存储高质量信息
+    }
+)
+```
+
+### 配置参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|------|------|------|--------|
+| `enabled` | bool | 启用长期记忆 | True |
+| `min_quality` | float | 存储的最低质量阈值 (0.0-1.0) | 0.7 |
+
+## 工作原理
+
+### 基于质量的存储
+
+长期记忆只存储满足质量阈值的信息：
+
+```python
+from langcrew import Crew
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///knowledge.db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # 高质量阈值
+    }
+)
+
+crew = Crew(agents=[agent], memory=memory_config)
+
+# 高质量信息被存储
+crew.kickoff(
+    inputs={"user_input": "公司年收入5000万美元，增长25%"},
+    thread_id="business_analysis"
+)
+
+# 低质量信息可能被过滤
+crew.kickoff(
+    inputs={"user_input": "也许今天天气不错"},
+    thread_id="casual_chat"
+)
+```
+
+### 知识组织
+
+长期记忆通过以下方式组织知识：
+- **代理命名空间**：每个代理有自己的知识空间
+- **任务类别**：按任务类型分组知识
+- **质量评分**：按重要性和准确性加权
+- **时间戳**：跟踪时近性和更新
+
+## 使用示例
+
+### 知识管理系统
+
+```python
+from langcrew import Agent, Crew
+from langcrew.memory import MemoryConfig
+
+# 为知识管理配置
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/knowledge_db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # 知识库高质量
+    }
+)
+
+knowledge_agent = Agent(
+    role="知识管理员",
+    goal="构建和维护组织知识",
+    backstory="您积累并组织重要信息以供将来参考"
+)
+
+crew = Crew(agents=[knowledge_agent], memory=memory_config)
+
+# 存储重要公司信息
+sessions = [
+    ("company_info", "我们公司成立于2020年，专门从事AI解决方案"),
+    ("product_info", "我们有三个主要产品：ChatBot Pro、Analytics Suite和API Gateway"),
+    ("team_info", "工程团队有15名开发人员，分布在前端、后端和ML领域"),
+]
+
+for session_id, info in sessions:
+    crew.kickoff(
+        inputs={"user_input": info},
+        thread_id=session_id
+    )
+
+# 查询积累的知识
+result = crew.kickoff(
+    inputs={"user_input": "告诉我关于我们公司和产品的信息"},
+    thread_id="knowledge_query"
+)
+```
+
+## 内存管理
+
+### 搜索长期记忆
+
+```python
+# 在长期记忆中搜索
+results = crew.search_memory(
+    query="销售目标",
+    memory_type="long_term",
+    limit=5
+)
+
+for result in results:
+    print(f"质量: {result['quality']}")
+    print(f"内容: {result['content']}")
+    print(f"任务: {result['task']}")
+    print(f"代理: {result['agent']}")
+```
+
+### 保存任务结果
+
+```python
+# 手动保存高质量结果
+crew.long_term_memory.save_task_result(
+    task="market_analysis",
+    result="Q3市场分析显示我们目标细分市场增长15%",
+    quality=0.9,
+    learnings=["市场时机至关重要", "客户反馈推动采用"],
+    agent="market_analyst"
+)
+```
+
+## 最佳实践
+
+### 质量阈值策略
+
+```python
+# 根据用例调整质量阈值
+quality_strategies = {
+    "research": 0.9,        # 研究的极高质量
+    "business_intel": 0.8,  # 业务决策的高质量
+    "general_knowledge": 0.7, # 一般用途的标准质量
+    "casual_learning": 0.6,  # 探索性学习的较低阈值
+}
+
+memory_config = MemoryConfig(
+    long_term={
+        "enabled": True,
+        "min_quality": quality_strategies["business_intel"]
+    }
+)
+```
+
+## 与其他内存类型集成
+
+长期记忆与短期记忆和实体记忆协同工作：
+
+```python
+# 全面的内存配置
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://...",
+    short_term={"enabled": True, "max_history": 20},    # 近期上下文
+    long_term={"enabled": True, "min_quality": 0.8},    # 重要知识
+    entity={"enabled": True}                            # 实体关系
+)
+
+# 代理受益于所有内存类型：
+# - 短期：提供即时上下文
+# - 长期：提供积累知识
+# - 实体：结构化实体关系
+```
+
+## 下一步
+
+- **[实体记忆](/zh/guides/memory/entity)** - 跟踪实体和关系
+- **[短期记忆](/zh/guides/memory/short-term)** - 基于会话的对话历史
+- **[存储配置](/zh/guides/memory/storage)** - 配置存储后端
+- **[内存概念](/zh/concepts/memory)** - 理解内存架构

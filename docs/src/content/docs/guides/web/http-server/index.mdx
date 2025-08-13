@@ -1,0 +1,609 @@
+---
+title: HTTP Server
+description: FastAPI-based HTTP server for exposing AI agents as web services
+---
+
+# HTTP Server
+
+LangCrew's Web module transforms your AI agents into production-ready web services. It consists of four main components working together:
+
+## Web Architecture Overview
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   HTTP Server   │────│   Streaming     │────│  Tool Display   │
+│  (FastAPI API)  │    │ (SSE Protocol)  │    │ (Rich UI/UX)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │ LangGraph       │
+                    │ Integration     │
+                    │ (Agent Runtime) │
+                    └─────────────────┘
+```
+
+- **[HTTP Server](/guides/web/http-server)**: FastAPI-based REST API endpoints
+- **[Streaming](/guides/web/streaming)**: Real-time Server-Sent Events (SSE) communication  
+- **[LangGraph Integration](/guides/web/langgraph-integration)**: Direct LangGraph execution engine
+- **[Tool Display](/guides/web/tool-display)**: Rich visualization for tool calls
+
+## Quick Start
+
+Get your agent running as a web service in 3 lines:
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+# Your agent
+agent = Agent(role="Assistant", goal="Help users", backstory="Helpful AI")
+crew = Crew(agents=[agent])
+
+# Create and run web server
+server = create_server(crew)
+server.run(port=8000)  # Visit http://localhost:8000/docs
+```
+
+## HTTP Server Details
+
+The HTTP server module (`langcrew.web.http_server`) offers:
+- **FastAPI Integration**: Modern, fast web framework with automatic API documentation
+- **Agent Exposure**: Convert LangCrew agents/crews into HTTP endpoints
+- **Streaming Support**: Server-Sent Events (SSE) for real-time communication
+- **Production Ready**: Built-in CORS, error handling, and health checks
+
+## Basic Usage
+
+### Simple Agent Server
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+# Create your agent
+agent = Agent(
+    role="Web Assistant",
+    goal="Help users through web interface",
+    backstory="You are a helpful web-based AI assistant"
+)
+
+# Create crew
+crew = Crew(agents=[agent])
+
+# Create and run server
+server = create_server(crew)
+server.run(host="0.0.0.0", port=8000)
+```
+
+### Direct LangGraph Server
+
+```python
+from langcrew.web import create_langgraph_server
+from langgraph import Graph
+
+# If you have a compiled LangGraph
+compiled_graph = your_compiled_graph  # Your LangGraph compilation
+
+# Create server directly from LangGraph
+server = create_langgraph_server(compiled_graph)
+server.run(host="0.0.0.0", port=8000)
+```
+
+## Server Configuration
+
+### Advanced Server Setup
+
+```python
+from langcrew.web import AdapterServer, LangGraphAdapter
+
+# Custom adapter configuration
+adapter = LangGraphAdapter(
+    compiled_graph=compiled_graph,
+    config={
+        "max_concurrent_requests": 10,
+        "request_timeout": 300,
+        "enable_interrupts": True
+    }
+)
+
+# Create server with custom configuration
+server = AdapterServer(
+    adapter=adapter,
+    title="My AI Agent API",
+    description="Custom AI agent service",
+    version="1.0.0"
+)
+
+# Configure CORS
+server.add_cors(
+    allow_origins=["https://myapp.com", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"]
+)
+
+# Run server
+server.run(
+    host="0.0.0.0",
+    port=8000,
+    workers=4,  # For production
+    log_level="info"
+)
+```
+
+### Environment-Based Configuration
+
+```python
+import os
+from langcrew.web import create_server
+
+def create_production_server(crew):
+    """Create server with production configuration"""
+    server = create_server(crew)
+    
+    # Production settings
+    server.add_cors(
+        allow_origins=os.getenv("ALLOWED_ORIGINS", "*").split(","),
+        allow_credentials=True
+    )
+    
+    # Add custom middleware
+    @server.app.middleware("http")
+    async def add_security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        return response
+    
+    return server
+
+# Usage
+server = create_production_server(crew)
+server.run(
+    host="0.0.0.0",
+    port=int(os.getenv("PORT", 8000)),
+    workers=int(os.getenv("WORKERS", 1))
+)
+```
+
+## API Endpoints
+
+### Default Endpoints
+
+The server automatically provides these endpoints:
+
+```bash
+# Chat endpoint (streaming)
+POST /chat
+Content-Type: application/json
+{
+  "message": "Hello, how are you?",
+  "session_id": "user_123"
+}
+
+# Stop execution
+POST /stop
+Content-Type: application/json
+{
+  "session_id": "user_123"
+}
+
+# Health check
+GET /health
+
+# API documentation
+GET /docs        # Swagger UI
+GET /redoc       # ReDoc
+GET /openapi.json # OpenAPI schema
+```
+
+### Custom Endpoints
+
+```python
+from langcrew.web import AdapterServer
+from fastapi import HTTPException
+
+# Create server
+server = create_server(crew)
+
+# Add custom endpoints
+@server.app.get("/status")
+async def get_status():
+    """Custom status endpoint"""
+    return {
+        "status": "running",
+        "version": "1.0.0",
+        "agents": len(crew.agents)
+    }
+
+@server.app.get("/agents")
+async def list_agents():
+    """List available agents"""
+    return {
+        "agents": [
+            {
+                "role": agent.role,
+                "goal": agent.goal
+            }
+            for agent in crew.agents
+        ]
+    }
+
+@server.app.post("/agents/{agent_role}/chat")
+async def chat_with_specific_agent(agent_role: str, message: dict):
+    """Chat with specific agent"""
+    agent = next((a for a in crew.agents if a.role == agent_role), None)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Custom logic for single agent interaction
+    # ... implementation
+    
+    return {"response": "Custom response"}
+```
+
+## Request/Response Handling
+
+### Chat Request Format
+
+```python
+from langcrew.web.protocol import ChatRequest
+
+# Request format
+chat_request = {
+    "message": "What is machine learning?",
+    "session_id": "user_123",  # Optional, auto-generated if not provided
+    "interrupt_data": {}       # Optional, for resuming interrupted sessions
+}
+```
+
+### Response Streaming
+
+```python
+# Server-Sent Events format
+# Each event contains:
+{
+    "id": "1748438204041_a7k9",
+    "role": "assistant",
+    "type": "text",
+    "content": "Machine learning is...",
+    "detail": {},
+    "timestamp": 1748438204041,
+    "session_id": "user_123"
+}
+```
+
+## Production Deployment
+
+### Docker Deployment
+
+```dockerfile
+# Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+# Copy application
+COPY . .
+
+# Expose port
+EXPOSE 8000
+
+# Run server
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+```
+
+```python
+# main.py
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+import os
+
+# Create your agents and crew
+agent = Agent(
+    role="Production Assistant",
+    goal="Handle production workloads",
+    backstory="You are a production-ready AI assistant"
+)
+
+crew = Crew(agents=[agent])
+
+# Create server
+server = create_server(crew)
+
+# Configure for production
+server.add_cors(
+    allow_origins=os.getenv("ALLOWED_ORIGINS", "*").split(","),
+    allow_credentials=True
+)
+
+# Export the FastAPI app for uvicorn
+app = server.app
+```
+
+### Kubernetes Deployment
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langcrew-web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: langcrew-web
+  template:
+    metadata:
+      labels:
+        app: langcrew-web
+    spec:
+      containers:
+      - name: langcrew-web
+        image: your-registry/langcrew-web:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        - name: WORKERS
+          value: "1"  # Let Kubernetes handle scaling
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langcrew-web-service
+spec:
+  selector:
+    app: langcrew-web
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+```
+
+### Load Balancing
+
+```python
+# For multiple server instances
+import os
+from langcrew.web import create_server
+
+def create_load_balanced_server(crew):
+    """Create server optimized for load balancing"""
+    server = create_server(crew)
+    
+    # Add health check with detailed status
+    @server.app.get("/health/detailed")
+    async def detailed_health():
+        return {
+            "status": "healthy",
+            "instance_id": os.getenv("HOSTNAME", "unknown"),
+            "memory_usage": "...",  # Add actual memory monitoring
+            "active_sessions": "...",  # Add session counting
+        }
+    
+    # Add graceful shutdown handling
+    import signal
+    import asyncio
+    
+    def signal_handler(signum, frame):
+        print(f"Received signal {signum}, shutting down gracefully...")
+        # Implement graceful shutdown logic
+        os._exit(0)
+    
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    return server
+```
+
+## Monitoring and Logging
+
+### Custom Logging
+
+```python
+import logging
+from langcrew.web import create_server
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Create server
+server = create_server(crew)
+
+# Add request logging middleware
+@server.app.middleware("http")
+async def log_requests(request, call_next):
+    start_time = time.time()
+    
+    # Log request
+    logger.info(f"Request: {request.method} {request.url}")
+    
+    response = await call_next(request)
+    
+    # Log response
+    process_time = time.time() - start_time
+    logger.info(f"Response: {response.status_code} in {process_time:.3f}s")
+    
+    return response
+```
+
+### Metrics Collection
+
+```python
+from prometheus_client import Counter, Histogram, generate_latest
+from langcrew.web import create_server
+
+# Metrics
+request_count = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint'])
+request_duration = Histogram('http_request_duration_seconds', 'HTTP request duration')
+
+server = create_server(crew)
+
+@server.app.middleware("http")
+async def metrics_middleware(request, call_next):
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    # Record metrics
+    request_count.labels(method=request.method, endpoint=request.url.path).inc()
+    request_duration.observe(time.time() - start_time)
+    
+    return response
+
+@server.app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(generate_latest(), media_type="text/plain")
+```
+
+## Error Handling
+
+### Custom Error Handlers
+
+```python
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+from langcrew.web import create_server
+
+server = create_server(crew)
+
+@server.app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Custom HTTP exception handler"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.status_code,
+                "message": exc.detail,
+                "timestamp": int(time.time()),
+                "path": str(request.url)
+            }
+        }
+    )
+
+@server.app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """General exception handler"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": 500,
+                "message": "Internal server error",
+                "timestamp": int(time.time()),
+                "path": str(request.url)
+            }
+        }
+    )
+```
+
+## Testing
+
+### Unit Tests
+
+```python
+import pytest
+from fastapi.testclient import TestClient
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+@pytest.fixture
+def test_client():
+    """Create test client"""
+    agent = Agent(
+        role="Test Agent",
+        goal="Handle test requests",
+        backstory="You are a test agent"
+    )
+    crew = Crew(agents=[agent])
+    server = create_server(crew)
+    return TestClient(server.app)
+
+def test_health_endpoint(test_client):
+    """Test health endpoint"""
+    response = test_client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+
+def test_chat_endpoint(test_client):
+    """Test chat endpoint"""
+    response = test_client.post(
+        "/chat",
+        json={"message": "Hello", "session_id": "test_session"}
+    )
+    assert response.status_code == 200
+    # Test streaming response handling
+```
+
+### Load Testing
+
+```python
+# load_test.py
+import asyncio
+import aiohttp
+import time
+
+async def send_request(session, url, data):
+    """Send single request"""
+    async with session.post(url, json=data) as response:
+        return await response.json()
+
+async def load_test(num_requests=100, concurrent=10):
+    """Run load test"""
+    url = "http://localhost:8000/chat"
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        
+        for i in range(num_requests):
+            data = {
+                "message": f"Test message {i}",
+                "session_id": f"session_{i % concurrent}"
+            }
+            task = send_request(session, url, data)
+            tasks.append(task)
+            
+            # Limit concurrent requests
+            if len(tasks) >= concurrent:
+                await asyncio.gather(*tasks)
+                tasks = []
+        
+        # Process remaining tasks
+        if tasks:
+            await asyncio.gather(*tasks)
+
+# Run load test
+# asyncio.run(load_test(1000, 20))
+```
+
+## Next Steps
+
+- **[Streaming](/guides/web/streaming)** - Server-Sent Events and real-time communication
+- **[LangGraph Integration](/guides/web/langgraph-integration)** - Direct LangGraph adapter usage  
+- **[Tool Display](/guides/web/tool-display)** - Rich tool call visualization
+- **[Web Concepts](/concepts/web)** - Understanding web architecture

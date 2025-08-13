@@ -80,7 +80,7 @@ Add approval workflows where you need them:
 # Configure which tools require approval
 hitl_config = HITLConfig(
     enabled=True,
-    tools_requiring_approval=["WebSearchTool", "DatabaseTool"]
+    interrupt_before_tools=["WebSearchTool", "DatabaseTool"]
 )
 
 crew = Crew(agents=[agent], tasks=[tasks], hitl=hitl_config)

@@ -89,17 +89,17 @@ export default defineConfig({
 							}
 						},
 						{
-							label: 'Web服务',
-							link: '/concepts/web',
-							translations: {
-								en: 'Web'
-							}
-						},
-						{
 							label: '人机协作',
 							link: '/concepts/hitl',
 							translations: {
 								en: 'Human-in-the-Loop'
+							}
+						},
+						{
+							label: 'Web服务',
+							link: '/concepts/web',
+							translations: {
+								en: 'Web'
 							}
 						},
 						{
@@ -123,6 +123,13 @@ export default defineConfig({
 								en: 'Memory'
 							},
 							items: [
+								{
+									label: '快速开始',
+									link: '/guides/memory/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
 								{
 									label: '短期记忆',
 									link: '/guides/memory/short-term',
@@ -160,24 +167,31 @@ export default defineConfig({
 							},
 							items: [
 								{
-									label: '快速开始',
-									link: '/guides/web/getting-started',
+									label: 'HTTP服务器',
+									link: '/guides/web/http-server',
 									translations: {
-										en: 'Getting Started'
+										en: 'HTTP Server'
 									}
 								},
 								{
-									label: '生产部署',
-									link: '/guides/web/deployment',
+									label: '流式协议',
+									link: '/guides/web/streaming',
 									translations: {
-										en: 'Deployment'
+										en: 'Streaming'
 									}
 								},
 								{
-									label: '配置指南',
-									link: '/guides/web/configuration',
+									label: 'LangGraph集成',
+									link: '/guides/web/langgraph-integration',
 									translations: {
-										en: 'Configuration'
+										en: 'LangGraph Integration'
+									}
+								},
+								{
+									label: '工具展示',
+									link: '/guides/web/tool-display',
+									translations: {
+										en: 'Tool Display'
 									}
 								},
 							]
@@ -211,24 +225,31 @@ export default defineConfig({
 							},
 							items: [
 								{
-									label: '快速开始',
-									link: '/guides/utils/getting-started',
+									label: '文件检测',
+									link: '/guides/utils/file-detection',
 									translations: {
-										en: 'Getting Started'
+										en: 'File Detection'
 									}
 								},
 								{
-									label: '实用示例',
-									link: '/guides/utils/examples',
+									label: 'Token计数',
+									link: '/guides/utils/token-counting',
 									translations: {
-										en: 'Examples'
+										en: 'Token Counting'
 									}
 								},
 								{
-									label: '高级配置',
-									link: '/guides/utils/configuration',
+									label: '语言检测',
+									link: '/guides/utils/language-detection',
 									translations: {
-										en: 'Advanced Configuration'
+										en: 'Language Detection'
+									}
+								},
+								{
+									label: '消息工具',
+									link: '/guides/utils/message-utilities',
+									translations: {
+										en: 'Message Utilities'
 									}
 								},
 							]
@@ -236,18 +257,11 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'API 参考',
+					label: '参考',
 					translations: {
-						en: 'API Reference'
+						en: 'Reference'
 					},
-					autogenerate: { directory: 'api' },
-				},
-				{
-					label: '示例',
-					translations: {
-						en: 'Examples'
-					},
-					autogenerate: { directory: 'examples' },
+					autogenerate: { directory: 'reference' },
 				},
 			],
 		}),

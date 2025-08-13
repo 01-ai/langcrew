@@ -1,0 +1,291 @@
+---
+title: 短期记忆
+description: 基于会话的对话历史管理
+---
+
+# 短期记忆
+
+短期记忆使用LangGraph的Checkpointer系统提供基于会话的对话历史。它在对话线程内维护上下文，并自动将相关历史注入代理提示中。
+
+## 概述
+
+短期记忆适用于：
+- **对话连续性**在会话内
+- **上下文感知响应**基于近期交互
+- **多轮对话**维持状态
+- **基于会话的应用程序**临时上下文需求
+
+## 配置
+
+### 基本设置
+
+```python
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///short_term.db",
+    short_term={
+        "enabled": True,
+        "max_history": 20,  # 保留最后20轮对话
+    }
+)
+```
+
+### 配置参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|------|------|------|--------|
+| `enabled` | bool | 启用短期记忆 | True |
+| `max_history` | int | 要记住的最大对话轮数 | 20 |
+
+## 工作原理
+
+### 基于线程的会话
+
+短期记忆使用线程ID来分离不同的对话会话：
+
+```python
+from langcrew import Crew
+
+crew = Crew(agents=[agent], memory=memory_config)
+
+# 用户A的对话
+result_a = crew.kickoff(
+    inputs={"user_input": "我叫Alice"},
+    thread_id="user_alice"
+)
+
+# 用户B的对话（独立内存）
+result_b = crew.kickoff(
+    inputs={"user_input": "我叫Bob"}, 
+    thread_id="user_bob"
+)
+
+# Alice的后续对话（记住她的名字）
+result_a2 = crew.kickoff(
+    inputs={"user_input": "我叫什么名字？"},
+    thread_id="user_alice"  # 相同的线程ID
+)
+```
+
+### 自动上下文注入
+
+短期记忆自动注入相关的对话历史：
+
+```python
+# 第一条消息
+crew.kickoff(
+    inputs={"user_input": "我喜欢意大利菜"},
+    thread_id="conversation_1"
+)
+
+# 第二条消息 - 代理从第一条消息获得上下文
+crew.kickoff(
+    inputs={"user_input": "推荐一家餐厅"},
+    thread_id="conversation_1"  # 代理知道用户喜欢意大利菜
+)
+```
+
+## 使用示例
+
+### 客户支持聊天
+
+```python
+from langcrew import Agent, Crew
+from langcrew.memory import MemoryConfig
+
+# 为客户支持配置
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/support_db",
+    short_term={
+        "enabled": True,
+        "max_history": 30,  # 复杂问题需要更长历史
+    }
+)
+
+support_agent = Agent(
+    role="客户支持代理",
+    goal="使用对话上下文提供有用支持",
+    backstory="您记住对话历史以提供上下文帮助"
+)
+
+crew = Crew(agents=[support_agent], memory=memory_config)
+
+# 客户对话
+def handle_customer_message(customer_id, message):
+    return crew.kickoff(
+        inputs={"user_input": message},
+        thread_id=f"customer_{customer_id}"
+    )
+
+# 使用示例
+response1 = handle_customer_message("12345", "我的订单还没有到")
+response2 = handle_customer_message("12345", "本来昨天就应该到的")
+# 代理记住关于缺失订单的上下文
+```
+
+### 教育导师
+
+```python
+# 为教育会话配置
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///education.db",
+    short_term={
+        "enabled": True,
+        "max_history": 25,  # 记住学习进度
+    }
+)
+
+tutor_agent = Agent(
+    role="数学导师",
+    goal="基于之前的解释教授数学概念",
+    backstory="您记住已涵盖的概念和学生的理解水平"
+)
+
+crew = Crew(agents=[tutor_agent], memory=memory_config)
+
+# 教学会话
+student_id = "student_456"
+
+# 第1课：基本概念
+crew.kickoff(
+    inputs={"user_input": "解释什么是代数"},
+    thread_id=f"student_{student_id}"
+)
+
+# 第2课：在之前基础上构建（代理记住代数解释）
+crew.kickoff(
+    inputs={"user_input": "现在告诉我如何解 x + 5 = 10"},
+    thread_id=f"student_{student_id}"
+)
+```
+
+## 内存管理
+
+### 搜索短期记忆
+
+```python
+# 在短期记忆中搜索
+results = crew.search_memory(
+    query="披萨订单",
+    memory_type="short_term",
+    limit=5
+)
+
+for result in results:
+    print(f"找到: {result['content']}")
+    print(f"时间戳: {result['timestamp']}")
+```
+
+### 清除会话内存
+
+```python
+# 清除特定会话的内存
+crew.short_term_memory.clear(thread_id="user_alice")
+
+# 或清除所有短期记忆
+crew.short_term_memory.clear()
+```
+
+### 获取会话上下文
+
+```python
+# 获取对话上下文
+context = crew.short_term_memory.get_context(
+    thread_id="conversation_1",
+    limit=10  # 最后10条消息
+)
+
+for item in context:
+    print(f"代理: {item['agent']}")
+    print(f"内容: {item['value']}")
+    print(f"时间: {item['timestamp']}")
+```
+
+## 最佳实践
+
+### 线程ID策略
+
+```python
+# 使用有意义的线程ID
+thread_patterns = {
+    "user_sessions": f"user_{user_id}",
+    "support_tickets": f"ticket_{ticket_id}",
+    "project_planning": f"project_{project_id}_{phase}",
+    "learning_sessions": f"student_{student_id}_{subject}"
+}
+```
+
+### 内存大小管理
+
+```python
+# 根据用例调整max_history
+memory_configs = {
+    "quick_chat": {"max_history": 5},      # 简短交互
+    "support": {"max_history": 30},        # 复杂问题解决
+    "tutoring": {"max_history": 25},       # 教育连续性
+    "planning": {"max_history": 15},       # 项目讨论
+}
+```
+
+### 性能优化
+
+```python
+# 为您的规模使用适当的存储
+storage_choices = {
+    "development": "memory",               # 快速，无持久化
+    "small_scale": "sqlite",              # 基于文件，性能好
+    "production": "postgresql",           # 可扩展，并发访问
+}
+
+memory_config = MemoryConfig(
+    provider=storage_choices["production"],
+    connection_string="postgresql://...",
+    short_term={"enabled": True, "max_history": 20}
+)
+```
+
+## 与其他内存类型集成
+
+短期记忆与长期记忆和实体记忆协同工作：
+
+```python
+# 组合内存配置
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://...",
+    short_term={"enabled": True, "max_history": 20},    # 近期上下文
+    long_term={"enabled": True, "min_quality": 0.8},    # 重要知识
+    entity={"enabled": True}                            # 跟踪实体
+)
+
+# 代理受益于所有内存类型
+crew = Crew(agents=[agent], memory=memory_config)
+```
+
+## 故障排除
+
+### 内存未加载
+- 验证调用之间thread_id的一致性
+- 检查数据库连接和权限
+- 确保checkpointer正确配置
+
+### 上下文未注入
+- 确认short_term配置中`enabled: True`
+- 检查max_history > 0
+- 验证代理使用相同的crew实例
+
+### 性能问题
+- 减少max_history以加快上下文加载
+- 为数据库提供商使用连接池
+- 单用户应用考虑SQLite
+
+## 下一步
+
+- **[长期记忆](/zh/guides/memory/long-term)** - 持久知识存储
+- **[实体记忆](/zh/guides/memory/entity)** - 跟踪实体和关系
+- **[存储配置](/zh/guides/memory/storage)** - 配置存储后端
+- **[内存概念](/zh/concepts/memory)** - 理解内存架构

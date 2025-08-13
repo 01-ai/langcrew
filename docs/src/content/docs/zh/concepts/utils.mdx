@@ -1,202 +1,216 @@
 ---
 title: 工具库
-description: 理解工具库 - AI 工作流的实用函数和助手
+description: 理解工具库 - AI代理开发的实用工具函数
 ---
 
-工具库为 AI 工作流提供基本的实用函数和助手，为文件处理、令牌管理、语言处理和消息操作提供实用工具。
+工具库为AI代理开发提供实用工具函数和辅助工具集合，包括文件检测、token计数、语言处理和消息处理实用工具。
 
 ## 什么是工具库？
 
-langcrew 中的工具库提供：
-- **文件检测**：智能文件类型检测，包含内容分析和二进制/文本分类
-- **令牌计数**：针对 OpenAI、Anthropic 和其他 LLM 模型的精确令牌计数
-- **语言检测**：用于文本处理的简单语言识别
-- **消息实用工具**：消息 ID 生成和格式化的助手函数
+langcrew中的工具库提供：
+- **文件检测**：智能文件类型检测和编码分析
+- **Token计数**：GPT和Claude模型的精确token计数
+- **语言检测**：简单的语言识别（中文/英文）
+- **消息工具**：消息ID生成和处理辅助工具
 
 ## 核心架构
 
-工具库是独立实用模块的集合，可以独立使用：
+工具库组织为独立的实用工具模块，每个都服务于特定目的：
 
 ```python
-from langcrew.utils import detect_file_type, count_tokens, detect_language
-
-# 文件检测
-file_info = detect_file_type("document.pdf")
-
-# 令牌计数
-tokens = count_tokens("你好，世界！", model="gpt-4")
-
-# 语言检测
-language = detect_language("Hello, how are you?")
+from langcrew.utils import (
+    is_binary_file, is_text_file,      # 文件检测
+    TokenCounter,                       # Token计数
+    detect_chinese, detect_language,    # 语言检测
+    generate_message_id                 # 消息工具
+)
 ```
 
-## 关键组件
+## 核心组件
 
 ### 文件检测
-自动检测文件类型并提取元数据。
+使用多种启发式规则进行二进制/文本分类的智能文件类型检测。
+
+**核心特性：**
+- 二进制与文本文件检测
+- UTF-8/UTF-16编码验证
+- 文件签名识别
+- 中文文本支持
+- 编码检测
 
 ```python
-from langcrew.utils import detect_file_type
+from langcrew.utils.file_detect import is_binary_file, is_text_file
 
-# 检测文件类型和元数据
-file_info = detect_file_type("path/to/file.pdf")
-print(file_info.file_type)  # "pdf"
-print(file_info.mime_type)  # "application/pdf"
-print(file_info.size)       # 文件大小（字节）
+# 检测文件类型
+with open('document.pdf', 'rb') as f:
+    data = f.read()
+    is_binary = is_binary_file(data)  # True
+    is_text = is_text_file(data)      # False
+
+# 文件类型提示
+from langcrew.utils.file_detect import get_file_type_hint
+file_type = get_file_type_hint(data)  # "binary" 或 "text"
 ```
 
-#### 文件检测参数
+**检测规则：**
+1. 空字节存在（最可靠）
+2. 常见二进制文件签名
+3. UTF-8/UTF-16编码验证
+4. 控制字符比率分析
+5. 中文字符模式支持
 
-| 参数 | 类型 | 描述 | 默认值 |
-|------|------|------|--------|
-| `file_path` | str | 要检测的文件路径 | 必需 |
-| `read_content` | bool | 是否读取文件内容 | True |
-| `extract_metadata` | bool | 提取详细元数据 | True |
+| 函数 | 用途 | 参数 |
+|------|------|------|
+| `is_binary_file(data)` | 检测二进制文件 | `data: bytes \| bytearray` |
+| `is_text_file(data)` | 检测文本文件 | `data: bytes \| bytearray` |
+| `get_file_type_hint(data)` | 获取文件类型提示 | `data: bytes \| bytearray` |
 
-### 令牌计数器
-为各种 LLM 模型提供高精度的令牌计数。
+### Token计数
+支持GPT和Claude的LLM模型精确token计数。
+
+**核心特性：**
+- GPT-4精确token计数
+- Claude token估算
+- 基于消息的计数
+- Token限制常量
+- 模型特定编码
 
 ```python
-from langcrew.utils import count_tokens
+from langcrew.utils.token_counter import TokenCounter
+from langchain_core.messages import HumanMessage
 
-# 为不同模型计数令牌
-gpt4_tokens = count_tokens("你好，世界！", model="gpt-4")
-claude_tokens = count_tokens("你好，世界！", model="claude-3")
+# 初始化计数器
+counter = TokenCounter(model_name="gpt-4")
 
-# 计算消息中的令牌
-messages = [
-    {"role": "user", "content": "你好"},
-    {"role": "assistant", "content": "你好！"}
-]
-total_tokens = count_tokens(messages, model="gpt-4")
+# 计算消息中的token
+messages = [HumanMessage(content="你好，你好吗？")]
+token_count, is_exact = counter.count_messages(messages)
+print(f"Tokens: {token_count}, Exact: {is_exact}")
 ```
 
-#### 令牌计数器参数
+**常量：**
+- `TOKEN_LIMIT = 64000` - 截断的统一token限制
+- `MAX_TOKEN_LIMIT = 150000` - 用户上下文的最大token限制
 
-| 参数 | 类型 | 描述 | 默认值 |
-|------|------|------|--------|
-| `text` | str \| List[dict] | 要计数的文本或消息 | 必需 |
-| `model` | str | 用于分词的模型名称 | "gpt-4" |
-| `include_metadata` | bool | 包含令牌分解信息 | False |
+| 方法 | 用途 | 返回值 |
+|------|------|--------|
+| `count_messages(messages)` | 计算消息列表中的token | `tuple[int, bool]` |
+| `_count_gpt_tokens(messages)` | 精确GPT token计数 | `int` |
+| `_estimate_claude_tokens(messages)` | 估算Claude token | `int` |
 
 ### 语言检测
-检测语言并处理文本以实现国际化。
+专注于中英文文本的简单语言识别。
+
+**核心特性：**
+- 中文字符检测
+- 字符比率分析
+- 简单快速处理
+- Unicode范围支持
 
 ```python
-from langcrew.utils import detect_language, normalize_text
+from langcrew.utils.language import detect_chinese, detect_language
 
-# 检测语言
-lang = detect_language("Bonjour, comment allez-vous?")
-print(lang)  # "fr"
+# 检测中文文本
+is_chinese = detect_chinese("你好世界")  # True
+is_chinese = detect_chinese("Hello World")  # False
 
-# 规范化文本
-normalized = normalize_text("  你好，   世界！  ")
-print(normalized)  # "你好，世界！"
+# 通用语言检测
+language = detect_language("你好世界")  # "zh"
+language = detect_language("Hello World")  # "en"
 ```
 
-#### 语言检测参数
+**检测逻辑：**
+- 中文字符：Unicode范围`\u4e00-\u9fff`
+- 阈值：30%中文字符 = 中文文本
+- 回退：非中文文本为英文
 
-| 参数 | 类型 | 描述 | 默认值 |
+| 函数 | 用途 | 参数 | 返回值 |
 |------|------|------|--------|
-| `text` | str | 用于语言检测的文本 | 必需 |
-| `confidence_threshold` | float | 最小置信度分数 | 0.8 |
-| `return_confidence` | bool | 返回置信度分数 | False |
+| `detect_chinese(text)` | 检测中文文本 | `text: str` | `bool` |
+| `detect_language(text)` | 检测语言 | `text: str` | `str` ("zh"/"en") |
 
-### 消息实用工具
-消息处理和格式化的助手函数。
+### 消息工具
+消息ID生成和消息处理的辅助函数。
+
+**核心特性：**
+- 唯一消息ID生成
+- 基于时间戳的ID
+- 冲突避免
+- 高并发支持
 
 ```python
-from langcrew.utils import generate_message_id, format_message
+from langcrew.utils.message_utils import generate_message_id
 
 # 生成唯一消息ID
 msg_id = generate_message_id()
-
-# 格式化消息用于显示
-formatted = format_message(
-    content="你好，世界！",
-    role="user",
-    timestamp=True
-)
+# 格式："1748438204041_a7k9"（时间戳_随机后缀）
 ```
 
-## 与 langcrew 的集成
+**ID格式：**
+- 时间戳：自纪元以来的毫秒数
+- 后缀：4字符随机字符串（小写+数字）
+- 示例：`1748438204041_a7k9`
 
-工具库与所有 langcrew 组件无缝集成：
+| 函数 | 用途 | 返回值 |
+|------|------|--------|
+| `generate_message_id()` | 生成唯一消息ID | `str` |
 
-- **[智能体](/zh/concepts/agents)**：使用令牌计数进行提示优化
-- **[任务](/zh/concepts/tasks)**：文件检测用于文档处理任务
-- **[团队](/zh/concepts/crews)**：语言检测用于多语言团队
+## 使用模式
 
+### 文件处理流水线
 ```python
-from langcrew import Agent
-from langcrew.utils import count_tokens, detect_language
+from langcrew.utils.file_detect import is_binary_file, get_file_type_hint
 
-# 具有令牌感知提示的智能体
-agent = Agent(
-    role="内容分析师",
-    goal="高效分析内容",
-    backstory="处理各种内容类型的专家",
-    tools=[detect_file_type, count_tokens]
-)
+def process_file(file_path):
+    with open(file_path, 'rb') as f:
+        data = f.read()
+    
+    if is_binary_file(data):
+        return f"二进制文件：{get_file_type_hint(data)}"
+    else:
+        # 作为文本处理
+        text_content = data.decode('utf-8')
+        return f"文本文件：{len(text_content)}字符"
+```
 
-# 在任务执行中使用
-def process_document(file_path: str):
-    # 检测文件类型
-    file_info = detect_file_type(file_path)
+### Token管理
+```python
+from langcrew.utils.token_counter import TokenCounter, TOKEN_LIMIT
+
+def manage_context(messages, model_name="gpt-4"):
+    counter = TokenCounter(model_name)
+    token_count, _ = counter.count_messages(messages)
     
-    # 如果是文本文件则计算令牌
-    if file_info.is_text:
-        tokens = count_tokens(file_info.content)
-        print(f"文档有 {tokens} 个令牌")
+    if token_count > TOKEN_LIMIT:
+        # 截断消息以适应限制
+        return messages[-10:]  # 保留最后10条消息
     
-    # 检测语言
-    if file_info.content:
-        language = detect_language(file_info.content)
-        print(f"文档语言：{language}")
+    return messages
+```
+
+### 多语言支持
+```python
+from langcrew.utils.language import detect_language
+
+def get_response_template(user_input):
+    lang = detect_language(user_input)
+    
+    if lang == "zh":
+        return "我理解了您的问题："
+    else:
+        return "I understand your question:"
 ```
 
 ## 何时使用工具库
 
-- **文件处理** 应用处理多种格式
-- **令牌优化** 实现成本效益的 LLM 使用
-- **多语言** 应用需要语言检测
-- **消息处理** 系统需要格式化实用工具
-- **内容分析** 工作流需要元数据提取
-
-## 支持的文件类型
-
-### 文档格式
-- **文本**：.txt, .md, .rst, .log
-- **办公**：.docx, .xlsx, .pptx
-- **PDF**：.pdf（带文本提取）
-- **代码**：.py, .js, .html, .css, .json, .xml
-
-### 媒体格式
-- **图像**：.jpg, .png, .gif, .bmp, .svg
-- **音频**：.mp3, .wav, .flac, .ogg
-- **视频**：.mp4, .avi, .mov, .wmv
-
-### 压缩格式
-- **压缩**：.zip, .rar, .7z, .tar, .gz
-
-## 令牌计数支持的模型
-
-### OpenAI 模型
-- GPT-4、GPT-4 Turbo、GPT-4o
-- GPT-3.5 Turbo 变体
-- 文本嵌入模型
-
-### Anthropic 模型
-- Claude-3（Opus、Sonnet、Haiku）
-- Claude-2 变体
-
-### 其他模型
-- Llama 2/3 变体
-- Mistral 模型
-- 自定义分词器
+- **文件处理应用程序**需要智能文件类型检测
+- **Token感知应用程序**需要LLM使用的精确token计数
+- **多语言应用程序**需要简单的语言检测
+- **基于消息的系统**需要唯一ID生成
+- **代理开发**需要常见实用工具函数
 
 ## 下一步
 
-- **[工具库快速开始](/zh/guides/utils/getting-started)** - 5分钟快速上手
-- **[工具库配置指南](/zh/guides/utils/configuration)** - 完整配置指南
-- **示例** - 查看 `examples/components/utils/` 了解实际实现案例
+- **[工具库快速开始](/zh/guides/utils/getting-started)** - 5分钟快速开始
+- **[实用示例](/zh/guides/utils/examples)** - 真实世界使用示例
+- **[高级配置](/zh/guides/utils/configuration)** - 高级实用工具配置

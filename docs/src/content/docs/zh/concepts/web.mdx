@@ -1,167 +1,218 @@
 ---
 title: Web服务
-description: 理解Web服务 - AI 工作流的 HTTP 服务器和适配器
+description: 理解Web服务 - 支持流式通信的AI代理HTTP服务器
 ---
 
-Web服务是将 AI 智能体暴露为 Web 服务的 HTTP 服务器组件，提供 REST API、实时流式传输和基于 Web 的智能体交互界面。它将您的 AI 工作流转换为生产就绪的 Web 应用程序。
+Web服务为AI代理提供HTTP服务器功能，支持实时流式通信，基于FastAPI构建并与LangGraph执行引擎集成，将代理暴露为Web服务。
 
 ## 什么是Web服务？
 
-langcrew 中的Web服务提供：
-- **HTTP 服务器**：用于托管 AI 智能体的生产就绪 FastAPI 服务器
-- **LangGraph 适配器**：与 LangGraph 流式功能的直接集成
-- **实时流式传输**：用于实时智能体响应的服务器发送事件 (SSE)
-- **工具可视化**：工具调用、参数和结果的丰富显示
-- **前端 UI**：完整的 Web 界面（位于 `/web` 目录）
+langcrew中的Web服务提供：
+- **HTTP服务器**：基于FastAPI的服务器（AdapterServer）用于代理通信
+- **流式通信**：通过SSE（Server-Sent Events）实现实时代理响应
+- **LangGraph集成**：与LangGraph流式功能直接集成
+- **协议通信**：用于前端集成的结构化消息协议
+- **工具显示管理**：Web界面中工具调用的丰富可视化
+- **前端UI集成**：配套的React基础UI组件
 
 ## 核心架构
 
-Web服务基于 FastAPI 构建，集成 LangGraph 以提供强大的 Web 界面：
+Web服务围绕最小化HTTP服务器构建，在AI代理和Web客户端之间建立桥梁：
 
 ```python
-from langcrew.web import create_server, LangGraphAdapter
+from langcrew import Agent, Crew
+from langcrew.web import create_server
 
-# 基本服务器设置
-server = create_server(
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["http://localhost:3000"]
+# 创建代理
+agent = Agent(
+    role="Web助手",
+    goal="通过Web界面帮助用户",
+    backstory="您是一个有用的基于Web的AI助手"
 )
+
+# 创建HTTP服务器
+server = create_server(crew=Crew(agents=[agent]))
+server.run(host="0.0.0.0", port=8000)
 ```
 
-## 关键组件
+## 核心组件
 
 ### AdapterServer
-用于托管智能体工作流的 HTTP 服务器，提供 REST API 端点。
+基于FastAPI的HTTP服务器，处理客户端请求并将其转换为代理执行。
+
+**核心特性：**
+- 最小化、专注的设计
+- 内置CORS支持
+- 健康检查端点
+- 优雅错误处理
+- 自定义路由扩展性
 
 ```python
-from langcrew.web import AdapterServer
+from langcrew.web import AdapterServer, LangGraphAdapter
 
-# 创建服务器实例
-server = AdapterServer(
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["*"],
-    debug=True
-)
+# 自定义服务器配置
+adapter = LangGraphAdapter(crew=crew)
+server = AdapterServer(adapter=adapter)
+
+# 添加自定义路由
+@server.app.get("/custom")
+async def custom_endpoint():
+    return {"message": "自定义端点"}
+
+server.run()
 ```
 
 ### LangGraphAdapter
-将 LangCrew 智能体与 LangGraph 工作流集成的适配器。
+流式适配器，在LangCrew代理和LangGraph执行引擎之间建立桥梁。
+
+**核心特性：**
+- 直接LangGraph流式集成
+- 会话状态管理
+- 事件过滤和转换
+- 停止信号处理
+- 工具执行跟踪
 
 ```python
 from langcrew.web import LangGraphAdapter
-from langcrew import Agent, Crew
 
-# 创建适配器
+# 高级适配器配置
 adapter = LangGraphAdapter(
     crew=crew,
-    enable_streaming=True,
-    tool_display=True
+    # 会话管理自动处理
+)
+
+# 与纯LangGraph一起使用
+from langcrew.web import create_langgraph_server
+server = create_langgraph_server(compiled_graph)
+```
+
+### 协议通信
+用于一致前后端通信的结构化消息协议。
+
+**核心消息类型：**
+- `SESSION_INIT` - 会话初始化
+- `TEXT` / `MARKDOWN` - 文本内容
+- `TOOL_CALL` / `TOOL_RESULT` - 工具执行
+- `USER_INPUT` - HITL用户输入请求
+- `FINISH_REASON` - 执行完成
+
+```python
+from langcrew.web.protocol import StreamMessage, MessageType
+
+# 消息结构示例
+message = StreamMessage(
+    id="msg_123",
+    role="assistant",
+    type=MessageType.TEXT,
+    content="您好，我如何帮助您？",
+    session_id="session_456"
 )
 ```
 
-### 协议类型
-HTTP 通信的类型定义。
-
-| 类型 | 描述 | 用途 |
-|------|------|------|
-| `ChatRequest` | 聊天消息请求 | 客户端 → 服务器 |
-| `StreamMessage` | 流式响应 | 服务器 → 客户端 |
-| `ExecutionInput` | 工作流执行输入 | 智能体执行 |
-| `ToolResult` | 工具执行结果 | 工具显示 |
-| `TaskExecutionStatus` | 任务状态更新 | 进度跟踪 |
-
-### ToolDisplayManager
-管理工具调用和结果的丰富可视化。
+### 工具显示管理
+管理工具调用在Web前端的可视化，支持多语言。
 
 ```python
 from langcrew.web import ToolDisplayManager
 
-# 配置工具显示
-display_manager = ToolDisplayManager(
-    show_parameters=True,
-    show_results=True,
-    format_json=True
+# 注册工具显示
+ToolDisplayManager.register(
+    tool_name="web_search",
+    display_names={
+        "en": "Searching the web",
+        "zh": "正在搜索网页"
+    },
+    display_content_param="query"
 )
 ```
 
-## 与 langcrew 的集成
+## 通信协议
 
-Web服务与所有 langcrew 组件无缝集成：
+Web使用**SSE（Server-Sent Events）**进行实时流式传输，不是WebSocket：
 
-- **[智能体](/zh/concepts/agents)**：通过 HTTP 端点暴露智能体
-- **[任务](/zh/concepts/tasks)**：通过 Web 界面执行任务
-- **[团队](/zh/concepts/crews)**：将整个团队托管为 Web 服务
+```javascript
+// 使用SSE的前端集成
+const eventSource = new EventSource('/api/v1/chat', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        message: '你好！',
+        session_id: 'session_123'
+    })
+});
 
+eventSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    console.log('收到:', data);
+};
+```
+
+## 前端UI集成
+
+Web包含位于`/web`目录中的完整React基础前端UI：
+
+**技术栈：**
+- React 19与现代hooks
+- Ant Design (Antd)组件
+- Tailwind CSS样式
+- Rspack快速打包
+
+**特性：**
+- 实时聊天界面
+- 工具调用可视化
+- 文件上传/预览支持
+- 多语言支持
+- 响应式设计
+
+**注意：**前端UI有自己的文档，可以独立使用。
+
+## 服务器部署选项
+
+### 开发服务器
 ```python
-from langcrew import Agent, Crew
-from langcrew.web import create_langgraph_server
-
-# 创建智能体和团队
-agent = Agent(
-    role="Web助手",
-    goal="通过Web界面帮助用户",
-    backstory="专业的基于Web的AI助手"
-)
-
-crew = Crew(agents=[agent])
-
-# 创建Web服务器
-server = create_langgraph_server(
-    crew=crew,
-    host="0.0.0.0",
-    port=8000
-)
-
-# 启动服务器
-server.start()
+# 快速开发设置
+server = create_server(crew)
+server.run(host="127.0.0.1", port=8000, reload=True)
 ```
 
-## 前端 UI 集成
+### 生产服务器
+```python
+# 生产配置
+server = create_server(crew)
+server.run(
+    host="0.0.0.0", 
+    port=8000,
+    workers=4,
+    access_log=True
+)
+```
 
-Web服务配备了使用现代 React 技术栈构建的完整前端 UI：
+### 纯LangGraph服务器
+```python
+# 直接LangGraph集成
+from langgraph.graph import StateGraph
 
-- **位置**：位于 langcrew 仓库的 `/web` 目录
-- **技术栈**：React 19 + Antd + Tailwind CSS + Rspack
-- **功能**：AgentX 组件、实时流式 UI、工具可视化
-- **文档**：前端有其自己的完整文档
+# 构建您的图
+compiled_graph = builder.compile(checkpointer=checkpointer)
 
-前端 UI 与 Web 服务器无缝连接，提供完整的 Web 应用程序体验。
+# 创建服务器
+server = create_langgraph_server(compiled_graph)
+server.run()
+```
 
 ## 何时使用Web服务
 
-- **生产 Web 应用** 需要带 UI 的 AI 智能体后端
-- **API 服务** 用于移动应用或自定义前端
-- **实时聊天界面** 需要流式智能体响应
-- **多用户平台** 需要并发智能体交互
-- **企业应用** 需要基于 Web 的 AI 工作流
-
-## API 端点
-
-### 标准端点
-
-- `POST /chat` - 向智能体发送聊天消息
-- `POST /execute` - 执行特定任务
-- `GET /status` - 检查服务器和智能体状态
-- `WebSocket /stream` - 实时流式界面
-
-### API 使用示例
-
-```bash
-# 发送聊天消息
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "你好，你能帮我什么？"}'
-
-# 执行特定任务
-curl -X POST http://localhost:8000/execute \
-  -H "Content-Type: application/json" \
-  -d '{"task": "analyze_data", "input": {"data": "sample"}}'
-```
+- **交互式AI应用程序**需要实时用户交互
+- **基于代理的Web服务**需要HTTP API端点
+- **流式应用程序**有实时响应需求
+- **多会话应用程序**需要对话连续性
+- **工具丰富的代理**需要可视化工具调用反馈
+- **HITL工作流**需要人工审批界面
 
 ## 下一步
 
-- **[Web服务快速开始](/zh/guides/web/getting-started)** - 5分钟快速上手
-- **[Web服务配置指南](/zh/guides/web/configuration)** - 完整配置指南
-- **示例** - 查看 `examples/components/web/` 了解实际实现案例
+- **[Web快速开始](/zh/guides/web/getting-started)** - 5分钟快速开始
+- **[部署指南](/zh/guides/web/deployment)** - 生产部署策略
+- **[配置指南](/zh/guides/web/configuration)** - 服务器和适配器配置

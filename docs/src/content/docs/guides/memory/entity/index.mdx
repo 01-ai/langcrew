@@ -1,419 +1,440 @@
 ---
 title: Entity Memory
-description: Track entities like people, organizations, and concepts across conversations
+description: Track entities and relationships across conversations
 ---
 
-Entity memory tracks and remembers entities (people, organizations, concepts) across conversations using structured storage for relationship management.
+Entity memory tracks entities (people, organizations, concepts) across conversations using structured storage. It maintains information about entities and their relationships, providing context-aware responses.
 
-## What is Entity Memory?
+## Overview
 
-Entity memory automatically extracts and stores information about entities mentioned in conversations. It's perfect for:
+Entity memory is ideal for:
+- **Person tracking** in customer service or CRM systems
+- **Organization management** in business applications
+- **Concept learning** in educational systems
+- **Relationship mapping** between different entities
 
-- **Relationship tracking** - Remember connections between people and organizations
-- **Entity profiles** - Build detailed profiles of important entities
-- **Context enrichment** - Provide relevant entity information in conversations
+## Configuration
 
-## Quick Start
-
-### Basic Usage
+### Basic Setup
 
 ```python
-from langcrew import Agent
 from langcrew.memory import MemoryConfig
 
-# Enable entity memory
-agent = Agent(
-    role="Relationship Manager",
-    goal="Track and remember important people and organizations",
-    backstory="I excel at remembering details about people and their relationships",
-    memory=MemoryConfig(
-        entity={
-            "enabled": True,
-            "extract_entities": True,
-            "entity_types": ["person", "organization", "location"]
-        }
-    )
-)
-
-# Entities will be automatically extracted and stored
-response = agent.execute_task(
-    "John Smith from Acme Corp called about the partnership with TechStart Inc."
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///entities.db",
+    entity={
+        "enabled": True,
+    }
 )
 ```
 
-### Manual Entity Management
-
-```python
-from langcrew.memory import EntityMemory, MemoryConfig
-
-# Create entity memory instance
-config = MemoryConfig(provider="sqlite", connection_string="sqlite:///entities.db")
-entity_memory = EntityMemory(config=config)
-
-# Store entity information manually
-entity_memory.save(
-    value="Senior Software Engineer with 10 years experience in AI",
-    metadata={
-        "entity_name": "John Smith",
-        "entity_type": "person",
-        "attributes": {
-            "role": "Senior Software Engineer",
-            "experience": "10 years",
-            "expertise": ["AI", "Machine Learning"]
-        },
-        "relationships": [
-            {"type": "works_at", "entity": "Acme Corp"},
-            {"type": "collaborates_with", "entity": "Jane Doe"}
-        ]
-    },
-    agent="relationship_manager"
-)
-```
-
-## Configuration Options
-
-### Entity Memory Parameters
+### Configuration Parameters
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
 | `enabled` | bool | Enable entity memory | True |
-| `extract_entities` | bool | Auto-extract entities from conversations | True |
-| `entity_types` | List[str] | Types of entities to track | ["person", "organization", "location", "concept"] |
 
-### Entity Types
+## How It Works
+
+### Entity Recognition and Storage
+
+Entity memory automatically recognizes and stores entity information:
 
 ```python
-# Track specific entity types
+from langcrew import Crew
+from langcrew.memory import MemoryConfig
+
 memory_config = MemoryConfig(
-    entity={
-        "enabled": True,
-        "extract_entities": True,
-        "entity_types": [
-            "person",       # People
-            "organization", # Companies, institutions
-            "location",     # Places, addresses
-            "product",      # Products, services
-            "concept",      # Ideas, technologies
-            "event"         # Meetings, conferences
-        ]
-    }
+    provider="sqlite",
+    connection_string="sqlite:///entities.db",
+    entity={"enabled": True}
+)
+
+crew = Crew(agents=[agent], memory=memory_config)
+
+# Store entity information
+crew.kickoff(
+    inputs={"user_input": "Alice Johnson is the CEO of TechCorp, based in San Francisco"},
+    thread_id="business_context"
+)
+
+# Later queries can reference entities
+crew.kickoff(
+    inputs={"user_input": "What do you know about Alice?"},
+    thread_id="entity_query"
 )
 ```
 
-### Custom Entity Types
+### Entity Types and Organization
+
+Entity memory organizes entities by type:
+- **Person**: Individuals with names, roles, and attributes
+- **Organization**: Companies, departments, teams
+- **Location**: Cities, countries, addresses
+- **Concept**: Ideas, technologies, methodologies
+- **General**: Other entity types
 
 ```python
-# Define custom entity types for specific domains
-crm_entities = MemoryConfig(
-    entity={
-        "entity_types": [
-            "customer",
-            "prospect", 
-            "partner",
-            "competitor",
-            "product",
-            "deal"
-        ]
-    }
-)
+# Entities are automatically categorized
+conversations = [
+    "John Smith works as a Software Engineer at Microsoft",  # Person + Organization
+    "The project is based in Seattle, Washington",           # Location
+    "We're using React and Node.js for development",        # Concept/Technology
+    "The Marketing team reports to Sarah Wilson",           # Person + Organization
+]
+
+for i, msg in enumerate(conversations):
+    crew.kickoff(
+        inputs={"user_input": msg},
+        thread_id=f"context_{i}"
+    )
 ```
 
-## Use Cases
+## Usage Examples
 
 ### Customer Relationship Management
+
 ```python
-# Track customer entities and relationships
-crm_memory = MemoryConfig(
-    provider="postgres",
-    connection_string=DATABASE_URL,
+from langcrew import Agent, Crew
+from langcrew.memory import MemoryConfig
+
+# Configure for CRM
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/crm_db",
     entity={
-        "entity_types": [
-            "customer",
-            "contact_person", 
-            "company",
-            "deal",
-            "product"
-        ],
-        "extract_entities": True
+        "enabled": True,
     }
 )
 
 crm_agent = Agent(
-    role="CRM Specialist",
-    memory=crm_memory
-)
-```
-
-### Research and Knowledge Management
-```python
-# Track research entities
-research_memory = MemoryConfig(
-    provider="sqlite",
-    connection_string="sqlite:///research_entities.db",
-    entity={
-        "entity_types": [
-            "researcher",
-            "institution", 
-            "publication",
-            "concept",
-            "methodology",
-            "dataset"
-        ]
-    }
-)
-```
-
-### Sales and Business Development
-```python
-# Track business entities
-sales_memory = MemoryConfig(
-    entity={
-        "entity_types": [
-            "prospect",
-            "decision_maker",
-            "company",
-            "opportunity",
-            "competitor",
-            "product"
-        ],
-        "extract_entities": True
-    }
+    role="Customer Relationship Manager",
+    goal="Maintain detailed customer relationships and history",
+    backstory="You track customer information, preferences, and interaction history"
 )
 
-sales_agent = Agent(
-    role="Sales Representative",
-    goal="Build and maintain business relationships",
-    memory=sales_memory
-)
-```
+crew = Crew(agents=[crm_agent], memory=memory_config)
 
-## Entity Relationships
-
-### Defining Relationships
-
-```python
-# Store entity with relationships
-entity_memory.save(
-    value="CEO of TechStart Inc, former VP at Google",
-    metadata={
-        "entity_name": "Sarah Johnson",
-        "entity_type": "person",
-        "attributes": {
-            "current_role": "CEO",
-            "previous_role": "VP at Google"
-        },
-        "relationships": [
-            {"type": "leads", "entity": "TechStart Inc"},
-            {"type": "former_employee", "entity": "Google"},
-            {"type": "partner_with", "entity": "Acme Corp"}
-        ]
-    }
-)
-```
-
-### Relationship Types
-
-```python
-# Common relationship types
-relationship_types = [
-    "works_at",
-    "leads", 
-    "reports_to",
-    "collaborates_with",
-    "partner_with",
-    "competitor_of",
-    "customer_of",
-    "supplier_to",
-    "located_in",
-    "owns",
-    "invested_in"
+# Build customer profiles
+customer_interactions = [
+    ("customer_001", "Emily Chen is the CTO at DataFlow Inc, prefers email communication"),
+    ("customer_001", "DataFlow Inc is a 50-person startup in the fintech space"),
+    ("customer_001", "Emily mentioned they're evaluating AI solutions for fraud detection"),
+    ("customer_002", "Michael Rodriguez from RetailPlus, interested in inventory optimization"),
+    ("customer_002", "RetailPlus operates 25 stores across California and Texas"),
 ]
-```
 
-## Advanced Features
-
-### Entity Profiles
-
-```python
-# Build comprehensive entity profiles
-def create_person_profile(name, role, company, skills, contacts):
-    entity_memory.save(
-        value=f"{role} at {company} with expertise in {', '.join(skills)}",
-        metadata={
-            "entity_name": name,
-            "entity_type": "person",
-            "attributes": {
-                "role": role,
-                "company": company,
-                "skills": skills,
-                "contact_info": contacts
-            },
-            "mentions": 1
-        }
+for customer_id, info in customer_interactions:
+    crew.kickoff(
+        inputs={"user_input": info},
+        thread_id=customer_id
     )
 
-# Example usage
-create_person_profile(
-    name="Alice Chen",
-    role="Data Scientist",
-    company="AI Research Lab",
-    skills=["Machine Learning", "Python", "Statistics"],
-    contacts={"email": "alice@ailab.com", "linkedin": "alice-chen"}
+# Query customer information
+result = crew.kickoff(
+    inputs={"user_input": "What do we know about Emily Chen and her company?"},
+    thread_id="customer_query"
 )
 ```
 
-### Entity Updates
+### Educational Knowledge Tracking
 
 ```python
-# Entities are automatically updated when mentioned again
-# Each mention increases the mention count and updates last_updated timestamp
+# Configure for educational entity tracking
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///education.db",
+    entity={
+        "enabled": True,
+    }
+)
 
-# First mention
-agent.execute_task("Met with John Smith from Acme Corp")
+tutor_agent = Agent(
+    role="Educational Tutor",
+    goal="Track student progress and concept understanding",
+    backstory="You remember students, their learning progress, and concept relationships"
+)
 
-# Second mention - will update existing entity
-agent.execute_task("John Smith mentioned the new AI project")
+crew = Crew(agents=[tutor_agent], memory=memory_config)
+
+# Track students and concepts
+educational_data = [
+    ("math_class", "Sarah is a 10th grade student who excels in geometry"),
+    ("math_class", "Algebra is a foundational concept for advanced mathematics"),
+    ("math_class", "Sarah struggles with quadratic equations in algebra"),
+    ("math_class", "Linear equations are easier for Sarah to understand"),
+    ("math_class", "Mrs. Johnson is the math teacher who uses visual methods"),
+]
+
+for session, info in educational_data:
+    crew.kickoff(
+        inputs={"user_input": info},
+        thread_id=session
+    )
+
+# Query student progress
+result = crew.kickoff(
+    inputs={"user_input": "How is Sarah doing with math concepts?"},
+    thread_id="student_progress"
+)
 ```
 
-### Entity Search and Retrieval
+### Business Intelligence
 
 ```python
-# Search for entities by type
-def get_entities_by_type(entity_memory, entity_type):
-    # This would use the underlying store to search
-    # Implementation depends on storage backend
-    return entity_memory._get_entities_by_type(entity_type)
+# Configure for business entity tracking
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///business.db",
+    entity={
+        "enabled": True,
+    }
+)
 
-# Get all people
-people = get_entities_by_type(entity_memory, "person")
+business_agent = Agent(
+    role="Business Intelligence Analyst",
+    goal="Track business entities and their relationships",
+    backstory="You maintain knowledge of companies, people, and business relationships"
+)
+
+crew = Crew(agents=[business_agent], memory=memory_config)
+
+# Track business ecosystem
+business_info = [
+    ("market_analysis", "Apple Inc is a major competitor in the smartphone market"),
+    ("market_analysis", "Tim Cook is the CEO of Apple Inc since 2011"),
+    ("market_analysis", "Cupertino, California is Apple's headquarters location"),
+    ("partnerships", "Microsoft and Apple have a strategic partnership for enterprise software"),
+    ("partnerships", "Satya Nadella leads Microsoft's cloud-first strategy"),
+]
+
+for context, info in business_info:
+    crew.kickoff(
+        inputs={"user_input": info},
+        thread_id=context
+    )
+
+# Analyze business relationships
+result = crew.kickoff(
+    inputs={"user_input": "What relationships exist between Apple and Microsoft?"},
+    thread_id="relationship_analysis"
+)
+```
+
+## Entity Management
+
+### Save Entity Information
+
+```python
+# Manually save entity information
+crew.entity_memory.save(
+    value="John is a senior developer with 8 years of Python experience",
+    metadata={
+        "entity_name": "John",
+        "entity_type": "person",
+        "attributes": {
+            "role": "senior developer",
+            "experience": "8 years",
+            "skills": ["Python"]
+        },
+        "relationships": [
+            {"type": "works_at", "entity": "TechCorp"}
+        ]
+    },
+    agent="hr_system"
+)
+```
+
+### Search Entities
+
+```python
+# Search for specific entities
+results = crew.search_memory(
+    query="John",
+    memory_type="entity",
+    limit=5
+)
+
+for result in results:
+    print(f"Entity: {result['name']}")
+    print(f"Type: {result['type']}")
+    print(f"Description: {result['description']}")
+    print(f"Attributes: {result['attributes']}")
+    print(f"Relationships: {result['relationships']}")
+```
+
+### Get Entity Details
+
+```python
+# Get specific entity information
+john_info = crew.entity_memory.get_entity(
+    entity_name="John",
+    entity_type="person"
+)
+
+if john_info:
+    print(f"Name: {john_info['name']}")
+    print(f"Type: {john_info['type']}")
+    print(f"Description: {john_info['description']}")
+    print(f"Mentions: {john_info['mentions']}")
+    print(f"Last Updated: {john_info['last_updated']}")
+```
+
+### Get Entity Relationships
+
+```python
+# Get relationships for an entity
+relationships = crew.entity_memory.get_relationships("John")
+
+for rel in relationships:
+    print(f"Relationship: {rel['type']}")
+    print(f"Related Entity: {rel['entity']}")
+    print(f"Description: {rel['description']}")
+```
+
+### Update Entity Information
+
+```python
+# Update existing entity
+success = crew.entity_memory.update_entity(
+    entity_name="John",
+    updates={
+        "attributes": {
+            "role": "lead developer",  # Promotion
+            "experience": "9 years",   # Updated experience
+            "skills": ["Python", "JavaScript", "Go"]  # New skills
+        }
+    },
+    entity_type="person"
+)
+```
+
+### List Entities by Type
+
+```python
+# Get all entities of a specific type
+people = crew.entity_memory.get_entities(
+    entity_type="person",
+    limit=10
+)
+
+for person in people:
+    print(f"Person: {person['name']}")
+    print(f"Description: {person['description']}")
 
 # Get all organizations
-organizations = get_entities_by_type(entity_memory, "organization")
-```
-
-## Storage and Persistence
-
-### SQLite for Entity Database
-```python
-entity_config = MemoryConfig(
-    provider="sqlite",
-    connection_string="sqlite:///entity_database.db",
-    entity={
-        "entity_types": ["person", "organization", "product"],
-        "extract_entities": True
-    }
-)
-```
-
-### PostgreSQL for Production
-```python
-production_entity_config = MemoryConfig(
-    provider="postgres",
-    connection_string="postgresql://user:pass@host/entity_db",
-    entity={
-        "entity_types": [
-            "customer", "prospect", "partner", 
-            "product", "deal", "contact"
-        ]
-    }
+orgs = crew.entity_memory.get_entities(
+    entity_type="organization",
+    limit=10
 )
 ```
 
 ## Best Practices
 
-### Entity Type Design
-```python
-# Design entity types for your domain
-healthcare_entities = [
-    "patient",
-    "doctor", 
-    "hospital",
-    "treatment",
-    "medication",
-    "diagnosis"
-]
+### Entity Naming Strategy
 
-financial_entities = [
-    "client",
-    "advisor",
-    "institution",
-    "investment",
-    "portfolio",
-    "transaction"
-]
+```python
+# Use consistent entity naming
+entity_naming_rules = {
+    "people": "FirstName LastName",           # "John Smith"
+    "companies": "Company Name Inc/Corp",     # "TechCorp Inc"
+    "locations": "City, State/Country",       # "San Francisco, CA"
+    "concepts": "Concept Name",               # "Machine Learning"
+}
 ```
 
 ### Relationship Modeling
-```python
-# Model meaningful relationships
-def store_business_relationship(person, company, role, start_date=None):
-    entity_memory.save(
-        value=f"{person} works as {role} at {company}",
-        metadata={
-            "entity_name": person,
-            "entity_type": "person",
-            "relationships": [
-                {
-                    "type": "works_at",
-                    "entity": company,
-                    "role": role,
-                    "start_date": start_date
-                }
-            ]
-        }
-    )
-```
 
-### Entity Maintenance
 ```python
-# Regular entity cleanup and consolidation
-def cleanup_entities():
-    # Remove low-mention entities
-    # Merge duplicate entities
-    # Update stale information
-    pass
-```
+# Define clear relationship types
+relationship_types = {
+    "employment": ["works_at", "employed_by", "manages", "reports_to"],
+    "business": ["partners_with", "competes_with", "supplies_to"],
+    "location": ["located_in", "based_in", "operates_in"],
+    "expertise": ["expert_in", "specializes_in", "teaches"],
+    "family": ["related_to", "parent_of", "spouse_of"]
+}
 
-## Troubleshooting
-
-### Entities Not Being Extracted
-```python
-# Ensure extraction is enabled
-memory_config = MemoryConfig(
-    entity={
-        "enabled": True,
-        "extract_entities": True,  # ← Make sure this is True
-        "entity_types": ["person", "organization"]
-    }
-)
-```
-
-### Missing Entity Types
-```python
-# Add relevant entity types for your domain
-memory_config = MemoryConfig(
-    entity={
-        "entity_types": [
-            "person", "organization",  # Basic types
-            "product", "service",      # Business types
-            "location", "event"        # Additional types
+# Example usage in entity storage
+crew.entity_memory.save(
+    value="Alice manages the engineering team at TechCorp",
+    metadata={
+        "entity_name": "Alice",
+        "entity_type": "person",
+        "relationships": [
+            {"type": "manages", "entity": "Engineering Team"},
+            {"type": "works_at", "entity": "TechCorp"}
         ]
     }
 )
 ```
 
-### Storage Issues
+### Performance Optimization
+
 ```python
-# Use persistent storage
-memory_config = MemoryConfig(
-    provider="sqlite",  # Not "memory"
-    connection_string="sqlite:///entities.db",
-    entity={"enabled": True}
-)
+# Optimize entity queries
+def search_entities_efficiently(query, entity_type=None):
+    return crew.entity_memory.search(
+        query=query,
+        entity_type=entity_type,  # Filter by type for better performance
+        limit=20  # Reasonable limit
+    )
+
+# Batch entity updates
+def update_multiple_entities(updates):
+    for entity_name, update_data in updates.items():
+        crew.entity_memory.update_entity(
+            entity_name=entity_name,
+            updates=update_data
+        )
 ```
+
+## Integration with Other Memory Types
+
+Entity memory works alongside short-term and long-term memory:
+
+```python
+# Comprehensive memory with entity tracking
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://...",
+    short_term={"enabled": True, "max_history": 20},    # Recent context
+    long_term={"enabled": True, "min_quality": 0.8},    # Important knowledge
+    entity={"enabled": True}                            # Entity relationships
+)
+
+# Benefits from all memory types:
+# - Short-term: Recent conversation context
+# - Long-term: Important facts and learnings
+# - Entity: Structured entity relationships
+```
+
+## Troubleshooting
+
+### Entities Not Being Recognized
+- Provide clear entity information in conversations
+- Use consistent naming conventions
+- Include entity types and relationships explicitly
+
+### Duplicate Entities
+- Use consistent entity names across conversations
+- Check for variations in spelling or formatting
+- Implement entity normalization in your application
+
+### Relationship Tracking Issues
+- Define clear relationship types
+- Provide explicit relationship information
+- Use structured metadata when saving entities
+
+### Performance with Large Entity Sets
+- Use entity type filtering in searches
+- Implement pagination for large result sets
+- Consider archiving old or inactive entities
 
 ## Next Steps
 
 - **[Short-term Memory](/guides/memory/short-term)** - Session-based conversation history
 - **[Long-term Memory](/guides/memory/long-term)** - Persistent knowledge storage
-- **[Memory Storage](/guides/memory/storage)** - Configure storage backends
+- **[Storage Configuration](/guides/memory/storage)** - Configure storage backends
+- **[Memory Concepts](/concepts/memory)** - Understanding memory architecture

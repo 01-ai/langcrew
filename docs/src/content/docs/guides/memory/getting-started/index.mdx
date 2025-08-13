@@ -1,147 +1,256 @@
 ---
-title: Memory - Getting Started
+title: Memory Quick Start
 description: Get started with Memory in 5 minutes
 ---
 
-Quick guide to get Memory working in your langcrew application.
+# Getting Started with Memory
+
+Get up and running with LangCrew Memory in just a few minutes. This guide covers basic setup and common usage patterns.
 
 ## Installation
 
-Memory is included with langcrew - no additional installation required:
+Install LangCrew with memory support:
 
 ```bash
-uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+# Install LangCrew
+uv add langcrew
 ```
 
-## Basic Example
+## Basic Usage
 
-Here's a simple example that enables memory for an agent:
+### 1. Simple Memory Setup
 
 ```python
-from langcrew import Agent
-from langcrew.memory import MemoryConfig
+from langcrew import Agent, Crew
 
-# Basic memory configuration
-memory_config = MemoryConfig(
-    provider="memory",  # In-memory storage for development
-    short_term={"max_history": 10},
-    long_term={"enabled": True},
-    entity={"enabled": True}
-)
+# Create memory configuration - just enable it!
+memory_config = True  # Uses default settings with all memory types enabled
 
 # Create agent with memory
 agent = Agent(
-    role="Personal Assistant",
-    goal="Help users with their tasks while remembering context",
-    backstory="You are a helpful assistant with perfect memory",
-    memory=memory_config,
-    verbose=True
+    role="Memory Assistant",
+    goal="Remember and use information from our conversations",
+    backstory="You are an AI assistant with excellent memory capabilities"
 )
 
-# Test conversation
-response1 = agent.execute_task("My name is John and I work at Acme Corp")
-print(response1)
-
-response2 = agent.execute_task("What's my name and where do I work?")
-print(response2)  # Should remember John and Acme Corp
+# Create crew with shared memory
+crew = Crew(
+    agents=[agent],
+    memory=memory_config
+)
 ```
 
-## Persistent Memory Example
+### 2. Run Your First Memory-Enabled Conversation
 
-For production use, configure persistent storage:
+```python
+# First conversation
+result1 = crew.kickoff(
+    inputs={"user_input": "My name is Alice and I love pizza"},
+    thread_id="conversation_1"
+)
+
+# Later conversation - agent remembers Alice
+result2 = crew.kickoff(
+    inputs={"user_input": "What food do I like?"},
+    thread_id="conversation_1"  # Same thread ID
+)
+
+print(result2)  # Agent will remember Alice likes pizza
+```
+
+### 3. Persistent Memory with SQLite
 
 ```python
 from langcrew.memory import MemoryConfig
 
-# SQLite configuration (recommended for single-node)
+# Persistent memory configuration
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///langcrew_memory.db",
-    short_term={"max_history": 50},
-    long_term={
+    connection_string="sqlite:///my_memory.db",
+    short_term={"enabled": True, "max_history": 20},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
+)
+
+crew = Crew(agents=[agent], memory=memory_config)
+
+# Memory persists across program restarts
+result = crew.kickoff(
+    inputs={"user_input": "Remember that I work at TechCorp"},
+    thread_id="user_alice"
+)
+```
+
+## Memory Types in Action
+
+### Short-term Memory
+Remembers recent conversation history within a session:
+
+```python
+# Configure short-term memory
+memory_config = MemoryConfig(
+    short_term={
         "enabled": True,
-        "chunk_size": 1000,
-        "search_k": 10
+        "max_history": 15,  # Keep last 15 conversation turns
     }
 )
 
-# PostgreSQL configuration (recommended for production)
+# Agent will remember context from recent messages
+crew = Crew(agents=[agent], memory=memory_config)
+```
+
+### Long-term Memory
+Stores important knowledge across sessions:
+
+```python
+# Configure long-term memory
 memory_config = MemoryConfig(
-    provider="postgres",
-    connection_string="postgresql://user:pass@localhost/langcrew_memory"
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # Only store high-quality information
+    }
+)
+
+# Agent learns and remembers important facts
+crew = Crew(agents=[agent], memory=memory_config)
+```
+
+### Entity Memory
+Tracks people, organizations, and concepts:
+
+```python
+# Configure entity memory
+memory_config = MemoryConfig(
+    entity={"enabled": True}
+)
+
+# Agent remembers entities and their relationships
+crew = Crew(agents=[agent], memory=memory_config)
+
+# Example: Agent will remember "Alice works at TechCorp"
+result = crew.kickoff(
+    inputs={"user_input": "Alice is the CEO of TechCorp"},
+    thread_id="business_context"
 )
 ```
 
-## Testing Your Setup
+## Memory Search
 
-### Run the Complete Example
+Search across all memory types:
 
-```bash
-# Set your OpenAI API key
-export OPENAI_API_KEY=your_api_key_here
+```python
+# Search memory
+results = crew.search_memory(
+    query="Alice",
+    memory_type="all",  # Search all memory types
+    limit=5
+)
 
-# Run from the memory example directory
-cd examples/components/memory
-uv run memory_example.py
+for result in results:
+    print(f"Memory type: {result['memory_type']}")
+    print(f"Content: {result['content']}")
 ```
 
-This example demonstrates:
-- Basic memory configuration
-- Short-term and long-term memory usage
-- Entity extraction and recall
-- Cross-session persistence
+## Configuration Examples
 
-## More Examples
-
-For additional examples, check out:
-
-- **📁 `examples/components/memory/`** - Complete memory implementations
-- **📄 `examples/components/memory/README.md`** - Setup instructions  
-- **🐍 `examples/components/memory/memory_example.py`** - Runnable code
-
-## Troubleshooting
-
-### Memory Not Persisting
-
-Check your provider configuration:
+### Development Setup (In-Memory)
 ```python
-# ❌ Wrong - will not persist between sessions
-memory_config = MemoryConfig(provider="memory")
+memory_config = MemoryConfig(
+    provider="memory",  # Fast, no persistence
+    short_term={"enabled": True, "max_history": 10},
+    long_term={"enabled": True},
+    entity={"enabled": True}
+)
+```
 
-# ✅ Correct - persists to database
+### Production Setup (PostgreSQL)
+```python
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db",
+    short_term={"enabled": True, "max_history": 50},
+    long_term={"enabled": True, "min_quality": 0.8},
+    entity={"enabled": True}
+)
+```
+
+### Local Development (SQLite)
+```python
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///my_memory.db"
+    connection_string="sqlite:///development.db",
+    short_term={"enabled": True, "max_history": 30},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
 )
 ```
 
-### Connection Errors
+## Common Patterns
 
-Ensure your database is accessible:
+### Customer Service Agent
 ```python
-# For SQLite, ensure directory exists
-import os
-os.makedirs("./data", exist_ok=True)
-
+# Memory-enabled customer service
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///./data/memory.db"
+    connection_string="sqlite:///customer_service.db",
+    short_term={"enabled": True, "max_history": 20},
+    entity={"enabled": True}  # Remember customer details
+)
+
+service_agent = Agent(
+    role="Customer Service Representative",
+    goal="Provide personalized customer support",
+    backstory="You remember customer history and preferences"
+)
+
+crew = Crew(agents=[service_agent], memory=memory_config)
+
+# Each customer gets their own thread
+result = crew.kickoff(
+    inputs={"user_input": "I need help with my order"},
+    thread_id=f"customer_{customer_id}"
 )
 ```
 
-### Import Errors
-
-Make sure you're importing from the correct modules:
+### Learning Assistant
 ```python
-# Core memory configuration
-from langcrew.memory import MemoryConfig
+# Memory-enabled learning assistant
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///learning.db",
+    long_term={"enabled": True, "min_quality": 0.8},  # Store learnings
+    entity={"enabled": True}  # Track concepts and topics
+)
 
-# Specific memory types (if needed directly)
-from langcrew.memory import ShortTermMemory, LongTermMemory, EntityMemory
+tutor = Agent(
+    role="Personal Tutor",
+    goal="Adapt teaching based on student progress",
+    backstory="You remember what students have learned and their difficulties"
+)
+
+crew = Crew(agents=[tutor], memory=memory_config)
 ```
 
 ## Next Steps
 
-- **[Configuration Guide](/guides/memory/configuration)** - Learn all options
-- **[Memory Concepts](/concepts/memory)** - Understand architecture
-- **Examples** - Check `examples/components/memory/` for implementations
+- **[Short-term Memory](/guides/memory/short-term)** - Deep dive into conversation history
+- **[Long-term Memory](/guides/memory/long-term)** - Persistent knowledge storage  
+- **[Entity Memory](/guides/memory/entity)** - Track entities and relationships
+- **[Storage Configuration](/guides/memory/storage)** - Configure different storage backends
+
+## Troubleshooting
+
+### Memory Not Persisting
+- Check your `connection_string` format
+- Ensure database permissions are correct
+- Verify the database file/connection is accessible
+
+### High Memory Usage
+- Reduce `max_history` in short-term memory
+- Increase `min_quality` threshold in long-term memory
+- Consider using SQLite/PostgreSQL instead of in-memory
+
+### Slow Performance
+- Use PostgreSQL for production workloads
+- Enable connection pooling for database providers
+- Consider memory provider for development/testing

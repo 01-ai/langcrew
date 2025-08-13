@@ -225,7 +225,7 @@ from langcrew.memory import MemoryConfig
 
 memory_config = MemoryConfig(
     enabled=True,
-    provider="postgres",  # Options: "memory", "postgres", "redis"
+    provider="postgresql",  # Options: "memory", "sqlite", "postgresql"
     connection_string="postgresql://user:pass@localhost/db",
     short_term={"enabled": True},
     long_term={"enabled": True}, 
@@ -663,12 +663,12 @@ crew = Crew(
     tasks=tasks,
     memory=MemoryConfig(
         enabled=True,
-        provider="postgres",
+        provider="postgresql",
         connection_string=os.getenv("DATABASE_URL")
     ),
     hitl=HITLConfig(
         enabled=True,
-        interrupt_before=["final_decision"]
+        interrupt_before_tools=["final_decision_tool"]
     ),
     verbose=True
 )

@@ -1,0 +1,683 @@
+---
+title: Streaming Protocol
+description: Server-Sent Events (SSE) and message types for real-time communication
+---
+
+LangCrew's streaming protocol uses Server-Sent Events (SSE) for real-time communication between agents and web clients, with a comprehensive message type system for rich interactions.
+
+## Overview
+
+The streaming protocol (`langcrew.web.protocol`) provides:
+- **Server-Sent Events (SSE)**: Real-time, one-way communication from server to client
+- **Structured Messages**: Comprehensive message types for different content and interactions
+- **Session Management**: Session-based streaming with resumable conversations
+- **HITL Support**: Built-in support for human-in-the-loop workflows
+
+## Message Types
+
+### Core Message Types
+
+```python
+from langcrew.web.protocol import MessageType
+
+# Content types
+MessageType.TEXT          # Plain text content
+MessageType.MARKDOWN      # Markdown formatted content  
+MessageType.IMAGE         # Image content
+MessageType.AUDIO         # Audio content
+MessageType.VIDEO         # Video content
+
+# Tool interaction
+MessageType.TOOL_CALL     # Tool execution request
+MessageType.TOOL_RESULT   # Tool execution result
+
+# Planning and workflow
+MessageType.PLAN          # Agent planning information
+MessageType.PLAN_UPDATE   # Plan updates/modifications
+
+# System messages
+MessageType.CONFIG        # Configuration messages
+MessageType.LIVE_STATUS   # Real-time status updates
+MessageType.SESSION_INIT  # Session initialization
+MessageType.FINISH_REASON # Task completion status
+MessageType.ERROR         # Error messages
+
+# Human-in-the-loop
+MessageType.USER_INPUT    # Request for user input
+MessageType.TOOL_APPROVAL_REQUEST  # Tool approval request
+MessageType.MESSAGE_TO_USER        # Direct message to user
+```
+
+### Message Structure
+
+```python
+from langcrew.web.protocol import StreamMessage
+
+# Standard message format
+message = StreamMessage(
+    id="1748438204041_a7k9",           # Unique message ID
+    role="assistant",                   # Message sender role
+    type=MessageType.TEXT,             # Message type
+    content="Hello, how can I help?",  # Main content
+    detail={                           # Additional structured data
+        "metadata": {},
+        "tool_info": {},
+        "planning_data": {}
+    },
+    timestamp=1748438204041,           # Unix timestamp (ms)
+    session_id="user_123"              # Session identifier
+)
+```
+
+## Streaming Implementation
+
+### Basic SSE Client
+
+```javascript
+// JavaScript client for receiving SSE
+function connectToAgent(sessionId) {
+    const eventSource = new EventSource(`/chat?session_id=${sessionId}`);
+    
+    eventSource.onmessage = function(event) {
+        const message = JSON.parse(event.data);
+        handleMessage(message);
+    };
+    
+    eventSource.onerror = function(event) {
+        console.error('SSE connection error:', event);
+    };
+    
+    return eventSource;
+}
+
+function handleMessage(message) {
+    switch(message.type) {
+        case 'text':
+            displayText(message.content);
+            break;
+        case 'tool_call':
+            displayToolCall(message.detail);
+            break;
+        case 'plan':
+            displayPlan(message.detail);
+            break;
+        case 'user_input':
+            showUserInputDialog(message.detail);
+            break;
+        case 'finish_reason':
+            handleTaskCompletion(message.detail);
+            break;
+        default:
+            console.log('Unknown message type:', message.type);
+    }
+}
+```
+
+### Python SSE Client
+
+```python
+import httpx
+import json
+from langcrew.web.protocol import StreamMessage, MessageType
+
+async def stream_chat(message: str, session_id: str):
+    """Stream chat responses from LangCrew server"""
+    
+    async with httpx.AsyncClient() as client:
+        # Start streaming request
+        async with client.stream(
+            "POST", 
+            "http://localhost:8000/chat",
+            json={"message": message, "session_id": session_id},
+            headers={"Accept": "text/event-stream"}
+        ) as response:
+            
+            async for line in response.aiter_lines():
+                if line.startswith("data: "):
+                    data = line[6:]  # Remove "data: " prefix
+                    
+                    try:
+                        message_data = json.loads(data)
+                        message = StreamMessage(**message_data)
+                        
+                        # Handle different message types
+                        await handle_stream_message(message)
+                        
+                    except json.JSONDecodeError:
+                        continue
+
+async def handle_stream_message(message: StreamMessage):
+    """Handle different types of streaming messages"""
+    
+    if message.type == MessageType.TEXT:
+        print(f"Assistant: {message.content}")
+        
+    elif message.type == MessageType.TOOL_CALL:
+        print(f"Tool Call: {message.detail.get('tool_name')}")
+        print(f"Arguments: {message.detail.get('arguments')}")
+        
+    elif message.type == MessageType.PLAN:
+        print(f"Plan: {message.detail.get('steps')}")
+        
+    elif message.type == MessageType.USER_INPUT:
+        # Handle user input request
+        user_response = input(f"Input needed: {message.content}")
+        await send_user_input(message.session_id, user_response)
+        
+    elif message.type == MessageType.FINISH_REASON:
+        print(f"Task completed: {message.detail.get('status')}")
+```
+
+## Message Type Details
+
+### Text and Content Messages
+
+```python
+# Text message
+{
+    "type": "text",
+    "content": "I'll help you analyze this data.",
+    "detail": {
+        "formatting": "plain",
+        "language": "en"
+    }
+}
+
+# Markdown message
+{
+    "type": "markdown", 
+    "content": "## Analysis Results\n\n- **Accuracy**: 95.2%\n- **Precision**: 89.1%",
+    "detail": {
+        "render_options": {
+            "code_highlighting": true,
+            "math_support": true
+        }
+    }
+}
+
+# Image message
+{
+    "type": "image",
+    "content": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+    "detail": {
+        "filename": "chart.png",
+        "size": 15432,
+        "dimensions": {"width": 800, "height": 600}
+    }
+}
+```
+
+### Tool Messages
+
+```python
+# Tool call message
+{
+    "type": "tool_call",
+    "content": "Calling web search tool",
+    "detail": {
+        "tool_name": "web_search",
+        "tool_id": "call_123",
+        "arguments": {
+            "query": "latest AI research 2024",
+            "num_results": 5
+        },
+        "status": "pending"
+    }
+}
+
+# Tool result message
+{
+    "type": "tool_result", 
+    "content": "Found 5 relevant articles",
+    "detail": {
+        "tool_name": "web_search",
+        "tool_id": "call_123",
+        "result": {
+            "articles": [...],
+            "total_found": 5
+        },
+        "status": "success",
+        "execution_time": 2.3
+    }
+}
+```
+
+### Planning Messages
+
+```python
+# Plan message
+{
+    "type": "plan",
+    "content": "Created execution plan with 3 steps",
+    "detail": {
+        "plan_id": "plan_456",
+        "steps": [
+            {
+                "id": "step_1",
+                "description": "Analyze user requirements",
+                "status": "pending",
+                "estimated_time": 30
+            },
+            {
+                "id": "step_2", 
+                "description": "Generate recommendations",
+                "status": "pending",
+                "estimated_time": 60
+            },
+            {
+                "id": "step_3",
+                "description": "Present findings",
+                "status": "pending", 
+                "estimated_time": 15
+            }
+        ],
+        "total_estimated_time": 105
+    }
+}
+
+# Plan update message
+{
+    "type": "plan_update",
+    "content": "Updated step 1 status to completed",
+    "detail": {
+        "plan_id": "plan_456",
+        "action": "update",
+        "step_id": "step_1",
+        "changes": {
+            "status": "completed",
+            "actual_time": 25,
+            "result": "Requirements analyzed successfully"
+        }
+    }
+}
+```
+
+### HITL Messages
+
+```python
+# User input request
+{
+    "type": "user_input",
+    "content": "Please provide your email address for the report",
+    "detail": {
+        "input_type": "email",
+        "required": true,
+        "validation": {
+            "pattern": "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$",
+            "message": "Please enter a valid email address"
+        },
+        "timeout": 300  # 5 minutes
+    }
+}
+
+# Tool approval request
+{
+    "type": "tool_approval_request",
+    "content": "Requesting approval to send email",
+    "detail": {
+        "tool_name": "send_email",
+        "arguments": {
+            "to": "user@example.com",
+            "subject": "Analysis Report",
+            "body": "Please find the analysis report attached."
+        },
+        "risk_level": "medium",
+        "reason": "Sending external email with analysis results"
+    }
+}
+
+# Message to user
+{
+    "type": "message_to_user",
+    "content": "I need to pause here and wait for your approval before proceeding.",
+    "detail": {
+        "urgency": "normal",
+        "requires_response": true,
+        "options": ["approve", "reject", "modify"]
+    }
+}
+```
+
+### System Messages
+
+```python
+# Session initialization
+{
+    "type": "session_init",
+    "content": "Session initialized successfully",
+    "detail": {
+        "session_id": "user_123",
+        "capabilities": ["text", "tools", "planning", "hitl"],
+        "agent_info": {
+            "role": "Data Analyst",
+            "available_tools": ["web_search", "data_analysis", "visualization"]
+        }
+    }
+}
+
+# Live status
+{
+    "type": "live_status",
+    "content": "Processing your request",
+    "detail": {
+        "status": "processing",
+        "progress": 0.45,
+        "current_task": "Analyzing data patterns",
+        "eta": 30  # seconds
+    }
+}
+
+# Finish reason
+{
+    "type": "finish_reason",
+    "content": "Task completed successfully",
+    "detail": {
+        "status": "completed",
+        "reason": "task_finished",
+        "execution_time": 125.7,
+        "tokens_used": 1250,
+        "tools_called": 3
+    }
+}
+
+# Error message
+{
+    "type": "error",
+    "content": "Failed to process request",
+    "detail": {
+        "error_code": "TOOL_EXECUTION_ERROR",
+        "error_message": "Web search tool timeout",
+        "recoverable": true,
+        "suggested_action": "retry"
+    }
+}
+```
+
+## Advanced Streaming Patterns
+
+### Resumable Streaming
+
+```python
+from langcrew.web.protocol import ChatRequest
+
+# Resume interrupted session
+resume_request = ChatRequest(
+    message="Continue from where we left off",
+    session_id="user_123",
+    interrupt_data={
+        "last_message_id": "1748438204041_a7k9",
+        "context": "user_approval_pending"
+    }
+)
+```
+
+### Batch Message Processing
+
+```python
+async def process_message_batch(messages: list[StreamMessage]):
+    """Process multiple messages efficiently"""
+    
+    # Group by type for batch processing
+    by_type = {}
+    for msg in messages:
+        if msg.type not in by_type:
+            by_type[msg.type] = []
+        by_type[msg.type].append(msg)
+    
+    # Process each type
+    for msg_type, msgs in by_type.items():
+        if msg_type == MessageType.TEXT:
+            await process_text_batch(msgs)
+        elif msg_type == MessageType.TOOL_RESULT:
+            await process_tool_results(msgs)
+        # ... handle other types
+```
+
+### Custom Message Types
+
+```python
+from langcrew.web.protocol import MessageType, StreamMessage
+
+# Extend message types for custom use cases
+class CustomMessageType(str, Enum):
+    CUSTOM_VISUALIZATION = "custom_visualization"
+    CUSTOM_NOTIFICATION = "custom_notification"
+    CUSTOM_FORM = "custom_form"
+
+# Create custom message
+custom_message = StreamMessage(
+    id=generate_message_id(),
+    role="assistant",
+    type=CustomMessageType.CUSTOM_VISUALIZATION,
+    content="Generated custom chart",
+    detail={
+        "chart_type": "scatter_plot",
+        "data_points": 150,
+        "chart_data": {...}
+    },
+    timestamp=int(time.time() * 1000),
+    session_id="user_123"
+)
+```
+
+## Client Integration Examples
+
+### React Integration
+
+```jsx
+// React hook for LangCrew streaming
+import { useState, useEffect } from 'react';
+
+function useLangCrewStream(sessionId) {
+    const [messages, setMessages] = useState([]);
+    const [isConnected, setIsConnected] = useState(false);
+    
+    useEffect(() => {
+        const eventSource = new EventSource(`/chat?session_id=${sessionId}`);
+        
+        eventSource.onopen = () => setIsConnected(true);
+        eventSource.onclose = () => setIsConnected(false);
+        
+        eventSource.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            setMessages(prev => [...prev, message]);
+        };
+        
+        return () => eventSource.close();
+    }, [sessionId]);
+    
+    return { messages, isConnected };
+}
+
+// Component using the stream
+function ChatInterface() {
+    const { messages, isConnected } = useLangCrewStream('user_123');
+    
+    return (
+        <div>
+            <div className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
+                {isConnected ? 'Connected' : 'Disconnected'}
+            </div>
+            
+            {messages.map(message => (
+                <MessageComponent key={message.id} message={message} />
+            ))}
+        </div>
+    );
+}
+
+function MessageComponent({ message }) {
+    switch(message.type) {
+        case 'text':
+            return <div className="text-message">{message.content}</div>;
+        case 'tool_call':
+            return <ToolCallComponent data={message.detail} />;
+        case 'plan':
+            return <PlanComponent plan={message.detail} />;
+        default:
+            return <div>Unknown message type: {message.type}</div>;
+    }
+}
+```
+
+### Vue.js Integration
+
+```vue
+<template>
+  <div class="chat-interface">
+    <div :class="['status', isConnected ? 'connected' : 'disconnected']">
+      {{ isConnected ? 'Connected' : 'Disconnected' }}
+    </div>
+    
+    <div v-for="message in messages" :key="message.id" class="message">
+      <component :is="getMessageComponent(message.type)" :message="message" />
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted, onUnmounted } from 'vue';
+
+export default {
+  name: 'ChatInterface',
+  setup() {
+    const messages = ref([]);
+    const isConnected = ref(false);
+    let eventSource = null;
+    
+    onMounted(() => {
+      eventSource = new EventSource('/chat?session_id=user_123');
+      
+      eventSource.onopen = () => isConnected.value = true;
+      eventSource.onclose = () => isConnected.value = false;
+      
+      eventSource.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        messages.value.push(message);
+      };
+    });
+    
+    onUnmounted(() => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    });
+    
+    const getMessageComponent = (type) => {
+      const components = {
+        'text': 'TextMessage',
+        'tool_call': 'ToolCallMessage', 
+        'plan': 'PlanMessage'
+      };
+      return components[type] || 'UnknownMessage';
+    };
+    
+    return {
+      messages,
+      isConnected,
+      getMessageComponent
+    };
+  }
+};
+</script>
+```
+
+## Error Handling and Reconnection
+
+### Robust SSE Client
+
+```javascript
+class RobustSSEClient {
+    constructor(url, options = {}) {
+        this.url = url;
+        this.options = {
+            maxRetries: 5,
+            retryDelay: 1000,
+            maxRetryDelay: 30000,
+            ...options
+        };
+        this.retryCount = 0;
+        this.eventSource = null;
+        this.messageHandlers = new Map();
+    }
+    
+    connect() {
+        this.eventSource = new EventSource(this.url);
+        
+        this.eventSource.onopen = () => {
+            console.log('SSE connected');
+            this.retryCount = 0; // Reset on successful connection
+        };
+        
+        this.eventSource.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                this.handleMessage(message);
+            } catch (error) {
+                console.error('Failed to parse message:', error);
+            }
+        };
+        
+        this.eventSource.onerror = () => {
+            console.log('SSE connection error');
+            this.reconnect();
+        };
+    }
+    
+    reconnect() {
+        if (this.retryCount >= this.options.maxRetries) {
+            console.error('Max retries exceeded');
+            return;
+        }
+        
+        this.retryCount++;
+        const delay = Math.min(
+            this.options.retryDelay * Math.pow(2, this.retryCount - 1),
+            this.options.maxRetryDelay
+        );
+        
+        console.log(`Reconnecting in ${delay}ms (attempt ${this.retryCount})`);
+        
+        setTimeout(() => {
+            this.connect();
+        }, delay);
+    }
+    
+    on(messageType, handler) {
+        this.messageHandlers.set(messageType, handler);
+    }
+    
+    handleMessage(message) {
+        const handler = this.messageHandlers.get(message.type);
+        if (handler) {
+            handler(message);
+        }
+    }
+    
+    disconnect() {
+        if (this.eventSource) {
+            this.eventSource.close();
+        }
+    }
+}
+
+// Usage
+const client = new RobustSSEClient('/chat?session_id=user_123');
+
+client.on('text', (message) => {
+    console.log('Text:', message.content);
+});
+
+client.on('tool_call', (message) => {
+    console.log('Tool call:', message.detail);
+});
+
+client.connect();
+```
+
+## Next Steps
+
+- **[HTTP Server](/guides/web/http-server)** - FastAPI server setup and configuration
+- **[LangGraph Integration](/guides/web/langgraph-integration)** - Direct LangGraph adapter usage
+- **[Tool Display](/guides/web/tool-display)** - Rich tool call visualization  
+- **[Web Concepts](/concepts/web)** - Understanding web architecture

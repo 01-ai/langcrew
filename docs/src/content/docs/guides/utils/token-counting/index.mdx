@@ -1,0 +1,393 @@
+---
+title: Token Counting
+description: Precise token counting for LLM models (GPT, Claude)
+---
+
+LangCrew's token counting utilities provide precise token counting for LLM models, supporting both GPT and Claude with exact and approximate counting methods.
+
+## Overview
+
+The token counter module (`langcrew.utils.token_counter`) offers:
+- **Multi-model Support**: GPT-4.1 (exact) and Claude 3.7 (approximate)
+- **Message-aware Counting**: Handles LangChain message formats
+- **Token Limits**: Built-in limits for truncation and validation
+- **Performance Optimized**: Efficient counting for large message histories
+
+## Basic Usage
+
+### Initialize Token Counter
+
+```python
+from langcrew.utils.token_counter import TokenCounter
+
+# For GPT models (exact counting)
+gpt_counter = TokenCounter("gpt-4.1")
+
+# For Claude models (approximate counting)
+claude_counter = TokenCounter("claude-3.7")
+```
+
+### Count Message Tokens
+
+```python
+from langchain_core.messages import HumanMessage, AIMessage
+
+messages = [
+    HumanMessage(content="What is machine learning?"),
+    AIMessage(content="Machine learning is a subset of AI that enables computers to learn from data."),
+    HumanMessage(content="Can you give me an example?")
+]
+
+# Count tokens
+token_count, is_exact = gpt_counter.count_messages(messages)
+print(f"Token count: {token_count}, Exact: {is_exact}")
+```
+
+## Token Limits
+
+### Built-in Limits
+
+```python
+from langcrew.utils.token_counter import TOKEN_LIMIT, MAX_TOKEN_LIMIT
+
+print(f"Default token limit: {TOKEN_LIMIT}")        # 64000
+print(f"Maximum token limit: {MAX_TOKEN_LIMIT}")    # 150000
+```
+
+### Validation and Truncation
+
+```python
+def validate_message_length(messages, counter):
+    """Validate and truncate messages if needed"""
+    token_count, _ = counter.count_messages(messages)
+    
+    if token_count > TOKEN_LIMIT:
+        print(f"Messages exceed limit ({token_count} > {TOKEN_LIMIT})")
+        # Implement truncation logic
+        return truncate_messages(messages, counter)
+    
+    return messages
+
+def truncate_messages(messages, counter, target_limit=TOKEN_LIMIT):
+    """Truncate messages to fit within token limit"""
+    while len(messages) > 1:  # Keep at least one message
+        token_count, _ = counter.count_messages(messages)
+        if token_count <= target_limit:
+            break
+        # Remove oldest message
+        messages = messages[1:]
+    
+    return messages
+```
+
+## Model-Specific Counting
+
+### GPT Models (Exact Counting)
+
+```python
+from langcrew.utils.token_counter import TokenCounter
+
+# GPT uses tiktoken for exact counting
+gpt_counter = TokenCounter("gpt-4.1")
+
+# Exact token count
+messages = [HumanMessage(content="Hello, world!")]
+count, is_exact = gpt_counter.count_messages(messages)
+print(f"GPT tokens: {count} (exact: {is_exact})")  # exact: True
+```
+
+### Claude Models (Approximate Counting)
+
+```python
+# Claude uses LangChain's approximate counting
+claude_counter = TokenCounter("claude-3.7")
+
+# Approximate token count
+count, is_exact = claude_counter.count_messages(messages)
+print(f"Claude tokens: {count} (exact: {is_exact})")  # exact: False
+```
+
+## Advanced Usage
+
+### Custom Token Counter with LLM
+
+```python
+from langchain_openai import ChatOpenAI
+from langcrew.utils.token_counter import TokenCounter
+
+# Initialize with LLM instance
+llm = ChatOpenAI(model="gpt-4.1")
+counter = TokenCounter("gpt-4.1", llm=llm)
+
+# Use for conversation management
+def manage_conversation_tokens(messages, max_tokens=50000):
+    """Manage conversation within token limits"""
+    counter = TokenCounter("gpt-4.1")
+    
+    while True:
+        token_count, _ = counter.count_messages(messages)
+        
+        if token_count <= max_tokens:
+            break
+            
+        if len(messages) <= 2:  # Keep system + last user message
+            break
+            
+        # Remove middle messages, keep first and last
+        messages = [messages[0]] + messages[-1:]
+    
+    return messages, token_count
+```
+
+### Batch Token Analysis
+
+```python
+def analyze_message_batches(message_batches: list, model_name: str):
+    """Analyze token usage across multiple message batches"""
+    counter = TokenCounter(model_name)
+    results = []
+    
+    for i, messages in enumerate(message_batches):
+        token_count, is_exact = counter.count_messages(messages)
+        
+        results.append({
+            "batch_id": i,
+            "message_count": len(messages),
+            "token_count": token_count,
+            "is_exact": is_exact,
+            "avg_tokens_per_message": token_count / len(messages) if messages else 0
+        })
+    
+    return results
+
+# Example usage
+batches = [
+    [HumanMessage(content="Short message")],
+    [HumanMessage(content="This is a much longer message with more content to analyze")],
+    [HumanMessage(content="Medium length message")]
+]
+
+results = analyze_message_batches(batches, "gpt-4.1")
+for result in results:
+    print(f"Batch {result['batch_id']}: {result['token_count']} tokens")
+```
+
+## Integration with Agents
+
+### Token-Aware Agent
+
+```python
+from langcrew import Agent
+from langcrew.utils.token_counter import TokenCounter, TOKEN_LIMIT
+
+class TokenAwareAgent(Agent):
+    """Agent that manages its token usage"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.token_counter = TokenCounter("gpt-4.1")  # Adjust based on your LLM
+    
+    def prepare_messages(self, messages):
+        """Prepare messages within token limits"""
+        token_count, _ = self.token_counter.count_messages(messages)
+        
+        if token_count > TOKEN_LIMIT:
+            # Implement smart truncation
+            messages = self.truncate_conversation(messages)
+            
+        return messages
+    
+    def truncate_conversation(self, messages):
+        """Smart truncation preserving context"""
+        if len(messages) <= 2:
+            return messages
+            
+        # Keep system message (if any) and recent messages
+        system_messages = [msg for msg in messages if msg.type == "system"]
+        other_messages = [msg for msg in messages if msg.type != "system"]
+        
+        # Start with recent messages and add backwards
+        truncated = system_messages + other_messages[-5:]  # Keep last 5 non-system
+        
+        while True:
+            count, _ = self.token_counter.count_messages(truncated)
+            if count <= TOKEN_LIMIT or len(truncated) <= len(system_messages) + 1:
+                break
+            # Remove one more message (but keep system messages)
+            if len(truncated) > len(system_messages) + 1:
+                truncated = system_messages + truncated[len(system_messages)+1:]
+        
+        return truncated
+```
+
+### Memory-Efficient Processing
+
+```python
+from langcrew.utils.token_counter import TokenCounter
+
+def process_large_conversation(conversation_history, model_name="gpt-4.1"):
+    """Process large conversations efficiently"""
+    counter = TokenCounter(model_name)
+    
+    # Process in chunks
+    chunk_size = 10  # messages per chunk
+    chunks = [conversation_history[i:i+chunk_size] 
+             for i in range(0, len(conversation_history), chunk_size)]
+    
+    token_summary = []
+    
+    for i, chunk in enumerate(chunks):
+        token_count, is_exact = counter.count_messages(chunk)
+        token_summary.append({
+            "chunk": i,
+            "messages": len(chunk),
+            "tokens": token_count,
+            "exact": is_exact
+        })
+    
+    total_tokens = sum(chunk["tokens"] for chunk in token_summary)
+    
+    return {
+        "total_messages": len(conversation_history),
+        "total_tokens": total_tokens,
+        "chunks": token_summary,
+        "avg_tokens_per_message": total_tokens / len(conversation_history)
+    }
+```
+
+## Performance Optimization
+
+### Caching Token Counts
+
+```python
+from functools import lru_cache
+from langcrew.utils.token_counter import TokenCounter
+
+class CachedTokenCounter:
+    """Token counter with caching for repeated messages"""
+    
+    def __init__(self, model_name: str):
+        self.counter = TokenCounter(model_name)
+        self._cache = {}
+    
+    @lru_cache(maxsize=1000)
+    def _count_single_message(self, content: str, message_type: str) -> int:
+        """Cache individual message token counts"""
+        from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+        
+        message_classes = {
+            "human": HumanMessage,
+            "ai": AIMessage, 
+            "system": SystemMessage
+        }
+        
+        message = message_classes.get(message_type, HumanMessage)(content=content)
+        count, _ = self.counter.count_messages([message])
+        return count
+    
+    def count_messages(self, messages):
+        """Count with caching"""
+        # For exact counting, we can sum individual cached counts
+        total = 0
+        for msg in messages:
+            count = self._count_single_message(msg.content, msg.type)
+            total += count
+        
+        return total, True  # Assume exact for cached counting
+```
+
+## Error Handling
+
+```python
+from langcrew.utils.token_counter import TokenCounter
+
+def safe_token_counting(messages, model_name="gpt-4.1"):
+    """Safe token counting with error handling"""
+    try:
+        counter = TokenCounter(model_name)
+        token_count, is_exact = counter.count_messages(messages)
+        
+        return {
+            "success": True,
+            "token_count": token_count,
+            "is_exact": is_exact,
+            "message_count": len(messages)
+        }
+    
+    except Exception as e:
+        # Fallback to simple estimation
+        estimated_tokens = sum(len(msg.content.split()) * 1.3 for msg in messages)
+        
+        return {
+            "success": False,
+            "error": str(e),
+            "estimated_tokens": int(estimated_tokens),
+            "is_exact": False,
+            "message_count": len(messages)
+        }
+```
+
+## Best Practices
+
+### 1. Choose the Right Model Counter
+
+```python
+# Use exact counting for GPT models
+gpt_counter = TokenCounter("gpt-4.1")
+
+# Use approximate counting for Claude (faster)
+claude_counter = TokenCounter("claude-3.7")
+```
+
+### 2. Implement Smart Truncation
+
+```python
+def smart_truncate(messages, counter, target_tokens=TOKEN_LIMIT):
+    """Preserve important context while truncating"""
+    
+    # Always keep system messages
+    system_msgs = [msg for msg in messages if msg.type == "system"]
+    user_msgs = [msg for msg in messages if msg.type != "system"]
+    
+    # Keep recent user-assistant pairs
+    result = system_msgs
+    
+    # Add messages from the end, maintaining conversation flow
+    for i in range(len(user_msgs) - 1, -1, -2):  # Take pairs
+        candidate = system_msgs + user_msgs[i-1:i+1] if i > 0 else system_msgs + user_msgs[i:i+1]
+        count, _ = counter.count_messages(candidate)
+        
+        if count <= target_tokens:
+            result = candidate
+        else:
+            break
+    
+    return result
+```
+
+### 3. Monitor Token Usage
+
+```python
+def create_token_monitor(model_name: str):
+    """Create a token usage monitor"""
+    counter = TokenCounter(model_name)
+    stats = {"total_tokens": 0, "message_count": 0, "calls": 0}
+    
+    def monitor(messages):
+        token_count, is_exact = counter.count_messages(messages)
+        stats["total_tokens"] += token_count
+        stats["message_count"] += len(messages)
+        stats["calls"] += 1
+        
+        print(f"Tokens: {token_count}, Total: {stats['total_tokens']}, Avg: {stats['total_tokens']/stats['calls']:.1f}")
+        return token_count, is_exact
+    
+    return monitor, stats
+```
+
+## Next Steps
+
+- **[File Detection](/guides/utils/file-detection)** - Intelligent file type detection
+- **[Language Detection](/guides/utils/language-detection)** - Detect text language  
+- **[Message Utilities](/guides/utils/message-utilities)** - Message ID generation
+- **[Utils Concepts](/concepts/utils)** - Understanding utility functions

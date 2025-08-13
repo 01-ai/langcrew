@@ -1,208 +1,216 @@
 ---
 title: Utils
-description: Understanding Utils - utility functions and helpers for AI workflows
+description: Understanding Utils - utility functions for AI agent development
 ---
 
-Utils provides essential utility functions and helpers that support AI workflows, offering practical tools for file handling, token management, language processing, and message operations.
+Utils provides a collection of utility functions and helper tools for AI agent development, including file detection, token counting, language processing, and message handling utilities.
 
 ## What is Utils?
 
 Utils in langcrew provides:
-- **File detection**: Intelligent file type detection with content analysis and binary/text classification
-- **Token counting**: Precise token counting for OpenAI, Anthropic, and other LLM models
-- **Language detection**: Simple language identification for text processing
-- **Message utilities**: Helper functions for message ID generation and formatting
+- **File Detection**: Intelligent file type detection and encoding analysis
+- **Token Counting**: Precise token counting for GPT and Claude models
+- **Language Detection**: Simple language identification (Chinese/English)
+- **Message Utilities**: Message ID generation and handling helpers
 
 ## Core Architecture
 
-Utils is a collection of standalone utility modules that can be used independently:
+Utils is organized as independent utility modules, each serving specific purposes:
 
 ```python
-from langcrew.utils import detect_file_type, count_tokens, detect_language
-
-# File detection
-file_info = detect_file_type("document.pdf")
-
-# Token counting
-tokens = count_tokens("Hello, world!", model="gpt-4")
-
-# Language detection
-language = detect_language("Hello, how are you?")
+from langcrew.utils import (
+    is_binary_file, is_text_file,      # File detection
+    TokenCounter,                       # Token counting
+    detect_chinese, detect_language,    # Language detection
+    generate_message_id                 # Message utilities
+)
 ```
 
 ## Key Components
 
 ### File Detection
-Intelligent file type detection using binary signatures, content analysis, and encoding detection.
+Intelligent file type detection using multiple heuristic rules for binary/text classification.
+
+**Key Features:**
+- Binary vs text file detection
+- UTF-8/UTF-16 encoding validation
+- File signature recognition
+- Chinese text support
+- Encoding detection
 
 ```python
-from langcrew.utils.file_detect import detect_file_type
+from langcrew.utils.file_detect import is_binary_file, is_text_file
 
-# Detect file type with content analysis
-file_info = detect_file_type("document.pdf")
-print(file_info.file_type)    # File extension
-print(file_info.mime_type)    # MIME type
-print(file_info.is_binary)    # True/False for binary detection
-print(file_info.size)         # File size in bytes
+# Detect file types
+with open('document.pdf', 'rb') as f:
+    data = f.read()
+    is_binary = is_binary_file(data)  # True
+    is_text = is_text_file(data)      # False
+
+# File type hints
+from langcrew.utils.file_detect import get_file_type_hint
+file_type = get_file_type_hint(data)  # "binary" or "text"
 ```
 
-#### File Detection Parameters
+**Detection Rules:**
+1. Null bytes presence (most reliable)
+2. Common binary file signatures
+3. UTF-8/UTF-16 encoding validation
+4. Control character ratio analysis
+5. Chinese character pattern support
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `file_path` | str | Path to file for detection | Required |
-| `read_content` | bool | Whether to read file content | True |
-| `extract_metadata` | bool | Extract detailed metadata | True |
+| Function | Purpose | Parameters |
+|----------|---------|------------|
+| `is_binary_file(data)` | Detect binary files | `data: bytes \| bytearray` |
+| `is_text_file(data)` | Detect text files | `data: bytes \| bytearray` |
+| `get_file_type_hint(data)` | Get file type hint | `data: bytes \| bytearray` |
 
-### Token Counter
-Precise token counting using tiktoken for GPT models and approximation for other models.
+### Token Counting
+Precise token counting for LLM models with support for GPT and Claude.
+
+**Key Features:**
+- GPT-4 exact token counting
+- Claude token estimation
+- Message-based counting
+- Token limit constants
+- Model-specific encoding
 
 ```python
 from langcrew.utils.token_counter import TokenCounter
+from langchain_core.messages import HumanMessage
 
-# Create token counter for specific model
+# Initialize counter
 counter = TokenCounter(model_name="gpt-4")
 
-# Count tokens in text
-tokens = counter.count_text("Hello, world!")
-
-# Count tokens in messages (with exact/approximate indicator)
-messages = [
-    {"role": "user", "content": "Hello"},
-    {"role": "assistant", "content": "Hi there!"}
-]
+# Count tokens in messages
+messages = [HumanMessage(content="Hello, how are you?")]
 token_count, is_exact = counter.count_messages(messages)
+print(f"Tokens: {token_count}, Exact: {is_exact}")
 ```
 
-#### Token Counter Parameters
+**Constants:**
+- `TOKEN_LIMIT = 64000` - Unified token limit for truncation
+- `MAX_TOKEN_LIMIT = 150000` - Maximum token limit for user context
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `text` | str \| List[dict] | Text or messages to count | Required |
-| `model` | str | Model name for tokenization | "gpt-4" |
-| `include_metadata` | bool | Include token breakdown | False |
+| Method | Purpose | Returns |
+|--------|---------|---------|
+| `count_messages(messages)` | Count tokens in message list | `tuple[int, bool]` |
+| `_count_gpt_tokens(messages)` | Exact GPT token counting | `int` |
+| `_estimate_claude_tokens(messages)` | Estimate Claude tokens | `int` |
 
 ### Language Detection
-Simple language detection focusing on Chinese vs. non-Chinese text classification.
+Simple language identification focusing on Chinese and English text.
+
+**Key Features:**
+- Chinese character detection
+- Character ratio analysis
+- Simple and fast processing
+- Unicode range support
 
 ```python
-from langcrew.utils.language import detect_language, detect_chinese
+from langcrew.utils.language import detect_chinese, detect_language
 
-# Basic language detection (primarily Chinese vs. English)
-lang = detect_language("你好，世界！")
-print(lang)  # "zh"
+# Detect Chinese text
+is_chinese = detect_chinese("你好世界")  # True
+is_chinese = detect_chinese("Hello World")  # False
 
-# Specific Chinese detection
-is_chinese = detect_chinese("Hello, 世界！")
-print(is_chinese)  # True (if >30% Chinese characters)
+# General language detection
+language = detect_language("你好世界")  # "zh"
+language = detect_language("Hello World")  # "en"
 ```
 
-#### Language Detection Parameters
+**Detection Logic:**
+- Chinese characters: Unicode range `\u4e00-\u9fff`
+- Threshold: 30% Chinese characters = Chinese text
+- Fallback: English for non-Chinese text
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `text` | str | Text for language detection | Required |
-| `confidence_threshold` | float | Minimum confidence score | 0.8 |
-| `return_confidence` | bool | Return confidence score | False |
+| Function | Purpose | Parameters | Returns |
+|----------|---------|------------|---------|
+| `detect_chinese(text)` | Detect Chinese text | `text: str` | `bool` |
+| `detect_language(text)` | Detect language | `text: str` | `str` ("zh"/"en") |
 
 ### Message Utilities
-Helper functions for generating unique message IDs and handling message operations.
+Helper functions for message ID generation and message handling.
+
+**Key Features:**
+- Unique message ID generation
+- Timestamp-based IDs
+- Collision avoidance
+- High concurrency support
 
 ```python
 from langcrew.utils.message_utils import generate_message_id
 
-# Generate unique message ID with timestamp and random suffix
+# Generate unique message ID
 msg_id = generate_message_id()
-print(msg_id)  # Example: "1748438204041_a7k9"
-
-# Use in web applications for message tracking
-def create_message(content: str, role: str):
-    return {
-        "id": generate_message_id(),
-        "content": content,
-        "role": role,
-        "timestamp": time.time()
-    }
+# Format: "1748438204041_a7k9" (timestamp_randomsuffix)
 ```
 
-## Integration with langcrew
+**ID Format:**
+- Timestamp: Milliseconds since epoch
+- Suffix: 4-character random string (lowercase + digits)
+- Example: `1748438204041_a7k9`
 
-Utils integrates seamlessly with all langcrew components:
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `generate_message_id()` | Generate unique message ID | `str` |
 
-- **[Agents](/concepts/agents)**: Use token counting for prompt optimization
-- **[Tasks](/concepts/tasks)**: File detection for document processing tasks
-- **[Crews](/concepts/crews)**: Language detection for multi-language crews
+## Usage Patterns
 
+### File Processing Pipeline
 ```python
-from langcrew import Agent
-from langcrew.utils import count_tokens, detect_language
+from langcrew.utils.file_detect import is_binary_file, get_file_type_hint
 
-# Agent with token-aware prompts
-agent = Agent(
-    role="Content Analyzer",
-    goal="Analyze content efficiently",
-    backstory="Expert at processing various content types",
-    tools=[detect_file_type, count_tokens]
-)
+def process_file(file_path):
+    with open(file_path, 'rb') as f:
+        data = f.read()
+    
+    if is_binary_file(data):
+        return f"Binary file: {get_file_type_hint(data)}"
+    else:
+        # Process as text
+        text_content = data.decode('utf-8')
+        return f"Text file: {len(text_content)} characters"
+```
 
-# Use in task execution
-def process_document(file_path: str):
-    # Detect file type
-    file_info = detect_file_type(file_path)
+### Token Management
+```python
+from langcrew.utils.token_counter import TokenCounter, TOKEN_LIMIT
+
+def manage_context(messages, model_name="gpt-4"):
+    counter = TokenCounter(model_name)
+    token_count, _ = counter.count_messages(messages)
     
-    # Count tokens if text file
-    if file_info.is_text:
-        tokens = count_tokens(file_info.content)
-        print(f"Document has {tokens} tokens")
+    if token_count > TOKEN_LIMIT:
+        # Truncate messages to fit limit
+        return messages[-10:]  # Keep last 10 messages
     
-    # Detect language
-    if file_info.content:
-        language = detect_language(file_info.content)
-        print(f"Document language: {language}")
+    return messages
+```
+
+### Multi-language Support
+```python
+from langcrew.utils.language import detect_language
+
+def get_response_template(user_input):
+    lang = detect_language(user_input)
+    
+    if lang == "zh":
+        return "我理解了您的问题："
+    else:
+        return "I understand your question:"
 ```
 
 ## When to Use Utils
 
-- **File processing** applications handling multiple formats
-- **Token optimization** for cost-effective LLM usage
-- **Multi-language** applications requiring language detection
-- **Message processing** systems needing formatting utilities
-- **Content analysis** workflows requiring metadata extraction
-
-## Supported File Types
-
-### Document Formats
-- **Text**: .txt, .md, .rst, .log
-- **Office**: .docx, .xlsx, .pptx
-- **PDF**: .pdf (with text extraction)
-- **Code**: .py, .js, .html, .css, .json, .xml
-
-### Media Formats
-- **Images**: .jpg, .png, .gif, .bmp, .svg
-- **Audio**: .mp3, .wav, .flac, .ogg
-- **Video**: .mp4, .avi, .mov, .wmv
-
-### Archive Formats
-- **Compressed**: .zip, .rar, .7z, .tar, .gz
-
-## Supported Models for Token Counting
-
-### OpenAI Models
-- GPT-4, GPT-4 Turbo, GPT-4o
-- GPT-3.5 Turbo variants
-- Text-embedding models
-
-### Anthropic Models
-- Claude-3 (Opus, Sonnet, Haiku)
-- Claude-2 variants
-
-### Other Models
-- Llama 2/3 variants
-- Mistral models
-- Custom tokenizers
+- **File processing applications** requiring intelligent file type detection
+- **Token-aware applications** needing precise token counting for LLM usage
+- **Multi-language applications** requiring simple language detection
+- **Message-based systems** needing unique ID generation
+- **Agent development** requiring common utility functions
 
 ## Next Steps
 
 - **[Utils Quick Start](/guides/utils/getting-started)** - Get started in 5 minutes
-- **[Utils Configuration](/guides/utils/configuration)** - Complete configuration guide
-- **Examples** - Check `examples/components/utils/` for real-world implementations
+- **[Practical Examples](/guides/utils/examples)** - Real-world usage examples
+- **[Advanced Configuration](/guides/utils/configuration)** - Advanced utility configuration

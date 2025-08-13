@@ -3,36 +3,47 @@ title: Memory
 description: Understanding Memory - persistent state management for AI workflows
 ---
 
-Memory provides persistent state and context management for AI agent workflows using LangGraph's Store and Checkpointer systems, enabling agents to maintain conversation history, knowledge, and entity information across sessions.
+Memory is LangCrew's **high-level memory management component** built on top of [LangGraph's Store and Checkpointer systems](https://langchain-ai.github.io/langgraph/concepts/persistence/). It provides a unified, easy-to-use interface for persistent state management in AI agent workflows.
 
 ## What is Memory?
 
-Memory in langcrew provides:
-- **Short-term memory**: Session-based conversation history using LangGraph's Checkpointer
-- **Long-term memory**: Persistent knowledge storage using LangGraph's Store system
+Memory is a high-level abstraction that wraps LangGraph's low-level persistence primitives:
+
+- **Short-term memory**: Session-based conversation history using [LangGraph's Checkpointer](https://langchain-ai.github.io/langgraph/concepts/persistence/#checkpoints)
+- **Long-term memory**: Persistent knowledge storage using [LangGraph's Store system](https://langchain-ai.github.io/langgraph/concepts/persistence/#store)
 - **Entity memory**: Track and remember entities (people, organizations, concepts) across conversations
 - **Multi-provider support**: In-memory, SQLite, PostgreSQL backends (tested); Redis, MongoDB, MySQL (experimental)
+- **Unified configuration**: Single MemoryConfig class manages all memory types and LangGraph backends
 
 ## Core Architecture
 
-Memory is built on [LangGraph's Store and Checkpointer](https://langchain-ai.github.io/langgraph/concepts/persistence/) with enhanced capabilities:
+Memory provides a high-level wrapper around [LangGraph's persistence layer](https://langchain-ai.github.io/langgraph/concepts/persistence/) with three specialized memory types:
 
 ```python
+from langcrew import Crew
 from langcrew.memory import MemoryConfig
 
-# Basic configuration
+# Unified memory configuration
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///memory.db"
+    connection_string="sqlite:///memory.db",
+    short_term={"enabled": True, "max_history": 20},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
+)
+
+crew = Crew(
+    agents=[agent],
+    memory=memory_config
 )
 ```
 
 ## Key Components
 
 ### MemoryConfig
-Unified configuration for all memory types and providers.
+Unified configuration class that manages all three memory types and storage providers.
 
-#### Configuration Parameters
+#### Core Parameters
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
@@ -46,8 +57,14 @@ Unified configuration for all memory types and providers.
 ### Short-term Memory
 Session-based conversation history using LangGraph's Checkpointer system for immediate context retention.
 
+**Key Features:**
+- Thread-based session management
+- Automatic context injection
+- Configurable history limits
+- Local caching for performance
+
 ```python
-# Short-term memory using checkpointer
+# Short-term memory configuration
 memory_config = MemoryConfig(
     short_term={
         "enabled": True,
@@ -59,8 +76,14 @@ memory_config = MemoryConfig(
 ### Long-term Memory
 Persistent knowledge storage using LangGraph's Store system for cross-session information retention.
 
+**Key Features:**
+- Quality-based knowledge filtering
+- Task-based knowledge organization
+- Agent-specific namespaces
+- Learning extraction and storage
+
 ```python
-# Long-term memory using store system
+# Long-term memory configuration
 memory_config = MemoryConfig(
     long_term={
         "enabled": True,
@@ -72,6 +95,12 @@ memory_config = MemoryConfig(
 ### Entity Memory
 Tracks entities (people, organizations, concepts) across conversations using structured storage.
 
+**Key Features:**
+- Automatic entity recognition and updates
+- Relationship tracking between entities
+- Mention counting and recency tracking
+- Type-based entity organization
+
 ```python
 # Entity memory configuration
 memory_config = MemoryConfig(
@@ -81,16 +110,42 @@ memory_config = MemoryConfig(
 )
 ```
 
+## Storage Providers
+
+**✅ Tested Providers:**
+- `memory` - In-memory storage (development/testing)
+- `postgresql` - PostgreSQL database (production)
+- `sqlite` - SQLite database (single-user/development)
+
+**⚠️ Experimental Providers:**
+- `redis` - Redis storage (not fully tested)
+- `mongodb` - MongoDB storage (not fully tested)
+- `mysql` - MySQL storage (not fully tested)
+
+```python
+# Production configuration with PostgreSQL
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db"
+)
+
+# Development configuration with SQLite
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db"
+)
+```
+
 ## Integration with langcrew
 
 Memory integrates seamlessly with all langcrew components:
 
 - **[Agents](/concepts/agents)**: Agents inherit memory configuration for context-aware responses
-- **[Tasks](/concepts/tasks)**: Tasks maintain state across executions
+- **[Tasks](/concepts/tasks)**: Tasks maintain state across executions  
 - **[Crews](/concepts/crews)**: Crews share memory across team members
 
 ```python
-# Integration example
+# Shared memory across crew
 from langcrew import Agent, Crew
 from langcrew.memory import MemoryConfig
 
@@ -99,14 +154,9 @@ memory_config = MemoryConfig(
     connection_string="sqlite:///team_memory.db"
 )
 
-agent = Agent(
-    role="Assistant",
-    memory=memory_config
-)
-
 crew = Crew(
     agents=[agent],
-    memory=memory_config  # Shared memory across crew
+    memory=memory_config  # All agents share this memory
 )
 ```
 
@@ -121,5 +171,7 @@ crew = Crew(
 ## Next Steps
 
 - **[Memory Quick Start](/guides/memory/getting-started)** - Get started in 5 minutes
-- **[Memory Configuration](/guides/memory/configuration)** - Complete configuration guide
-- **Examples** - Check `examples/components/memory/` for real-world implementations
+- **[Short-term Memory](/guides/memory/short-term)** - Session-based conversation history
+- **[Long-term Memory](/guides/memory/long-term)** - Persistent knowledge storage
+- **[Entity Memory](/guides/memory/entity)** - Track entities across conversations
+- **[Storage Configuration](/guides/memory/storage)** - Configure storage backends

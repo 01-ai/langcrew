@@ -1,147 +1,256 @@
 ---
-title: 内存管理 - 快速开始
-description: 5分钟快速上手内存管理
+title: 内存管理快速开始
+description: 5分钟快速开始使用内存管理
 ---
 
-快速指南，让内存管理在您的 langcrew 应用中工作。
+# 快速开始
+
+只需几分钟即可开始使用LangCrew内存管理。本指南涵盖基本设置和常见使用模式。
 
 ## 安装
 
-内存管理包含在 langcrew 中 - 无需额外安装：
+安装带有内存管理支持的LangCrew：
 
 ```bash
-uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+# 安装LangCrew
+uv add langcrew
 ```
 
-## 基础示例
+## 基本用法
 
-这是一个为智能体启用内存的简单示例：
+### 1. 简单内存设置
 
 ```python
-from langcrew import Agent
+from langcrew import Agent, Crew
+
+# 创建内存配置 - 直接启用即可！
+memory_config = True  # 使用默认设置，启用所有内存类型
+
+# 创建带有内存的代理
+agent = Agent(
+    role="内存助手",
+    goal="记住并使用我们对话中的信息",
+    backstory="您是一个具有出色记忆能力的AI助手"
+)
+
+# 创建带有共享内存的团队
+crew = Crew(
+    agents=[agent],
+    memory=memory_config
+)
+```
+
+### 2. 运行您的第一个启用内存的对话
+
+```python
+# 第一次对话
+result1 = crew.kickoff(
+    inputs={"user_input": "我叫Alice，喜欢吃披萨"},
+    thread_id="conversation_1"
+)
+
+# 稍后的对话 - 代理记住Alice
+result2 = crew.kickoff(
+    inputs={"user_input": "我喜欢什么食物？"},
+    thread_id="conversation_1"  # 相同的thread ID
+)
+
+print(result2)  # 代理会记住Alice喜欢披萨
+```
+
+### 3. 使用SQLite的持久内存
+
+```python
 from langcrew.memory import MemoryConfig
 
-# 基本内存配置
+# 持久内存配置
 memory_config = MemoryConfig(
-    provider="memory",  # 开发用内存存储
-    short_term={"max_history": 10},
-    long_term={"enabled": True},
+    provider="sqlite",
+    connection_string="sqlite:///my_memory.db",
+    short_term={"enabled": True, "max_history": 20},
+    long_term={"enabled": True, "min_quality": 0.7},
     entity={"enabled": True}
 )
 
-# 创建具有内存的智能体
-agent = Agent(
-    role="个人助手",
-    goal="在记住上下文的同时帮助用户完成任务",
-    backstory="您是一个拥有完美记忆的有用助手",
-    memory=memory_config,
-    verbose=True
+crew = Crew(agents=[agent], memory=memory_config)
+
+# 内存在程序重启后保持
+result = crew.kickoff(
+    inputs={"user_input": "记住我在TechCorp工作"},
+    thread_id="user_alice"
 )
-
-# 测试对话
-response1 = agent.execute_task("我的名字是张三，我在ABC公司工作")
-print(response1)
-
-response2 = agent.execute_task("我的名字是什么，我在哪里工作？")
-print(response2)  # 应该记住张三和ABC公司
 ```
 
-## 持久内存示例
+## 内存类型实战
 
-对于生产使用，配置持久存储：
+### 短期记忆
+记住会话中的近期对话历史：
 
 ```python
-from langcrew.memory import MemoryConfig
-
-# SQLite 配置（推荐用于单节点）
+# 配置短期记忆
 memory_config = MemoryConfig(
-    provider="sqlite",
-    connection_string="sqlite:///langcrew_memory.db",
-    short_term={"max_history": 50},
-    long_term={
+    short_term={
         "enabled": True,
-        "chunk_size": 1000,
-        "search_k": 10
+        "max_history": 15,  # 保留最后15轮对话
     }
 )
 
-# PostgreSQL 配置（推荐用于生产）
+# 代理将记住近期消息的上下文
+crew = Crew(agents=[agent], memory=memory_config)
+```
+
+### 长期记忆
+跨会话存储重要知识：
+
+```python
+# 配置长期记忆
 memory_config = MemoryConfig(
-    provider="postgres",
-    connection_string="postgresql://user:pass@localhost/langcrew_memory"
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # 仅存储高质量信息
+    }
+)
+
+# 代理学习并记住重要事实
+crew = Crew(agents=[agent], memory=memory_config)
+```
+
+### 实体记忆
+跟踪人员、组织和概念：
+
+```python
+# 配置实体记忆
+memory_config = MemoryConfig(
+    entity={"enabled": True}
+)
+
+# 代理记住实体及其关系
+crew = Crew(agents=[agent], memory=memory_config)
+
+# 示例：代理将记住"Alice在TechCorp工作"
+result = crew.kickoff(
+    inputs={"user_input": "Alice是TechCorp的CEO"},
+    thread_id="business_context"
 )
 ```
 
-## 测试您的设置
+## 内存搜索
 
-### 运行完整示例
+搜索所有内存类型：
 
-```bash
-# 设置您的 OpenAI API 密钥
-export OPENAI_API_KEY=your_api_key_here
+```python
+# 搜索内存
+results = crew.search_memory(
+    query="Alice",
+    memory_type="all",  # 搜索所有内存类型
+    limit=5
+)
 
-# 从内存示例目录运行
-cd examples/components/memory
-uv run memory_example.py
+for result in results:
+    print(f"内存类型: {result['memory_type']}")
+    print(f"内容: {result['content']}")
 ```
 
-这个示例演示了：
-- 基本内存配置
-- 短期和长期内存使用
-- 实体提取和回忆
-- 跨会话持久化
+## 配置示例
 
-## 更多示例
-
-要了解更多示例，请查看：
-
-- **📁 `examples/components/memory/`** - 完整的内存实现
-- **📄 `examples/components/memory/README.md`** - 设置说明
-- **🐍 `examples/components/memory/memory_example.py`** - 可运行代码
-
-## 故障排除
-
-### 内存不持久
-
-检查您的提供商配置：
+### 开发设置（内存模式）
 ```python
-# ❌ 错误 - 不会在会话间持久化
-memory_config = MemoryConfig(provider="memory")
+memory_config = MemoryConfig(
+    provider="memory",  # 快速，无持久化
+    short_term={"enabled": True, "max_history": 10},
+    long_term={"enabled": True},
+    entity={"enabled": True}
+)
+```
 
-# ✅ 正确 - 持久化到数据库
+### 生产设置（PostgreSQL）
+```python
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db",
+    short_term={"enabled": True, "max_history": 50},
+    long_term={"enabled": True, "min_quality": 0.8},
+    entity={"enabled": True}
+)
+```
+
+### 本地开发（SQLite）
+```python
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///my_memory.db"
+    connection_string="sqlite:///development.db",
+    short_term={"enabled": True, "max_history": 30},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
 )
 ```
 
-### 连接错误
+## 常见模式
 
-确保您的数据库可访问：
+### 客户服务代理
 ```python
-# 对于 SQLite，确保目录存在
-import os
-os.makedirs("./data", exist_ok=True)
-
+# 启用内存的客户服务
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///./data/memory.db"
+    connection_string="sqlite:///customer_service.db",
+    short_term={"enabled": True, "max_history": 20},
+    entity={"enabled": True}  # 记住客户详情
+)
+
+service_agent = Agent(
+    role="客户服务代表",
+    goal="提供个性化的客户支持",
+    backstory="您记住客户历史和偏好"
+)
+
+crew = Crew(agents=[service_agent], memory=memory_config)
+
+# 每个客户有自己的线程
+result = crew.kickoff(
+    inputs={"user_input": "我需要帮助处理我的订单"},
+    thread_id=f"customer_{customer_id}"
 )
 ```
 
-### 导入错误
-
-确保您从正确的模块导入：
+### 学习助手
 ```python
-# 核心内存配置
-from langcrew.memory import MemoryConfig
+# 启用内存的学习助手
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///learning.db",
+    long_term={"enabled": True, "min_quality": 0.8},  # 存储学习内容
+    entity={"enabled": True}  # 跟踪概念和主题
+)
 
-# 特定内存类型（如果需要直接使用）
-from langcrew.memory import ShortTermMemory, LongTermMemory, EntityMemory
+tutor = Agent(
+    role="个人导师",
+    goal="根据学生进度调整教学",
+    backstory="您记住学生学过什么以及他们的困难"
+)
+
+crew = Crew(agents=[tutor], memory=memory_config)
 ```
 
 ## 下一步
 
-- **[配置指南](/zh/guides/memory/configuration)** - 学习所有选项
-- **[内存管理概念](/zh/concepts/memory)** - 理解架构
-- **示例** - 查看 `examples/components/memory/` 了解实现案例
+- **[短期记忆](/zh/guides/memory/short-term)** - 深入了解对话历史
+- **[长期记忆](/zh/guides/memory/long-term)** - 持久知识存储
+- **[实体记忆](/zh/guides/memory/entity)** - 跟踪实体和关系
+- **[存储配置](/zh/guides/memory/storage)** - 配置不同的存储后端
+
+## 故障排除
+
+### 内存不持久
+- 检查您的`connection_string`格式
+- 确保数据库权限正确
+- 验证数据库文件/连接可访问
+
+### 内存使用量高
+- 减少短期记忆中的`max_history`
+- 提高长期记忆中的`min_quality`阈值
+- 考虑使用SQLite/PostgreSQL而不是内存模式
+
+### 性能慢
+- 生产工作负载使用PostgreSQL
+- 为数据库提供商启用连接池
+- 开发/测试考虑内存提供商
