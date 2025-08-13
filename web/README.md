@@ -60,7 +60,7 @@ http://localhost:3000/chat
 ### Local Installation of LangCrew UI
 
 ```bash
-# In the web root directory
+# In the web root directory (Optional)
 pnpm install    # Install dependencies
 pnpm run publish     # Generate ./agentx directory
 
