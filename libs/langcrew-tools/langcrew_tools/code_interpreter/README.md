@@ -1,186 +1,55 @@
 # Code Interpreter Tool
 
-A secure Python code execution tool for LangCrew that supports both Docker-based isolation and local restricted execution.
+This package provides a robust and safe code interpreter tool designed for executing Python code within a sandboxed environment. It is primarily intended for integration with LangChain agents, allowing them to execute arbitrary Python code and receive the output, including standard output and any errors.
 
 ## Features
 
-- **Dual Execution Backends**:
-  - **Docker**: Fully isolated container execution (default when available)
-  - **Python exec**: Restricted local execution with security constraints
+The `langcrew-tools/code_interpreter` package offers the following key features:
 
-- **Security Features**:
-  - Network isolation in Docker mode
-  - Resource limits (memory, CPU, execution time)
-  - Restricted imports and builtins in local mode
-  - Code validation before execution
-  - Output truncation to prevent flooding
+* **Safe Python Code Execution**: Executes Python code in an isolated sandbox environment, preventing unintended side effects on the host system.
+* **Standard Output and Error Capture**: Captures both `stdout` and `stderr` from the executed code, providing comprehensive feedback on execution.
+* **Configurable Timeout**: Allows setting a maximum execution time for the code, preventing infinite loops or long-running processes from blocking the agent.
+* **Output Truncation**: Automatically truncates excessively long outputs to a configurable maximum length, ensuring efficient processing and display.
+* **LangChain Integration**: Designed as a `BaseTool` for seamless integration with LangChain agents, enabling agents to leverage code execution capabilities.
 
-- **Advanced Capabilities**:
-  - Package installation support (Docker mode only)
-  - Custom module allowlisting
-  - Configurable timeouts and resource limits
-  - Async execution support
+## Tool Details
+
+### `CodeInterpreterTool`
+
+* **Name**: `python_executor`
+* **Description**: "Execute Python code safely. Returns the output of the code execution including both stdout and any errors."
+
+#### Input Parameters
+
+* `code` (string, **required**): The Python code string to be executed.
+* `timeout` (integer, optional): The maximum time in seconds allowed for code execution.
+  * Default: `30` seconds
+  * Minimum: `1` second
+  * Maximum: `300` seconds
+
+#### Output
+
+The tool returns a string containing the `stdout` of the executed code. If `stderr` is present, it will be appended to the output under an "Errors:" section. If the code execution fails with a non-zero exit code and no `stdout` or `stderr` is produced, a generic failure message will be returned. Outputs exceeding 10,000 characters will be truncated.
 
 ## Usage
 
-### Basic Usage
+To use the `CodeInterpreterTool` with a LangChain agent, you would typically initialize it and include it in the list of tools provided to your agent.
+
+### Example (Conceptual)
 
 ```python
-from langcrew.tools.code_interpreter import CodeInterpreterTool
+from langcrew_tools.code_interpreter import CodeInterpreterTool
 
-# Create tool instance
-tool = CodeInterpreterTool()
-
-# Execute simple code
-result = tool._run("print('Hello, World!')")
-print(result)  # Output: Hello, World!
-
-# Execute with timeout
-result = tool._run("import time; time.sleep(5)", timeout=2)
-print(result)  # Output: Code execution timed out after 2 seconds
+# Initialize the CodeInterpreterTool
+code_interpreter_tool = CodeInterpreterTool()
+ret = code_interpreter_tool._arun("123+456")
+print(ret)
 ```
 
-### Using with External Packages (Docker only)
+## Installation
 
-```python
-# Install and use numpy
-code = """
-import numpy as np
-arr = np.array([1, 2, 3, 4, 5])
-print(f"Mean: {np.mean(arr)}")
-"""
-result = tool._run(code, packages=["numpy"])
-```
-
-### Configuration Options
-
-```python
-tool = CodeInterpreterTool(
-    # Force specific backend
-    use_docker=True,  # True/False/None (auto-detect)
-    
-    # Docker configuration
-    docker_image="python:3.11-slim",
-    docker_memory_limit="1g",
-    docker_cpu_limit="2.0",
-    
-    # Output configuration
-    max_output_length=20000,
-    
-    # Python exec configuration
-    python_allowed_modules=["pandas", "scipy"]  # Additional allowed modules
-)
-```
-
-## Security Model
-
-### Docker Mode (Recommended)
-
-- Complete process isolation
-- No network access
-- Read-only filesystem (except /tmp)
-- Resource limits enforced by Docker
-- Custom package installation in isolated environment
-
-### Python Exec Mode (Fallback)
-
-- Restricted imports (only safe standard library modules)
-- Limited builtins (no file I/O, network, or system access)
-- AST-based code validation
-- Timeout enforcement
-- Memory limits (Linux only)
-
-### Allowed Modules in Python Mode
-
-- Math and statistics: `math`, `statistics`, `decimal`, `fractions`
-- Data structures: `collections`, `itertools`, `functools`
-- Date/time: `datetime`, `calendar`
-- Text processing: `string`, `re`, `json`, `csv`
-- Utilities: `random`, `uuid`, `hashlib`, `base64`
-- Type hints: `typing`, `dataclasses`, `abc`
-
-### Forbidden Operations
-
-- File system access (`open`, `os`, `pathlib`)
-- Network operations (`socket`, `urllib`, `requests`)
-- Process execution (`subprocess`, `os.system`)
-- Code evaluation (`eval`, `exec`, `compile`)
-- Module importing (`importlib`, `__import__`)
-- System access (`sys`, `signal`, `atexit`)
-
-## Error Handling
-
-The tool handles various error conditions gracefully:
-
-```python
-# Syntax errors
-result = tool._run("print('unclosed string")
-# Output: SyntaxError: unterminated string literal
-
-# Runtime errors
-result = tool._run("1 / 0")
-# Output: ZeroDivisionError: division by zero
-
-# Security violations
-result = tool._run("import os")
-# Output: Security violations found: Import of module 'os' is not allowed
-
-# Timeouts
-result = tool._run("while True: pass", timeout=1)
-# Output: Code execution timed out after 1 seconds
-```
-
-## Integration with LangChain
-
-The tool follows LangChain's BaseTool interface:
-
-```python
-from langchain.agents import initialize_agent, AgentType
-from langchain.llms import OpenAI
-
-llm = OpenAI()
-tools = [CodeInterpreterTool()]
-
-agent = initialize_agent(
-    tools,
-    llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True
-)
-
-result = agent.run("Calculate the factorial of 10")
-```
-
-## Testing
-
-Run the test suite:
+(Assuming standard Python package installation)
 
 ```bash
-# Run all tests
-python test_code_interpreter.py
-
-# Run with pytest
-pytest test_code_interpreter.py -v
+pip install langcrew-tools
 ```
-
-## Examples
-
-See `example.py` for comprehensive usage examples including:
-
-- Basic calculations
-- Data processing with statistics
-- Date/time operations
-- String manipulation
-- Error handling
-- Package usage (Docker mode)
-
-## Requirements
-
-- Python 3.8+
-- Docker (optional, for isolated execution)
-- langchain-core
-- pydantic
-
-## License
-
-This tool is part of the LangCrew project and follows the same license terms.
