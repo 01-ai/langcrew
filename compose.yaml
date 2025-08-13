@@ -1,17 +1,47 @@
 services:
-  web_chat:
+  # Frontend React application
+  frontend:
+    image: node:18-alpine
+    ports:
+      - "3600:3600"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.pnpm-store
+    working_dir: /app
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - AGENT_API_HOST=http://backend:8000
+    command: >
+      sh -c "
+        npm install -g pnpm &&
+        pnpm install &&
+        pnpm dev
+      "
+    networks:
+      - langcrew-network
+    depends_on:
+      - backend
+
+  # Backend API service
+  backend:
     build:
       context: .
       dockerfile: examples/components/web/web_chat/Dockerfile
-    # platform: linux/amd64  # Uncomment if you need to force amd64 on Apple Silicon (not recommended unless necessary)
+    ports:
+      - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
-      - PORT=${PORT:-8000}
-      - MODE=${MODE:-full}
+      - PORT=8000
+      - MODE=full
       - LOG_LEVEL=${LOG_LEVEL:-info}
-    ports:
-      - "${PORT:-8000}:${PORT:-8000}"
-    restart: unless-stopped
+    networks:
+      - langcrew-network
+
+networks:
+  langcrew-network:
+    driver: bridge
 

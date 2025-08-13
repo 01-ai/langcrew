@@ -1,0 +1,107 @@
+---
+title: Welcome to langcrew
+description: Build powerful AI agent crews with langcrew
+template: splash
+hero:
+  tagline: A comprehensive framework for orchestrating AI agents to work together on complex tasks
+  actions:
+    - text: Get Started
+      link: /guides/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/01-ai/langcrew
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why LangCrew?
+
+<CardGrid stagger>
+	<Card title="Advanced Agent Framework" icon="rocket">
+		Built on LangGraph with HITL, dynamic workflows, and event-driven processes for powerful multi-agent collaboration.
+	</Card>
+	<Card title="Full-Stack Visualization" icon="puzzle">
+		Complete Agent-UI protocol and React components to visualize agent planning, execution, and tool usage.
+	</Card>
+	<Card title="Ready-to-Use Templates" icon="list-format">
+		Rich collection of industry templates enabling rapid prototyping and deployment across various scenarios.
+	</Card>
+	<Card title="Integrated DevOps" icon="information">
+		Free SaaS services covering development, observability, sandbox environments, and deployment resources.
+	</Card>
+</CardGrid>
+
+## Quick Example
+
+```python
+from langcrew import Agent, Crew, Task
+from langcrew.project import CrewBase, agent, crew, task
+from langcrew_tools import WebSearchTool, WebFetchTool
+from pydantic import BaseModel, Field
+from typing import List
+
+class MarketStrategy(BaseModel):
+    name: str = Field(..., description="Strategy name")
+    tactics: List[str] = Field(..., description="Marketing tactics")
+    channels: List[str] = Field(..., description="Distribution channels")
+
+@CrewBase
+class MarketingCrew:
+    agents_config = "config/agents.yaml"
+    tasks_config = "config/tasks.yaml"
+    
+    @agent
+    def market_analyst(self) -> Agent:
+        return Agent(
+            config=self.agents_config["market_analyst"],
+            tools=[WebSearchTool(), WebFetchTool()],
+            verbose=True
+        )
+    
+    @agent  
+    def strategist(self) -> Agent:
+        return Agent(
+            config=self.agents_config["strategist"],
+            verbose=True
+        )
+    
+    @task
+    def research_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["research_task"],
+            agent=self.market_analyst()
+        )
+    
+    @task
+    def strategy_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["strategy_task"],  
+            agent=self.strategist(),
+            context=[self.research_task()],
+            output_json=MarketStrategy
+        )
+    
+    @crew
+    def crew(self) -> Crew:
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            verbose=True,
+            memory=True
+        )
+
+# Execute
+inputs = {"domain": "AI automation", "project": "Enterprise marketing"}
+crew = MarketingCrew().crew()
+result = crew.kickoff(inputs=inputs)
+```
+
+## Features
+
+- **Multi-Agent Collaboration** - Agents work together, sharing context and results
+- **Flexible Executors** - Choose from different execution strategies (sequential, parallel, hierarchical)
+- **Human-in-the-Loop** - Interactive tools for human oversight and intervention
+- **Production Ready** - Built for scalability with async support and error handling
+- **Extensible** - Easy to add custom agents, tools, and integrations

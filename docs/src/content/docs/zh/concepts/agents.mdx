@@ -1,0 +1,458 @@
+---
+title: 智能体
+description: 理解智能体 - langcrew 系统中的智能参与者
+---
+
+智能体是 langcrew 的核心构建模块。它们是由AI驱动的自主实体，能够理解任务、使用工具，并在团队中协作以实现复杂目标。
+
+## 智能体架构
+
+langcrew 中的每个智能体都构建在灵活的架构之上，既支持 CrewAI 兼容配置，也支持原生 langcrew 功能。
+
+### 核心组件
+
+#### 1. 角色、目标和背景故事（CrewAI 兼容性）
+对于 CrewAI 风格的智能体，您需要定义：
+- **Role（角色）**: 智能体的专业化和专长
+- **Goal（目标）**: 智能体的主要目标  
+- **Backstory（背景故事）**: 塑造智能体行为的上下文
+
+#### 2. 执行器系统
+智能体使用可配置的执行器来处理任务：
+- **executor_type**: 执行器类型（默认："react"）
+- **prompt**: 自定义提示或系统消息
+- **executor_kwargs**: 额外的执行器配置
+
+#### 3. 工具和能力
+- **tools**: 智能体可用的工具列表
+- **mcp_servers**: MCP（模型上下文协议）服务器配置
+- **llm**: 语言模型配置
+
+## 创建智能体
+
+### 基础 CrewAI 风格智能体
+
+```python
+from langcrew import Agent
+
+# 带有角色、目标和背景故事的简单智能体
+researcher = Agent(
+    role="研究专员",
+    goal="找到准确和相关的信息",
+    backstory="具有学术背景的专业研究员"
+)
+```
+
+### 带工具的智能体
+
+```python
+from langcrew import Agent
+from langchain_core.tools import BaseTool
+
+# 自定义工具示例
+class SearchTool(BaseTool):
+    name = "search"
+    description = "搜索信息"
+    
+    def _run(self, query: str) -> str:
+        return f"搜索结果：{query}"
+
+analyst = Agent(
+    role="业务分析师",
+    goal="分析市场趋势和竞争对手数据",
+    backstory="前世界500强分析师，专长市场研究",
+    tools=[SearchTool()],
+    verbose=True
+)
+```
+
+### 带自定义执行器的智能体
+
+```python
+from langcrew import Agent
+
+# 带有自定义执行器配置的智能体
+agent = Agent(
+    role="数据处理员",
+    goal="高效处理和分析数据",
+    backstory="数据处理和分析专家",
+    executor_type="react",  # 默认执行器类型
+    executor_kwargs={
+        "max_iterations": 15,
+        "early_stopping": True
+    }
+)
+```
+
+### 带自定义提示的智能体
+
+```python
+from langchain_core.messages import SystemMessage
+from langcrew import Agent
+
+# 带原生提示的智能体（不能与角色/目标/背景故事同时使用）
+custom_agent = Agent(
+    prompt=SystemMessage(content="您是专门从事代码审查的有用助手。"),
+    tools=[],  # 添加相关工具
+    executor_type="react"
+)
+```
+
+## 配置参数
+
+### 核心参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|-----------|------|-------------|---------|
+| `role` | str | 智能体的角色/职务 | None |
+| `goal` | str | 主要目标 | None |
+| `backstory` | str | 背景上下文 | None |
+| `name` | str | 自定义名称/标识符 | None |
+| `tools` | List[BaseTool] | 可用工具 | [] |
+| `llm` | Any | 语言模型配置 | None |
+| `verbose` | bool | 显示执行详情 | False |
+| `debug` | bool | 启用调试模式 | True |
+
+### 执行器配置
+
+| 参数 | 类型 | 描述 | 默认值 |
+|-----------|------|-------------|---------|
+| `executor_type` | str | 执行器类型 | "react" |
+| `prompt` | str/SystemMessage/Callable/Runnable | 自定义提示 | None |
+| `executor_kwargs` | dict | 额外的执行器配置 | {} |
+
+### 高级功能
+
+```python
+agent = Agent(
+    role="项目经理",
+    goal="协调团队并交付项目",
+    backstory="PMP认证，具有15年经验",
+    
+    # 执行器配置
+    executor_type="react",
+    executor_kwargs={
+        "max_iterations": 20,
+        "timeout": 300
+    },
+    
+    # 内存支持
+    memory=True,  # 启用基本内存
+    
+    # MCP 服务器集成
+    mcp_servers={
+        "filesystem": {
+            "command": "npx",
+            "args": ["@modelcontextprotocol/server-filesystem", "/path/to/files"]
+        }
+    },
+    
+    # 人机交互
+    hitl=True,
+    
+    # 交接配置
+    handoff_to=["developer", "tester"],
+    is_entry=True,  # 入口点智能体
+    
+    # 防护栏
+    input_guards=[],   # 输入验证函数
+    output_guards=[],  # 输出验证函数
+    
+    # 钩子
+    pre_model_hook=None,   # 执行前钩子
+    post_model_hook=None,  # 执行后钩子
+)
+```
+
+## CrewAI 配置风格
+
+您也可以使用配置字典来实现 CrewAI 兼容性：
+
+```python
+config = {
+    "role": "高级开发工程师",
+    "goal": "编写简洁高效的代码",
+    "backstory": "10年全栈开发经验",
+    "llm": {
+        "provider": "openai",
+        "model": "gpt-4",
+        "temperature": 0.1
+    },
+    "handoff_to": ["code_reviewer"],
+    "is_entry": False
+}
+
+agent = Agent(config=config)
+```
+
+## MCP（模型上下文协议）集成
+
+通过 MCP 服务器将智能体连接到外部工具和数据源：
+
+```python
+agent = Agent(
+    role="文件管理器",
+    goal="管理和组织文件",
+    backstory="文件系统操作专家",
+    mcp_servers={
+        "filesystem": {
+            "command": "npx",
+            "args": ["@modelcontextprotocol/server-filesystem", "/workspace"]
+        },
+        "database": {
+            "command": "python",
+            "args": ["-m", "mcp_server_sqlite", "database.db"]
+        }
+    },
+    mcp_tool_filter=["read_file", "write_file", "list_directory"]  # 可选过滤器
+)
+```
+
+## 内存配置
+
+### 基础内存
+```python
+# 启用简单内存
+agent = Agent(
+    role="助手",
+    goal="协助完成任务",
+    memory=True
+)
+```
+
+### 高级内存配置
+```python
+from langcrew.memory import MemoryConfig
+
+agent = Agent(
+    role="客户服务",
+    goal="协助客户",
+    memory=MemoryConfig(
+        enabled=True,
+        provider="redis",
+        connection="redis://localhost:6379",
+        ttl=3600  # 1小时
+    )
+)
+```
+
+## 人机交互（HITL）
+
+启用人工监督和干预：
+
+```python
+from langcrew.hitl import HITLConfig
+
+agent = Agent(
+    role="关键决策者",
+    goal="做出重要的业务决策",
+    hitl=HITLConfig(
+        enabled=True,
+        interrupt_before=["decision_node"],
+        interrupt_after=["analysis_node"],
+        approval_required=True
+    )
+)
+```
+
+## 防护栏
+
+使用防护栏装饰器添加输入和输出验证：
+
+```python
+from typing import Any, Tuple
+from langcrew.guardrail import input_guard, output_guard, GuardrailError
+
+@input_guard
+def check_no_sensitive_info(data: Any) -> Tuple[bool, str]:
+    """防止处理敏感信息"""
+    # 从 LangGraph 输入格式中提取内容
+    content = str(data)
+    if isinstance(data, dict) and "messages" in data:
+        messages = data.get("messages", [])
+        if messages and hasattr(messages[-1], "content"):
+            content = str(messages[-1].content)
+    
+    # 检查敏感模式
+    sensitive_patterns = [
+        "password:", "api_key:", "secret_key:", 
+        "credit card", "ssn:", "social security",
+        "密码：", "秘钥：", "信用卡", "身份证号"
+    ]
+    
+    for pattern in sensitive_patterns:
+        if pattern.lower() in content.lower():
+            return False, f"❌ 输入包含敏感信息：{pattern}"
+    
+    return True, "✅ 未检测到敏感信息"
+
+@output_guard
+def check_output_quality(data: Any) -> Tuple[bool, str]:
+    """确保输出符合质量标准"""
+    # 从 LangGraph 输出格式中提取内容
+    output_str = str(data)
+    if isinstance(data, dict) and "messages" in data:
+        messages = data.get("messages", [])
+        if messages and hasattr(messages[-1], "content"):
+            output_str = str(messages[-1].content)
+    
+    if not output_str or len(output_str) < 10:
+        return False, "❌ 输出太短或为空"
+    
+    # 检查占位符文本
+    placeholders = ["TODO", "FIXME", "[INSERT", "[PLACEHOLDER", "待办", "修复"]
+    for placeholder in placeholders:
+        if placeholder in output_str.upper():
+            return False, f"❌ 输出包含占位符：{placeholder}"
+    
+    return True, "✅ 输出质量检查通过"
+
+@input_guard
+def check_input_length(data: Any) -> Tuple[bool, str]:
+    """限制输入长度以防止滥用"""
+    content = str(data)
+    if isinstance(data, dict) and "messages" in data:
+        messages = data.get("messages", [])
+        if messages and hasattr(messages[-1], "content"):
+            content = str(messages[-1].content)
+    
+    max_length = 1000
+    if len(content) > max_length:
+        return False, f"❌ 输入太长：{len(content)} > {max_length} 字符"
+    
+    return True, f"✅ 输入长度合适：{len(content)} 字符"
+
+# 在智能体中使用防护栏
+agent = Agent(
+    role="数据处理器",
+    goal="安全处理数据",
+    backstory="注重安全的数据处理器",
+    input_guards=[check_no_sensitive_info, check_input_length],
+    output_guards=[check_output_quality]
+)
+
+# 防护栏也可以在任务级别应用
+from langcrew import Task
+
+task = Task(
+    description="处理用户数据",
+    expected_output="清洁的处理过的数据",
+    agent=agent,
+    input_guards=[check_input_length],  # 任务特定的防护栏
+    output_guards=[check_output_quality]
+)
+```
+
+### 防护栏错误处理
+
+```python
+from langcrew import Crew
+
+crew = Crew(agents=[agent], tasks=[task])
+
+try:
+    result = crew.kickoff()
+    print("✅ 任务成功完成")
+except GuardrailError as e:
+    print(f"❌ 防护栏阻止了执行：{e}")
+except Exception as e:
+    print(f"❌ 其他错误：{e}")
+```
+
+## 智能体执行
+
+### 同步执行
+```python
+result = agent.invoke({
+    "messages": [],
+    "context": "处理这些数据"
+})
+```
+
+### 异步执行
+```python
+import asyncio
+
+async def run_agent():
+    result = await agent.ainvoke({
+        "messages": [],
+        "context": "处理这些数据"
+    })
+    return result
+
+result = asyncio.run(run_agent())
+```
+
+## 最佳实践
+
+### 1. 选择合适的配置风格
+```python
+# 用于 CrewAI 兼容性
+agent = Agent(
+    role="具体角色",
+    goal="明确目标",
+    backstory="相关经验"
+)
+
+# 用于自定义行为
+agent = Agent(
+    prompt=SystemMessage(content="自定义指令"),
+    tools=[custom_tools]
+)
+```
+
+### 2. 使用合适的工具
+```python
+# 将工具与智能体能力匹配
+data_agent = Agent(
+    role="数据科学家",
+    tools=[pandas_tool, visualization_tool, statistics_tool]
+    # 而不是：[email_tool, calendar_tool]
+)
+```
+
+### 3. 在需要时配置内存
+```python
+# 用于有状态交互
+agent = Agent(
+    role="个人助手",
+    memory=True  # 记住对话历史
+)
+```
+
+### 4. 使用 MCP 进行外部集成
+```python
+# 连接到外部系统
+agent = Agent(
+    role="系统管理员",
+    mcp_servers={
+        "filesystem": {...},
+        "database": {...}
+    }
+)
+```
+
+## 调试和监控
+
+### 详细模式
+```python
+agent = Agent(
+    role="调试器",
+    verbose=True  # 显示详细执行步骤
+)
+```
+
+### 调试模式
+```python
+agent = Agent(
+    role="系统监控器",
+    debug=True  # 启用调试输出
+)
+```
+
+## 下一步
+
+- 了解 [任务](/concepts/tasks) 以及智能体如何执行它们
+- 探索 [团队](/concepts/crews) 了解智能体如何协同工作
+- 理解有状态智能体的 [内存系统](/concepts/memory)
+- 发现高级智能体行为的 [执行器](/concepts/executors)

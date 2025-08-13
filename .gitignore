@@ -32,9 +32,4 @@ examples/**/.venv/
 examples/**/.venv
 examples/**/uv.lock
 
-libs/crewAI
-libs/langgraph
-libs/langchain
-
-
 web/.pnpm-store

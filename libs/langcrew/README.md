@@ -1,97 +1,118 @@
-# 🚀 LangCrew
+# LangCrew
 
-> **A LangChain-based crew management system for building intelligent multi-agent workflows**
+> **A high-level multi-agent development framework built on LangGraph for building intelligent workflows with ease**
 
 [![PyPI version](https://badge.fury.io/py/langcrew.svg)](https://badge.fury.io/py/langcrew)
+[![Downloads](https://static.pepy.tech/badge/langcrew/month)](https://pepy.tech/project/langcrew)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue)](https://mypy-lang.org/)
+[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](https://github.com/01-ai/langcrew/actions)
 
-## 🔗 Related Projects
+LangCrew simplifies multi-agent development by providing powerful built-in capabilities like human-in-the-loop workflows, dynamic orchestration, and event-driven processes—making complex agent collaboration accessible to developers at any skill level.
 
-- **LangChain**: [github.com/langchain-ai/langchain](https://github.com/langchain-ai/langchain)
-- **LangGraph**: [github.com/langchain-ai/langgraph](https://github.com/langchain-ai/langgraph)
-- **CrewAI**: [github.com/joaomdmoura/crewAI](https://github.com/joaomdmoura/crewAI)
+## Quick Start
 
-## ⚡ Quick Install
+Install LangCrew:
 
 ```bash
-# Install from PyPI
 pip install --extra-index-url="https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple" langcrew
-
-# Install with optional dependencies
-pip install --extra-index-url="https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple" "langcrew[redis,mongodb]"
-
-# Install from source
-git clone https://github.com/01-ai/langcrew.git
-cd langcrew/libs/langcrew
-pip install -e .
 ```
 
-## 🤔 What is this?
+Create your first multi-agent workflow:
 
-LangCrew is a high-level multi-agent development framework built on LangGraph, offering out-of-the-box core capabilities to help construct complex agent collaboration systems.
+```python
+import os
+# Note: You'll need to install: pip install langchain-openai
+from langchain_openai import ChatOpenAI
+from langcrew import Agent, Task, Crew
 
-### 🎯 Core Problems Solved
-1. Beyond Traditional Flexible Paradigms: Provides a simple, highly configurable development experience, featuring powerful built-in mechanisms such as HITL (Human-in-the-Loop), dynamic workflow orchestration, and event-driven processes—empowering stronger agent collaboration.
-2. Full-Stack Support for Productization: Comes with an accompanying Agent-UI protocol and React component library, enabling the frontend to clearly visualize agent planning, scheduling, execution processes, and tool invocation details. This significantly accelerates the journey from agent development to productization, allowing for rapid delivery to users.
-3. Application Templates for Fast Launch: Offers a rich variety of ready-to-use templates, enabling rapid prototyping and deployment of multi-agent solutions across a wide range of industries and scenarios.
-4. Integrated Development and Operations Support: Integrates free SaaS services, seamlessly covering system construction, deep observability, sandbox environments, and deployment resources—simplifying the entire lifecycle from development to operations.
+# Create agents
+researcher = Agent(
+    role="Research Analyst",
+    goal="Find and analyze information about any topic",
+    backstory="You excel at finding key information and insights",
+    llm=ChatOpenAI(model="gpt-4.1", api_key=os.getenv("OPENAI_API_KEY"))
+)
+
+writer = Agent(
+    role="Content Writer", 
+    goal="Create engaging content based on research",
+    backstory="You're skilled at turning complex information into clear, compelling content",
+    llm=ChatOpenAI(model="gpt-4.1", api_key=os.getenv("OPENAI_API_KEY"))
+)
+
+# Define tasks
+research_task = Task(
+    description="Research the latest trends in {topic}",
+    agent=researcher,
+    expected_output="A comprehensive analysis of current trends"
+)
+
+write_task = Task(
+    description="Write a blog post about the research findings",
+    agent=writer,
+    expected_output="A well-structured blog post"
+)
+
+# Create and run crew
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, write_task]
+)
+
+result = crew.kickoff(inputs={"topic": "AI agents"})
+print(result)
+```
+
+That's it! Your agents will collaborate to research and write about any topic you choose.
+
+## Why Choose LangCrew?
+
+LangCrew bridges the gap between the flexibility of LangGraph and the simplicity of CrewAI, giving you the best of both worlds.
+
+### **Rapid Development**
+Go from idea to working multi-agent system in minutes, not hours. Our intuitive API and pre-built components eliminate boilerplate code while maintaining full customization power.
+
+### **Advanced Workflows**
+Built on LangGraph's robust foundation, LangCrew supports complex workflows including conditional routing, parallel execution, human-in-the-loop processes, and persistent memory.
+
+### **Production Ready**
+Complete with Agent-UI protocol and React components for visualizing agent workflows. Deploy confidently with built-in error handling, monitoring, and scaling capabilities.
+
+### **Developer Experience**
+Familiar CrewAI-style decorators and patterns, extensive documentation, and rich ecosystem of tools and templates make development enjoyable and productive.
 
 
-### 🔗 Real-World Applications
-
-- **Recruitment Systems**: [examples/recruitment/](https://github.com/01-ai/langcrew/tree/main/examples/recruitment)
-- **Marketing Strategy**: [examples/marketing-strategy/](https://github.com/01-ai/langcrew/tree/main/examples/marketing-strategy)
-- **Game Development**: [examples/game-builder-crew/](https://github.com/01-ai/langcrew/tree/main/examples/game-builder-crew)
-- **Trip Planning**: [examples/surprise-trip/](https://github.com/01-ai/langcrew/tree/main/examples/surprise-trip)
-- **Jop Posting**: [examples/job-posting/](https://github.com/01-ai/langcrew/tree/main/examples/job-posting)
 
 
-## 🚀 What can this help with?
+## Core Capabilities
 
-### 🟢 **Beginner Level** - Basic Multi-Agent Workflows
-- **Simple Agent Creation**: Define agents with roles, goals, and backstories
-- **Task Orchestration**: Create sequential or parallel task workflows
-- **Basic Tool Integration**: Use built-in tools for common operations
-- **CrewAI Compatibility**: Familiar CrewAI-style decorators and patterns
+**For Beginners**: Start with simple agent creation, basic task orchestration, and familiar CrewAI-style patterns
 
-### 🟡 **Intermediate Level** - Advanced Workflow Features
-- **Memory Management**: Persistent short-term and long-term memory
-- **Custom Executors**: ReAct, Plan-and-Execute, and custom execution strategies
-- **State Management**: Built-in checkpointing with multiple backend support
-- **Error Handling**: Robust error handling and recovery mechanisms
+**For Teams**: Add memory management, custom execution strategies, state persistence, and robust error handling
 
-### 🔴 **Advanced Level** - Enterprise-Grade Features
-- **MCP Integration**: Connect to external tools and services via Model Context Protocol
-- **Human-in-the-Loop**: Add approval workflows and human oversight
-- **Security & Guardrails**: Input/output validation and security checks
+**For Enterprise**: Deploy with MCP integration, human-in-the-loop workflows, security guardrails, and production monitoring
 
-## 🎯 Application Scenarios
+## Documentation
 
-### 📊 **Business Applications**
-- **Content Creation**: Multi-agent content generation workflows
-- **Data Analysis**: Coordinated data processing and reporting
-- **Customer Service**: Intelligent customer support automation
-- **Project Management**: AI-powered project planning and execution
+### Core Concepts
+- **[Agents](../../docs/src/content/docs/concepts/agents.mdx)**: Learn about intelligent agent creation and configuration
+- **[Tasks](../../docs/src/content/docs/concepts/tasks.mdx)**: Understand task definition and orchestration
+- **[Crews](../../docs/src/content/docs/concepts/crews.mdx)**: Master multi-agent coordination and workflows
 
-### 🔧 **Technical Applications**
-- **API Orchestration**: Coordinate multiple external services
-- **Data Pipelines**: Build intelligent ETL workflows
-- **Testing Automation**: Multi-agent testing and quality assurance
-- **DevOps Automation**: Intelligent infrastructure management
+## Related Projects
 
-### 🎮 **Creative Applications**
-- **Game Development**: AI-driven game content generation
-- **Storytelling**: Collaborative story creation workflows
-- **Design Systems**: AI-powered design and prototyping
-- **Music Composition**: Multi-agent musical composition
+LangCrew builds on the shoulders of giants:
+- **LangChain**: [github.com/langchain-ai/langchain](https://github.com/langchain-ai/langchain) - The foundation for LLM applications
+- **LangGraph**: [github.com/langchain-ai/langgraph](https://github.com/langchain-ai/langgraph) - Our underlying orchestration engine
+- **CrewAI**: [github.com/joaomdmoura/crewAI](https://github.com/joaomdmoura/crewAI) - Inspiration for our agent patterns
 
-## 🚀 Getting Started Examples
+## Advanced Examples
 
-### **Basic Multi-Agent Workflow**
-To create a new LangCrew project, like this:
+### **Complete Project Structure**
+For more complex applications, create a structured project:
 
 ```
 my_project/
@@ -124,13 +145,7 @@ You can now start developing your crew by editing the files in the `src/my_proje
 
 #### Example of a simple crew with a sequential process:
 
-Instantiate your crew:
-
-```shell
-crewai create crew game-builder-crew
-```
-
-Modify the files as needed to fit your use case:
+Create your project structure manually or use your preferred project template. Then modify the files as needed to fit your use case:
 
 **agents.yaml**
 
@@ -179,9 +194,9 @@ personalized_activity_planning_task:
 
     - age of the traveler: {age}
 
-    - hotel localtion: {hotel_location}
+    - hotel location: {hotel_location}
 
-    - flight infromation: {flight_information}
+    - flight information: {flight_information}
 
     - how long is the trip: {trip_duration}
   expected_output: >
@@ -204,9 +219,9 @@ restaurant_scenic_location_scout_task:
 
     - age of the traveler: {age}
 
-    - hotel localtion: {hotel_location}
+    - hotel location: {hotel_location}
 
-    - flight infromation: {flight_information}
+    - flight information: {flight_information}
 
     - how long is the trip: {trip_duration}
   expected_output: >
@@ -226,49 +241,33 @@ itinerary_compilation_task:
 **tools/custom_tool.py**
 ```python
 # src/my_project/tools/custom_tool.py
-from crewai_tools import BaseTool
+from langcrew.tools import BaseTool
 
 
 class MyCustomTool(BaseTool):
     name: str = "Name of my tool"
     description: str = (
-        "Clear description for what this tool is useful for, you agent will need this information to use it."
+        "Clear description for what this tool is useful for, your agent will need this information to use it."
     )
 
     def _run(self, argument: str) -> str:
         # Implementation goes here
-        return "this is an example of a tool output, ignore it and move along."
+        return "This is an example of a tool output, ignore it and move along."
 ```
 
 **crew.py**
 
 ```python
 # src/my_project/crew.py
-# Add default LLM import
 import os
 
-# Uncomment the following line to use an example of a custom tool
-# from surprise_travel.tools.custom_tool import MyCustomTool
-# Check our tools documentations for more information on how to use them
-from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, Field
-
+# Core LangCrew imports
 from langcrew import Agent, Crew, Task
 from langcrew.project import CrewBase, agent, crew, task
 
-# Import tool converter
-from langcrew_tools.fetch.langchain_tools import WebFetchTool
-from langcrew_tools.search.langchain_tools import WebSearchTool
-
-
-# Simple tool conversion function
-def get_research_tools():
-    """Get converted research tools"""
-    return [WebFetchTool(),WebSearchTool()]
-
-def get_serper_tools():
-    """Get converted serper tools"""
-    return [WebSearchTool()]
+# External dependencies (install separately)
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
 
 
 class Activity(BaseModel):
@@ -294,44 +293,41 @@ class Itinerary(BaseModel):
 
 @CrewBase
 class SurpriseTravelCrew:
-    """SurpriseTravel crew"""
+    """Travel planning crew"""
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
 
     def _get_default_llm(self):
         """Get default LLM for agents"""
         return ChatOpenAI(
-            model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")
+            model="gpt-4.1", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")
         )
         
     @agent
     def personalized_activity_planner(self) -> Agent:
         return Agent(
             config=self.agents_config['personalized_activity_planner'],
-            tools=get_research_tools(), # Example of custom tool, loaded at the beginning of file
+            # tools=[], # Add your custom tools here
             llm=self._get_default_llm(),
-            verbose=True,
-            
+            verbose=True
         )
 
     @agent
     def restaurant_scout(self) -> Agent:
         return Agent(
             config=self.agents_config['restaurant_scout'],
-            tools=get_research_tools(),
+            # tools=[], # Add your custom tools here
             llm=self._get_default_llm(),
-            verbose=True,
-            
+            verbose=True
         )
 
     @agent
     def itinerary_compiler(self) -> Agent:
         return Agent(
             config=self.agents_config['itinerary_compiler'],
-            tools=get_serper_tools(),
+            # tools=[], # Add your custom tools here
             llm=self._get_default_llm(),
-            verbose=True,
-            
+            verbose=True
         )
 
     @task
@@ -358,7 +354,7 @@ class SurpriseTravelCrew:
 
     @crew
     def crew(self) -> Crew:
-        """Creates the SurpriseTravel crew"""
+        """Creates the travel planning crew"""
         return Crew(
             agents=self.agents, # Automatically created by the @agent decorator
             tasks=self.tasks, # Automatically created by the @task decorator
@@ -372,7 +368,7 @@ class SurpriseTravelCrew:
 #!/usr/bin/env python
 # src/my_project/main.py
 from dotenv import load_dotenv
-from surprise_travel.crew import SurpriseTravelCrew
+from my_project.crew import SurpriseTravelCrew
 
 load_dotenv()
 
@@ -396,16 +392,16 @@ if __name__ == "__main__":
 ```
 
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions from the community! Here's how you can help:
 
 ### **Ways to Contribute**
-- 🐛 **Report Bugs**: Open issues for bugs or feature requests
-- 💡 **Suggest Features**: Propose new features or improvements
-- 📝 **Improve Documentation**: Help make our docs better
-- 🔧 **Submit Code**: Contribute bug fixes or new features
-- 🧪 **Test**: Help test and validate new releases
+- **Report Bugs**: Open issues for bugs or feature requests
+- **Suggest Features**: Propose new features or improvements
+- **Improve Documentation**: Help make our docs better
+- **Submit Code**: Contribute bug fixes or new features
+- **Test**: Help test and validate new releases
 
 ### **Development Setup**
 ```bash
@@ -414,7 +410,10 @@ git clone https://github.com/01-ai/langcrew.git
 cd langcrew/libs/langcrew
 
 # Install development dependencies
-pip install -e "."
+pip install -e ".[dev]"
+
+# Run tests
+python -m pytest
 
 # Run linting
 ruff check .
@@ -423,18 +422,45 @@ ruff check .
 mypy langcrew/
 ```
 
-How to run the test [libs/langcrew/tests/] (https://github.com/01-ai/langcrew/tree/main/libs/langcrew/tests/)
+Run tests: `python -m pytest libs/langcrew/tests/`
 
 ### **Community Resources**
-- 🐛 **Issues**: [GitHub Issues](https://github.com/01-ai/langcrew/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/langcrew/langcrew/discussions)
-- 📧 **Email**: [btm@langcrew.ai](mailto:btm@langcrew.ai)
+- **Issues**: [GitHub Issues](https://github.com/01-ai/langcrew/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/01-ai/langcrew/discussions)
+- **Email**: [btm@langcrew.ai](mailto:btm@langcrew.ai)
 
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Real-World Applications
+
+See LangCrew in action across different industries:
+
+- **[Recruitment Systems](https://github.com/01-ai/langcrew/tree/main/examples/recruitment)**: Multi-agent candidate screening and evaluation
+- **[Marketing Strategy](https://github.com/01-ai/langcrew/tree/main/examples/marketing-strategy)**: Collaborative campaign planning and execution
+- **[Game Development](https://github.com/01-ai/langcrew/tree/main/examples/game-builder-crew)**: AI-driven game content generation
+- **[Trip Planning](https://github.com/01-ai/langcrew/tree/main/examples/surprise-trip)**: Intelligent travel itinerary creation
+- **[Job Posting](https://github.com/01-ai/langcrew/tree/main/examples/job-posting)**: Automated job description generation
+
+## Learning Resources
+
+### **Getting Started**
+- **[Quick Examples](https://github.com/01-ai/langcrew/tree/main/examples)**: Ready-to-run examples for common use cases
+- **[Documentation](https://github.com/01-ai/langcrew/tree/main/docs)**: Complete guides and API reference
+- **[Video Tutorials](https://github.com/01-ai/langcrew/tree/main/docs/tutorials)**: Step-by-step video guides
+
+### **Advanced Topics**
+- **[Custom Tools](https://github.com/01-ai/langcrew/tree/main/docs/tools)**: Building and integrating custom tools
+- **[Memory Systems](https://github.com/01-ai/langcrew/tree/main/docs/memory)**: Implementing persistent agent memory
+- **[Workflows](https://github.com/01-ai/langcrew/tree/main/docs/workflows)**: Designing complex multi-agent workflows
+
+### **Production**
+- **[Deployment Guide](https://github.com/01-ai/langcrew/tree/main/docs/deployment)**: Production deployment strategies
+- **[Monitoring](https://github.com/01-ai/langcrew/tree/main/docs/monitoring)**: Observability and performance tracking
+- **[Security](https://github.com/01-ai/langcrew/tree/main/docs/security)**: Security best practices and guidelines
+
 ---
 
-**Built with ❤️ by the LangCrew Team**
+**Built by the LangCrew Team**

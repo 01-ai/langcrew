@@ -1,0 +1,282 @@
+---
+title: 快速开始
+description: 通过此分步教程在几分钟内构建您的第一个AI智能体团队
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+让我们构建您的第一个 langcrew 应用程序！在本教程中，我们将创建一个简单的内容创作团队，其中两个智能体协同工作。
+
+## What We'll Build
+
+A content creation system where:
+1. A **Researcher** agent gathers information on a topic
+2. A **Writer** agent creates an article based on the research
+
+## Step 1: Import Required Components
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew.tools import SearchTool, WebScrapeTool
+```
+
+## Step 2: Create Your Agents
+
+### Research Agent
+
+```python
+researcher = Agent(
+    role="Senior Research Analyst",
+    goal="Gather comprehensive information on the given topic",
+    backstory="""You are an experienced researcher with a keen eye for 
+    credible sources and relevant information. You excel at finding and 
+    synthesizing data from multiple sources.""",
+    tools=[SearchTool(), WebScrapeTool()],
+    verbose=True
+)
+```
+
+### Writer Agent
+
+```python
+writer = Agent(
+    role="Content Writer",
+    goal="Create engaging and informative content based on research",
+    backstory="""You are a skilled writer who transforms research into 
+    compelling narratives. You have a talent for making complex topics 
+    accessible to readers.""",
+    verbose=True
+)
+```
+
+## Step 3: Define Tasks
+
+### Research Task
+
+```python
+research_task = Task(
+    description="""Research the topic: 'The Impact of AI on Healthcare'
+    
+    Your research should include:
+    - Current applications of AI in healthcare
+    - Benefits and challenges
+    - Future possibilities
+    - Real-world examples and case studies
+    
+    Provide a comprehensive research summary.""",
+    agent=researcher,
+    expected_output="A detailed research report on AI in healthcare"
+)
+```
+
+### Writing Task
+
+```python
+writing_task = Task(
+    description="""Using the research provided, write an engaging article 
+    about 'The Impact of AI on Healthcare'.
+    
+    The article should:
+    - Have a compelling introduction
+    - Cover key points from the research
+    - Include specific examples
+    - Be approximately 500 words
+    - End with a thought-provoking conclusion""",
+    agent=writer,
+    context=[research_task],  # This task depends on research_task
+    expected_output="A well-written article on AI in healthcare"
+)
+```
+
+## Step 4: Assemble Your Crew
+
+```python
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    verbose=True,
+    process="sequential"  # Tasks run one after another
+)
+```
+
+## Step 5: Execute the Crew
+
+```python
+# Start the crew's work
+result = crew.kickoff()
+
+# Display the final result
+print("=" * 50)
+print("FINAL ARTICLE:")
+print("=" * 50)
+print(result)
+```
+
+## Complete Example
+
+<Tabs>
+<TabItem label="Python">
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew.tools import SearchTool, WebScrapeTool
+
+# Create agents
+researcher = Agent(
+    role="Senior Research Analyst",
+    goal="Gather comprehensive information on the given topic",
+    backstory="""You are an experienced researcher with a keen eye for 
+    credible sources and relevant information.""",
+    tools=[SearchTool(), WebScrapeTool()],
+    verbose=True
+)
+
+writer = Agent(
+    role="Content Writer",
+    goal="Create engaging and informative content",
+    backstory="""You are a skilled writer who transforms research into 
+    compelling narratives.""",
+    verbose=True
+)
+
+# Define tasks
+research_task = Task(
+    description="Research the topic: 'The Impact of AI on Healthcare'",
+    agent=researcher,
+    expected_output="A detailed research report"
+)
+
+writing_task = Task(
+    description="Write an engaging article based on the research",
+    agent=writer,
+    context=[research_task],
+    expected_output="A well-written article"
+)
+
+# Create and run crew
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    verbose=True
+)
+
+result = crew.kickoff()
+print(result)
+```
+
+</TabItem>
+<TabItem label="CLI">
+
+```bash
+# Create a new project
+langcrew create my-content-crew
+
+# Navigate to project
+cd my-content-crew
+
+# Run the crew
+langcrew run
+```
+
+</TabItem>
+</Tabs>
+
+## Understanding the Output
+
+When you run this crew, you'll see:
+
+1. **Agent Initialization**: Both agents are created and ready
+2. **Task Execution**: 
+   - Researcher searches and gathers information
+   - Writer receives the research and creates content
+3. **Final Output**: The completed article
+
+## Customization Options
+
+### Different Execution Modes
+
+```python
+# Parallel execution (when tasks are independent)
+crew = Crew(
+    agents=[agent1, agent2],
+    tasks=[task1, task2],
+    process="parallel"
+)
+
+# Hierarchical execution (with a manager agent)
+crew = Crew(
+    agents=[manager, worker1, worker2],
+    tasks=[task1, task2, task3],
+    process="hierarchical"
+)
+```
+
+### Adding Human Input
+
+```python
+from langcrew.tools import HumanInputTool
+
+agent = Agent(
+    role="Interactive Agent",
+    tools=[HumanInputTool()],
+    # ... other parameters
+)
+```
+
+### Custom Tools
+
+```python
+from langcrew.tools import tool
+
+@tool
+def custom_calculator(expression: str) -> str:
+    """Evaluate a mathematical expression."""
+    try:
+        result = eval(expression)
+        return f"The result is: {result}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+agent = Agent(
+    tools=[custom_calculator],
+    # ... other parameters
+)
+```
+
+## Next Steps
+
+Congratulations! You've built your first langcrew application. Here's what to explore next:
+
+- **[Agents Deep Dive](/concepts/agents)**: Learn about agent capabilities and configuration
+- **[Task Management](/concepts/tasks)**: Understand task dependencies and execution flows
+- **[Tool Integration](/concepts/tools)**: Explore available tools and create custom ones
+- **[Examples](/examples/marketing-strategy)**: See more complex crew implementations
+
+## Tips for Success
+
+1. **Start Simple**: Begin with 2-3 agents and gradually add complexity
+2. **Clear Roles**: Give each agent a specific, well-defined role
+3. **Task Dependencies**: Use context to share information between tasks
+4. **Iterate**: Refine agent prompts and task descriptions based on results
+5. **Monitor Output**: Use verbose mode during development to understand agent behavior
+
+## Common Patterns
+
+### Research → Analysis → Action
+```python
+researcher → analyst → implementer
+```
+
+### Review and Revision
+```python
+creator → reviewer → creator (revision)
+```
+
+### Parallel Specialists
+```python
+specialist1 ↘
+specialist2 → aggregator → final output
+specialist3 ↗
+```
+
+Ready to build more complex crews? Check out our [advanced examples](/examples/game-builder)!

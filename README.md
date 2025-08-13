@@ -1,3 +1,7 @@
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/powered%20by-LangGraph-green.svg)](https://langchain-ai.github.io/langgraph/)
+
 # LangCrew
 
 LangCrew is a high-level multi-agent development framework built on LangGraph, offering out-of-the-box core capabilities to help construct complex agent collaboration systems:
@@ -10,166 +14,140 @@ LangCrew is a high-level multi-agent development framework built on LangGraph, o
 
 4. **Integrated Development and Operations Support**: Integrates free SaaS services, seamlessly covering system construction, deep observability, sandbox environments, and deployment resources—simplifying the entire lifecycle from development to operations.
 
-A powerful multi-agent framework built on LangGraph with CrewAI-compatible features.
-
 ## Features
 
-- **Agent-based Architecture**: Define agents with specific roles, goals, and backstories
-- **Task Management**: Create and execute tasks with clear descriptions and expected outputs
-- **Crew Coordination**: Organize agents and tasks into crews for collaborative work
-- **LangGraph Integration**: Built on LangGraph for robust workflow management
-- **CrewAI Context Mechanism**: Full support for task context passing and dependencies
-- **Tool Integration**: Support for various tools and integrations
-- **Web Interface**: Optional web-based interface for crew management
-- **MCP Support**: Model Context Protocol integration for enhanced capabilities
+**Multi-Agent Orchestration Architecture**
+- **Intelligent Agent System** - LangGraph-based ReAct executor supporting reasoning-action loops
+- **Dynamic Task Orchestration** - Topological sorting execution with task dependencies and context passing
+- **Flexible Handoff Mechanisms** - Both Agent-to-Agent and Task-to-Task handoff modes
 
-## Local Development with Docker Compose
+**Enterprise-Grade Memory Management**
+- **Layered Memory Architecture** - Short-term (session-level), long-term (persistent), entity memory (knowledge graph)
+- **Intelligent Context Injection** - Session state management based on LangGraph Checkpointer
+- **Multi-Storage Backends** - Support for in-memory, SQLite, PostgreSQL, Redis storage solutions
 
-To get started with LangCrew for local development, you can use the provided `docker-compose.yml` file to set up the development environment quickly.
+**Comprehensive Tool Ecosystem**
+- **Unified Tool Registry** - Auto-discovery and management of LangChain, CrewAI, and custom tools
+- **MCP Protocol Support** - Secure Model Context Protocol integration with session management and access control
+- **Tool Security Safeguards** - Built-in Guardrail mechanisms and user consent confirmation
 
-### Prerequisites
+**Human-in-the-Loop (HITL) Integration**
+- **Smart Interrupt Control** - User approval and intervention before/after tool execution
+- **Multi-language Interaction** - Chinese/English approval command recognition
+- **Fine-grained Control** - Precise control based on LangGraph native interrupt mechanisms
 
-- Docker and Docker Compose installed on your system
-- Git for cloning the repository
+**Production-Ready Web Services**
+- **Streaming Responses** - FastAPI-based SSE real-time streaming output
+- **Session Management** - Automatic session creation and resume mechanisms
+- **Protocol Adaptation** - Seamless LangGraph to HTTP API conversion
 
-### Quick Start
+**Developer Experience Optimization**
+- **CrewAI Compatibility** - Smooth migration path and decorator syntax support
+- **Flexible Configuration** - Support for both code definition and YAML configuration approaches
+- **Debug-Friendly** - Built-in debug mode and detailed execution logging
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd langcrew
-   ```
+**Enterprise Security Features**
+- **Multi-layer Security Protection** - Input/output Guardrails, tool execution approval, session security
+- **Access Control** - Fine-grained permission management based on sessions and fingerprints
+- **Audit Trail** - Complete execution chain and decision recording
 
-2. **Start the development environment**:
-   ```bash
-   docker-compose up -d
-   ```
+## How to Use
 
-3. **Access the web interface**:
-   - Open your browser and navigate to `http://localhost:3600`
-   - The web interface will be available for managing agents and crews
+### Local Development
 
-4. **Stop the development environment**:
-   ```bash
-   docker-compose down
-   ```
+**Backend Server:**
+```bash
+# 1. Clone repository
+git clone git@code.lingyiwanwu.net:oma/boway/langcrew.git
+git checkout github-main
 
-### Development Workflow
+# 2. Install uv (choose one method)
+# Option A: Official installer (recommended)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-- **Hot Reload**: The web application supports hot reloading for development
-- **Service Management**: Use `docker-compose logs -f` to monitor service logs
-- **Environment Variables**: Modify the `.env` file or docker-compose.yml for configuration changes
-- **Database**: The setup includes necessary database services for development
+# Option B: Using pip
+pip install uv
 
-### Troubleshooting
+# 3. Configure API Key
+export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
 
-- If you encounter port conflicts, check the `docker-compose.yml` file and modify ports as needed
-- Ensure Docker has sufficient resources allocated (recommended: 4GB RAM, 2 CPU cores)
-- For persistent data, the setup includes volume mounts for databases and application data
+# 4. Run the Server
+cd langcrew/examples/components/web/web_chat
+uv run run_server.py
+```
 
+The server will start at **http://localhost:8000**
 
-## Getting Started
+**Frontend Interface:**
+```bash
+# 1. Navigate to web directory
+cd langcrew/web
 
-### Getting Started With Docker Compose (One‑Command)
+# 2. Install dependencies and start development server
+pnpm install
+pnpm dev
+```
 
-Use `compose.yaml` for a more portable, one‑command startup across platforms.
+Open your browser to **http://localhost:3000/chat**
+
+### Docker Compose
+
+**Prerequisites:** Ensure Docker Compose is installed. If you get "command not found" errors:
+```bash
+# Install Docker Compose (choose one method)
+# Option 1: Using Docker Desktop (recommended) - includes Compose
+# Download from: https://www.docker.com/products/docker-desktop
+
+# Option 2: Using Homebrew (macOS)
+brew install docker-compose
+
+# Option 3: Manual installation (Linux/macOS)
+curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+#### Quick Start with Docker Compose
+
+Launch the complete LangCrew chat application with frontend and backend services:
 
 ```bash
 # From the repository root
 export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
-# Optional overrides
-export PORT=8000
-export MODE=full      # or simple
+
+# Optional configuration
 export LOG_LEVEL=info # debug|info|warning|error
 
+# Start services
 docker compose up --build
 ```
 
-Then open:
+**Available endpoints:**
+- **Web Chat Interface**: http://localhost:3600
+- **Backend API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/api/v1/health
 
-- API Docs: http://localhost:${PORT:-8000}/docs
-- Chat Endpoint: POST http://localhost:${PORT:-8000}/api/v1/chat
-- Health: http://localhost:${PORT:-8000}/api/v1/health
-
-Notes:
-- On Apple Silicon (arm64), if you need to force amd64 images for compatibility, uncomment the `platform: linux/amd64` line in `compose.yaml`. This may reduce performance.
-- To run detached: `docker compose up -d --build`
-- To stop: `docker compose down`
-
-### Getting Started With Code
-
-#### 1. Install uv (if not installed)
-```bash
-# Option 1: Official installer (recommended)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Option 2: Using pip
-pip install uv
-```
-
-#### 2. Configure API Key
-```bash
-cd examples/components/web/web_chat
-cp .env.example .env
-# Edit .env file and add your API key (choose one):
-# OPENAI_API_KEY=your-openai-api-key
-# ANTHROPIC_API_KEY=your-anthropic-api-key  
-# DASHSCOPE_API_KEY=your-dashscope-api-key
-```
-
-#### 3. Run the Server
-```bash
-uv run run_server.py
-```
-
-The server will start on `http://localhost:8000`
-
-#### API Endpoints
-
-- **API Documentation**: `http://localhost:8000/docs`
-- **Chat Endpoint**: `POST http://localhost:8000/api/v1/chat`
-- **Health Check**: `GET http://localhost:8000/api/v1/health`
-
-#### Options
+#### Common Commands
 
 ```bash
-# Simple mode (basic features only)
-uv run run_server.py --mode simple
+# Run in background
+docker compose up -d --build
 
-# Custom port
-uv run run_server.py --port 9000
+# Monitor logs
+docker compose logs -f
 
-# Debug mode
-uv run run_server.py --log-level debug
+# Stop services
+docker compose down
 ```
 
-#### Troubleshooting
+**Notes:**
+- Frontend automatically proxies API requests to backend
+- Ensure sufficient Docker resources (recommended: 4GB RAM, 2 CPU cores)
+- Both services will start automatically - no additional configuration needed
 
-**"No API keys found"** - Make sure you've configured at least one API key in the `.env` file.
+## Contributing
 
-**"uv: command not found"** - Install uv using one of the commands in step 1.
+You are welcome to open issues or submit PRs to improve this app, however, please note that we may not review all suggestions.
 
-### Usage
+## License
 
-Send a POST request to `/api/v1/chat`:
-
-```json
-{
-  "message": "What's the weather like in New York?",
-  "thread_id": "optional-thread-id"
-}
-```
-
-### Available Tools
-
-- **Calculator**: Mathematical calculations
-- **Web Search**: Current information search
-- **Weather**: Weather information for any city
-- **Timezone**: Time and timezone information
-
-### Model Selection
-
-The system automatically selects the best available model:
-1. **OpenAI** - `gpt-4o-mini` (recommended)
-2. **Anthropic** - `claude-3-haiku-20240307`
-3. **DashScope** - `qwen-plus` 
+This project is licensed under the MIT License. See the LICENSE file for details.

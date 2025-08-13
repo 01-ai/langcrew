@@ -1,0 +1,108 @@
+---
+title: 欢迎使用 langcrew
+description: 使用 langcrew 构建强大的AI智能体团队
+template: splash
+hero:
+  tagline: 用于协调AI智能体协同完成复杂任务的综合框架
+  actions:
+    - text: 开始使用
+      link: /zh/guides/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: 在 GitHub 查看
+      link: https://github.com/01-ai/langcrew
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## 为什么选择 LangCrew？
+
+<CardGrid stagger>
+	<Card title="高级智能体框架" icon="rocket">
+		基于 LangGraph 构建，支持人机协作、动态工作流和事件驱动的强大多智能体协作系统。
+	</Card>
+	<Card title="全栈可视化" icon="puzzle">
+		完整的 Agent-UI 协议和 React 组件库，清晰展示智能体规划、执行和工具调用过程。
+	</Card>
+	<Card title="即用模板" icon="list-format">
+		丰富的行业模板库，支持快速原型开发和跨场景部署。
+	</Card>
+	<Card title="集成开发运维" icon="information">
+		免费 SaaS 服务，覆盖系统构建、深度观测、沙箱环境和部署资源的完整生命周期。
+	</Card>
+</CardGrid>
+
+## 快速示例
+
+```python
+from langcrew import Agent, Crew, Task
+from langcrew.project import CrewBase, agent, crew, task
+from langcrew_tools import WebSearchTool, WebFetchTool
+from pydantic import BaseModel, Field
+from typing import List
+
+# 定义结构化输出模型
+class MarketStrategy(BaseModel):
+    name: str = Field(..., description="策略名称")
+    tactics: List[str] = Field(..., description="营销策略")
+    channels: List[str] = Field(..., description="分发渠道")
+
+@CrewBase  # 使用装饰器定义智能体团队
+class MarketingCrew:
+    agents_config = "config/agents.yaml"  # 智能体配置文件
+    tasks_config = "config/tasks.yaml"    # 任务配置文件
+    
+    @agent  # 装饰器自动注册智能体
+    def market_analyst(self) -> Agent:
+        return Agent(
+            config=self.agents_config["market_analyst"],
+            tools=[WebSearchTool(), WebFetchTool()],  # LangCrew 原生工具
+            verbose=True
+        )
+    
+    @agent  
+    def strategist(self) -> Agent:
+        return Agent(
+            config=self.agents_config["strategist"],
+            verbose=True
+        )
+    
+    @task  # 装饰器自动注册任务
+    def research_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["research_task"],
+            agent=self.market_analyst()
+        )
+    
+    @task
+    def strategy_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["strategy_task"],  
+            agent=self.strategist(),
+            context=[self.research_task()],  # 任务依赖
+            output_json=MarketStrategy      # 结构化输出
+        )
+    
+    @crew  # 装饰器定义团队
+    def crew(self) -> Crew:
+        return Crew(
+            agents=self.agents,  # 自动收集所有智能体
+            tasks=self.tasks,    # 自动收集所有任务
+            verbose=True,
+            memory=True          # 启用记忆系统
+        )
+
+# 执行团队
+inputs = {"domain": "AI自动化", "project": "企业营销"}
+crew = MarketingCrew().crew()
+result = crew.kickoff(inputs=inputs)
+```
+
+## 主要特性
+
+- **多智能体协作** - 智能体协同工作，共享上下文和结果
+- **灵活的执行器** - 从不同的执行策略中选择（顺序、并行、层次化）
+- **人机协作** - 提供人工监督和干预的交互工具
+- **生产就绪** - 为可扩展性而构建，支持异步和错误处理
+- **可扩展** - 易于添加自定义智能体、工具和集成

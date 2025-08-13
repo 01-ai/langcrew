@@ -1,0 +1,205 @@
+---
+title: 安装
+description: 学习如何安装 langcrew 并设置您的开发环境
+---
+
+本指南将指导您安装 langcrew 并设置开发环境。
+
+## 系统要求
+
+在安装 langcrew 之前，请确保您具备：
+
+- **Python**: 3.11 到 3.12 版本
+- **pip**: 建议使用最新版本
+- **虚拟环境**: 建议用于项目隔离
+
+## 安装方法
+
+### 使用 pip
+
+最简单的安装方式：
+
+```bash
+pip install langcrew
+```
+
+### 使用 Poetry
+
+用于更好的依赖管理：
+
+```bash
+poetry add langcrew
+```
+
+### 使用 uv（推荐）
+
+用于更快的包管理，需配置自定义索引：
+
+```bash
+# 首先添加自定义索引
+uv index add 01ai https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+
+# 然后安装 langcrew
+uv add langcrew
+```
+
+### 开发安装
+
+如需贡献或修改 langcrew：
+
+```bash
+git clone https://github.com/yourusername/langcrew.git
+cd langcrew
+
+# 使用 uv（推荐）
+uv sync
+
+# 或使用 pip
+pip install -e .
+```
+
+## 环境设置
+
+### 1. 创建虚拟环境
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 2. 环境变量
+
+在项目根目录创建 `.env` 文件：
+
+```bash
+# LLM 提供商密钥
+OPENAI_API_KEY=your_openai_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+
+# 可选：其他提供商
+COHERE_API_KEY=your_cohere_key_here
+HUGGINGFACE_API_KEY=your_huggingface_key_here
+
+# langcrew 配置
+LANGCREW_LOG_LEVEL=INFO
+LANGCREW_MEMORY_TYPE=short_term
+```
+
+### 3. 验证安装
+
+```python
+import langcrew
+print(langcrew.__version__)
+
+# 测试基本功能
+from langcrew import Agent
+
+agent = Agent(
+    role="测试智能体",
+    goal="验证安装",
+    backstory="一个有用的测试智能体"
+)
+print(f"智能体已创建: {agent.role}")
+```
+
+## 开发依赖
+
+### 用于开发和测试
+
+```bash
+# 安装开发依赖
+pip install langcrew[dev]
+
+# 或使用 uv
+uv sync --extra dev
+```
+
+这包括测试工具、代码检查、格式化和类型检查工具。
+
+### Tool-Specific Requirements
+
+Some tools require additional setup:
+
+```bash
+# Browser automation
+pip install playwright
+playwright install
+
+# Vector databases
+pip install chromadb
+
+# Cloud integrations
+pip install boto3  # AWS
+pip install google-cloud-storage  # GCP
+```
+
+## Configuration
+
+### Basic Configuration
+
+Create `langcrew.yaml` in your project root:
+
+```yaml
+# Default LLM settings
+llm:
+  provider: openai
+  model: gpt-4
+  temperature: 0.7
+
+# Memory settings
+memory:
+  type: short_term
+  max_tokens: 2000
+
+# Execution settings
+execution:
+  max_retries: 3
+  timeout: 300
+```
+
+### Advanced Configuration
+
+For more control, use Python configuration:
+
+```python
+from langcrew.config import Config
+
+config = Config(
+    llm_provider="anthropic",
+    llm_model="claude-3-opus-20240229",
+    memory_type="long_term",
+    execution_mode="parallel"
+)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**ImportError: No module named 'langcrew'**
+- Ensure you've activated your virtual environment
+- Verify installation with `pip list | grep langcrew`
+
+**API Key Errors**
+- Check your `.env` file is in the correct location
+- Verify environment variables are loaded: `echo $OPENAI_API_KEY`
+
+**Dependency Conflicts**
+- Create a fresh virtual environment
+- Use `pip install --upgrade langcrew`
+
+### Getting Help
+
+If you encounter issues:
+
+1. Check the [Troubleshooting Guide](/guides/troubleshooting)
+2. 查看 [GitHub Issues](https://github.com/yourusername/langcrew/issues)
+3. Ask in our [Discord Community](https://discord.gg/langcrew)
+
+## Next Steps
+
+Now that you have langcrew installed:
+
+- Follow the [Quick Start Guide](/guides/quickstart) to build your first crew
+- Explore [Core Concepts](/concepts/agents) to understand the framework
+- Check out [Examples](/examples/game-builder) for inspiration

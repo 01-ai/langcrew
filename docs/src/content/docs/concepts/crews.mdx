@@ -1,0 +1,688 @@
+---
+title: Crews
+description: Understanding crews - orchestrating multiple agents to work together
+---
+
+Crews are the orchestration layer in langcrew that brings agents and tasks together. Built on LangGraph, they manage complex workflows with intelligent routing, memory systems, and handoff capabilities.
+
+## What is a Crew?
+
+A Crew coordinates agents and tasks using LangGraph's state management and execution system. It compiles workflows into optimized graphs that support:
+
+- Sequential and dynamic task execution
+- Context sharing between tasks
+- Agent and task handoffs
+- Memory persistence across sessions
+- Human-in-the-loop interventions
+- Stream processing and monitoring
+
+## Creating a Crew
+
+### Basic Crew
+
+```python
+from langcrew import Crew, Agent, Task
+
+# Create agents
+researcher = Agent(
+    role="Research Specialist",
+    goal="Find accurate information",
+    backstory="Expert in gathering and analyzing data"
+)
+
+writer = Agent(
+    role="Content Writer", 
+    goal="Create engaging content",
+    backstory="Skilled in translating research into readable content"
+)
+
+# Create tasks
+research_task = Task(
+    agent=researcher,
+    description="Research the latest AI trends",
+    expected_output="Comprehensive research report"
+)
+
+writing_task = Task(
+    agent=writer,
+    description="Write an article based on research",
+    expected_output="Engaging article about AI trends",
+    context=[research_task]  # Depends on research_task output
+)
+
+# Create crew
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task]
+)
+
+# Execute
+result = crew.kickoff()
+```
+
+## Crew Parameters
+
+### Core Parameters
+
+| Parameter | Type | Description | Required |
+|-----------|------|-------------|----------|
+| `agents` | List[Agent] | Team members | ❌ |
+| `tasks` | List[Task] | Work to be done | ❌ |
+| `verbose` | bool | Show execution details | ❌ |
+| `graph` | StateGraph | Custom LangGraph workflow | ❌ |
+
+### Memory Configuration
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `memory` | bool \| MemoryConfig | Memory system config | None |
+| `embedder` | dict | Embedding configuration | None |
+| `checkpointer` | BaseCheckpointSaver | State persistence | None |
+| `store` | BaseStore | Long-term storage | None |
+
+### Advanced Configuration
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `async_checkpointer` | BaseCheckpointSaver | Async checkpointer | None |
+| `async_store` | BaseStore | Async storage | None |
+| `hitl` | bool \| HITLConfig | Human-in-the-loop | None |
+
+## Execution Patterns
+
+### Sequential Task Execution
+
+Default pattern where tasks execute in dependency order:
+
+```python
+# Tasks with dependencies execute sequentially
+task1 = Task(agent=agent1, description="Step 1", name="task1")
+task2 = Task(agent=agent2, description="Step 2", context=[task1], name="task2") 
+task3 = Task(agent=agent3, description="Step 3", context=[task2], name="task3")
+
+crew = Crew(
+    agents=[agent1, agent2, agent3],
+    tasks=[task1, task2, task3]
+)
+
+# Executes: task1 → task2 → task3
+result = crew.kickoff()
+```
+
+### Agent-Based Workflow
+
+When no tasks provided, agents work in sequence:
+
+```python
+crew = Crew(
+    agents=[researcher, analyst, writer]
+    # No tasks - agents work sequentially
+)
+
+# Each agent processes user input in order
+result = crew.kickoff({"messages": [HumanMessage(content="Analyze market trends")]})
+```
+
+### Handoff Workflows
+
+#### Agent Handoffs
+
+Agents can transfer control to other agents:
+
+```python
+# Configure agent handoffs
+primary_agent = Agent(
+    role="Primary Processor",
+    goal="Handle main processing",
+    backstory="Main workflow coordinator",
+    handoff_to=["specialist", "reviewer"],  # Can transfer to these agents
+    is_entry=True,  # Entry point for the workflow
+    name="primary"
+)
+
+specialist_agent = Agent(
+    role="Domain Specialist", 
+    goal="Handle specialized tasks",
+    backstory="Expert in complex analysis",
+    name="specialist"
+)
+
+reviewer_agent = Agent(
+    role="Quality Reviewer",
+    goal="Review and approve work", 
+    backstory="Quality assurance expert",
+    name="reviewer"
+)
+
+crew = Crew(
+    agents=[primary_agent, specialist_agent, reviewer_agent]
+)
+
+# Primary agent can use handoff tools to transfer control
+result = crew.kickoff()
+```
+
+#### Task Handoffs
+
+Tasks can transfer control to other tasks:
+
+```python
+# Main workflow task
+main_task = Task(
+    agent=processor,
+    description="Process main workflow",
+    expected_output="Processing results",
+    handoff_to=["error_handler", "quality_check"],  # Can transfer to these tasks
+    name="main_task"
+)
+
+# Specialized tasks (handoff targets)
+error_task = Task(
+    agent=error_handler,
+    description="Handle processing errors",
+    expected_output="Error resolution",
+    name="error_handler"
+)
+
+quality_task = Task(
+    agent=qa_agent,
+    description="Perform quality checks",
+    expected_output="Quality report",
+    name="quality_check"
+)
+
+crew = Crew(
+    agents=[processor, error_handler, qa_agent],
+    tasks=[main_task, error_task, quality_task]
+)
+
+# Uses backbone+router architecture for handoff routing
+result = crew.kickoff()
+```
+
+## Memory Systems
+
+### Basic Memory
+
+Enable simple memory for conversation continuity:
+
+```python
+crew = Crew(
+    agents=[agent1, agent2],
+    tasks=[task1, task2],
+    memory=True  # Enable basic memory
+)
+
+# Memory persists across kickoff calls
+result1 = crew.kickoff(thread_id="conversation_1")
+result2 = crew.kickoff(thread_id="conversation_1")  # Remembers previous context
+```
+
+### Advanced Memory Configuration
+
+```python
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    enabled=True,
+    provider="postgres",  # Options: "memory", "postgres", "redis"
+    connection_string="postgresql://user:pass@localhost/db",
+    short_term={"enabled": True},
+    long_term={"enabled": True}, 
+    entity={"enabled": True}
+)
+
+crew = Crew(
+    agents=[agent1, agent2],
+    tasks=[task1, task2],
+    memory=memory_config
+)
+
+# Access memory systems
+crew.search_memory("previous insights", memory_type="long_term")
+```
+
+## Human-in-the-Loop (HITL)
+
+### Basic HITL
+
+```python
+from langcrew.hitl import HITLConfig
+
+crew = Crew(
+    agents=[agent1, agent2],
+    tasks=[task1, task2],
+    hitl=True  # Enable basic HITL
+)
+
+# HITL will prompt for approval at configured points
+result = crew.kickoff()
+```
+
+### Advanced HITL Configuration
+
+```python
+hitl_config = HITLConfig(
+    enabled=True,
+    interrupt_before=["critical_decision"],
+    interrupt_after=["analysis_complete"],
+    approval_required=True
+)
+
+crew = Crew(
+    agents=[decision_agent, analysis_agent],
+    tasks=[decision_task, analysis_task],
+    hitl=hitl_config
+)
+```
+
+## Execution Methods
+
+### Synchronous Execution
+
+```python
+# Basic execution
+result = crew.kickoff()
+
+# With inputs and thread management
+result = crew.kickoff(
+    inputs={"topic": "AI trends", "deadline": "2024-12-31"},
+    thread_id="project_123"
+)
+
+# Direct invoke (lower level)
+result = crew.invoke(
+    input={"messages": [HumanMessage(content="Process this request")]},
+    config=RunnableConfig(configurable={"thread_id": "session_1"})
+)
+```
+
+### Asynchronous Execution
+
+```python
+import asyncio
+
+# Async kickoff
+async def run_crew():
+    result = await crew.akickoff(
+        inputs={"data": "sample_data"},
+        thread_id="async_session"
+    )
+    return result
+
+result = asyncio.run(run_crew())
+
+# Async invoke
+async def run_crew_invoke():
+    result = await crew.ainvoke(
+        input={"messages": []},
+        config=RunnableConfig(configurable={"thread_id": "async_session"})
+    )
+    return result
+```
+
+### Streaming Execution
+
+```python
+# Stream crew execution steps
+for chunk in crew.stream(
+    input={"messages": [HumanMessage(content="Process request")]},
+    stream_mode="values"  # Options: "values", "updates", "debug"
+):
+    print(f"Step: {chunk}")
+
+# Async streaming
+async def stream_crew():
+    async for chunk in crew.astream(
+        input={"messages": []},
+        stream_mode="updates"
+    ):
+        print(f"Update: {chunk}")
+
+asyncio.run(stream_crew())
+```
+
+### Event Streaming
+
+Monitor detailed execution events:
+
+```python
+async def monitor_crew():
+    async for event in crew.astream_events(
+        input={"messages": [HumanMessage(content="Analyze data")]},
+        version="v2",
+        include_types=["chat_model", "tool", "agent"]
+    ):
+        print(f"Event: {event['event']} - {event['name']}")
+        if event["event"] == "on_chat_model_stream":
+            print(f"Token: {event['data']['chunk']}")
+
+asyncio.run(monitor_crew())
+```
+
+## Crew Patterns
+
+### Research and Analysis Pipeline
+
+```python
+# Sequential processing with context flow
+research_crew = Crew(
+    agents=[
+        Agent(role="Researcher", goal="Gather data", name="researcher"),
+        Agent(role="Analyst", goal="Analyze findings", name="analyst"), 
+        Agent(role="Writer", goal="Create report", name="writer")
+    ],
+    tasks=[
+        Task(
+            agent="researcher",
+            description="Research market trends",
+            expected_output="Raw research data",
+            name="research"
+        ),
+        Task(
+            agent="analyst", 
+            description="Analyze research data",
+            expected_output="Analysis insights",
+            context=["research"],
+            name="analysis"
+        ),
+        Task(
+            agent="writer",
+            description="Write final report", 
+            expected_output="Executive report",
+            context=["analysis"],
+            name="report"
+        )
+    ]
+)
+```
+
+### Review and Approval Workflow
+
+```python
+# Multi-stage review with handoffs
+review_crew = Crew(
+    agents=[
+        Agent(role="Author", goal="Create content", name="author"),
+        Agent(role="Reviewer", goal="Review quality", name="reviewer"),
+        Agent(role="Approver", goal="Final approval", name="approver")
+    ],
+    tasks=[
+        Task(
+            agent="author",
+            description="Write initial content",
+            expected_output="Draft content",
+            handoff_to=["review"],
+            name="draft"
+        ),
+        Task(
+            agent="reviewer",
+            description="Review content quality",
+            expected_output="Review feedback",
+            handoff_to=["approval"],
+            name="review"
+        ),
+        Task(
+            agent="approver",
+            description="Final approval",
+            expected_output="Approval decision",
+            name="approval"
+        )
+    ]
+)
+```
+
+### Parallel Processing with Synthesis
+
+```python
+# Multiple parallel analyses with final synthesis
+analysis_crew = Crew(
+    agents=[
+        Agent(role="Market Analyst", name="market"),
+        Agent(role="Tech Analyst", name="tech"),
+        Agent(role="Risk Analyst", name="risk"),
+        Agent(role="Senior Analyst", name="senior")
+    ],
+    tasks=[
+        # Parallel analysis tasks
+        Task(agent="market", description="Market analysis", name="market_analysis"),
+        Task(agent="tech", description="Technology analysis", name="tech_analysis"), 
+        Task(agent="risk", description="Risk assessment", name="risk_analysis"),
+        
+        # Synthesis task (depends on all parallel tasks)
+        Task(
+            agent="senior",
+            description="Synthesize all analyses",
+            expected_output="Strategic recommendations",
+            context=["market_analysis", "tech_analysis", "risk_analysis"],
+            name="synthesis"
+        )
+    ]
+)
+```
+
+## Advanced Features
+
+### Custom LangGraph Workflows
+
+```python
+from langgraph.graph import StateGraph
+from langcrew.types import CrewState
+
+# Build custom graph
+builder = StateGraph(CrewState)
+builder.add_node("custom_node", custom_function)
+builder.add_edge("custom_node", END)
+custom_graph = builder
+
+crew = Crew(
+    agents=[],  # Can be empty when using custom graph
+    tasks=[],
+    graph=custom_graph  # Use custom workflow
+)
+```
+
+### Placeholder Replacement
+
+Crews support dynamic input substitution:
+
+```python
+# Tasks with placeholders
+task = Task(
+    agent=agent,
+    description="Analyze {topic} market for {year}",
+    expected_output="Report on {topic} market analysis"
+)
+
+crew = Crew(agents=[agent], tasks=[task])
+
+# Placeholders replaced at runtime
+result = crew.kickoff(inputs={
+    "topic": "renewable energy",
+    "year": "2024"
+})
+```
+
+### Memory Search
+
+```python
+# Search across memory systems
+results = crew.search_memory(
+    query="customer feedback analysis",
+    memory_type="all",  # Options: "short_term", "long_term", "entity", "all"
+    limit=10
+)
+
+for result in results:
+    print(f"Memory type: {result['memory_type']}")
+    print(f"Content: {result['content']}")
+```
+
+## Error Handling and Debugging
+
+### Verbose Mode
+
+```python
+crew = Crew(
+    agents=[agent1, agent2],
+    tasks=[task1, task2],
+    verbose=True  # Shows detailed execution logs
+)
+
+result = crew.kickoff()
+```
+
+### Execution Control
+
+```python
+# Control execution flow
+result = crew.invoke(
+    input={"messages": []},
+    interrupt_before=["critical_task"],  # Pause before these nodes
+    interrupt_after=["review_task"],     # Pause after these nodes
+    output_keys=["final_result"]         # Return only specific keys
+)
+```
+
+### Stream Modes
+
+```python
+# Different streaming modes for debugging
+for chunk in crew.stream(
+    input={"messages": []},
+    stream_mode="debug"  # Maximum information for debugging
+):
+    print(chunk)
+```
+
+## Best Practices
+
+### 1. Design Clear Workflows
+
+```python
+# Good - Clear dependencies and names
+crew = Crew(
+    agents=[data_collector, data_processor, report_writer],
+    tasks=[
+        Task(agent=data_collector, description="Collect data", name="collect"),
+        Task(agent=data_processor, description="Process data", context=["collect"], name="process"),
+        Task(agent=report_writer, description="Write report", context=["process"], name="report")
+    ]
+)
+```
+
+### 2. Use Appropriate Memory
+
+```python
+# For conversational workflows
+conversational_crew = Crew(
+    agents=[assistant],
+    tasks=[support_task],
+    memory=True  # Enable conversation memory
+)
+
+# For complex analysis workflows  
+analysis_crew = Crew(
+    agents=[analysts],
+    tasks=[analysis_tasks],
+    memory=MemoryConfig(
+        enabled=True,
+        long_term={"enabled": True},  # Persist insights
+        entity={"enabled": True}      # Track entities
+    )
+)
+```
+
+### 3. Configure Handoffs Strategically
+
+```python
+# Use agent handoffs for dynamic routing
+dynamic_crew = Crew(
+    agents=[
+        Agent(role="Router", handoff_to=["specialist1", "specialist2"], is_entry=True),
+        Agent(role="Specialist1", name="specialist1"),
+        Agent(role="Specialist2", name="specialist2")
+    ]
+)
+
+# Use task handoffs for exception handling
+robust_crew = Crew(
+    agents=[main_processor, error_handler],
+    tasks=[
+        Task(agent=main_processor, handoff_to=["error_recovery"], name="main"),
+        Task(agent=error_handler, name="error_recovery")
+    ]
+)
+```
+
+### 4. Monitor Execution
+
+```python
+# Use streaming for real-time monitoring
+async def monitor_crew_execution():
+    async for event in crew.astream_events(
+        input=data,
+        include_types=["agent", "task", "tool"]
+    ):
+        if event["event"] == "on_agent_start":
+            print(f"Agent {event['name']} started")
+        elif event["event"] == "on_task_complete":
+            print(f"Task completed: {event['data']}")
+```
+
+## Integration Examples
+
+### With CrewAI Compatibility
+
+```python
+# CrewAI-style usage
+crew = Crew(
+    agents=[
+        Agent(role="Researcher", goal="Research topics", backstory="Expert researcher"),
+        Agent(role="Writer", goal="Write content", backstory="Skilled writer")
+    ],
+    tasks=[
+        Task(description="Research AI trends", expected_output="Research report"),
+        Task(description="Write article", expected_output="Published article")
+    ]
+)
+
+result = crew.kickoff(inputs={"topic": "artificial intelligence"})
+thread_id = result.get("thread_id")  # For conversation continuity
+```
+
+### With Custom Configuration
+
+```python
+# Advanced langcrew configuration
+from langcrew.memory import MemoryConfig
+from langcrew.hitl import HITLConfig
+
+crew = Crew(
+    agents=agents,
+    tasks=tasks,
+    memory=MemoryConfig(
+        enabled=True,
+        provider="postgres",
+        connection_string=os.getenv("DATABASE_URL")
+    ),
+    hitl=HITLConfig(
+        enabled=True,
+        interrupt_before=["final_decision"]
+    ),
+    verbose=True
+)
+
+# Execute with full configuration
+result = crew.kickoff(
+    inputs={"data": complex_data},
+    thread_id="production_workflow"
+)
+```
+
+## Next Steps
+
+- Explore [Memory Systems](/concepts/memory) for stateful crews
+- Learn about [Agents](/concepts/agents) and their capabilities  
+- Understand [Tasks](/concepts/tasks) and workflow design
+- See [Examples](/examples) of production crew implementations

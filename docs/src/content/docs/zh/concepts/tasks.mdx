@@ -1,0 +1,505 @@
+---
+title: 任务
+description: 了解任务 - 智能体在 langcrew 中执行的工作单元
+---
+
+任务是 langcrew 中的基本工作单元。它们定义了需要完成什么、谁应该完成以及结果应该如何构造。
+
+## 任务架构
+
+langcrew 中的任务基于 Runnable 接口构建，与 LangGraph 执行系统无缝协作。每个任务都包装一个智能体，并提供上下文管理、防护栏和移交功能。
+
+## 创建任务
+
+### 基础任务
+
+```python
+from langcrew import Task, Agent
+
+# 创建智能体
+agent = Agent(
+    role="研究专员",
+    goal="找到准确的信息",
+    backstory="具有学术背景的专业研究员"
+)
+
+# 创建任务
+task = Task(
+    agent=agent,
+    description="研究AI技术的最新趋势",
+    expected_output="包含关键发现和趋势的综合报告"
+)
+```
+
+### 带上下文依赖的任务
+
+```python
+# 第一个任务
+research_task = Task(
+    agent=researcher,
+    description="研究竞争对手的定价策略",
+    expected_output="竞争对手定价的详细分析"
+)
+
+# 第二个任务依赖第一个任务
+analysis_task = Task(
+    agent=analyst,
+    description="基于竞争对手数据分析我们的定价",
+    expected_output="有理由支撑的定价建议",
+    context=[research_task]  # 接收 research_task 的输出
+)
+```
+
+## 任务参数
+
+### 核心参数
+
+| 参数 | 类型 | 描述 | 必需 |
+|-----------|------|-------------|----------|
+| `agent` | Agent | 执行此任务的智能体 | ✅ |
+| `description` | str | 需要完成的工作描述 | ✅ |
+| `expected_output` | str | 任务应该产生的结果 | ✅ |
+| `name` | str | 任务的唯一标识符 | ❌ |
+| `verbose` | bool | 显示执行详情 | ❌ |
+| `metadata` | dict | 额外的元数据 | ❌ |
+
+### 高级参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|-----------|------|-------------|---------|
+| `config` | dict | CrewAI 风格配置 | None |
+| `output_json` | type[BaseModel] | 结构化输出模式 | None |
+| `context` | List[Task] \| List[str] | 任务依赖 | [] |
+| `handoff_to` | List[str] | 可以移交到的任务 | [] |
+| `input_guards` | List[GuardrailFunc] | 输入验证函数 | [] |
+| `output_guards` | List[GuardrailFunc] | 输出验证函数 | [] |
+
+## 高级功能
+
+### 结构化输出
+
+使用 Pydantic 模型强制输出结构：
+
+```python
+from pydantic import BaseModel
+from typing import List
+
+class ProductInfo(BaseModel):
+    name: str
+    price: float
+    category: str
+    in_stock: bool
+
+class ProductList(BaseModel):
+    products: List[ProductInfo]
+    total_count: int
+
+task = Task(
+    agent=data_extractor,
+    description="从网站提取产品信息",
+    expected_output="结构化的产品数据",
+    output_json=ProductList  # 强制使用此模式
+)
+```
+
+### CrewAI 配置风格
+
+```python
+# 使用配置字典实现 CrewAI 兼容性
+task_config = {
+    "description": "分析客户反馈",
+    "expected_output": "关键洞察总结",
+    "handoff_to": ["report_task"]
+}
+
+task = Task(
+    agent=analyst,
+    config=task_config
+)
+```
+
+### 上下文依赖
+
+任务可以依赖其他任务的输出：
+
+```python
+# 顺序依赖链
+data_collection = Task(
+    agent=collector,
+    description="从API收集原始数据",
+    expected_output="JSON格式的原始数据",
+    name="data_collection"
+)
+
+data_analysis = Task(
+    agent=analyst,
+    description="分析收集的数据",
+    expected_output="包含洞察的分析报告",
+    context=[data_collection],  # 接收 data_collection 输出
+    name="data_analysis"
+)
+
+report_generation = Task(
+    agent=writer,
+    description="创建最终报告",
+    expected_output="执行摘要报告",
+    context=[data_analysis],  # 接收分析输出
+    name="report_generation"
+)
+```
+
+### 移交配置
+
+任务可以将执行权移交给其他任务：
+
+```python
+# 主要处理任务
+primary_task = Task(
+    agent=primary_processor,
+    description="处理主要工作流程",
+    expected_output="主要处理结果",
+    handoff_to=["error_handler", "quality_check"],  # 可以转移到这些任务
+    name="primary_task"
+)
+
+# 错误处理任务（移交目标）
+error_handler = Task(
+    agent=error_specialist,
+    description="处理处理错误",
+    expected_output="错误解决报告",
+    name="error_handler"
+)
+
+# 质量检查任务（移交目标）
+quality_check = Task(
+    agent=qa_specialist,
+    description="执行质量保证",
+    expected_output="质量评估报告", 
+    name="quality_check"
+)
+```
+
+### 防护栏
+
+添加输入和输出验证：
+
+```python
+from typing import Any, Tuple
+from langcrew.guardrail import input_guard, output_guard
+
+@input_guard
+def validate_task_input(data: Any) -> Tuple[bool, str]:
+    """验证任务输入数据"""
+    if not isinstance(data, dict):
+        return False, "输入必须是字典"
+    
+    if "messages" in data and data["messages"]:
+        return True, "有效的输入格式"
+    
+    return False, "输入中未找到消息"
+
+@output_guard
+def ensure_output_quality(data: Any) -> Tuple[bool, str]:
+    """确保输出符合质量标准"""
+    # 提取输出内容
+    content = str(data)
+    if isinstance(data, dict) and "messages" in data:
+        messages = data.get("messages", [])
+        if messages and hasattr(messages[-1], "content"):
+            content = str(messages[-1].content)
+    
+    if len(content) < 50:
+        return False, "输出太短 - 需要更多细节"
+    
+    return True, "输出质量通过"
+
+task = Task(
+    agent=processor,
+    description="处理复杂数据",
+    expected_output="详细的分析报告",
+    input_guards=[validate_task_input],
+    output_guards=[ensure_output_quality]
+)
+```
+
+## 任务执行
+
+### 直接执行
+
+```python
+# 直接执行任务
+result = task.invoke({"messages": []})
+print(result)
+```
+
+### 异步执行
+
+```python
+import asyncio
+
+async def run_task():
+    result = await task.ainvoke({"messages": []})
+    return result
+
+result = asyncio.run(run_task())
+```
+
+### 在团队中执行
+
+```python
+from langcrew import Crew
+
+crew = Crew(
+    agents=[agent1, agent2],
+    tasks=[task1, task2]
+)
+
+# 执行所有任务
+result = crew.kickoff()
+```
+
+## 任务模式
+
+### 研究和分析模式
+
+```python
+# 1. 数据收集
+research_task = Task(
+    agent=researcher,
+    description="研究可再生能源的市场趋势",
+    expected_output="包含数据和趋势的市场研究报告",
+    name="research"
+)
+
+# 2. 分析
+analysis_task = Task(
+    agent=analyst,
+    description="基于研究数据分析市场机会",
+    expected_output="投资机会分析",
+    context=[research_task],
+    name="analysis"
+)
+
+# 3. 报告
+report_task = Task(
+    agent=writer,
+    description="创建发现的执行摘要",
+    expected_output="包含建议的执行报告",
+    context=[analysis_task],
+    name="report"
+)
+```
+
+### 审核和修订模式
+
+```python
+# 1. 初始工作
+draft_task = Task(
+    agent=writer,
+    description="编写技术文档草稿",
+    expected_output="初始文档草稿",
+    name="draft"
+)
+
+# 2. 审核
+review_task = Task(
+    agent=reviewer,
+    description="审核文档的准确性和清晰度",
+    expected_output="审核反馈和建议",
+    context=[draft_task],
+    name="review"
+)
+
+# 3. 最终修订
+final_task = Task(
+    agent=writer,
+    description="整合反馈并完成文档",
+    expected_output="最终完善的文档",
+    context=[review_task],
+    name="final"
+)
+```
+
+### 并行处理模式
+
+```python
+# 多个独立的分析任务
+market_analysis = Task(
+    agent=market_analyst,
+    description="分析市场条件",
+    expected_output="市场分析报告",
+    name="market_analysis"
+)
+
+competitor_analysis = Task(
+    agent=competitor_analyst,
+    description="分析竞争对手格局",
+    expected_output="竞争对手分析报告", 
+    name="competitor_analysis"
+)
+
+risk_analysis = Task(
+    agent=risk_analyst,
+    description="评估潜在风险",
+    expected_output="风险评估报告",
+    name="risk_analysis"
+)
+
+# 依赖所有并行任务的综合任务
+synthesis_task = Task(
+    agent=senior_analyst,
+    description="将所有分析综合为战略建议",
+    expected_output="战略建议文档",
+    context=[market_analysis, competitor_analysis, risk_analysis],
+    name="synthesis"
+)
+```
+
+## 最佳实践
+
+### 1. 清晰具体的描述
+
+```python
+# 好的做法 - 具体且可执行
+task = Task(
+    agent=analyst,
+    description="""分析Q3销售表现：
+    1. 按产品类别计算总收入
+    2. 与Q2和去年Q3进行比较
+    3. 识别表现前5的产品
+    4. 突出任何异常或令人担忧的趋势
+    5. 使用数据文件夹中的 sales_data.csv 文件""",
+    expected_output="包含图表和关键洞察的Q3销售分析报告"
+)
+
+# 避免 - 太模糊
+task = Task(
+    agent=analyst,
+    description="分析销售",
+    expected_output="一份报告"
+)
+```
+
+### 2. 明确定义的预期输出
+
+```python
+# 好的做法 - 详细的期望
+expected_output = """全面的市场分析，包含：
+- 执行摘要（200-300字）
+- 市场规模和增长预测（附图表）
+- 关键玩家分析（前5名竞争对手）
+- 我们位置的SWOT分析
+- 3-5个可行的建议
+格式：Markdown，嵌入数据可视化"""
+
+task = Task(
+    agent=market_researcher,
+    description="研究AI自动化市场",
+    expected_output=expected_output
+)
+```
+
+### 3. 逻辑任务命名
+
+```python
+# 使用描述性名称用于将被引用的任务
+tasks = [
+    Task(agent=researcher, description="...", name="market_research"),
+    Task(agent=analyst, description="...", name="data_analysis"),
+    Task(agent=writer, description="...", name="report_writing")
+]
+
+# 在上下文中按名称引用
+final_task = Task(
+    agent=reviewer,
+    description="最终审核和批准",
+    context=["market_research", "data_analysis"],  # 按名称引用
+    name="final_review"
+)
+```
+
+### 4. 适当的防护栏
+
+```python
+# 使用输入防护栏进行数据验证
+@input_guard
+def validate_data_format(data: Any) -> Tuple[bool, str]:
+    """确保输入数据格式符合预期"""
+    # 添加验证逻辑
+    return True, "数据格式有效"
+
+# 使用输出防护栏进行质量控制
+@output_guard  
+def check_output_completeness(data: Any) -> Tuple[bool, str]:
+    """确保输出满足完整性要求"""
+    # 添加质量检查
+    return True, "输出完整"
+
+sensitive_task = Task(
+    agent=data_processor,
+    description="处理敏感客户数据",
+    expected_output="匿名化分析结果",
+    input_guards=[validate_data_format],
+    output_guards=[check_output_completeness]
+)
+```
+
+## 任务状态和输出
+
+### 访问任务结果
+
+任务自动将其输出保存到团队状态：
+
+```python
+# 任务输出在团队状态中作为 task_outputs 可用
+# 每个输出包括：name, description, expected_output, raw, agent
+crew = Crew(agents=[agent], tasks=[task])
+result = crew.kickoff()
+
+# 从团队状态访问任务输出
+if "task_outputs" in result:
+    for output in result["task_outputs"]:
+        print(f"任务：{output['name']}")
+        print(f"智能体：{output['agent']}")
+        print(f"结果：{output['raw']}")
+```
+
+### 任务属性
+
+```python
+# 访问任务属性
+print(f"任务名称：{task.name}")
+print(f"描述：{task.description}")
+print(f"预期输出：{task.expected_output}")
+print(f"元数据：{task.metadata}")
+```
+
+## 与团队集成
+
+任务与团队编排无缝协作：
+
+```python
+from langcrew import Crew, Agent, Task
+
+# 创建带依赖的任务
+tasks = [
+    Task(agent=agent1, description="步骤1", name="step1"),
+    Task(agent=agent2, description="步骤2", context=["step1"], name="step2"),
+    Task(agent=agent3, description="步骤3", context=["step2"], name="step3")
+]
+
+# 在团队中执行
+crew = Crew(
+    agents=[agent1, agent2, agent3],
+    tasks=tasks
+)
+
+result = crew.kickoff()
+```
+
+## 下一步
+
+- 了解 [团队](/concepts/crews) 和任务编排
+- 探索有状态任务的 [内存系统](/concepts/memory)
+- 理解 [智能体](/concepts/agents) 及其能力
+- 查看复杂任务工作流的 [示例](/examples)

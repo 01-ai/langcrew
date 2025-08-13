@@ -1,0 +1,105 @@
+---
+title: Installation
+description: Learn how to install langcrew and set up your development environment
+---
+
+This guide will walk you through installing langcrew and setting up your development environment.
+
+## Requirements
+
+Before installing langcrew, ensure you have:
+
+- **Python**: 3.11 to 3.12
+- **pip**: Latest version recommended
+- **Virtual Environment**: Recommended for project isolation
+
+## Installation
+
+> **Note**: langcrew is currently not open source and requires access to a private package index.
+
+Install langcrew directly using uv with the private index:
+
+```bash
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+### Optional: Configure Private Index Permanently
+
+If you plan to use langcrew frequently, you can configure the private index in your `pyproject.toml` to avoid specifying it each time:
+
+```toml
+[tool.uv]
+default-groups = ['dev']
+extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+```
+
+After adding this configuration, you can simply run:
+
+```bash
+uv add langcrew --prerelease=allow
+```
+
+### Development Installation
+
+To contribute or modify langcrew, you'll need to clone the repository and set up the development environment:
+
+```bash
+git clone https://github.com/01-ai/langcrew.git
+cd langcrew
+```
+
+The repository includes the necessary private index configuration in its `pyproject.toml`. Install the development dependencies using uv:
+
+```bash
+# Using uv (recommended)
+uv sync
+
+# Or using pip with the private index
+pip install -e . --extra-index-url https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+## Verify Installation
+
+```python
+import langcrew
+print(langcrew.__version__)
+
+# Test basic functionality
+from langcrew import Agent
+
+agent = Agent(
+    role="Test Agent",
+    goal="Verify installation",
+    backstory="A helpful test agent"
+)
+print(f"Agent created: {agent.role}")
+```
+
+
+
+## Troubleshooting
+
+### Common Issues
+
+**ImportError: No module named 'langcrew'**
+- Ensure you've activated your virtual environment
+- Verify installation with `pip list | grep langcrew`
+
+**Dependency Conflicts**
+- Create a fresh virtual environment
+- Use `pip install --upgrade langcrew`
+
+### Getting Help
+
+If you encounter issues:
+
+1. Search [GitHub Issues](https://github.com/01-ai/langcrew/issues)
+2. Check the documentation for more examples
+
+## Next Steps
+
+Now that you have langcrew installed:
+
+- Follow the [Quick Start Guide](/guides/quickstart) to build your first crew
+- Explore [Core Concepts](/concepts/agents) to understand the framework
+- Check out [Examples](/examples/game-builder) for inspiration
