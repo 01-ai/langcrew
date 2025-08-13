@@ -1,57 +1,74 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/powered%20by-LangGraph-green.svg)](https://langchain-ai.github.io/langgraph/)
+[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](./docs/)
 
 # LangCrew
 
-LangCrew is a high-level multi-agent development framework built on LangGraph, offering out-of-the-box core capabilities to help construct complex agent collaboration systems:
+LangCrew is a high-level multi-agent development framework built on LangGraph, combining CrewAI's intuitive concepts with enterprise-grade capabilities and out-of-the-box core features for complex agent collaboration systems.
 
-1. **Beyond Traditional Flexible Paradigms**: Provides a simple, highly configurable development experience, featuring powerful built-in mechanisms such as HITL (Human-in-the-Loop), dynamic workflow orchestration, and event-driven processes—empowering stronger agent collaboration.
+## Why LangCrew?
 
-2. **Full-Stack Support for Productization**: Comes with an accompanying Agent-UI protocol and React component library, enabling the frontend to clearly visualize agent planning, scheduling, execution processes, and tool invocation details. This significantly accelerates the journey from agent development to productization, allowing for rapid delivery to users.
+### Core Benefits
 
-3. **Application Templates for Fast Launch**: Offers a rich variety of ready-to-use templates, enabling rapid prototyping and deployment of multi-agent solutions across a wide range of industries and scenarios.
+- **Beyond Traditional Flexible Paradigms**: Provides a simple, highly configurable development experience, featuring powerful built-in mechanisms such as HITL (Human-in-the-Loop), dynamic workflow orchestration, and event-driven processes—empowering stronger agent collaboration.
 
-4. **Integrated Development and Operations Support**: Integrates free SaaS services, seamlessly covering system construction, deep observability, sandbox environments, and deployment resources—simplifying the entire lifecycle from development to operations.
+- **Full-Stack Support for Productization**: Comes with an accompanying Agent-UI protocol and React component library, enabling the frontend to clearly visualize agent planning, scheduling, execution processes, and tool invocation details. This significantly accelerates the journey from agent development to productization, allowing for rapid delivery to users.
 
-## Features
+- **Application Templates for Fast Launch**: Offers a rich variety of ready-to-use templates, enabling rapid prototyping and deployment of multi-agent solutions across a wide range of industries and scenarios.
 
-**Multi-Agent Orchestration Architecture**
-- **Intelligent Agent System** - LangGraph-based ReAct executor supporting reasoning-action loops
-- **Dynamic Task Orchestration** - Topological sorting execution with task dependencies and context passing
-- **Flexible Handoff Mechanisms** - Both Agent-to-Agent and Task-to-Task handoff modes
+- **Integrated Development and Operations Support**: Integrates free SaaS services, seamlessly covering system construction, deep observability, sandbox environments, and deployment resources—simplifying the entire lifecycle from development to operations.
 
-**Enterprise-Grade Memory Management**
-- **Layered Memory Architecture** - Short-term (session-level), long-term (persistent), entity memory (knowledge graph)
-- **Intelligent Context Injection** - Session state management based on LangGraph Checkpointer
-- **Multi-Storage Backends** - Support for in-memory, SQLite, PostgreSQL, Redis storage solutions
+### Comparison with Other Frameworks
 
-**Comprehensive Tool Ecosystem**
-- **Unified Tool Registry** - Auto-discovery and management of LangChain, CrewAI, and custom tools
-- **MCP Protocol Support** - Secure Model Context Protocol integration with session management and access control
-- **Tool Security Safeguards** - Built-in Guardrail mechanisms and user consent confirmation
+| Aspect | LangGraph | CrewAI | LangCrew |
+|--------|-----------|---------|----------|
+| **Abstraction** | Low-level primitives | High-level patterns | **High-level on LangGraph** |
+| **Development** | Build from scratch | Simple but limited | **Best practices pre-built** |
+| **HITL** | Basic interrupt/resume | Limited support | **Advanced approval system + bilingual UI** |
+| **Memory** | Complete primitives/docs | Simple context | **LangGraph native + mem0 integration** |
+| **Tools** | LangChain only | Custom only | **Unified registry + LangCrew-Tools** |
+| **UI** | None | Basic examples | **Full React components** |
+| **Observability** | LangSmith integration | Enterprise edition | **LangTrace support** |
+| **Deployment** | Platform available | Enterprise edition | **Platform planned** |
 
-**Human-in-the-Loop (HITL) Integration**
-- **Smart Interrupt Control** - User approval and intervention before/after tool execution
-- **Multi-language Interaction** - Chinese/English approval command recognition
-- **Fine-grained Control** - Precise control based on LangGraph native interrupt mechanisms
+### Key Differentiators
 
-**Production-Ready Web Services**
-- **Streaming Responses** - FastAPI-based SSE real-time streaming output
-- **Session Management** - Automatic session creation and resume mechanisms
-- **Protocol Adaptation** - Seamless LangGraph to HTTP API conversion
+- **Lower LangGraph's Barrier**: LangCrew eliminates the complexity of LangGraph by providing pre-built, production-tested implementations of agent orchestration, memory management, and tool integration - no need to make architectural decisions or build foundational components from scratch.
 
-**Developer Experience Optimization**
-- **CrewAI Compatibility** - Smooth migration path and decorator syntax support
-- **Flexible Configuration** - Support for both code definition and YAML configuration approaches
-- **Debug-Friendly** - Built-in debug mode and detailed execution logging
+- **Enterprise-Grade Open Source**: While CrewAI offers simplicity, LangCrew brings enterprise features to the open-source community - including sophisticated HITL capabilities, multi-layer memory, security guardrails, and comprehensive observability that have been carefully crafted and battle-tested.
 
-**Enterprise Security Features**
-- **Multi-layer Security Protection** - Input/output Guardrails, tool execution approval, session security
-- **Access Control** - Fine-grained permission management based on sessions and fingerprints
-- **Audit Trail** - Complete execution chain and decision recording
+- **Best of Both Worlds**: Combines LangGraph's power and flexibility with CrewAI's intuitive concepts (crew, agent, task), while adding production-ready components that neither framework provides out of the box.
 
-## How to Use
+## Project Components
+
+### Core Framework (`libs/langcrew/`)
+The heart of LangCrew - a high-level abstraction over LangGraph that provides multi-agent orchestration, memory management, and production-ready features.
+- [Full documentation →](./libs/langcrew/README.md)
+
+### Tool Library (`libs/langcrew-tools/`)
+Production-ready tools for agent workflows including browser automation, cloud phone control, sandboxed code interpreter, and more.
+- [Explore tools →](./libs/langcrew-tools/README.md)
+
+### Web Platform (`web/`)
+Full-stack UI for agent visualization with React components, real-time streaming, and human-in-the-loop interfaces.
+- [UI documentation →](./web/README.md)
+
+### Examples & Templates (`examples/`)
+Industry-specific solutions ready for deployment:
+- [Recruitment System](./examples/recruitment/) - Multi-agent candidate screening
+- [Marketing Strategy](./examples/marketing-strategy/) - Campaign planning automation
+- [Game Development](./examples/game-builder-crew/) - AI content generation
+- [Travel Planning](./examples/surprise-trip/) - Intelligent itinerary creation
+- [Job Posting](./examples/job-posting/) - Automated job description generation
+
+### Documentation (`docs/`)
+Comprehensive guides and API references built with Astro Starlight.
+- [Getting Started](./docs/src/content/docs/guides/quickstart.mdx) - Build your first agent
+- [Core Concepts](./docs/src/content/docs/concepts/) - Understanding agents, tasks, and crews
+- [Installation Guide](./docs/src/content/docs/guides/installation.mdx) - Detailed setup instructions
+
+## Quick Start
 
 ### Local Development
 
@@ -124,25 +141,8 @@ docker compose up --build
 **Available endpoints:**
 - **Web Chat Interface**: http://localhost:3600
 - **Backend API Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/api/v1/health
 
-#### Common Commands
 
-```bash
-# Run in background
-docker compose up -d --build
-
-# Monitor logs
-docker compose logs -f
-
-# Stop services
-docker compose down
-```
-
-**Notes:**
-- Frontend automatically proxies API requests to backend
-- Ensure sufficient Docker resources (recommended: 4GB RAM, 2 CPU cores)
-- Both services will start automatically - no additional configuration needed
 
 ## Contributing
 
