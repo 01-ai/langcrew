@@ -17,7 +17,7 @@ from .executors.base import BaseExecutor
 from .executors.factory import ExecutorFactory
 from .guardrail import GuardrailFunc, with_guardrails
 from .hitl import HITLConfig
-from .mcp import MCPConfig, MCPToolAdapter
+from .mcp import MCPToolAdapter
 from .memory import MemoryConfig
 from .prompt_builder import PromptBuilder
 from .types import TaskSpec
@@ -45,7 +45,6 @@ class Agent:
         executor_kwargs: dict[str, Any] | None = None,
         # MCP support
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-        mcp_config: MCPConfig | None = None,
         mcp_tool_filter: list[str] | None = None,
         # Memory support
         memory: bool | MemoryConfig | None = None,
@@ -78,7 +77,6 @@ class Agent:
             prompt: Custom prompt for the agent
             executor_kwargs: Additional kwargs for executor
             mcp_servers: MCP server configurations
-            mcp_config: MCP configuration
             mcp_tool_filter: Filter for MCP tools
             memory: Memory configuration (bool, MemoryConfig instance, or None to disable)
             pre_model_hook: Hook to run before model execution
@@ -146,7 +144,6 @@ class Agent:
 
         # MCP configuration
         self.mcp_servers = mcp_servers
-        self.mcp_config = mcp_config
         self.mcp_tool_filter = mcp_tool_filter
         self._mcp_adapter = None
         self._mcp_tools = []
@@ -229,7 +226,7 @@ class Agent:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 # Create adapter if not exists (must be done in main thread)
                 if self._mcp_adapter is None:
-                    self._mcp_adapter = MCPToolAdapter(config=self.mcp_config)
+                    self._mcp_adapter = MCPToolAdapter()
 
                 # Submit the async work to thread pool
                 future = executor.submit(
@@ -243,7 +240,7 @@ class Agent:
         except RuntimeError:
             # No running loop, safe to use asyncio.run directly
             if self._mcp_adapter is None:
-                self._mcp_adapter = MCPToolAdapter(config=self.mcp_config)
+                self._mcp_adapter = MCPToolAdapter()
 
             tools = asyncio.run(
                 self._mcp_adapter.from_servers(
@@ -259,7 +256,7 @@ class Agent:
 
         # Create adapter if not exists
         if self._mcp_adapter is None:
-            self._mcp_adapter = MCPToolAdapter(config=self.mcp_config)
+            self._mcp_adapter = MCPToolAdapter()
 
         tools = await self._mcp_adapter.from_servers(
             servers=self.mcp_servers, tool_filter=self.mcp_tool_filter

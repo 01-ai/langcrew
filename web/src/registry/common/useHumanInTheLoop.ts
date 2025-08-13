@@ -7,7 +7,7 @@ import { MessageChunk, UserInputChunk } from '@/types';
  * @returns 是否是云手机HIL消息
  */
 export const isPhoneHIL = (message: MessageChunk) =>
-  (message.type === 'message_notify_user' &&
+  (message.type === 'message_to_user' &&
     message.detail?.scene === 'phone' &&
     message.detail?.intent_type === 'asking_user') ||
   (message.type === 'user_input' &&

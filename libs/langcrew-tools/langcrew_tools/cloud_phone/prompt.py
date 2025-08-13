@@ -45,7 +45,7 @@ Compare clickable elements: same = maybe operation failed, different = maybe ope
 - **Loading Issues**: Use wait action or retry
 - **Content Discovery**: Swipe up for more content, swipe down for history
 - **Task Completion**: If unable to complete (e.g., app not installed), call complete tool directly
-- If all attempts fail, explain the failure to the user and request further guidance (use `message_notify_user` tool)
+- If all attempts fail, explain the failure to the user and request further guidance (use `message_to_user` tool)
 - If I'm repeating the same tool more than 3 times without success, try alternatives or notify user and end task
 
 ## Core Tools

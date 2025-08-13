@@ -1,0 +1,277 @@
+---
+title: MCP Integration
+description: Learn how to integrate Model Context Protocol (MCP) servers with LangCrew agents
+---
+
+## What is MCP?
+
+**Model Context Protocol (MCP)** is an open standard that enables secure connections between large language models and data sources. MCP servers provide tools and resources that agents can use to access external systems, APIs, and data sources.
+
+## Why Use MCP with LangCrew?
+
+MCP integration in LangCrew provides:
+
+- ** Standardized Connections** - Connect to any MCP-compatible server
+- ** Secure Access** - Built-in security and permission controls  
+- ** Multiple Transports** - Support for SSE, HTTP streaming, and stdio
+- ** Tool Filtering** - Control which tools agents can access
+- ** Easy Scaling** - Add new capabilities without code changes
+
+## Supported Transport Types
+
+LangCrew supports three MCP transport methods:
+
+### 1. Server-Sent Events (SSE)
+Best for real-time data and live updates:
+
+```python
+server_config = {
+    "url": "https://api.example.com/mcp/sse?key=your_key",
+    "transport": "sse"
+}
+```
+
+### 2. Streamable HTTP
+Ideal for REST API integrations:
+
+```python
+server_config = {
+    "url": "https://api.example.com/mcp",
+    "transport": "streamable_http"
+}
+```
+
+### 3. Standard I/O (stdio)
+Perfect for local tools and scripts:
+
+```python
+server_config = {
+    "command": "python3",
+    "args": ["path/to/your/tool.py"],
+    "transport": "stdio"
+}
+```
+
+## Basic Usage
+
+### 1. Configure MCP Server
+
+Define your MCP server configuration:
+
+```python
+from langcrew import Agent
+
+# Configure your MCP server
+mcp_server_configs = {
+    "my_server": {
+        "url": "https://api.example.com/mcp",
+        "transport": "streamable_http"
+    }
+}
+```
+
+### 2. Create Agent with MCP
+
+Add MCP servers to your agent:
+
+```python
+@agent
+def my_agent(self) -> Agent:
+    return Agent(
+        config=self.agents_config["my_agent"],
+        mcp_servers=mcp_server_configs,
+        llm=self._get_default_llm(),
+        verbose=True
+    )
+```
+
+### 3. Optional: Filter Available Tools
+
+Control which tools the agent can access:
+
+```python
+@agent
+def restricted_agent(self) -> Agent:
+    return Agent(
+        config=self.agents_config["my_agent"],
+        mcp_servers=mcp_server_configs,
+        mcp_tool_filter=["search", "calculator"],  # Only these tools
+        llm=self._get_default_llm()
+    )
+```
+
+## Complete Example
+
+Here's a full working example using different MCP transport types:
+
+```python
+import os
+from langchain_openai import ChatOpenAI
+from langcrew import Agent, CrewBase, agent, task, crew
+from langcrew.task import Task
+from langcrew.crew import Crew
+
+@CrewBase
+class MyCrew:
+    agents_config = "config/agents.yaml"
+    tasks_config = "config/tasks.yaml"
+
+    def _get_default_llm(self):
+        return ChatOpenAI(
+            model="gpt-4o-mini", 
+            temperature=0.1, 
+            api_key=os.getenv("OPENAI_API_KEY")
+        )
+
+    @agent
+    def web_agent(self) -> Agent:
+        # SSE transport for real-time data
+        server_config = {
+            "url": f"https://api.example.com/sse?key={os.getenv('API_KEY')}",
+            "transport": "sse"
+        }
+        return Agent(
+            config=self.agents_config["web_agent"],
+            mcp_servers={"web_server": server_config},
+            llm=self._get_default_llm()
+        )
+
+    @agent  
+    def calculator_agent(self) -> Agent:
+        # stdio transport for local tools
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        calc_script = os.path.join(current_dir, "tools", "calculator.py")
+        
+        server_config = {
+            "command": "python3",
+            "args": [calc_script],
+            "transport": "stdio"
+        }
+        return Agent(
+            config=self.agents_config["calculator"],
+            mcp_servers={"calc_server": server_config},
+            mcp_tool_filter=["add", "multiply"],  # Restrict tools
+            llm=self._get_default_llm()
+        )
+
+    @task
+    def web_search_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["web_search"],
+            agent=self.web_agent()
+        )
+
+    @task
+    def calculation_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["calculation"],
+            agent=self.calculator_agent()
+        )
+
+    @crew
+    def crew(self) -> Crew:
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            verbose=True
+        )
+```
+
+## Configuration Files
+
+### agents.yaml
+```yaml
+web_agent:
+  role: "Web Search Specialist"
+  goal: "Find relevant information from the web"
+  backstory: "Expert at searching and analyzing web content"
+
+calculator:
+  role: "Mathematics Expert"  
+  goal: "Perform accurate calculations"
+  backstory: "Specialized in mathematical computations"
+```
+
+### tasks.yaml
+```yaml
+web_search_task:
+  description: "Search for information about {topic}"
+  expected_output: "Comprehensive summary of findings"
+
+calculation_task:
+  description: "Calculate the result of {expression}"
+  expected_output: "Accurate numerical result with explanation"
+```
+
+## Best Practices
+
+### 1. Environment Variables
+Store sensitive data in environment variables:
+
+```bash
+# .env file
+API_KEY=your_api_key_here
+OPENAI_API_KEY=your_openai_key_here
+```
+
+### 2. Error Handling
+Always handle MCP connection errors gracefully:
+
+```python
+try:
+    result = crew.kickoff(inputs={"topic": "AI trends"})
+except Exception as e:
+    print(f"MCP server error: {e}")
+    # Fallback logic here
+```
+
+### 3. Tool Filtering
+Use tool filtering for security and performance:
+
+```python
+# Only allow safe, read-only operations
+mcp_tool_filter=["search", "read", "analyze"]
+```
+
+### 4. Multiple Servers
+You can connect to multiple MCP servers:
+
+```python
+mcp_servers = {
+    "search_server": {"url": "...", "transport": "sse"},
+    "data_server": {"url": "...", "transport": "streamable_http"},
+    "local_tools": {"command": "python3", "args": ["tools.py"], "transport": "stdio"}
+}
+```
+
+## Common Use Cases
+
+- ** Web Search** - Connect to search APIs
+- ** Data Analysis** - Access databases and analytics tools
+- ** Calculations** - Mathematical and statistical computations  
+- ** File Operations** - Read, write, and process files
+- ** API Integration** - Connect to REST APIs and services
+- ** System Tools** - Execute system commands and scripts
+
+## Troubleshooting
+
+### Connection Issues
+- Verify server URLs and authentication
+- Check network connectivity
+- Validate transport type compatibility
+
+### Tool Not Found
+- Ensure tool names match server exports
+- Check tool filtering configuration
+- Verify server is running and accessible
+
+### Performance Issues
+- Use appropriate transport for your use case
+- Implement tool filtering to reduce overhead
+- Consider connection pooling for high-volume usage
+
+## Next Steps
+
+- Explore [Agent Configuration](/concepts/agents) for advanced setups
+- Learn about [Tool Development](/guides/tools) to create custom MCP servers  
+- Check out [Production Deployment](/guides/production) for scaling considerations

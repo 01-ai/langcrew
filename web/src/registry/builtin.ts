@@ -32,7 +32,7 @@ import './image_parser';
 import './image_generation';
 
 // 用户通知消息(added 2025-01-27)
-import './message_notify_user';
+import './message_to_user';
 
 // SQL执行(added 2025-07-18)
 import './mysql';
