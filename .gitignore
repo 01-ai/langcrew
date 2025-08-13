@@ -27,7 +27,7 @@ CREDITS.md
 .cursor/rules/my-custom-rule.mdc
 checkpoints.db*
 
-# 忽略 examples 目录下所有任务文件夹中的 .venv 目录
+# Ignore .venv directories in all task folders under examples directory
 examples/**/.venv/
 examples/**/.venv
 examples/**/uv.lock

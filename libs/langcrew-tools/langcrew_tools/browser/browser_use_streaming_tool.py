@@ -97,13 +97,11 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
     first_screenshot_url: str | None = Field(
         default=None, description="First screenshot url"
     )
-    request_language: str  = Field(
-        default= ..., description="Request language"
-    )
+    request_language: str = Field(default=..., description="Request language")
     browser_profile: BrowserProfile | None = Field(
         default=None, description="Browser profile"
     )
-    desktop_resolution: tuple[int, int]  = Field(
+    desktop_resolution: tuple[int, int] = Field(
         default=..., description="Desktop resolution"
     )
     async_s3_client: AsyncS3Client | None = Field(
@@ -127,11 +125,10 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         vl_llm: BrowserBaseChatModel,
         step_limit: int | None = 25,
         agent_kwargs: dict[str, Any] | None = None,
-        first_screenshot_url: str
-        | None =  None,
+        first_screenshot_url: str | None = None,
         page_extraction_llm: BrowserBaseChatModel | None = None,
         request_language: str = "zh",
-        browser_profile: BrowserProfile | None = None,  
+        browser_profile: BrowserProfile | None = None,
         desktop_resolution: tuple[int, int] = DESKTOP_RESOLUTION,
         async_s3_client: AsyncS3Client | None = None,
         **kwargs,
@@ -162,11 +159,11 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             async_s3_client=async_s3_client,
             **kwargs,
         )
-        
+
         # Handle page_extraction_llm fallback after Pydantic initialization
         if self.page_extraction_llm is None:
             self.page_extraction_llm = self.vl_llm
-            
+
         # Initialize async objects
         self._event_queue = asyncio.Queue(maxsize=200)
         self._agent_finished = asyncio.Event()
@@ -226,6 +223,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             "msg": error_msg or "",
             "data": data or {},
         }
+
     def _get_default_agent_params(self) -> dict[str, Any]:
         """Get default agent parameters"""
         return {
@@ -238,7 +236,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                     "replace_file_str",
                     "write_file",
                     "read_file",
-                    # Google Sheets 操作
+                    # Google Sheets operations
                     "read_sheet_contents",
                     "read_cell_contents",
                     "update_cell_contents",
@@ -246,7 +244,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                     "select_cell_or_range",
                     "fallback_input_into_single_selected_cell",
                 ]
-            )
+            ),
         }
 
     def _get_default_browser_profile(self) -> BrowserProfile:
@@ -262,28 +260,28 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             geolocation = Geolocation(latitude=40.7128, longitude=-74.0060)
 
         return BrowserProfile(
-            # DOM和截图优化（解决日志中DOM处理和截图慢的问题）
-            chromium_sandbox=False,  # 关闭沙盒，减少启动时间
+            # DOM and screenshot optimization (solve slow DOM processing and screenshot issues in logs)
+            chromium_sandbox=False,  # Disable sandbox to reduce startup time
             viewport_expansion=150,
-            # 关闭高亮元素，减少token使用
+            # Disable element highlighting to reduce token usage
             highlight_elements=False,
             args=[
                 "--disable-dev-shm-usage",
-                "--disable-extensions",  # 关闭扩展
-                "--disable-plugins",  # 关闭插件
-                "--aggressive-cache-discard",  # 积极释放缓存
+                "--disable-extensions",  # Disable extensions
+                "--disable-plugins",  # Disable plugins
+                "--aggressive-cache-discard",  # Aggressively discard cache
                 "--memory-pressure-off",
-                "--max_old_space_size=4096",  # 增加内存限制
+                "--max_old_space_size=4096",  # Increase memory limit
             ],
             locale=locale,
             timezone_id=timezone_id,
             geolocation=geolocation,
-            # 安全相关配置
-            ignore_https_errors=True,  # 忽略HTTPS错误
-            bypass_csp=True,  # 绕过CSP策略
-            # 方法1：使用启动参数
+            # Security related configuration
+            ignore_https_errors=True,  # Ignore HTTPS errors
+            bypass_csp=True,  # Bypass CSP policy
+            # Method 1: Use startup parameters
             window_position={"width": 0, "height": 0},
-            # 方法2：固定大尺寸（备选）
+            # Method 2: Fixed large size (alternative)
             viewport={
                 "width": self.desktop_resolution[0],
                 "height": self.desktop_resolution[1],
@@ -303,7 +301,8 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                 async_sandbox
             )
             await sandbox_browser_session_manager.init_browser_session(
-                async_sandbox, self.browser_profile or self._get_default_browser_profile()
+                async_sandbox,
+                self.browser_profile or self._get_default_browser_profile(),
             )
             self._vnc_url = (
                 sandbox_browser_session_manager._browser_vnc_url
@@ -324,7 +323,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             request_language=request_language,
         )
         agent_params = self.agent_kwargs or self._get_default_agent_params()
-        
+
         agent_params["task"] = enhanced_task
         agent_params["extend_system_message"] = language_prompt
         agent_params["llm"] = self.vl_llm
@@ -340,7 +339,6 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             self._status_callback
         )
         self._agent = agent
-
 
     async def _new_step_callback(
         self,
@@ -422,7 +420,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             else:
                 # Format event with consistent structure
                 formatted_event = self._format_event(event_data.model_dump(), "end")
-                # 告知转换器，已经完成一个intermediate事件
+                # Notify converter that an intermediate event has been completed
                 await self._event_queue.put(("intermediate", formatted_event))
                 await self._event_queue.put(("end", history.final_result()))
 
@@ -451,9 +449,9 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         intervention_dict["intervention_url"] = intervention_url
         intervention_dict["screenshot"] = self._previous_screenshot
         formatted_event = self._format_event(intervention_dict, "end")
-        # 告知转换器，已经完成一个intermediate事件
+        # Notify converter that an intermediate event has been completed
         await self._event_queue.put(("intermediate", formatted_event))
-        # tool正常输出结果
+        # Tool normal output result
         await self._event_queue.put((
             "end",
             self.to_human_intervention_prompt(intervention_dict["suggestion"]),
@@ -474,7 +472,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             self._agent_finished.is_set() if self._agent_finished is not None else False
         )
 
-    async def _run_agent_with_completion(self,max_steps: int) -> None:
+    async def _run_agent_with_completion(self, max_steps: int) -> None:
         """Wrapper for agent.run() that ensures completion flag is set"""
         try:
             await self._agent.run(max_steps=max_steps)
@@ -490,7 +488,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             if self._agent_finished is not None:
                 self._agent_finished.set()
 
-    # 同一个tool 在agent执行中会被多次调用，需要重置状态
+    # The same tool will be called multiple times during agent execution, need to reset state
     def reset_state(self):
         """Reset state for new execution"""
         # Reset state
@@ -516,7 +514,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                 self._agent.resume()
             except Exception as e:
                 logger.warning(f"Error resuming agent: {e}")
-                # 源码恢复异常，不处理
+                # Source code recovery exception, do not handle
                 pass
             return True
         else:
@@ -563,7 +561,9 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         yield StreamEventType.START, self.start_standard_stream_event(start_event)
 
         # Start agent (don't wait for completion)
-        agent_task = asyncio.create_task(self._run_agent_with_completion(self.step_limit))
+        agent_task = asyncio.create_task(
+            self._run_agent_with_completion(self.step_limit)
+        )
 
         try:
             # Consume events until agent completes and queue is empty
@@ -672,27 +672,27 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         try:
             event_data = custom_event.get("data", {}).get("data", {}).get("input", {})
             data_content = event_data.get("data", {})
-            if self.async_s3_client :
-                # 检查是否包含screenshot字段
+            if self.async_s3_client:
+                # Check if screenshot field is included
                 if "screenshot" in data_content and data_content["screenshot"]:
                     try:
-                        # 获取sandbox_id，用于上传路径
+                        # Get sandbox_id for upload path
                         sandbox_id = event_data.get("sandbox_id", "local")
                         data_iamge = data_content["screenshot"]
-                        # 如果data_iamge是url，则直接使用
+                        # If data_image is url, use it directly
                         if data_iamge.startswith("http"):
                             screenshot_url = data_iamge
                         else:
-                            # 使用SandboxS3Toolkit的upload_base64_image方法异步将图片转换为url
+                            # Use SandboxS3Toolkit's upload_base64_image method to asynchronously convert image to url
                             screenshot_url = await sandbox_toolkit.upload_base64_image(
                                 async_s3_client=self.async_s3_client,
                                 base64_data=data_content["screenshot"],
                                 sandbox_id=sandbox_id,
                             )
-                        # 替换data中的screenshot
+                        # Replace screenshot in data
                         data_content["screenshot"] = screenshot_url
 
-                        # 记录日志
+                        # Log the result
                         logger.info(
                             f"Successfully uploaded screenshot to S3: {screenshot_url}"
                         )
@@ -702,9 +702,9 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
 
             sandbox_url = event_data.get("sandbox_url", "")
 
-            # 创建处理后的数据副本函数
+            # Function to create processed data copy
             def create_tool_start_data(data_content, brief: str = None):
-                """创建on_tool_start事件的数据副本，去掉screenshot、evaluation_previous_goal、memory字段"""
+                """Create data copy for on_tool_start event, removing screenshot, evaluation_previous_goal, memory fields"""
                 brief_obj = ""
                 if "task" in data_content:
                     brief_obj = data_content.get("task", "")
@@ -717,23 +717,23 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                 }
 
             def create_tool_end_data(data_content):
-                """创建on_tool_end事件的数据副本，去掉thinking、next_goal、actions字段，并将screenshot重命名为image_url"""
+                """Create data copy for on_tool_end event, removing thinking, next_goal, actions fields, and rename screenshot to image_url"""
                 return {
                     "url": data_content.get("url", ""),
                     "title": data_content.get("title", ""),
                     "image_url": data_content.get("screenshot", ""),
                     "final_result": data_content.get("final_result", ""),
-                    # 添加纳秒时间戳
+                    # Add nanosecond timestamp
                     "timestamp_ns": time.time_ns(),
                     "sandbox_url": sandbox_url,
                 }
 
-            # 返回 StandardStreamEvent
-            # 根据不同的status值返回相应的StandardStreamEvent
+            # Return StandardStreamEvent
+            # Return corresponding StandardStreamEvent based on different status values
             status = event_data.get("status", "")
 
             if status == "error":
-                # 如果status为error，返回on_tool_error事件
+                # If status is error, return on_tool_error event
                 end_data = create_tool_end_data(data_content)
                 return StandardStreamEvent(
                     event="on_tool_end",
@@ -747,7 +747,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                 )
 
             elif status == "end":
-                # 如果status为end，返回on_tool_end事件
+                # If status is end, return on_tool_end event
                 end_data = create_tool_end_data(data_content)
                 return StandardStreamEvent(
                     event="on_tool_end",
@@ -761,7 +761,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                 )
 
             elif status == "start":
-                # 如果status为start，返回on_tool_start事件，name为open_browser
+                # If status is start, return on_tool_start event, name is open_browser
                 start_data = create_tool_start_data(
                     data_content,
                     self._brief_process(data_content.get("next_goal", self.name)),
@@ -778,10 +778,10 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                 )
 
             elif status == "intermediate":
-                # 如果status为intermediate，返回两个StandardStreamEvent
-                # 注意：intermediate状态时对象是共享的，需要创建副本
+                # If status is intermediate, return two StandardStreamEvent
+                # Note: objects are shared in intermediate state, need to create copies
 
-                # 第一个on_tool_end，name=previous_goal中的内容
+                # First on_tool_end, name=content from previous_goal
                 end_data = create_tool_end_data(data_content)
                 end_event = StandardStreamEvent(
                     event="on_tool_end",
@@ -794,7 +794,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                     timestamp=custom_event.get("timestamp", ""),
                 )
 
-                # 第二个on_tool_start，name取next_goal中的内容
+                # Second on_tool_start, name takes content from next_goal
                 start_data = create_tool_start_data(
                     data_content,
                     self._brief_process(data_content.get("next_goal", self.name)),
@@ -811,11 +811,11 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                     timestamp=custom_event.get("timestamp", ""),
                 )
 
-                # 返回包含两个事件的特殊结构
+                # Return special structure containing two events
                 return [end_event, start_event]
 
         except Exception as e:
-            # 全局容错处理：如果发生任何错误，打印日志并返回原对象
+            # Global error handling: if any error occurs, print log and return original object
             logger.error(f"Error in custom_event_hook_class: {e}")
             return custom_event
 

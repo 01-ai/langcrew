@@ -36,7 +36,7 @@ def apply_browser_use_patches():
     from browser_use.agent.prompts import SystemPrompt
     from browser_use.controller.service import Controller
 
-    # 保存原始方法
+    # Save original method
     original_register_done_action = Controller._register_done_action
 
     def patched_register_done_action(
@@ -87,7 +87,7 @@ def apply_browser_use_patches():
         if override_system_message:
             prompt = override_system_message
         else:
-            # 调用原始的_load_prompt_template方法
+            # Call original _load_prompt_template method
             self._load_prompt_template()
             prompt = self.prompt_template.format(max_actions=self.max_actions_per_step)
 

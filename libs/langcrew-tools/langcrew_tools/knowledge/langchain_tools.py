@@ -43,10 +43,10 @@ class PgVectorSearchTool(BaseTool):
         self,
         vector_config: VectorConfig | None = None,
         siliconflow_client: SiliconFlowClient | None = None,
-        **kwargs
+        **kwargs,
     ):
         """Initialize PgVectorSearchTool.
-        
+
         Args:
             vector_config: Optional VectorConfig for database configuration.
                           If not provided, uses default config from environment variables.
@@ -81,7 +81,7 @@ class PgVectorSearchTool(BaseTool):
             logger.warning("Empty query provided")
             return "No query provided"
 
-        # 优先级：传入的knowledge_ids > 从上下文提取的IDs > 默认kb_ids
+        # Priority: passed knowledge_ids > IDs extracted from context > default kb_ids
         if not knowledge_ids:
             logger.warning(
                 "No knowledge IDs provided, extracted from context, or configured as default"
@@ -97,8 +97,7 @@ class PgVectorSearchTool(BaseTool):
 
             # Use the unified search method from VectorManager with custom config
             vector_manager = await create_vector_manager(
-                config=self.vector_config,
-                siliconflow_client=self.siliconflow_client
+                config=self.vector_config, siliconflow_client=self.siliconflow_client
             )
             if not vector_manager:
                 return "Error: Failed to create vector manager - dependencies not available"
@@ -114,7 +113,9 @@ class PgVectorSearchTool(BaseTool):
             logger.info(f"Unified search returned {len(rag_responses)} results")
 
             if not rag_responses:
-                logger.info(f"No results found for query: {query[:100]}... in knowledge bases: {knowledge_ids}")
+                logger.info(
+                    f"No results found for query: {query[:100]}... in knowledge bases: {knowledge_ids}"
+                )
                 return "No relevant documents found"
 
             # Convert to knowledge-specific markdown format

@@ -1,7 +1,7 @@
 class TerminalFormatter:
-    """终端格式构造工具"""
+    """Terminal format construction tool"""
 
-    # ANSI颜色代码
+    # ANSI color codes
     COLORS = {
         "green": "\u001b[32m",
         "red": "\u001b[31m",
@@ -18,50 +18,50 @@ class TerminalFormatter:
         self.hostname = hostname
 
     def create_prompt(self, path="~", color="green"):
-        """创建终端提示符"""
+        """Create terminal prompt"""
         color_code = self.COLORS.get(color, self.COLORS["green"])
         reset_code = self.COLORS["reset"]
         return f"{color_code}{self.username}@{self.hostname}:{path} ${reset_code}"
 
     def analyze_path_change(self, command, current_path="~", success=True):
-        """分析命令是否会改变路径
+        """Analyze whether the command will change the path
 
         Args:
-            command: 执行的命令
-            current_path: 当前路径
-            success: 命令是否成功执行
+            command: The command to execute
+            current_path: Current path
+            success: Whether the command executed successfully
 
         Returns:
-            新路径，如果路径没有改变则返回原路径
+            New path, returns original path if path doesn't change
         """
         if not success:
             return current_path
 
-        # 处理 ~ 路径
+        # Handle ~ path
         if current_path == "~":
             current_path = f"/home/{self.username}"
 
-        # 分析复合命令（用 && 连接的命令）
+        # Analyze compound commands (commands connected with &&)
         commands = [cmd.strip() for cmd in command.split("&&")]
         new_path = current_path
 
         for cmd in commands:
             cmd = cmd.strip()
 
-            # 匹配 cd 命令
+            # Match cd command
             if cmd.startswith("cd "):
                 target_path = cmd[3:].strip()
 
                 if not target_path or target_path == "~":
                     new_path = f"/home/{self.username}"
                 elif target_path.startswith("/"):
-                    # 绝对路径
+                    # Absolute path
                     new_path = target_path
                 elif target_path == "..":
-                    # 上级目录
+                    # Parent directory
                     new_path = "/".join(new_path.split("/")[:-1]) or "/"
                 elif target_path.startswith("../"):
-                    # 相对路径向上
+                    # Relative path upward
                     parts = target_path.split("/")
                     temp_path = new_path
                     for part in parts:
@@ -75,13 +75,13 @@ class TerminalFormatter:
                             )
                     new_path = temp_path
                 else:
-                    # 相对路径向下
+                    # Relative path downward
                     if new_path == "/":
                         new_path = f"/{target_path}"
                     else:
                         new_path = f"{new_path}/{target_path}"
 
-        # 转换回 ~ 表示法（如果是用户主目录）
+        # Convert back to ~ notation (if it's user home directory)
         home_dir = f"/home/{self.username}"
         if new_path == home_dir:
             return "~"
@@ -93,32 +93,32 @@ class TerminalFormatter:
     def create_command_execution(
         self, command, current_path="~", new_path=None, output="", success=True
     ):
-        """创建命令执行过程
+        """Create command execution process
 
         Args:
-            command: 要执行的命令
-            current_path: 当前路径
-            new_path: 命令执行后的新路径（如果为None则自动分析）
-            output: 命令输出
-            success: 命令是否成功执行
+            command: Command to execute
+            current_path: Current path
+            new_path: New path after command execution (auto-analyze if None)
+            output: Command output
+            success: Whether the command executed successfully
         """
         result = []
 
-        # 1. 显示命令行
+        # 1. Display command line
         command_line = f"{self.create_prompt(current_path)} {command}"
         result.append(command_line)
 
-        # 2. 显示命令输出（如果有）
+        # 2. Display command output (if any)
         if output:
             result.append(output)
 
-        # 3. 分析最终路径
+        # 3. Analyze final path
         if new_path is None:
             final_path = self.analyze_path_change(command, current_path, success)
         else:
             final_path = new_path
 
-        # 4. 显示命令执行后的提示符
+        # 4. Display prompt after command execution
         color = "green" if success else "red"
         final_prompt = self.create_prompt(final_path, color)
         result.append(final_prompt)
@@ -126,16 +126,16 @@ class TerminalFormatter:
         return "\n".join(result)
 
     def create_terminal_session(self, commands):
-        """创建完整的终端会话
+        """Create complete terminal session
 
         Args:
-            commands: 列表，每个元素是字典:
+            commands: List, each element is a dictionary:
                 {
-                    'command': '命令',
-                    'current_path': '当前路径',
-                    'new_path': '新路径（可选）',
-                    'output': '输出结果（可选）',
-                    'success': True/False（可选，默认True）
+                    'command': 'command',
+                    'current_path': 'current path',
+                    'new_path': 'new path (optional)',
+                    'output': 'output result (optional)',
+                    'success': True/False (optional, default True)
                 }
         """
         session = []
@@ -148,17 +148,17 @@ class TerminalFormatter:
             output = cmd_info.get("output", "")
             success = cmd_info.get("success", True)
 
-            # 创建命令执行
+            # Create command execution
             execution = self.create_command_execution(
                 command, cmd_current_path, new_path, output, success
             )
             session.append(execution)
 
-            # 更新当前路径
+            # Update current path
             if new_path is not None:
                 current_path = new_path
             else:
-                # 自动分析路径变化
+                # Auto-analyze path changes
                 success = cmd_info.get("success", True)
                 current_path = self.analyze_path_change(
                     command, cmd_current_path, success

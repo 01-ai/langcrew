@@ -570,28 +570,28 @@ class GetClickablesTool(CloudPhoneBaseTool):
 
 
 ALL_PHONE_TOOLS = [
-    # 基础交互工具
+    # Basic interaction tools
     TapTool,
     TapByCoordinatesTool,
     SwipeTool,
     InputTextTool,
     PressKeyTool,
     ClearTextTool,
-    # 应用管理工具
+    # Application management tools
     StartAppTool,
     ListPackagesTool,
-    # 导航工具
+    # Navigation tools
     EnterTool,
     SwitchAppTool,
     BackTool,
     HomeTool,
-    # 复合操作工具
+    # Composite operation tools
     TapInputAndEnterTool,
-    # 控制工具
+    # Control tools
     WaitTool,
-    # 截图工具
+    # Screenshot tools
     TaskScreenShotTool,
-    # 获取点击元素工具
+    # Get clickable elements tools
     GetClickablesTool,
 ]
 
@@ -611,7 +611,7 @@ def get_cloudphone_tools(
         tool = tool_class(
             session_id=session_id, sandbox_id=sandbox_id, tool_state_manager=None
         )
-        # 为每个工具添加移动设备描述前缀
+        # Add mobile device description prefix for each tool
         original_description = tool.description
         tool.__class__.description = (
             f"This is a mobile phone automation tool. {original_description}"

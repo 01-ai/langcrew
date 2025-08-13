@@ -196,8 +196,8 @@ async def clear_text(sbx: Sandbox, x: int, y: int, num_chars: int = 20) -> str:
         sbx.adb_shell.shell(f"input tap {x} {y}")
         await asyncio.sleep(0.5)
 
-        sbx.adb_shell.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
-        for _ in range(num_chars):  # 多次删除以确保清空
+        sbx.adb_shell.shell("input keyevent KEYCODE_MOVE_END")  # Move to end
+        for _ in range(num_chars):  # Multiple deletions to ensure clearing
             sbx.adb_shell.shell("input keyevent KEYCODE_DEL")
         await asyncio.sleep(0.5)
         return f"Cleared up to {num_chars} characters from text field at ({x},{y})"
@@ -335,18 +335,18 @@ async def tap_input_and_enter(x: int, y: int, text: str, sbx: Sandbox) -> str:
         sbx.adb_shell.shell(f"input tap {x} {y}")
         await asyncio.sleep(0.5)
 
-        sbx.adb_shell.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
-        for _ in range(20):  # 多次删除以确保清空
+        sbx.adb_shell.shell("input keyevent KEYCODE_MOVE_END")  # Move to end
+        for _ in range(20):  # Multiple deletions to ensure clearing
             sbx.adb_shell.shell("input keyevent KEYCODE_DEL")
         await asyncio.sleep(0.5)
 
-        # Input new text using am broadcast (更可靠的方式)
+        # Input new text using am broadcast (more reliable method)
         if text:
             try:
-                # 尝试使用 am broadcast 方式
+                # Try using am broadcast method
                 sbx.adb_shell.shell(f'am broadcast -a ADB_INPUT_TEXT --es msg "{text}"')
             except Exception:
-                # 如果失败，尝试使用 input keyboard text
+                # If failed, try using input keyboard text
                 sbx.adb_shell.shell(f'input keyboard text "{text}"')
             await asyncio.sleep(0.5)
 
