@@ -372,6 +372,26 @@ def get_checkpointer(
         except ImportError:
             raise ImportError("MongoDB support requires additional package")
 
+    # SQLite checkpointer - needs connection management
+    elif provider == "sqlite":
+        if not conn_str:
+            raise ValueError("SQLite checkpointer requires connection_string in config")
+        try:
+            if is_async:
+                from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+                saver_cm = AsyncSqliteSaver.from_conn_string(conn_str)
+                return AsyncCheckpointerWrapper(saver_cm)
+            else:
+                from langgraph.checkpoint.sqlite import SqliteSaver
+
+                saver_cm = SqliteSaver.from_conn_string(conn_str)
+                return CheckpointerWrapper(saver_cm)
+        except ImportError:
+            raise ImportError(
+                "SQLite support requires additional package: pip install langgraph-checkpoint-sqlite"
+            )
+
     # MySQL checkpointer - needs connection management
     elif provider == "mysql":
         if not conn_str:
