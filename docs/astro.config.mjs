@@ -137,6 +137,44 @@ export default defineConfig({
 										en: 'Long-term Memory'
 									}
 								},
+
+							]
+						},
+						{
+							label: '工具系统',
+							translations: {
+								en: 'Tools'
+							},
+							items: [
+								{
+									label: '工具注册',
+									link: '/guides/tools/tool-registry',
+									translations: {
+										en: 'Tool Registry'
+									}
+								},
+								{
+									label: '工具转换',
+									link: '/guides/tools/tool-converter',
+									translations: {
+										en: 'Tool Converter'
+									}
+								},
+								{
+									label: 'MCP 集成',
+									link: '/guides/tools/tool-mcp',
+									translations: {
+										en: 'MCP Integration'
+									}
+								},
+							]
+						},
+						{
+							label: '内存管理',
+							translations: {
+								en: 'Memory'
+							},
+							items: [
 								{
 									label: '实体记忆',
 									link: '/guides/memory/entity',

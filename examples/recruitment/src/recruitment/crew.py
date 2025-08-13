@@ -6,7 +6,7 @@ from langcrew import Agent, Crew, Task
 from langcrew.project import CrewBase, agent, crew, task
 from langcrew_tools.fetch.langchain_tools import WebFetchTool
 from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew.tools.tool_converter import convert_tools
+from langcrew.tools.converter import convert_tools
 from recruitment.tools.linkedin import LinkedInTool
 
 

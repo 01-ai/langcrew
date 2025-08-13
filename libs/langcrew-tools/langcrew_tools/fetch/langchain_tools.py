@@ -42,11 +42,16 @@ class WebFetchTool(BaseTool):
     timeout: int = Field(default=120)
     max_content_length: int = Field(default=128000)  # Optimized for LLM token limits
     filter_type: Literal["llm", "pruning"] = Field(default="llm")
-    service_url: str = Field(default="http://localhost:11235")  # crawl4ai service URL
-    llm_provider: str = Field(
-        default="openai/gpt-4o-mini"
-    )  # LLM provider for content filtering
-    llm_api_key: str = Field(default=None)  # API key for LLM provider
+    crawl4ai_service_url: str = Field(
+        default="http://localhost:11235", description="Crawl4ai HTTP service URL"
+    )
+    crawl4ai_llm_provider: str = Field(
+        default="openai/gpt-4o-mini",
+        description="LLM provider for crawl4ai content filtering",
+    )
+    crawl4ai_llm_api_key: str = Field(
+        default=None, description="API key for crawl4ai LLM provider"
+    )
     proxy: str = Field(default=None)  # HTTP proxy for web requests
 
     def __init__(
@@ -54,35 +59,36 @@ class WebFetchTool(BaseTool):
         timeout: int | None = None,
         max_content_length: int | None = None,
         filter_type: Literal["llm", "pruning"] | None = None,
-        service_url: str | None = None,
-        llm_provider: str | None = None,
-        llm_api_key: str | None = None,
+        crawl4ai_service_url: str | None = None,
+        crawl4ai_llm_provider: str | None = None,
+        crawl4ai_llm_api_key: str | None = None,
         proxy: str | None = None,
         **kwargs,
     ):
-        """Initialize WebFetchTool with optimized configuration.
+        """Initialize WebFetchTool with crawl4ai configuration.
 
         Configuration priority (highest to lowest):
         1. Constructor parameters
-        2. Environment variables (LANGCREW_WEB_FETCH_*)
-        3. Field default values
+        2. Environment variables (LANGCREW_CRAWL4AI_*)
+        3. OPENAI_API_KEY for crawl4ai_llm_api_key
+        4. Field default values
 
         Args:
             timeout: Request timeout in seconds (default: 120)
             max_content_length: Maximum content length before truncation (default: 128000)
-            filter_type: Content filter type: 'llm' or 'pruning' (default: 'llm')
-            service_url: crawl4ai service URL (default: 'http://localhost:11235')
-            llm_provider: LLM provider for content filtering (default: 'openai/gpt-4o-mini')
-            llm_api_key: API key for LLM provider (default: None, uses OPENAI_API_KEY env var)
+            filter_type: Content filter type: 'llm' or 'pruning' (default: 'llm', auto-fallback to 'pruning')
+            crawl4ai_service_url: Crawl4ai HTTP service URL (default: 'http://localhost:11235')
+            crawl4ai_llm_provider: LLM provider for crawl4ai content filtering (default: 'openai/gpt-4o-mini')
+            crawl4ai_llm_api_key: API key for crawl4ai LLM provider (default: uses OPENAI_API_KEY)
             proxy: HTTP proxy for web requests (default: None)
         """
         super().__init__(**kwargs)
 
         # Load configuration with priority
-        self.service_url = (
-            service_url
-            or os.getenv("LANGCREW_WEB_FETCH_SERVICE_URL")
-            or self.service_url
+        self.crawl4ai_service_url = (
+            crawl4ai_service_url
+            or os.getenv("LANGCREW_CRAWL4AI_SERVICE_URL")
+            or self.crawl4ai_service_url
         )
         self.timeout = (
             timeout or int(os.getenv("LANGCREW_WEB_FETCH_TIMEOUT", "0")) or self.timeout
@@ -97,17 +103,26 @@ class WebFetchTool(BaseTool):
             or os.getenv("LANGCREW_WEB_FETCH_FILTER_TYPE")
             or self.filter_type
         )
-        self.llm_provider = (
-            llm_provider
-            or os.getenv("LANGCREW_WEB_FETCH_LLM_PROVIDER")
-            or self.llm_provider
+        self.crawl4ai_llm_provider = (
+            crawl4ai_llm_provider
+            or os.getenv("LANGCREW_CRAWL4AI_LLM_PROVIDER")
+            or self.crawl4ai_llm_provider
         )
-        self.llm_api_key = (
-            llm_api_key
-            or os.getenv("LANGCREW_WEB_FETCH_LLM_API_KEY")
-            or self.llm_api_key
+        self.crawl4ai_llm_api_key = (
+            crawl4ai_llm_api_key
+            or os.getenv("LANGCREW_CRAWL4AI_LLM_API_KEY")
+            or os.getenv("OPENAI_API_KEY")  # Fallback to OPENAI_API_KEY
+            or self.crawl4ai_llm_api_key
         )
         self.proxy = proxy or os.getenv("LANGCREW_WEB_FETCH_PROXY") or self.proxy
+
+        # Intelligent fallback: if LLM mode selected but no API key, switch to pruning
+        if self.filter_type == "llm" and not self.crawl4ai_llm_api_key:
+            logger.warning(
+                "LLM filter type selected but no crawl4ai API key provided. "
+                "Falling back to pruning mode for better compatibility."
+            )
+            self.filter_type = "pruning"
 
     async def _arun(
         self,
@@ -141,8 +156,8 @@ class WebFetchTool(BaseTool):
                     "llm_config": {
                         "type": "LLMConfig",
                         "params": {
-                            "provider": self.llm_provider,
-                            "api_token": self.llm_api_key,
+                            "provider": self.crawl4ai_llm_provider,
+                            "api_token": self.crawl4ai_llm_api_key,
                         },
                     },
                     "instruction": """
@@ -169,7 +184,7 @@ class WebFetchTool(BaseTool):
                     "verbose": True,
                 },
             }
-            logger.info("Using LLMContentFilter with openai/gpt-4o-mini")
+            logger.info(f"Using LLMContentFilter with {self.crawl4ai_llm_provider}")
 
         # Build request payload following crawl4ai API structure
         payload = {
@@ -222,7 +237,7 @@ class WebFetchTool(BaseTool):
         # Make HTTP request to crawl4ai service
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{self.service_url}/crawl",
+                f"{self.crawl4ai_service_url}/crawl",
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=self.timeout),
             ) as response:

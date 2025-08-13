@@ -14,7 +14,7 @@ import os
 from langchain_openai import ChatOpenAI
 
 # Import tool converter
-from langcrew.tools.tool_converter import convert_tools
+from langcrew.tools.converter import convert_tools
 
 
 # Simple tool conversion function

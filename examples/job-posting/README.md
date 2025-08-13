@@ -4,19 +4,13 @@ This project demonstrates the use of the LangCrew framework to automate the crea
 
 Based on [@joaomdmoura](https://x.com/joaomdmoura)'s CrewAI example, enhanced with LangCrew.
 
-- [LangCrew Framework](#langcrew-framework)
 - [Running the Script](#running-the-script)
 - [Details & Explanation](#details--explanation)
-- [Contributing](#contributing)
-- [License](#license)
-
-## LangCrew Framework
-LangCrew is an enhanced framework built on top of CrewAI, designed to facilitate the collaboration of role-playing AI agents. In this example, these agents work together to analyze company culture and identify role requirements to create comprehensive job postings and industry analysis.
 
 ## Running the Script
-It uses GPT-4o by default so you should have access to that to run it.
+It uses gpt-4o-mini by default so you should have access to that to run it.
 
-***Disclaimer:** This will use gpt-4o unless you change it to use a different model, and by doing so it may incur different costs.*
+***Disclaimer:** This will use gpt-4o-mini unless you change it to use a different model, and by doing so it may incur different costs.*
 
 - **Configure Environment**: Copy `.env.example` to `.env` and set up the environment variables for [OpenAI](https://platform.openai.com/api-keys) and other tools as needed, like [Serper](https://serper.dev).
 - **Install Dependencies**: Run `  uv sync --prerelease=allow` to install all dependencies.
@@ -37,6 +31,3 @@ It uses GPT-4o by default so you should have access to that to run it.
   - **Company Description**: Brief overview of the company and its mission
   - **Hiring Needs**: Specific role requirements and position details
   - **Specific Benefits**: Unique benefits and perks offered by the company
-
-## License
-This project is released under the MIT License.
