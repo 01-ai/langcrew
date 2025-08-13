@@ -1,0 +1,237 @@
+---
+title: Utils - Getting Started
+description: Get started with Utils in 5 minutes
+---
+
+Quick guide to get Utils working in your langcrew application.
+
+## Installation
+
+Utils is included with langcrew - no additional installation required:
+
+```bash
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+## Basic Examples
+
+### File Detection
+
+Automatically detect file types and extract metadata:
+
+```python
+from langcrew.utils import detect_file_type
+
+# Detect various file types
+pdf_info = detect_file_type("document.pdf")
+print(f"Type: {pdf_info.file_type}")
+print(f"MIME: {pdf_info.mime_type}")
+print(f"Size: {pdf_info.size} bytes")
+
+# Detect text files with content
+text_info = detect_file_type("README.md", read_content=True)
+print(f"Content preview: {text_info.content[:100]}...")
+print(f"Is text file: {text_info.is_text}")
+```
+
+### Token Counting
+
+Count tokens accurately for different models:
+
+```python
+from langcrew.utils import count_tokens
+
+# Simple text token counting
+text = "Hello, how can I help you today?"
+gpt4_tokens = count_tokens(text, model="gpt-4")
+print(f"GPT-4 tokens: {gpt4_tokens}")
+
+# Message-based token counting
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "What is the capital of France?"},
+    {"role": "assistant", "content": "The capital of France is Paris."}
+]
+
+total_tokens = count_tokens(messages, model="gpt-4")
+print(f"Total conversation tokens: {total_tokens}")
+```
+
+### Language Detection
+
+Detect language and process text:
+
+```python
+from langcrew.utils import detect_language, normalize_text
+
+# Detect language
+english_text = "Hello, how are you doing today?"
+french_text = "Bonjour, comment allez-vous aujourd'hui?"
+chinese_text = "你好，今天怎么样？"
+
+print(f"English: {detect_language(english_text)}")  # "en"
+print(f"French: {detect_language(french_text)}")    # "fr"
+print(f"Chinese: {detect_language(chinese_text)}")  # "zh"
+
+# Normalize text
+messy_text = "  Hello,   World!   \n\n  "
+clean_text = normalize_text(messy_text)
+print(f"Cleaned: '{clean_text}'")  # "Hello, World!"
+```
+
+### Message Utilities
+
+Generate IDs and format messages:
+
+```python
+from langcrew.utils import generate_message_id, format_message
+
+# Generate unique message ID
+msg_id = generate_message_id()
+print(f"Message ID: {msg_id}")
+
+# Format message for display
+formatted = format_message(
+    content="Hello, world!",
+    role="user",
+    timestamp=True,
+    message_id=msg_id
+)
+print(formatted)
+```
+
+## Integration Example
+
+Use utils in an agent workflow:
+
+```python
+from langcrew import Agent, Task
+from langcrew.utils import detect_file_type, count_tokens, detect_language
+
+# Create document analysis agent
+analyzer = Agent(
+    role="Document Analyzer",
+    goal="Analyze documents and provide insights",
+    backstory="Expert at processing various document types"
+)
+
+def analyze_document(file_path: str):
+    """Comprehensive document analysis"""
+    
+    # Step 1: Detect file type
+    file_info = detect_file_type(file_path, read_content=True)
+    print(f"File type: {file_info.file_type}")
+    
+    # Step 2: Count tokens if text
+    if file_info.is_text and file_info.content:
+        tokens = count_tokens(file_info.content)
+        print(f"Token count: {tokens}")
+        
+        # Step 3: Detect language
+        language = detect_language(file_info.content)
+        print(f"Language: {language}")
+        
+        # Step 4: Create analysis task
+        task = Task(
+            agent=analyzer,
+            description=f"Analyze this {language} document with {tokens} tokens",
+            expected_output="Document summary and key insights"
+        )
+        
+        return task.execute()
+    
+    return f"Cannot analyze {file_info.file_type} file"
+
+# Test the function
+result = analyze_document("sample.txt")
+print(result)
+```
+
+## Testing Your Setup
+
+### Run the Complete Example
+
+```bash
+# Set your OpenAI API key
+export OPENAI_API_KEY=your_api_key_here
+
+# Run from the utils example directory
+cd examples/components/utils
+uv run utils_example.py
+```
+
+This example demonstrates:
+- File type detection for various formats
+- Token counting for different models
+- Language detection for multilingual content
+- Message formatting and ID generation
+
+## More Examples
+
+For additional examples, check out:
+
+- **📁 `examples/components/utils/`** - Complete utility implementations
+- **📄 `examples/components/utils/README.md`** - Setup instructions  
+- **🐍 `examples/components/utils/utils_example.py`** - Runnable code
+- **📊 `examples/components/utils/token_analysis.py`** - Token counting examples
+
+## Troubleshooting
+
+### File Detection Issues
+
+Ensure file exists and is readable:
+```python
+import os
+
+# ❌ Wrong - file doesn't exist
+file_info = detect_file_type("nonexistent.txt")
+
+# ✅ Correct - check file exists
+if os.path.exists("document.pdf"):
+    file_info = detect_file_type("document.pdf")
+else:
+    print("File not found")
+```
+
+### Token Counting Errors
+
+Use supported model names:
+```python
+# ❌ Wrong - unsupported model
+tokens = count_tokens(text, model="unsupported-model")
+
+# ✅ Correct - supported models
+tokens = count_tokens(text, model="gpt-4")
+tokens = count_tokens(text, model="claude-3")
+```
+
+### Language Detection Issues
+
+Provide sufficient text for accurate detection:
+```python
+# ❌ Wrong - too short
+lang = detect_language("Hi")  # May be inaccurate
+
+# ✅ Correct - sufficient text
+lang = detect_language("Hello, how are you doing today?")
+```
+
+### Import Errors
+
+Make sure you're importing from the correct modules:
+```python
+# Core utilities
+from langcrew.utils import detect_file_type, count_tokens
+
+# Language utilities
+from langcrew.utils import detect_language, normalize_text
+
+# Message utilities
+from langcrew.utils import generate_message_id, format_message
+```
+
+## Next Steps
+
+- **[Configuration Guide](/guides/utils/configuration)** - Learn all options
+- **[Utils Concepts](/concepts/utils)** - Understand architecture
+- **Examples** - Check `examples/components/utils/` for implementations

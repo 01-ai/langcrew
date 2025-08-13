@@ -1,0 +1,147 @@
+---
+title: Memory - Getting Started
+description: Get started with Memory in 5 minutes
+---
+
+Quick guide to get Memory working in your langcrew application.
+
+## Installation
+
+Memory is included with langcrew - no additional installation required:
+
+```bash
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+## Basic Example
+
+Here's a simple example that enables memory for an agent:
+
+```python
+from langcrew import Agent
+from langcrew.memory import MemoryConfig
+
+# Basic memory configuration
+memory_config = MemoryConfig(
+    provider="memory",  # In-memory storage for development
+    short_term={"max_history": 10},
+    long_term={"enabled": True},
+    entity={"enabled": True}
+)
+
+# Create agent with memory
+agent = Agent(
+    role="Personal Assistant",
+    goal="Help users with their tasks while remembering context",
+    backstory="You are a helpful assistant with perfect memory",
+    memory=memory_config,
+    verbose=True
+)
+
+# Test conversation
+response1 = agent.execute_task("My name is John and I work at Acme Corp")
+print(response1)
+
+response2 = agent.execute_task("What's my name and where do I work?")
+print(response2)  # Should remember John and Acme Corp
+```
+
+## Persistent Memory Example
+
+For production use, configure persistent storage:
+
+```python
+from langcrew.memory import MemoryConfig
+
+# SQLite configuration (recommended for single-node)
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///langcrew_memory.db",
+    short_term={"max_history": 50},
+    long_term={
+        "enabled": True,
+        "chunk_size": 1000,
+        "search_k": 10
+    }
+)
+
+# PostgreSQL configuration (recommended for production)
+memory_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@localhost/langcrew_memory"
+)
+```
+
+## Testing Your Setup
+
+### Run the Complete Example
+
+```bash
+# Set your OpenAI API key
+export OPENAI_API_KEY=your_api_key_here
+
+# Run from the memory example directory
+cd examples/components/memory
+uv run memory_example.py
+```
+
+This example demonstrates:
+- Basic memory configuration
+- Short-term and long-term memory usage
+- Entity extraction and recall
+- Cross-session persistence
+
+## More Examples
+
+For additional examples, check out:
+
+- **📁 `examples/components/memory/`** - Complete memory implementations
+- **📄 `examples/components/memory/README.md`** - Setup instructions  
+- **🐍 `examples/components/memory/memory_example.py`** - Runnable code
+
+## Troubleshooting
+
+### Memory Not Persisting
+
+Check your provider configuration:
+```python
+# ❌ Wrong - will not persist between sessions
+memory_config = MemoryConfig(provider="memory")
+
+# ✅ Correct - persists to database
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///my_memory.db"
+)
+```
+
+### Connection Errors
+
+Ensure your database is accessible:
+```python
+# For SQLite, ensure directory exists
+import os
+os.makedirs("./data", exist_ok=True)
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///./data/memory.db"
+)
+```
+
+### Import Errors
+
+Make sure you're importing from the correct modules:
+```python
+# Core memory configuration
+from langcrew.memory import MemoryConfig
+
+# Specific memory types (if needed directly)
+from langcrew.memory import ShortTermMemory, LongTermMemory, EntityMemory
+```
+
+## Next Steps
+
+- **[Configuration Guide](/guides/memory/configuration)** - Learn all options
+- **[Memory Concepts](/concepts/memory)** - Understand architecture
+- **Examples** - Check `examples/components/memory/` for implementations

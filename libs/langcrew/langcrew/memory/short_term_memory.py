@@ -7,7 +7,7 @@ from typing import Any
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 
-from .config import MemoryConfig
+from .base import MemoryConfig
 
 
 class ShortTermMemory:

@@ -1,0 +1,134 @@
+---
+title: 内存管理
+description: 理解内存管理 - AI 工作流的持久状态管理
+---
+
+内存管理为 AI 智能体工作流提供持久状态管理，包括短期、长期和实体记忆功能，实现上下文感知的对话。
+
+## 什么是内存管理？
+
+langcrew 中的内存管理提供：
+- **短期记忆**：对话历史和近期上下文
+- **长期记忆**：基于嵌入的持久知识存储
+- **实体记忆**：跨对话跟踪和记住实体
+- **多提供商支持**：内存、SQLite、PostgreSQL、Redis、MongoDB、MySQL
+
+## 核心架构
+
+内存管理基于 [LangGraph 的 Store 和 Checkpointer](https://langchain-ai.github.io/langgraph/concepts/persistence/) 并提供增强功能：
+
+```python
+from langcrew.memory import MemoryConfig
+
+# 基本配置
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db"
+)
+```
+
+## 关键组件
+
+### MemoryConfig
+所有内存类型和提供商的统一配置。
+
+#### 配置参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|------|------|------|--------|
+| `enabled` | bool | 启用/禁用内存功能 | True |
+| `provider` | str | 存储提供商："memory"、"sqlite"、"postgres" 等 | "memory" |
+| `connection_string` | str \| None | 数据库连接字符串 | None |
+| `short_term` | dict | 短期记忆配置 | 见下文 |
+| `long_term` | dict | 长期记忆配置 | 见下文 |
+| `entity` | dict | 实体记忆配置 | 见下文 |
+| `shared_namespaces` | List[str] | 跨项目命名空间 | [] |
+| `thread_id` | str \| None | 固定线程标识符 | None |
+
+### 短期记忆
+管理对话历史和近期上下文。
+
+```python
+# 短期记忆配置
+memory_config = MemoryConfig(
+    short_term={
+        "enabled": True,
+        "auto_inject": True,
+        "max_history": 20,
+        "relevance_threshold": 0.7
+    }
+)
+```
+
+### 长期记忆
+具有语义搜索的持久知识存储。
+
+```python
+# 长期记忆配置
+memory_config = MemoryConfig(
+    long_term={
+        "enabled": True,
+        "embedding_model": "text-embedding-ada-002",
+        "chunk_size": 500,
+        "search_k": 5,
+        "min_quality": 0.7
+    }
+)
+```
+
+### 实体记忆
+跨对话跟踪和记住实体。
+
+```python
+# 实体记忆配置
+memory_config = MemoryConfig(
+    entity={
+        "enabled": True,
+        "extract_entities": True,
+        "entity_types": ["person", "organization", "location", "concept"]
+    }
+)
+```
+
+## 与 langcrew 的集成
+
+内存管理与所有 langcrew 组件无缝集成：
+
+- **[智能体](/zh/concepts/agents)**：智能体继承内存配置以实现上下文感知响应
+- **[任务](/zh/concepts/tasks)**：任务在执行过程中维护状态
+- **[团队](/zh/concepts/crews)**：团队成员间共享内存
+
+```python
+# 集成示例
+from langcrew import Agent, Crew
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///team_memory.db"
+)
+
+agent = Agent(
+    role="助手",
+    memory=memory_config
+)
+
+crew = Crew(
+    agents=[agent],
+    memory=memory_config  # 团队间共享内存
+)
+```
+
+## 何时使用内存管理
+
+- **对话智能体** 需要上下文感知
+- **长期运行工作流** 需要状态持久化
+- **多会话应用** 需要连续性
+- **团队协作** 需要共享知识
+- **客户服务** 需要交互历史
+
+## 下一步
+
+- **[内存管理快速开始](/zh/guides/memory/getting-started)** - 5分钟快速上手
+- **[内存管理配置指南](/zh/guides/memory/configuration)** - 完整配置指南
+- **示例** - 查看 `examples/components/memory/` 了解实际实现案例

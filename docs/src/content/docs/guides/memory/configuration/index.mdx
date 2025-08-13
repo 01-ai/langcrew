@@ -1,0 +1,277 @@
+---
+title: Memory Configuration
+description: Complete configuration guide for Memory
+---
+
+Comprehensive guide to configuring Memory for your needs.
+
+## Basic Configuration
+
+### In-Memory Storage (Development)
+
+For development and testing:
+
+```python
+from langcrew.memory import MemoryConfig
+
+# Simple in-memory configuration
+memory_config = MemoryConfig(
+    provider="memory",
+    short_term={"max_history": 20},
+    long_term={"enabled": True},
+    entity={"enabled": True}
+)
+```
+
+### SQLite Storage (Single Node)
+
+For single-node production deployments:
+
+```python
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///langcrew_memory.db",
+    short_term={
+        "max_history": 100,
+        "auto_inject": True,
+        "relevance_threshold": 0.8
+    },
+    long_term={
+        "enabled": True,
+        "chunk_size": 1000,
+        "search_k": 10,
+        "min_quality": 0.7
+    }
+)
+```
+
+## Advanced Configuration
+
+### PostgreSQL (Distributed Production)
+
+For scalable production deployments:
+
+```python
+memory_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:password@host:port/database",
+    short_term={
+        "enabled": True,
+        "max_history": 200,
+        "auto_inject": True
+    },
+    long_term={
+        "enabled": True,
+        "embedding_model": "text-embedding-ada-002",
+        "chunk_size": 1500,
+        "search_k": 15
+    },
+    entity={
+        "enabled": True,
+        "extract_entities": True,
+        "entity_types": ["person", "organization", "location", "product"]
+    }
+)
+```
+
+### Redis (High Performance)
+
+For high-performance caching:
+
+```python
+memory_config = MemoryConfig(
+    provider="redis",
+    connection_string="redis://localhost:6379/0",
+    short_term={
+        "max_history": 50,
+        "relevance_threshold": 0.9
+    }
+)
+```
+
+## Configuration Patterns
+
+### Pattern 1: Customer Service Agent
+
+For customer service with conversation history:
+
+```python
+customer_service_memory = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@db/customer_service",
+    short_term={
+        "enabled": True,
+        "max_history": 100,
+        "auto_inject": True
+    },
+    entity={
+        "enabled": True,
+        "entity_types": ["person", "product", "issue", "date"]
+    },
+    shared_namespaces=["customer_profiles", "product_catalog"]
+)
+```
+
+### Pattern 2: Research Assistant
+
+For research with long-term knowledge storage:
+
+```python
+research_memory = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///research_knowledge.db",
+    long_term={
+        "enabled": True,
+        "chunk_size": 2000,
+        "search_k": 20,
+        "min_quality": 0.6
+    },
+    entity={
+        "enabled": True,
+        "entity_types": ["person", "organization", "concept", "publication"]
+    }
+)
+```
+
+### Pattern 3: Team Collaboration
+
+For teams sharing knowledge:
+
+```python
+team_memory = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@db/team_memory",
+    shared_namespaces=["team_knowledge", "project_context"],
+    short_term={"max_history": 30},
+    long_term={
+        "enabled": True,
+        "search_k": 10
+    },
+    entity={
+        "enabled": True,
+        "entity_types": ["person", "project", "task", "deadline"]
+    }
+)
+```
+
+### Pattern 4: Multi-Session Continuity
+
+For applications requiring session continuity:
+
+```python
+session_memory = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///sessions.db",
+    thread_id="user_12345",  # Fixed thread per user
+    short_term={
+        "max_history": 200,
+        "auto_inject": True
+    },
+    long_term={"enabled": True}
+)
+```
+
+## Memory Type Configuration
+
+### Short-term Memory Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enabled` | bool | Enable short-term memory | True |
+| `auto_inject` | bool | Auto-inject context into prompts | True |
+| `max_history` | int | Maximum conversation history | 20 |
+| `relevance_threshold` | float | Minimum relevance score | 0.7 |
+
+### Long-term Memory Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enabled` | bool | Enable long-term memory | True |
+| `embedding_model` | str \| None | Embedding model name | None |
+| `chunk_size` | int | Text chunk size for storage | 500 |
+| `search_k` | int | Number of results to retrieve | 5 |
+| `min_quality` | float | Minimum quality threshold | 0.7 |
+
+### Entity Memory Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enabled` | bool | Enable entity memory | True |
+| `extract_entities` | bool | Auto-extract entities | True |
+| `entity_types` | List[str] | Types of entities to track | ["person", "organization", "location", "concept"] |
+
+## Provider-Specific Configuration
+
+### SQLite Configuration
+
+```python
+# SQLite with custom settings
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db?timeout=20&journal_mode=WAL"
+)
+```
+
+### PostgreSQL Configuration
+
+```python
+# PostgreSQL with connection pooling
+memory_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@host/db?pool_size=10&max_overflow=20"
+)
+```
+
+### MongoDB Configuration
+
+```python
+# MongoDB configuration
+memory_config = MemoryConfig(
+    provider="mongodb",
+    connection_string="mongodb://user:pass@host:port/database"
+)
+```
+
+## Best Practices
+
+- **Choose the right provider**: Use SQLite for single-node, PostgreSQL for production
+- **Configure appropriate limits**: Set reasonable `max_history` and `search_k` values
+- **Use shared namespaces**: Enable knowledge sharing across related agents
+- **Monitor memory usage**: Regularly clean up old or irrelevant memories
+- **Secure connections**: Use SSL/TLS for production database connections
+- **Backup regularly**: Implement backup strategies for persistent memory
+
+## Performance Tuning
+
+### Optimize Search Performance
+
+```python
+# Tuned for performance
+memory_config = MemoryConfig(
+    provider="postgres",
+    long_term={
+        "chunk_size": 1000,  # Larger chunks for better context
+        "search_k": 5,       # Fewer results for speed
+        "min_quality": 0.8   # Higher threshold for relevance
+    }
+)
+```
+
+### Optimize Storage Size
+
+```python
+# Tuned for storage efficiency
+memory_config = MemoryConfig(
+    short_term={
+        "max_history": 50,   # Limit history size
+        "relevance_threshold": 0.9  # Only keep highly relevant
+    }
+)
+```
+
+## Next Steps
+
+- **[Memory Concepts](/concepts/memory)** - Understand architecture
+- **[Getting Started](/guides/memory/getting-started)** - Quick start guide
+- **Examples** - Check `examples/components/memory/` for implementations
+- **[Community Forum](https://github.com/01-ai/langcrew/discussions)** - Get help

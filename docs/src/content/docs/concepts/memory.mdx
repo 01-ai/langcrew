@@ -1,0 +1,134 @@
+---
+title: Memory
+description: Understanding Memory - persistent state management for AI workflows
+---
+
+Memory enables persistent state management in AI agent workflows, providing short-term, long-term, and entity-based memory capabilities for context-aware conversations.
+
+## What is Memory?
+
+Memory in langcrew provides:
+- **Short-term memory**: Conversation history and recent context
+- **Long-term memory**: Persistent knowledge storage with embeddings  
+- **Entity memory**: Track and remember entities across conversations
+- **Multi-provider support**: Memory, SQLite, PostgreSQL, Redis, MongoDB, MySQL
+
+## Core Architecture
+
+Memory is built on [LangGraph's Store and Checkpointer](https://langchain-ai.github.io/langgraph/concepts/persistence/) with enhanced capabilities:
+
+```python
+from langcrew.memory import MemoryConfig
+
+# Basic configuration
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db"
+)
+```
+
+## Key Components
+
+### MemoryConfig
+Unified configuration for all memory types and providers.
+
+#### Configuration Parameters
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enabled` | bool | Enable/disable memory functionality | True |
+| `provider` | str | Storage provider: "memory", "sqlite", "postgres", etc. | "memory" |
+| `connection_string` | str \| None | Database connection string | None |
+| `short_term` | dict | Short-term memory configuration | See below |
+| `long_term` | dict | Long-term memory configuration | See below |
+| `entity` | dict | Entity memory configuration | See below |
+| `shared_namespaces` | List[str] | Cross-project namespaces | [] |
+| `thread_id` | str \| None | Fixed thread identifier | None |
+
+### Short-term Memory
+Manages conversation history and recent context.
+
+```python
+# Short-term memory configuration
+memory_config = MemoryConfig(
+    short_term={
+        "enabled": True,
+        "auto_inject": True,
+        "max_history": 20,
+        "relevance_threshold": 0.7
+    }
+)
+```
+
+### Long-term Memory
+Persistent knowledge storage with semantic search.
+
+```python
+# Long-term memory configuration  
+memory_config = MemoryConfig(
+    long_term={
+        "enabled": True,
+        "embedding_model": "text-embedding-ada-002",
+        "chunk_size": 500,
+        "search_k": 5,
+        "min_quality": 0.7
+    }
+)
+```
+
+### Entity Memory
+Tracks and remembers entities across conversations.
+
+```python
+# Entity memory configuration
+memory_config = MemoryConfig(
+    entity={
+        "enabled": True,
+        "extract_entities": True,
+        "entity_types": ["person", "organization", "location", "concept"]
+    }
+)
+```
+
+## Integration with langcrew
+
+Memory integrates seamlessly with all langcrew components:
+
+- **[Agents](/concepts/agents)**: Agents inherit memory configuration for context-aware responses
+- **[Tasks](/concepts/tasks)**: Tasks maintain state across executions
+- **[Crews](/concepts/crews)**: Crews share memory across team members
+
+```python
+# Integration example
+from langcrew import Agent, Crew
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///team_memory.db"
+)
+
+agent = Agent(
+    role="Assistant",
+    memory=memory_config
+)
+
+crew = Crew(
+    agents=[agent],
+    memory=memory_config  # Shared memory across crew
+)
+```
+
+## When to Use Memory
+
+- **Conversational agents** requiring context awareness
+- **Long-running workflows** needing state persistence
+- **Multi-session applications** requiring continuity
+- **Team collaboration** with shared knowledge
+- **Customer service** with interaction history
+
+## Next Steps
+
+- **[Memory Quick Start](/guides/memory/getting-started)** - Get started in 5 minutes
+- **[Memory Configuration](/guides/memory/configuration)** - Complete configuration guide
+- **Examples** - Check `examples/components/memory/` for real-world implementations

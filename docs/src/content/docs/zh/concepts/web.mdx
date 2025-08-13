@@ -1,0 +1,155 @@
+---
+title: Web服务
+description: 理解Web服务 - AI 工作流的 HTTP 服务器和适配器
+---
+
+Web服务为 AI 智能体工作流提供 HTTP 服务器功能和基于 Web 的界面，包括 REST API、流式响应和 LangGraph 集成。
+
+## 什么是Web服务？
+
+langcrew 中的Web服务提供：
+- **HTTP 服务器**：用于智能体交互的 RESTful API 端点
+- **LangGraph 适配器**：与 LangGraph 工作流的无缝集成
+- **流式支持**：实时响应流和工具执行
+- **工具显示**：工具调用和结果的丰富可视化
+
+## 核心架构
+
+Web服务基于 FastAPI 构建，集成 LangGraph 以提供强大的 Web 界面：
+
+```python
+from langcrew.web import create_server, LangGraphAdapter
+
+# 基本服务器设置
+server = create_server(
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["http://localhost:3000"]
+)
+```
+
+## 关键组件
+
+### AdapterServer
+用于托管智能体工作流的 HTTP 服务器，提供 REST API 端点。
+
+```python
+from langcrew.web import AdapterServer
+
+# 创建服务器实例
+server = AdapterServer(
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["*"],
+    debug=True
+)
+```
+
+### LangGraphAdapter
+将 LangCrew 智能体与 LangGraph 工作流集成的适配器。
+
+```python
+from langcrew.web import LangGraphAdapter
+from langcrew import Agent, Crew
+
+# 创建适配器
+adapter = LangGraphAdapter(
+    crew=crew,
+    enable_streaming=True,
+    tool_display=True
+)
+```
+
+### 协议类型
+HTTP 通信的类型定义。
+
+| 类型 | 描述 | 用途 |
+|------|------|------|
+| `ChatRequest` | 聊天消息请求 | 客户端 → 服务器 |
+| `StreamMessage` | 流式响应 | 服务器 → 客户端 |
+| `ExecutionInput` | 工作流执行输入 | 智能体执行 |
+| `ToolResult` | 工具执行结果 | 工具显示 |
+| `TaskExecutionStatus` | 任务状态更新 | 进度跟踪 |
+
+### ToolDisplayManager
+管理工具调用和结果的丰富可视化。
+
+```python
+from langcrew.web import ToolDisplayManager
+
+# 配置工具显示
+display_manager = ToolDisplayManager(
+    show_parameters=True,
+    show_results=True,
+    format_json=True
+)
+```
+
+## 与 langcrew 的集成
+
+Web服务与所有 langcrew 组件无缝集成：
+
+- **[智能体](/zh/concepts/agents)**：通过 HTTP 端点暴露智能体
+- **[任务](/zh/concepts/tasks)**：通过 Web 界面执行任务
+- **[团队](/zh/concepts/crews)**：将整个团队托管为 Web 服务
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_langgraph_server
+
+# 创建智能体和团队
+agent = Agent(
+    role="Web助手",
+    goal="通过Web界面帮助用户",
+    backstory="专业的基于Web的AI助手"
+)
+
+crew = Crew(agents=[agent])
+
+# 创建Web服务器
+server = create_langgraph_server(
+    crew=crew,
+    host="0.0.0.0",
+    port=8000
+)
+
+# 启动服务器
+server.start()
+```
+
+## 何时使用Web服务
+
+- **Web应用** 需要AI智能体后端
+- **API服务** 用于移动或前端应用
+- **微服务** 架构中的AI功能
+- **实时界面** 需要流式响应
+- **多用户平台** 需要并发访问
+
+## API 端点
+
+### 标准端点
+
+- `POST /chat` - 向智能体发送聊天消息
+- `POST /execute` - 执行特定任务
+- `GET /status` - 检查服务器和智能体状态
+- `WebSocket /stream` - 实时流式界面
+
+### API 使用示例
+
+```bash
+# 发送聊天消息
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "你好，你能帮我什么？"}'
+
+# 执行特定任务
+curl -X POST http://localhost:8000/execute \
+  -H "Content-Type: application/json" \
+  -d '{"task": "analyze_data", "input": {"data": "sample"}}'
+```
+
+## 下一步
+
+- **[Web服务快速开始](/zh/guides/web/getting-started)** - 5分钟快速上手
+- **[Web服务配置指南](/zh/guides/web/configuration)** - 完整配置指南
+- **示例** - 查看 `examples/components/web/` 了解实际实现案例

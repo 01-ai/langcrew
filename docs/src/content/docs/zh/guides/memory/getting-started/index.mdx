@@ -1,0 +1,147 @@
+---
+title: 内存管理 - 快速开始
+description: 5分钟快速上手内存管理
+---
+
+快速指南，让内存管理在您的 langcrew 应用中工作。
+
+## 安装
+
+内存管理包含在 langcrew 中 - 无需额外安装：
+
+```bash
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+## 基础示例
+
+这是一个为智能体启用内存的简单示例：
+
+```python
+from langcrew import Agent
+from langcrew.memory import MemoryConfig
+
+# 基本内存配置
+memory_config = MemoryConfig(
+    provider="memory",  # 开发用内存存储
+    short_term={"max_history": 10},
+    long_term={"enabled": True},
+    entity={"enabled": True}
+)
+
+# 创建具有内存的智能体
+agent = Agent(
+    role="个人助手",
+    goal="在记住上下文的同时帮助用户完成任务",
+    backstory="您是一个拥有完美记忆的有用助手",
+    memory=memory_config,
+    verbose=True
+)
+
+# 测试对话
+response1 = agent.execute_task("我的名字是张三，我在ABC公司工作")
+print(response1)
+
+response2 = agent.execute_task("我的名字是什么，我在哪里工作？")
+print(response2)  # 应该记住张三和ABC公司
+```
+
+## 持久内存示例
+
+对于生产使用，配置持久存储：
+
+```python
+from langcrew.memory import MemoryConfig
+
+# SQLite 配置（推荐用于单节点）
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///langcrew_memory.db",
+    short_term={"max_history": 50},
+    long_term={
+        "enabled": True,
+        "chunk_size": 1000,
+        "search_k": 10
+    }
+)
+
+# PostgreSQL 配置（推荐用于生产）
+memory_config = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://user:pass@localhost/langcrew_memory"
+)
+```
+
+## 测试您的设置
+
+### 运行完整示例
+
+```bash
+# 设置您的 OpenAI API 密钥
+export OPENAI_API_KEY=your_api_key_here
+
+# 从内存示例目录运行
+cd examples/components/memory
+uv run memory_example.py
+```
+
+这个示例演示了：
+- 基本内存配置
+- 短期和长期内存使用
+- 实体提取和回忆
+- 跨会话持久化
+
+## 更多示例
+
+要了解更多示例，请查看：
+
+- **📁 `examples/components/memory/`** - 完整的内存实现
+- **📄 `examples/components/memory/README.md`** - 设置说明
+- **🐍 `examples/components/memory/memory_example.py`** - 可运行代码
+
+## 故障排除
+
+### 内存不持久
+
+检查您的提供商配置：
+```python
+# ❌ 错误 - 不会在会话间持久化
+memory_config = MemoryConfig(provider="memory")
+
+# ✅ 正确 - 持久化到数据库
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///my_memory.db"
+)
+```
+
+### 连接错误
+
+确保您的数据库可访问：
+```python
+# 对于 SQLite，确保目录存在
+import os
+os.makedirs("./data", exist_ok=True)
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///./data/memory.db"
+)
+```
+
+### 导入错误
+
+确保您从正确的模块导入：
+```python
+# 核心内存配置
+from langcrew.memory import MemoryConfig
+
+# 特定内存类型（如果需要直接使用）
+from langcrew.memory import ShortTermMemory, LongTermMemory, EntityMemory
+```
+
+## 下一步
+
+- **[配置指南](/zh/guides/memory/configuration)** - 学习所有选项
+- **[内存管理概念](/zh/concepts/memory)** - 理解架构
+- **示例** - 查看 `examples/components/memory/` 了解实现案例

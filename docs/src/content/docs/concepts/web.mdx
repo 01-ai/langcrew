@@ -1,0 +1,155 @@
+---
+title: Web
+description: Understanding Web - HTTP server and adapters for AI workflows
+---
+
+Web enables HTTP server capabilities and web-based interfaces for AI agent workflows, providing REST APIs, streaming responses, and LangGraph integration.
+
+## What is Web?
+
+Web in langcrew provides:
+- **HTTP server**: RESTful API endpoints for agent interaction
+- **LangGraph adapter**: Seamless integration with LangGraph workflows
+- **Streaming support**: Real-time response streaming and tool execution
+- **Tool display**: Rich visualization of tool calls and results
+
+## Core Architecture
+
+Web is built on FastAPI with LangGraph integration for robust web interfaces:
+
+```python
+from langcrew.web import create_server, LangGraphAdapter
+
+# Basic server setup
+server = create_server(
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["http://localhost:3000"]
+)
+```
+
+## Key Components
+
+### AdapterServer
+HTTP server for hosting agent workflows with REST API endpoints.
+
+```python
+from langcrew.web import AdapterServer
+
+# Create server instance
+server = AdapterServer(
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["*"],
+    debug=True
+)
+```
+
+### LangGraphAdapter
+Adapter for integrating LangCrew agents with LangGraph workflows.
+
+```python
+from langcrew.web import LangGraphAdapter
+from langcrew import Agent, Crew
+
+# Create adapter
+adapter = LangGraphAdapter(
+    crew=crew,
+    enable_streaming=True,
+    tool_display=True
+)
+```
+
+### Protocol Types
+Type definitions for HTTP communication.
+
+| Type | Description | Usage |
+|------|-------------|-------|
+| `ChatRequest` | Chat message request | Client → Server |
+| `StreamMessage` | Streaming response | Server → Client |
+| `ExecutionInput` | Workflow execution input | Agent execution |
+| `ToolResult` | Tool execution result | Tool display |
+| `TaskExecutionStatus` | Task status updates | Progress tracking |
+
+### ToolDisplayManager
+Manages rich visualization of tool calls and results.
+
+```python
+from langcrew.web import ToolDisplayManager
+
+# Configure tool display
+display_manager = ToolDisplayManager(
+    show_parameters=True,
+    show_results=True,
+    format_json=True
+)
+```
+
+## Integration with langcrew
+
+Web integrates seamlessly with all langcrew components:
+
+- **[Agents](/concepts/agents)**: Expose agents via HTTP endpoints
+- **[Tasks](/concepts/tasks)**: Execute tasks through web interfaces
+- **[Crews](/concepts/crews)**: Host entire crews as web services
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_langgraph_server
+
+# Create agent and crew
+agent = Agent(
+    role="Web Assistant",
+    goal="Help users through web interface",
+    backstory="Expert web-based AI assistant"
+)
+
+crew = Crew(agents=[agent])
+
+# Create web server
+server = create_langgraph_server(
+    crew=crew,
+    host="0.0.0.0",
+    port=8000
+)
+
+# Start server
+server.start()
+```
+
+## When to Use Web
+
+- **Web applications** requiring AI agent backends
+- **API services** for mobile or frontend applications  
+- **Microservices** architecture with AI capabilities
+- **Real-time interfaces** with streaming responses
+- **Multi-user platforms** with concurrent access
+
+## API Endpoints
+
+### Standard Endpoints
+
+- `POST /chat` - Send chat messages to agents
+- `POST /execute` - Execute specific tasks
+- `GET /status` - Check server and agent status
+- `WebSocket /stream` - Real-time streaming interface
+
+### Example API Usage
+
+```bash
+# Send chat message
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello, how can you help me?"}'
+
+# Execute specific task
+curl -X POST http://localhost:8000/execute \
+  -H "Content-Type: application/json" \
+  -d '{"task": "analyze_data", "input": {"data": "sample"}}'
+```
+
+## Next Steps
+
+- **[Web Quick Start](/guides/web/getting-started)** - Get started in 5 minutes
+- **[Web Configuration](/guides/web/configuration)** - Complete configuration guide
+- **Examples** - Check `examples/components/web/` for real-world implementations

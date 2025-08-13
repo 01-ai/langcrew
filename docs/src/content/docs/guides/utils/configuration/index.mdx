@@ -1,0 +1,389 @@
+---
+title: Utils Configuration
+description: Complete configuration guide for Utils
+---
+
+Comprehensive guide to configuring Utils for your needs.
+
+## Basic Configuration
+
+### File Detection Configuration
+
+Configure file detection behavior:
+
+```python
+from langcrew.utils import detect_file_type
+
+# Basic file detection
+file_info = detect_file_type(
+    file_path="document.pdf",
+    read_content=True,
+    extract_metadata=True
+)
+
+# Configure content reading limits
+file_info = detect_file_type(
+    file_path="large_file.txt",
+    read_content=True,
+    max_content_size=1024 * 1024,  # 1MB limit
+    encoding="utf-8"
+)
+```
+
+### Token Counting Configuration
+
+Configure token counting for different models:
+
+```python
+from langcrew.utils import count_tokens
+
+# Basic token counting
+tokens = count_tokens(
+    text="Hello, world!",
+    model="gpt-4"
+)
+
+# Advanced token counting with metadata
+result = count_tokens(
+    text="Hello, world!",
+    model="gpt-4",
+    include_metadata=True
+)
+
+print(result.token_count)    # Total tokens
+print(result.model_name)     # Model used
+print(result.encoding_name)  # Encoding used
+```
+
+### Language Detection Configuration
+
+Configure language detection parameters:
+
+```python
+from langcrew.utils import detect_language
+
+# Basic language detection
+language = detect_language("Hello, world!")
+
+# Advanced detection with confidence
+result = detect_language(
+    text="Bonjour, comment allez-vous?",
+    confidence_threshold=0.8,
+    return_confidence=True
+)
+
+print(result.language)    # "fr"
+print(result.confidence) # 0.95
+```
+
+## Advanced Configuration
+
+### Custom File Type Handlers
+
+Register custom file type handlers:
+
+```python
+from langcrew.utils.file_detect import FileDetector
+
+# Create custom detector
+detector = FileDetector()
+
+# Register custom handler
+@detector.register_handler(".custom")
+def handle_custom_file(file_path: str):
+    return {
+        "file_type": "custom",
+        "mime_type": "application/x-custom",
+        "is_text": True
+    }
+
+# Use custom detector
+file_info = detector.detect(file_path="data.custom")
+```
+
+### Custom Tokenizer
+
+Configure custom tokenizers:
+
+```python
+from langcrew.utils.token_counter import TokenCounter
+import tiktoken
+
+# Create custom token counter
+counter = TokenCounter()
+
+# Register custom model
+counter.register_model(
+    model_name="custom-gpt",
+    encoding=tiktoken.get_encoding("cl100k_base")
+)
+
+# Use custom model
+tokens = counter.count_tokens("Hello", model="custom-gpt")
+```
+
+### Multi-Language Configuration
+
+Configure language detection for specific use cases:
+
+```python
+from langcrew.utils.language import LanguageDetector
+
+# Create detector with specific languages
+detector = LanguageDetector(
+    supported_languages=["en", "fr", "es", "de", "zh"],
+    min_text_length=10,
+    confidence_threshold=0.7
+)
+
+# Use configured detector
+result = detector.detect("Hola, ¿cómo estás?")
+```
+
+## Configuration Patterns
+
+### Pattern 1: Document Processing Pipeline
+
+For document analysis workflows:
+
+```python
+from langcrew.utils import detect_file_type, count_tokens, detect_language
+
+class DocumentProcessor:
+    def __init__(self):
+        self.max_file_size = 10 * 1024 * 1024  # 10MB
+        self.supported_types = [".txt", ".pdf", ".docx", ".md"]
+        self.token_limit = 4000
+    
+    def process(self, file_path: str):
+        # Step 1: Detect file type
+        file_info = detect_file_type(
+            file_path,
+            read_content=True,
+            max_content_size=self.max_file_size
+        )
+        
+        if file_info.file_type not in self.supported_types:
+            raise ValueError(f"Unsupported file type: {file_info.file_type}")
+        
+        # Step 2: Check token count
+        if file_info.content:
+            tokens = count_tokens(file_info.content)
+            if tokens > self.token_limit:
+                # Truncate content
+                file_info.content = self.truncate_content(
+                    file_info.content, self.token_limit
+                )
+        
+        # Step 3: Detect language
+        language = detect_language(file_info.content)
+        
+        return {
+            "file_info": file_info,
+            "tokens": tokens,
+            "language": language
+        }
+```
+
+### Pattern 2: Multi-Model Token Optimization
+
+For cost optimization across models:
+
+```python
+from langcrew.utils import count_tokens
+
+class TokenOptimizer:
+    def __init__(self):
+        self.model_costs = {
+            "gpt-4": 0.03,      # per 1K tokens
+            "gpt-3.5-turbo": 0.002,
+            "claude-3": 0.015
+        }
+    
+    def find_optimal_model(self, text: str, max_cost: float):
+        results = []
+        
+        for model, cost_per_1k in self.model_costs.items():
+            tokens = count_tokens(text, model=model)
+            total_cost = (tokens / 1000) * cost_per_1k
+            
+            results.append({
+                "model": model,
+                "tokens": tokens,
+                "cost": total_cost
+            })
+        
+        # Filter by cost and return cheapest
+        affordable = [r for r in results if r["cost"] <= max_cost]
+        return min(affordable, key=lambda x: x["cost"]) if affordable else None
+```
+
+### Pattern 3: Intelligent Message Routing
+
+For multi-language applications:
+
+```python
+from langcrew.utils import detect_language, generate_message_id
+
+class MessageRouter:
+    def __init__(self):
+        self.language_agents = {
+            "en": "english_agent",
+            "fr": "french_agent", 
+            "es": "spanish_agent",
+            "zh": "chinese_agent"
+        }
+        self.default_agent = "english_agent"
+    
+    def route_message(self, content: str):
+        # Generate unique ID
+        msg_id = generate_message_id()
+        
+        # Detect language
+        language = detect_language(content)
+        
+        # Select appropriate agent
+        agent = self.language_agents.get(language, self.default_agent)
+        
+        return {
+            "message_id": msg_id,
+            "content": content,
+            "language": language,
+            "assigned_agent": agent
+        }
+```
+
+### Pattern 4: Content Analysis Pipeline
+
+For comprehensive content analysis:
+
+```python
+from langcrew.utils import detect_file_type, count_tokens, detect_language
+
+class ContentAnalyzer:
+    def __init__(self):
+        self.analysis_config = {
+            "extract_metadata": True,
+            "count_tokens": True,
+            "detect_language": True,
+            "generate_summary": True
+        }
+    
+    def analyze(self, file_path: str):
+        results = {}
+        
+        # File analysis
+        if self.analysis_config["extract_metadata"]:
+            file_info = detect_file_type(file_path, read_content=True)
+            results["file_info"] = {
+                "type": file_info.file_type,
+                "size": file_info.size,
+                "mime_type": file_info.mime_type
+            }
+        
+        # Token analysis
+        if self.analysis_config["count_tokens"] and file_info.content:
+            tokens = count_tokens(file_info.content, include_metadata=True)
+            results["tokens"] = {
+                "count": tokens.token_count,
+                "model": tokens.model_name,
+                "encoding": tokens.encoding_name
+            }
+        
+        # Language analysis
+        if self.analysis_config["detect_language"] and file_info.content:
+            lang_result = detect_language(
+                file_info.content,
+                return_confidence=True
+            )
+            results["language"] = {
+                "code": lang_result.language,
+                "confidence": lang_result.confidence
+            }
+        
+        return results
+```
+
+## Utility Configuration Options
+
+### File Detection Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `read_content` | bool | Read file content | True |
+| `extract_metadata` | bool | Extract file metadata | True |
+| `max_content_size` | int | Max content size (bytes) | 10MB |
+| `encoding` | str | Text encoding | "utf-8" |
+| `binary_threshold` | float | Binary detection threshold | 0.3 |
+
+### Token Counter Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `model` | str | Model for tokenization | "gpt-4" |
+| `include_metadata` | bool | Include token metadata | False |
+| `cache_encodings` | bool | Cache tokenizer encodings | True |
+| `max_cache_size` | int | Max encoding cache size | 100 |
+
+### Language Detection Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `confidence_threshold` | float | Minimum confidence score | 0.8 |
+| `return_confidence` | bool | Return confidence score | False |
+| `min_text_length` | int | Minimum text length | 3 |
+| `supported_languages` | List[str] | Supported language codes | All |
+
+## Performance Tuning
+
+### Optimize File Processing
+
+```python
+# For large files
+file_info = detect_file_type(
+    file_path="large_file.txt",
+    read_content=False,  # Skip content reading
+    extract_metadata=False  # Skip metadata extraction
+)
+
+# For batch processing
+files = ["file1.txt", "file2.pdf", "file3.docx"]
+results = []
+
+for file_path in files:
+    info = detect_file_type(
+        file_path,
+        read_content=True,
+        max_content_size=1024 * 1024  # 1MB limit
+    )
+    results.append(info)
+```
+
+### Optimize Token Counting
+
+```python
+# Cache tokenizer for repeated use
+from langcrew.utils.token_counter import TokenCounter
+
+counter = TokenCounter(cache_encodings=True)
+
+# Batch token counting
+texts = ["Hello", "World", "How are you?"]
+token_counts = [counter.count_tokens(text) for text in texts]
+```
+
+## Best Practices
+
+- **File Size Limits**: Set appropriate limits for content reading
+- **Model Selection**: Choose the right tokenizer for your target model
+- **Language Detection**: Provide sufficient text for accurate detection
+- **Caching**: Enable caching for repeated operations
+- **Error Handling**: Handle file access and processing errors gracefully
+- **Memory Management**: Process large files in chunks when possible
+
+## Next Steps
+
+- **[Utils Concepts](/concepts/utils)** - Understand architecture
+- **[Getting Started](/guides/utils/getting-started)** - Quick start guide
+- **Examples** - Check `examples/components/utils/` for implementations
+- **[Community Forum](https://github.com/01-ai/langcrew/discussions)** - Get help

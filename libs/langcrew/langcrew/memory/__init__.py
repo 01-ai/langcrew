@@ -4,7 +4,7 @@ Memory system built on top of LangGraph's Store and Checkpointer,
 providing CrewAI-compatible memory classes with enhanced capabilities.
 """
 
-from .config import MemoryConfig
+from .base import MemoryConfig
 from .entity_memory import EntityMemory
 from .long_term_memory import LongTermMemory
 from .short_term_memory import ShortTermMemory

@@ -1,0 +1,360 @@
+---
+title: Web Configuration
+description: Complete configuration guide for Web
+---
+
+Comprehensive guide to configuring Web servers for your needs.
+
+## Basic Configuration
+
+### Simple HTTP Server
+
+For basic API endpoints:
+
+```python
+from langcrew.web import create_server
+
+# Basic server configuration
+server = create_server(
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["http://localhost:3000"],
+    debug=False
+)
+```
+
+### LangGraph Server
+
+For advanced workflow integration:
+
+```python
+from langcrew.web import create_langgraph_server
+
+# LangGraph server configuration
+server = create_langgraph_server(
+    crew=crew,
+    host="0.0.0.0",
+    port=8000,
+    enable_streaming=True,
+    tool_display=True,
+    cors_origins=["*"]
+)
+```
+
+## Advanced Configuration
+
+### AdapterServer with Custom Settings
+
+For full control over server behavior:
+
+```python
+from langcrew.web import AdapterServer, LangGraphAdapter
+
+# Create custom adapter
+adapter = LangGraphAdapter(
+    crew=crew,
+    enable_streaming=True,
+    stream_tool_calls=True,
+    tool_display=True,
+    max_concurrent_requests=10,
+    request_timeout=300
+)
+
+# Create server with custom settings
+server = AdapterServer(
+    adapter=adapter,
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["https://yourdomain.com"],
+    cors_allow_credentials=True,
+    cors_allow_methods=["GET", "POST", "PUT", "DELETE"],
+    cors_allow_headers=["*"],
+    debug=False,
+    access_log=True
+)
+```
+
+### Production Configuration
+
+For production deployments:
+
+```python
+from langcrew.web import AdapterServer
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+# Production server
+server = AdapterServer(
+    adapter=adapter,
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=[
+        "https://app.yourdomain.com",
+        "https://admin.yourdomain.com"
+    ],
+    cors_allow_credentials=True,
+    debug=False,
+    access_log=True,
+    workers=4,  # Multiple workers for scalability
+    ssl_keyfile="/path/to/key.pem",
+    ssl_certfile="/path/to/cert.pem"
+)
+```
+
+## Configuration Patterns
+
+### Pattern 1: Development Server
+
+For local development with hot reload:
+
+```python
+dev_server = create_server(
+    agents=[agent],
+    host="127.0.0.1",
+    port=8000,
+    cors_origins=["http://localhost:3000", "http://localhost:3001"],
+    debug=True,
+    reload=True,
+    access_log=True
+)
+```
+
+### Pattern 2: API-Only Server
+
+For headless API services:
+
+```python
+api_server = AdapterServer(
+    adapter=adapter,
+    host="0.0.0.0",
+    port=8080,
+    cors_origins=["*"],
+    debug=False,
+    docs_url="/api/docs",  # Swagger UI
+    redoc_url="/api/redoc"  # ReDoc
+)
+```
+
+### Pattern 3: Streaming-First Server
+
+For real-time applications:
+
+```python
+streaming_adapter = LangGraphAdapter(
+    crew=crew,
+    enable_streaming=True,
+    stream_tool_calls=True,
+    stream_intermediate_steps=True,
+    buffer_size=1024,
+    flush_interval=0.1
+)
+
+streaming_server = AdapterServer(
+    adapter=streaming_adapter,
+    host="0.0.0.0",
+    port=8000,
+    websocket_ping_interval=30,
+    websocket_ping_timeout=10
+)
+```
+
+### Pattern 4: Multi-Crew Server
+
+For hosting multiple crews:
+
+```python
+from langcrew.web import MultiCrewServer
+
+# Multiple crews
+research_crew = Crew(agents=[researcher])
+writing_crew = Crew(agents=[writer])
+
+# Multi-crew server
+server = MultiCrewServer({
+    "research": research_crew,
+    "writing": writing_crew
+})
+
+server.start(port=8000)
+```
+
+## Server Configuration Options
+
+### Basic Server Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `host` | str | Server host address | "127.0.0.1" |
+| `port` | int | Server port number | 8000 |
+| `debug` | bool | Enable debug mode | False |
+| `reload` | bool | Auto-reload on changes | False |
+| `access_log` | bool | Enable access logging | True |
+| `workers` | int | Number of worker processes | 1 |
+
+### CORS Configuration
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `cors_origins` | List[str] | Allowed origins | [] |
+| `cors_allow_credentials` | bool | Allow credentials | False |
+| `cors_allow_methods` | List[str] | Allowed HTTP methods | ["GET", "POST"] |
+| `cors_allow_headers` | List[str] | Allowed headers | [] |
+
+### SSL Configuration
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `ssl_keyfile` | str \| None | SSL private key file | None |
+| `ssl_certfile` | str \| None | SSL certificate file | None |
+| `ssl_ca_certs` | str \| None | SSL CA certificates | None |
+
+## Adapter Configuration
+
+### LangGraphAdapter Options
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `enable_streaming` | bool | Enable response streaming | False |
+| `stream_tool_calls` | bool | Stream tool call execution | False |
+| `stream_intermediate_steps` | bool | Stream workflow steps | False |
+| `tool_display` | bool | Enable tool visualization | False |
+| `max_concurrent_requests` | int | Max concurrent requests | 100 |
+| `request_timeout` | int | Request timeout (seconds) | 300 |
+
+### Tool Display Configuration
+
+```python
+from langcrew.web import ToolDisplayManager
+
+# Configure tool display
+display_manager = ToolDisplayManager(
+    show_parameters=True,
+    show_results=True,
+    show_timing=True,
+    format_json=True,
+    max_result_length=1000
+)
+
+adapter = LangGraphAdapter(
+    crew=crew,
+    tool_display_manager=display_manager
+)
+```
+
+## Security Configuration
+
+### Authentication Middleware
+
+```python
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPBearer
+
+security = HTTPBearer()
+
+def verify_token(token: str = Depends(security)):
+    if token.credentials != "your-secret-token":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return token
+
+# Add to server
+server.add_middleware(verify_token)
+```
+
+### Rate Limiting
+
+```python
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+# Apply rate limiting
+@limiter.limit("10/minute")
+async def chat_endpoint():
+    # Your endpoint logic
+    pass
+```
+
+## Monitoring and Logging
+
+### Structured Logging
+
+```python
+import logging
+import json
+
+class StructuredLogger:
+    def __init__(self):
+        self.logger = logging.getLogger("langcrew.web")
+        
+    def log_request(self, request_id, method, path, status):
+        self.logger.info(json.dumps({
+            "request_id": request_id,
+            "method": method,
+            "path": path,
+            "status": status,
+            "timestamp": time.time()
+        }))
+
+# Add to server
+server.add_logging(StructuredLogger())
+```
+
+### Health Check Endpoint
+
+```python
+@server.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "version": "1.0.0"
+    }
+```
+
+## Performance Tuning
+
+### Optimize for Throughput
+
+```python
+# High-throughput configuration
+server = AdapterServer(
+    adapter=adapter,
+    workers=8,  # Multiple workers
+    max_concurrent_requests=200,
+    request_timeout=60,  # Shorter timeout
+    keep_alive_timeout=5
+)
+```
+
+### Optimize for Latency
+
+```python
+# Low-latency configuration
+adapter = LangGraphAdapter(
+    crew=crew,
+    enable_streaming=True,
+    buffer_size=512,  # Smaller buffer
+    flush_interval=0.05,  # Faster flush
+    max_concurrent_requests=50
+)
+```
+
+## Best Practices
+
+- **Use HTTPS in production**: Always configure SSL certificates
+- **Configure CORS properly**: Restrict origins to trusted domains
+- **Enable rate limiting**: Protect against abuse
+- **Monitor performance**: Track response times and error rates
+- **Use structured logging**: Enable better debugging and monitoring
+- **Configure timeouts**: Prevent hanging requests
+- **Scale horizontally**: Use multiple workers for high load
+
+## Next Steps
+
+- **[Web Concepts](/concepts/web)** - Understand architecture
+- **[Getting Started](/guides/web/getting-started)** - Quick start guide
+- **Examples** - Check `examples/components/web/` for implementations
+- **[Community Forum](https://github.com/01-ai/langcrew/discussions)** - Get help

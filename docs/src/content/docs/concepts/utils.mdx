@@ -1,0 +1,202 @@
+---
+title: Utils
+description: Understanding Utils - utility functions and helpers for AI workflows
+---
+
+Utils provides essential utility functions and helpers for AI workflows, including file detection, token counting, language processing, and message utilities.
+
+## What is Utils?
+
+Utils in langcrew provides:
+- **File detection**: Automatic file type detection and content analysis
+- **Token counting**: Accurate token counting for various LLM models
+- **Language processing**: Language detection and text processing utilities
+- **Message utilities**: Helper functions for message formatting and ID generation
+
+## Core Architecture
+
+Utils is a collection of standalone utility modules that can be used independently:
+
+```python
+from langcrew.utils import detect_file_type, count_tokens, detect_language
+
+# File detection
+file_info = detect_file_type("document.pdf")
+
+# Token counting
+tokens = count_tokens("Hello, world!", model="gpt-4")
+
+# Language detection
+language = detect_language("Hello, how are you?")
+```
+
+## Key Components
+
+### File Detection
+Automatically detect file types and extract metadata.
+
+```python
+from langcrew.utils import detect_file_type
+
+# Detect file type and metadata
+file_info = detect_file_type("path/to/file.pdf")
+print(file_info.file_type)  # "pdf"
+print(file_info.mime_type)  # "application/pdf"
+print(file_info.size)       # File size in bytes
+```
+
+#### File Detection Parameters
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `file_path` | str | Path to file for detection | Required |
+| `read_content` | bool | Whether to read file content | True |
+| `extract_metadata` | bool | Extract detailed metadata | True |
+
+### Token Counter
+Count tokens for various LLM models with high accuracy.
+
+```python
+from langcrew.utils import count_tokens
+
+# Count tokens for different models
+gpt4_tokens = count_tokens("Hello, world!", model="gpt-4")
+claude_tokens = count_tokens("Hello, world!", model="claude-3")
+
+# Count tokens in messages
+messages = [
+    {"role": "user", "content": "Hello"},
+    {"role": "assistant", "content": "Hi there!"}
+]
+total_tokens = count_tokens(messages, model="gpt-4")
+```
+
+#### Token Counter Parameters
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `text` | str \| List[dict] | Text or messages to count | Required |
+| `model` | str | Model name for tokenization | "gpt-4" |
+| `include_metadata` | bool | Include token breakdown | False |
+
+### Language Detection
+Detect language and process text for internationalization.
+
+```python
+from langcrew.utils import detect_language, normalize_text
+
+# Detect language
+lang = detect_language("Bonjour, comment allez-vous?")
+print(lang)  # "fr"
+
+# Normalize text
+normalized = normalize_text("  Hello,   World!  ")
+print(normalized)  # "Hello, World!"
+```
+
+#### Language Detection Parameters
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `text` | str | Text for language detection | Required |
+| `confidence_threshold` | float | Minimum confidence score | 0.8 |
+| `return_confidence` | bool | Return confidence score | False |
+
+### Message Utilities
+Helper functions for message processing and formatting.
+
+```python
+from langcrew.utils import generate_message_id, format_message
+
+# Generate unique message ID
+msg_id = generate_message_id()
+
+# Format message for display
+formatted = format_message(
+    content="Hello, world!",
+    role="user",
+    timestamp=True
+)
+```
+
+## Integration with langcrew
+
+Utils integrates seamlessly with all langcrew components:
+
+- **[Agents](/concepts/agents)**: Use token counting for prompt optimization
+- **[Tasks](/concepts/tasks)**: File detection for document processing tasks
+- **[Crews](/concepts/crews)**: Language detection for multi-language crews
+
+```python
+from langcrew import Agent
+from langcrew.utils import count_tokens, detect_language
+
+# Agent with token-aware prompts
+agent = Agent(
+    role="Content Analyzer",
+    goal="Analyze content efficiently",
+    backstory="Expert at processing various content types",
+    tools=[detect_file_type, count_tokens]
+)
+
+# Use in task execution
+def process_document(file_path: str):
+    # Detect file type
+    file_info = detect_file_type(file_path)
+    
+    # Count tokens if text file
+    if file_info.is_text:
+        tokens = count_tokens(file_info.content)
+        print(f"Document has {tokens} tokens")
+    
+    # Detect language
+    if file_info.content:
+        language = detect_language(file_info.content)
+        print(f"Document language: {language}")
+```
+
+## When to Use Utils
+
+- **File processing** applications handling multiple formats
+- **Token optimization** for cost-effective LLM usage
+- **Multi-language** applications requiring language detection
+- **Message processing** systems needing formatting utilities
+- **Content analysis** workflows requiring metadata extraction
+
+## Supported File Types
+
+### Document Formats
+- **Text**: .txt, .md, .rst, .log
+- **Office**: .docx, .xlsx, .pptx
+- **PDF**: .pdf (with text extraction)
+- **Code**: .py, .js, .html, .css, .json, .xml
+
+### Media Formats
+- **Images**: .jpg, .png, .gif, .bmp, .svg
+- **Audio**: .mp3, .wav, .flac, .ogg
+- **Video**: .mp4, .avi, .mov, .wmv
+
+### Archive Formats
+- **Compressed**: .zip, .rar, .7z, .tar, .gz
+
+## Supported Models for Token Counting
+
+### OpenAI Models
+- GPT-4, GPT-4 Turbo, GPT-4o
+- GPT-3.5 Turbo variants
+- Text-embedding models
+
+### Anthropic Models
+- Claude-3 (Opus, Sonnet, Haiku)
+- Claude-2 variants
+
+### Other Models
+- Llama 2/3 variants
+- Mistral models
+- Custom tokenizers
+
+## Next Steps
+
+- **[Utils Quick Start](/guides/utils/getting-started)** - Get started in 5 minutes
+- **[Utils Configuration](/guides/utils/configuration)** - Complete configuration guide
+- **Examples** - Check `examples/components/utils/` for real-world implementations

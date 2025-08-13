@@ -7,7 +7,7 @@ from typing import Any
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 
-from .config import MemoryConfig
+from .base import MemoryConfig
 
 
 class LongTermMemory:
@@ -19,18 +19,6 @@ class LongTermMemory:
         self.store = store or InMemoryStore()
         self.config = config or MemoryConfig()
         self._namespace_prefix = ("long_term",)
-
-    def _list_items(
-        self, namespace: tuple[str, ...]
-    ) -> list[tuple[str, dict[str, Any]]]:
-        """List all items in a namespace (compatibility helper)"""
-        try:
-            # Try the list method if it exists
-            return self.store.list(namespace=namespace)
-        except AttributeError:
-            # Fall back to search for stores that don't have list method
-            results = self.store.search(namespace, limit=1000)  # Large limit to get all
-            return [(result.key, result.value) for result in results]
 
     def save(
         self,
@@ -69,7 +57,7 @@ class LongTermMemory:
         """Search for relevant knowledge"""
         # Search across all namespaces under long_term
         results = self.store.search(
-            self._namespace_prefix,
+            namespace_prefix=self._namespace_prefix,
             query=query,
             limit=limit * 2,  # Get more for quality filtering
         )
@@ -97,7 +85,7 @@ class LongTermMemory:
         # List all items in namespace
         items = []
         for ns in self.store.list_namespaces(prefix=namespace):
-            namespace_items = self._list_items(ns)
+            namespace_items = self.store.list(namespace=ns)
             for _, item in namespace_items:
                 if task.lower() in item.get("task", "").lower():
                     items.append(item)
@@ -149,7 +137,7 @@ class LongTermMemory:
             namespace = namespace + (agent,)
 
         # Get all items and delete them
-        items = self._list_items(namespace)
+        items = self.store.list(namespace=namespace)
         for key, _ in items:
             self.store.delete(namespace=namespace, key=key)
 
@@ -159,7 +147,7 @@ class LongTermMemory:
 
         # Get all namespaces under long_term
         for ns in self.store.list_namespaces(prefix=self._namespace_prefix):
-            items = self._list_items(ns)
+            items = self.store.list(namespace=ns)
             for key, item in items:
                 export_item = {"namespace": ns, "key": key, "value": item}
                 all_items.append(export_item)

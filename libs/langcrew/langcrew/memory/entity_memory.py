@@ -6,7 +6,7 @@ from typing import Any
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 
-from .config import MemoryConfig
+from .base import MemoryConfig
 
 
 class EntityMemory:
@@ -18,18 +18,6 @@ class EntityMemory:
         self.store = store or InMemoryStore()
         self.config = config or MemoryConfig()
         self._namespace_prefix = ("entities",)
-
-    def _list_items(
-        self, namespace: tuple[str, ...]
-    ) -> list[tuple[str, dict[str, Any]]]:
-        """List all items in a namespace (compatibility helper)"""
-        try:
-            # Try the list method if it exists
-            return self.store.list(namespace=namespace)
-        except AttributeError:
-            # Fall back to search for stores that don't have list method
-            results = self.store.search(namespace, limit=1000)  # Large limit to get all
-            return [(result.key, result.value) for result in results]
 
     def save(
         self,
@@ -93,12 +81,12 @@ class EntityMemory:
         """Get all entities of a specific type"""
         if entity_type:
             namespace = self._namespace_prefix + (entity_type,)
-            items = self._list_items(namespace)
+            items = self.store.list(namespace=namespace)
         else:
             # Get all entities across all types
             items = []
             for ns in self.store.list_namespaces(prefix=self._namespace_prefix):
-                ns_items = self._list_items(ns)
+                ns_items = self.store.list(namespace=ns)
                 items.extend(ns_items)
 
         # Extract values and sort by mentions
@@ -203,7 +191,7 @@ class EntityMemory:
         """Clear entity memories"""
         if entity_type:
             namespace = self._namespace_prefix + (entity_type,)
-            items = self._list_items(namespace)
+            items = self.store.list(namespace=namespace)
             for key, _ in items:
                 self.store.delete(namespace=namespace, key=key)
         else:
@@ -216,7 +204,7 @@ class EntityMemory:
     def _get_entity(self, namespace: tuple, key: str) -> dict[str, Any] | None:
         """Get entity from store"""
         try:
-            items = self._list_items(namespace)
+            items = self.store.list(namespace=namespace)
             for item_key, item_value in items:
                 if item_key == key:
                     return item_value

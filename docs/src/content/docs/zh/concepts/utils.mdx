@@ -1,0 +1,202 @@
+---
+title: 工具库
+description: 理解工具库 - AI 工作流的实用函数和助手
+---
+
+工具库为 AI 工作流提供基本的实用函数和助手，包括文件检测、令牌计数、语言处理和消息实用工具。
+
+## 什么是工具库？
+
+langcrew 中的工具库提供：
+- **文件检测**：自动文件类型检测和内容分析
+- **令牌计数**：各种 LLM 模型的精确令牌计数
+- **语言处理**：语言检测和文本处理实用工具
+- **消息实用工具**：消息格式化和 ID 生成的助手函数
+
+## 核心架构
+
+工具库是独立实用模块的集合，可以独立使用：
+
+```python
+from langcrew.utils import detect_file_type, count_tokens, detect_language
+
+# 文件检测
+file_info = detect_file_type("document.pdf")
+
+# 令牌计数
+tokens = count_tokens("你好，世界！", model="gpt-4")
+
+# 语言检测
+language = detect_language("Hello, how are you?")
+```
+
+## 关键组件
+
+### 文件检测
+自动检测文件类型并提取元数据。
+
+```python
+from langcrew.utils import detect_file_type
+
+# 检测文件类型和元数据
+file_info = detect_file_type("path/to/file.pdf")
+print(file_info.file_type)  # "pdf"
+print(file_info.mime_type)  # "application/pdf"
+print(file_info.size)       # 文件大小（字节）
+```
+
+#### 文件检测参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|------|------|------|--------|
+| `file_path` | str | 要检测的文件路径 | 必需 |
+| `read_content` | bool | 是否读取文件内容 | True |
+| `extract_metadata` | bool | 提取详细元数据 | True |
+
+### 令牌计数器
+为各种 LLM 模型提供高精度的令牌计数。
+
+```python
+from langcrew.utils import count_tokens
+
+# 为不同模型计数令牌
+gpt4_tokens = count_tokens("你好，世界！", model="gpt-4")
+claude_tokens = count_tokens("你好，世界！", model="claude-3")
+
+# 计算消息中的令牌
+messages = [
+    {"role": "user", "content": "你好"},
+    {"role": "assistant", "content": "你好！"}
+]
+total_tokens = count_tokens(messages, model="gpt-4")
+```
+
+#### 令牌计数器参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|------|------|------|--------|
+| `text` | str \| List[dict] | 要计数的文本或消息 | 必需 |
+| `model` | str | 用于分词的模型名称 | "gpt-4" |
+| `include_metadata` | bool | 包含令牌分解信息 | False |
+
+### 语言检测
+检测语言并处理文本以实现国际化。
+
+```python
+from langcrew.utils import detect_language, normalize_text
+
+# 检测语言
+lang = detect_language("Bonjour, comment allez-vous?")
+print(lang)  # "fr"
+
+# 规范化文本
+normalized = normalize_text("  你好，   世界！  ")
+print(normalized)  # "你好，世界！"
+```
+
+#### 语言检测参数
+
+| 参数 | 类型 | 描述 | 默认值 |
+|------|------|------|--------|
+| `text` | str | 用于语言检测的文本 | 必需 |
+| `confidence_threshold` | float | 最小置信度分数 | 0.8 |
+| `return_confidence` | bool | 返回置信度分数 | False |
+
+### 消息实用工具
+消息处理和格式化的助手函数。
+
+```python
+from langcrew.utils import generate_message_id, format_message
+
+# 生成唯一消息ID
+msg_id = generate_message_id()
+
+# 格式化消息用于显示
+formatted = format_message(
+    content="你好，世界！",
+    role="user",
+    timestamp=True
+)
+```
+
+## 与 langcrew 的集成
+
+工具库与所有 langcrew 组件无缝集成：
+
+- **[智能体](/zh/concepts/agents)**：使用令牌计数进行提示优化
+- **[任务](/zh/concepts/tasks)**：文件检测用于文档处理任务
+- **[团队](/zh/concepts/crews)**：语言检测用于多语言团队
+
+```python
+from langcrew import Agent
+from langcrew.utils import count_tokens, detect_language
+
+# 具有令牌感知提示的智能体
+agent = Agent(
+    role="内容分析师",
+    goal="高效分析内容",
+    backstory="处理各种内容类型的专家",
+    tools=[detect_file_type, count_tokens]
+)
+
+# 在任务执行中使用
+def process_document(file_path: str):
+    # 检测文件类型
+    file_info = detect_file_type(file_path)
+    
+    # 如果是文本文件则计算令牌
+    if file_info.is_text:
+        tokens = count_tokens(file_info.content)
+        print(f"文档有 {tokens} 个令牌")
+    
+    # 检测语言
+    if file_info.content:
+        language = detect_language(file_info.content)
+        print(f"文档语言：{language}")
+```
+
+## 何时使用工具库
+
+- **文件处理** 应用处理多种格式
+- **令牌优化** 实现成本效益的 LLM 使用
+- **多语言** 应用需要语言检测
+- **消息处理** 系统需要格式化实用工具
+- **内容分析** 工作流需要元数据提取
+
+## 支持的文件类型
+
+### 文档格式
+- **文本**：.txt, .md, .rst, .log
+- **办公**：.docx, .xlsx, .pptx
+- **PDF**：.pdf（带文本提取）
+- **代码**：.py, .js, .html, .css, .json, .xml
+
+### 媒体格式
+- **图像**：.jpg, .png, .gif, .bmp, .svg
+- **音频**：.mp3, .wav, .flac, .ogg
+- **视频**：.mp4, .avi, .mov, .wmv
+
+### 压缩格式
+- **压缩**：.zip, .rar, .7z, .tar, .gz
+
+## 令牌计数支持的模型
+
+### OpenAI 模型
+- GPT-4、GPT-4 Turbo、GPT-4o
+- GPT-3.5 Turbo 变体
+- 文本嵌入模型
+
+### Anthropic 模型
+- Claude-3（Opus、Sonnet、Haiku）
+- Claude-2 变体
+
+### 其他模型
+- Llama 2/3 变体
+- Mistral 模型
+- 自定义分词器
+
+## 下一步
+
+- **[工具库快速开始](/zh/guides/utils/getting-started)** - 5分钟快速上手
+- **[工具库配置指南](/zh/guides/utils/configuration)** - 完整配置指南
+- **示例** - 查看 `examples/components/utils/` 了解实际实现案例

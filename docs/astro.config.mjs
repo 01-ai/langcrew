@@ -88,6 +88,27 @@ export default defineConfig({
 								en: 'Human-in-the-Loop'
 							}
 						},
+						{
+							label: '内存管理',
+							link: '/concepts/memory',
+							translations: {
+								en: 'Memory'
+							}
+						},
+						{
+							label: 'Web服务',
+							link: '/concepts/web',
+							translations: {
+								en: 'Web'
+							}
+						},
+						{
+							label: '工具库',
+							link: '/concepts/utils',
+							translations: {
+								en: 'Utils'
+							}
+						},
 					],
 				},
 				{
@@ -117,6 +138,72 @@ export default defineConfig({
 									}
 								},
 
+							]
+						},
+						{
+							label: '内存管理',
+							translations: {
+								en: 'Memory'
+							},
+							items: [
+								{
+									label: '快速开始',
+									link: '/guides/memory/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '配置指南',
+									link: '/guides/memory/configuration',
+									translations: {
+										en: 'Configuration'
+									}
+								},
+							]
+						},
+						{
+							label: 'Web服务',
+							translations: {
+								en: 'Web'
+							},
+							items: [
+								{
+									label: '快速开始',
+									link: '/guides/web/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '配置指南',
+									link: '/guides/web/configuration',
+									translations: {
+										en: 'Configuration'
+									}
+								},
+							]
+						},
+						{
+							label: '工具库',
+							translations: {
+								en: 'Utils'
+							},
+							items: [
+								{
+									label: '快速开始',
+									link: '/guides/utils/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '配置指南',
+									link: '/guides/utils/configuration',
+									translations: {
+										en: 'Configuration'
+									}
+								},
 							]
 						},
 					],
