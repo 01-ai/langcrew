@@ -54,25 +54,25 @@ analysis_task = Task(
 
 ### Core Parameters
 
-| Parameter | Type | Description | Required |
-|-----------|------|-------------|----------|
-| `agent` | Agent | The agent that will execute this task | ✅ |
-| `description` | str | What needs to be accomplished | ✅ |
-| `expected_output` | str | What the task should produce | ✅ |
-| `name` | str | Unique identifier for the task | ❌ |
-| `verbose` | bool | Show execution details | ❌ |
-| `metadata` | dict | Additional metadata | ❌ |
+| Parameter         | Type  | Description                           | Required |
+| ----------------- | ----- | ------------------------------------- | -------- |
+| `agent`           | Agent | The agent that will execute this task | ✅       |
+| `description`     | str   | What needs to be accomplished         | ✅       |
+| `expected_output` | str   | What the task should produce          | ✅       |
+| `name`            | str   | Unique identifier for the task        | ❌       |
+| `verbose`         | bool  | Show execution details                | ❌       |
+| `metadata`        | dict  | Additional metadata                   | ❌       |
 
 ### Advanced Parameters
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `config` | dict | CrewAI-style configuration | None |
-| `output_json` | type[BaseModel] | Structured output schema | None |
-| `context` | List[Task] \| List[str] | Task dependencies | [] |
-| `handoff_to` | List[str] | Tasks this can hand off to | [] |
-| `input_guards` | List[GuardrailFunc] | Input validation functions | [] |
-| `output_guards` | List[GuardrailFunc] | Output validation functions | [] |
+| Parameter       | Type                    | Description                 | Default |
+| --------------- | ----------------------- | --------------------------- | ------- |
+| `config`        | dict                    | CrewAI-style configuration  | None    |
+| `output_json`   | type[BaseModel]         | Structured output schema    | None    |
+| `context`       | List[Task] \| List[str] | Task dependencies           | []      |
+| `handoff_to`    | List[str]               | Tasks this can hand off to  | []      |
+| `input_guards`  | List[GuardrailFunc]     | Input validation functions  | []      |
+| `output_guards` | List[GuardrailFunc]     | Output validation functions | []      |
 
 ## Advanced Features
 

@@ -7,28 +7,33 @@ This directory contains the documentation website for langcrew, built with Astro
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
+
+- Node.js 18+
 - npm or yarn
 
 ### Installation
+
 ```bash
 cd docs
 npm install
 ```
 
 ### Development
+
 ```bash
 npm run dev
 # Open http://localhost:4321
 ```
 
 ### Build
+
 ```bash
 npm run build
 # Output in ./dist directory
 ```
 
 ## Project Structure
+
 ```
 docs/
 ├── src/
@@ -43,8 +48,10 @@ docs/
 ## Writing Documentation
 
 ### Creating New Pages
+
 1. Add `.mdx` files to `src/content/docs/`
 2. Use frontmatter for metadata:
+
    ```mdx
    ---
    title: Your Page Title
@@ -53,7 +60,9 @@ docs/
    ```
 
 ### Adding to Navigation
+
 Edit sidebar in `astro.config.mjs`:
+
 ```js
 sidebar: [
   {
@@ -66,7 +75,9 @@ sidebar: [
 ```
 
 ### Using Components
+
 Import and use MDX components:
+
 ```mdx
 import { Card } from '../../components/Card.astro';
 
@@ -91,11 +102,13 @@ All commands are run from the root of the docs directory:
 ## Deployment
 
 ### GitHub Pages
+
 1. Push to main branch
 2. GitHub Actions automatically builds and deploys
 3. Access at: https://[username].github.io/langcrew
 
 ### Manual Deploy
+
 ```bash
 npm run build
 # Deploy ./dist to any static host
@@ -104,18 +117,21 @@ npm run build
 ## Contributing
 
 ### Style Guide
+
 - Use clear, concise language
 - Include code examples
 - Add diagrams for complex concepts
 - Keep consistent formatting
 
 ### Review Process
+
 1. Create feature branch
 2. Make changes
 3. Preview locally
 4. Submit PR for review
 
 ## Resources
+
 - [Starlight Documentation](https://starlight.astro.build/)
 - [Astro Documentation](https://docs.astro.build)
 - [langcrew Repository](https://github.com/yourusername/langcrew)

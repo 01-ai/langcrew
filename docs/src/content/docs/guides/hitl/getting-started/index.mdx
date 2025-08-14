@@ -146,6 +146,7 @@ uv run hitl_example.py
 ```
 
 This example demonstrates:
+
 - 9 different HITL configuration patterns
 - Tool approval workflows with multi-language support
 - Parameter and result modification
@@ -197,6 +198,7 @@ Now that you have HITL working:
 ### Interrupts Not Triggering
 
 Check that tool names match exactly:
+
 ```python
 # ❌ Wrong - tool name mismatch
 hitl_config = HITLConfig(interrupt_before_tools=["file_writer"])
@@ -209,6 +211,7 @@ hitl_config = HITLConfig(interrupt_before_tools=["file_write"])
 ### Import Errors
 
 Make sure you're importing from the correct modules:
+
 ```python
 # Core HITL configuration
 from langcrew.hitl import HITLConfig

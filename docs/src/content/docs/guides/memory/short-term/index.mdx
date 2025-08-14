@@ -8,6 +8,7 @@ Short-term memory provides session-based conversation history using LangGraph's 
 ## Overview
 
 Short-term memory is ideal for:
+
 - **Conversational continuity** within a session
 - **Context-aware responses** based on recent interactions
 - **Multi-turn conversations** with maintained state
@@ -32,10 +33,10 @@ memory_config = MemoryConfig(
 
 ### Configuration Parameters
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `enabled` | bool | Enable short-term memory | True |
-| `max_history` | int | Maximum conversation turns to remember | 20 |
+| Parameter     | Type | Description                            | Default |
+| ------------- | ---- | -------------------------------------- | ------- |
+| `enabled`     | bool | Enable short-term memory               | True    |
+| `max_history` | int  | Maximum conversation turns to remember | 20      |
 
 ## How It Works
 
@@ -317,16 +318,19 @@ crew = Crew(agents=[agent], memory=memory_config)
 ## Troubleshooting
 
 ### Memory Not Loading
+
 - Verify thread_id consistency between calls
 - Check database connection and permissions
 - Ensure checkpointer is properly configured
 
 ### Context Not Injected
+
 - Confirm `enabled: True` in short_term configuration
 - Check that max_history > 0
 - Verify agent is using the same crew instance
 
 ### Performance Issues
+
 - Reduce max_history for faster context loading
 - Use connection pooling for database providers
 - Consider SQLite for single-user applications

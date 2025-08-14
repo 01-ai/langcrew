@@ -84,6 +84,7 @@ result = crew.kickoff(
 ## Memory Types in Action
 
 ### Short-term Memory
+
 Remembers recent conversation history within a session:
 
 ```python
@@ -100,6 +101,7 @@ crew = Crew(agents=[agent], memory=memory_config)
 ```
 
 ### Long-term Memory
+
 Stores important knowledge across sessions:
 
 ```python
@@ -116,6 +118,7 @@ crew = Crew(agents=[agent], memory=memory_config)
 ```
 
 ### Entity Memory
+
 Tracks people, organizations, and concepts:
 
 ```python
@@ -154,6 +157,7 @@ for result in results:
 ## Configuration Examples
 
 ### Development Setup (In-Memory)
+
 ```python
 memory_config = MemoryConfig(
     provider="memory",  # Fast, no persistence
@@ -164,6 +168,7 @@ memory_config = MemoryConfig(
 ```
 
 ### Production Setup (PostgreSQL)
+
 ```python
 memory_config = MemoryConfig(
     provider="postgresql",
@@ -175,6 +180,7 @@ memory_config = MemoryConfig(
 ```
 
 ### Local Development (SQLite)
+
 ```python
 memory_config = MemoryConfig(
     provider="sqlite",
@@ -188,6 +194,7 @@ memory_config = MemoryConfig(
 ## Common Patterns
 
 ### Customer Service Agent
+
 ```python
 # Memory-enabled customer service
 memory_config = MemoryConfig(
@@ -213,6 +220,7 @@ result = crew.kickoff(
 ```
 
 ### Learning Assistant
+
 ```python
 # Memory-enabled learning assistant
 memory_config = MemoryConfig(
@@ -241,16 +249,19 @@ crew = Crew(agents=[tutor], memory=memory_config)
 ## Troubleshooting
 
 ### Memory Not Persisting
+
 - Check your `connection_string` format
 - Ensure database permissions are correct
 - Verify the database file/connection is accessible
 
 ### High Memory Usage
+
 - Reduce `max_history` in short-term memory
 - Increase `min_quality` threshold in long-term memory
 - Consider using SQLite/PostgreSQL instead of in-memory
 
 ### Slow Performance
+
 - Use PostgreSQL for production workloads
 - Enable connection pooling for database providers
 - Consider memory provider for development/testing

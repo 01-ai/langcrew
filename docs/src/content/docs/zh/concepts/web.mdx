@@ -5,7 +5,7 @@ description: 理解Web服务 - 支持流式通信的AI智能体HTTP服务器
 
 Web服务为AI智能体提供HTTP服务器功能，支持实时流式通信，基于FastAPI构建并与LangGraph执行引擎集成，将智能体暴露为Web服务。
 
-## 快速开始 - 只需3行代码！
+## 快速开始 - 只需3行代码
 
 只需3行代码即可让您的智能体作为Web服务运行：
 
@@ -25,6 +25,7 @@ server.run(port=8000)  # 访问 http://localhost:8000/docs
 ## 什么是Web服务？
 
 langcrew中的Web服务提供：
+
 - **HTTP服务器**：基于FastAPI的智能体通信服务器
 - **流式通信**：通过SSE（Server-Sent Events）实现实时智能体响应
 - **LangGraph集成**：与LangGraph流式功能直接集成
@@ -58,6 +59,7 @@ graph TD
 LangCrew包含一个全面的基于React的Web界面：
 
 ### UI特性
+
 - **实时聊天界面**：带有输入指示器的流式智能体响应
 - **工具调用可视化**：实时查看智能体工具使用和结果
 - **计划执行跟踪**：可视化多步骤智能体规划和执行
@@ -67,6 +69,7 @@ LangCrew包含一个全面的基于React的Web界面：
 - **现代设计**：使用Antd + Tailwind CSS构建专业外观
 
 ### UI架构
+
 - **框架**：React 19 with TypeScript
 - **状态管理**：Zustand用于高效状态处理
 - **构建系统**：Rspack用于快速开发和构建
@@ -74,6 +77,7 @@ LangCrew包含一个全面的基于React的Web界面：
 - **包管理**：pnpm用于高效依赖管理
 
 ### 快速UI设置
+
 ```bash
 cd web/
 pnpm install
@@ -96,6 +100,7 @@ Web使用**SSE（Server-Sent Events）**进行实时流式通信：
 ### 两种集成方式
 
 **1. LangCrew集成**
+
 ```python
 from langcrew import Agent, Crew
 from langcrew.web import create_server
@@ -105,6 +110,7 @@ server = create_server(crew=crew)
 ```
 
 **2. LangGraph集成**  
+
 ```python
 from langcrew.web import create_langgraph_server
 from langgraph.graph import StateGraph

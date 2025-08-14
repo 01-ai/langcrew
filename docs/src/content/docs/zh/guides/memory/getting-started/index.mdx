@@ -84,6 +84,7 @@ result = crew.kickoff(
 ## 内存类型实战
 
 ### 短期记忆
+
 记住会话中的近期对话历史：
 
 ```python
@@ -100,6 +101,7 @@ crew = Crew(agents=[agent], memory=memory_config)
 ```
 
 ### 长期记忆
+
 跨会话存储重要知识：
 
 ```python
@@ -116,6 +118,7 @@ crew = Crew(agents=[agent], memory=memory_config)
 ```
 
 ### 实体记忆
+
 跟踪人员、组织和概念：
 
 ```python
@@ -154,6 +157,7 @@ for result in results:
 ## 配置示例
 
 ### 开发设置（内存模式）
+
 ```python
 memory_config = MemoryConfig(
     provider="memory",  # 快速，无持久化
@@ -164,6 +168,7 @@ memory_config = MemoryConfig(
 ```
 
 ### 生产设置（PostgreSQL）
+
 ```python
 memory_config = MemoryConfig(
     provider="postgresql",
@@ -175,6 +180,7 @@ memory_config = MemoryConfig(
 ```
 
 ### 本地开发（SQLite）
+
 ```python
 memory_config = MemoryConfig(
     provider="sqlite",
@@ -188,6 +194,7 @@ memory_config = MemoryConfig(
 ## 常见模式
 
 ### 客户服务代理
+
 ```python
 # 启用内存的客户服务
 memory_config = MemoryConfig(
@@ -213,6 +220,7 @@ result = crew.kickoff(
 ```
 
 ### 学习助手
+
 ```python
 # 启用内存的学习助手
 memory_config = MemoryConfig(
@@ -241,16 +249,19 @@ crew = Crew(agents=[tutor], memory=memory_config)
 ## 故障排除
 
 ### 内存不持久
+
 - 检查您的`connection_string`格式
 - 确保数据库权限正确
 - 验证数据库文件/连接可访问
 
 ### 内存使用量高
+
 - 减少短期记忆中的`max_history`
 - 提高长期记忆中的`min_quality`阈值
 - 考虑使用SQLite/PostgreSQL而不是内存模式
 
 ### 性能慢
+
 - 生产工作负载使用PostgreSQL
 - 为数据库提供商启用连接池
 - 开发/测试考虑内存提供商

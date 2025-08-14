@@ -91,6 +91,7 @@ hitl_config = HITLConfig(
 ```
 
 **Why this happens:**
+
 - `interrupt_after_tools` occurs during tool node execution, before the next checkpoint is saved
 - When system restarts, it cannot resume from the interrupt point and must restart from the last checkpoint
 - The tool node will re-execute from the beginning, causing the tool to run again

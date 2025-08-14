@@ -8,6 +8,7 @@ Configure different storage backends for LangCrew Memory to match your deploymen
 ## Overview
 
 LangCrew Memory supports multiple storage providers:
+
 - **✅ Tested**: `memory`, `sqlite`, `postgresql`
 - **⚠️ Experimental**: `redis`, `mongodb`, `mysql`
 
@@ -30,12 +31,14 @@ memory_config = MemoryConfig(
 ```
 
 **Characteristics:**
+
 - ✅ **Fast**: No disk I/O overhead
 - ✅ **Simple**: No setup required
 - ❌ **Volatile**: Data lost on restart
 - ❌ **Single-process**: No sharing between instances
 
 **Best for:**
+
 - Unit testing
 - Development environments
 - Proof of concepts
@@ -57,6 +60,7 @@ memory_config = MemoryConfig(
 ```
 
 **Connection String Examples:**
+
 ```python
 # Relative path
 "sqlite:///memory.db"
@@ -72,6 +76,7 @@ memory_config = MemoryConfig(
 ```
 
 **Characteristics:**
+
 - ✅ **Persistent**: Data survives restarts
 - ✅ **File-based**: Easy backup and migration
 - ✅ **No server**: Embedded database
@@ -79,6 +84,7 @@ memory_config = MemoryConfig(
 - ❌ **Local only**: No network access
 
 **Best for:**
+
 - Personal applications
 - Local development
 - Small team projects
@@ -100,6 +106,7 @@ memory_config = MemoryConfig(
 ```
 
 **Connection String Examples:**
+
 ```python
 # Basic connection
 "postgresql://user:password@localhost:5432/database"
@@ -119,6 +126,7 @@ connection_string = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWOR
 ```
 
 **Characteristics:**
+
 - ✅ **Scalable**: Handles large datasets
 - ✅ **Concurrent**: Multiple readers/writers
 - ✅ **ACID**: Full transaction support
@@ -127,6 +135,7 @@ connection_string = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWOR
 - ❌ **Resource**: Higher memory/CPU usage
 
 **Best for:**
+
 - Production applications
 - Multi-user systems
 - Large-scale deployments

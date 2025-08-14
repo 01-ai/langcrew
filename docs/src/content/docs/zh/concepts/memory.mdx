@@ -8,6 +8,7 @@ description: 理解内存管理 - AI工作流的持久状态管理
 ## 什么是内存管理？
 
 langcrew中的内存管理提供：
+
 - **短期记忆**：使用LangGraph Checkpointer的基于会话的对话历史
 - **长期记忆**：使用LangGraph Store系统的持久知识存储
 - **实体记忆**：跨对话跟踪和记住实体（人员、组织、概念）
@@ -40,6 +41,7 @@ crew = Crew(
 ## 核心组件
 
 ### MemoryConfig
+
 管理所有三种内存类型和存储提供商的统一配置类。
 
 #### 核心参数
@@ -54,9 +56,11 @@ crew = Crew(
 | `entity` | dict | 实体记忆配置 | 见下文 |
 
 ### 短期记忆
+
 使用LangGraph Checkpointer系统的基于会话的对话历史，用于即时上下文保留。
 
 **核心特性：**
+
 - 基于线程的会话管理
 - 自动上下文注入
 - 可配置的历史限制
@@ -73,9 +77,11 @@ memory_config = MemoryConfig(
 ```
 
 ### 长期记忆
+
 使用LangGraph Store系统的持久知识存储，用于跨会话信息保留。
 
 **核心特性：**
+
 - 基于质量的知识过滤
 - 基于任务的知识组织
 - 代理特定命名空间
@@ -92,9 +98,11 @@ memory_config = MemoryConfig(
 ```
 
 ### 实体记忆
+
 使用结构化存储跨对话跟踪实体（人员、组织、概念）。
 
 **核心特性：**
+
 - 自动实体识别和更新
 - 实体间关系跟踪
 - 提及计数和时近性跟踪
@@ -112,11 +120,13 @@ memory_config = MemoryConfig(
 ## 存储提供商
 
 **✅ 已测试提供商：**
+
 - `memory` - 内存存储（开发/测试）
 - `postgresql` - PostgreSQL数据库（生产）
 - `sqlite` - SQLite数据库（单用户/开发）
 
 **⚠️ 实验性提供商：**
+
 - `redis` - Redis存储（未完全测试）
 - `mongodb` - MongoDB存储（未完全测试）
 - `mysql` - MySQL存储（未完全测试）

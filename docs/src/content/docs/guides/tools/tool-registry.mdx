@@ -8,6 +8,7 @@ description: Learn how to find and use tools in your LangCrew agents
 **Tools** give your agents the ability to take real actions - like calculating numbers, reading files, scraping websites, or calling APIs. LangCrew's tool system automatically finds and provides access to tools from multiple sources.
 
 Quick example:
+
 ```python
 from langcrew.tools import ToolRegistry
 
@@ -27,6 +28,7 @@ pip install crewai_tools langchain_community
 ```
 
 Popular tools you'll get:
+
 ```python
 from langcrew.tools import ToolRegistry
 
@@ -44,6 +46,7 @@ calculator = ToolRegistry.get_tool("langchain:calculator")
 ```
 
 **Important**: Tool names use provider prefixes and snake_case format:
+
 - `crewai:` prefix for CrewAI tools (from `crewai_tools`) - use snake_case format
 - `langchain:` prefix for LangChain community tools (from `langchain_community.tools`) - use snake_case format
 - `langcrew:` prefix for LangCrew-specific tools (from `langcrew_tools`)
@@ -52,6 +55,7 @@ calculator = ToolRegistry.get_tool("langchain:calculator")
 **Note**: Always use snake_case format (lowercase with underscores) for tool names, even if the original tool uses descriptive names with spaces.
 
 To see all available tools:
+
 ```bash
 python -c "from langcrew.tools import ToolRegistry; print(ToolRegistry.list_tools())"
 ```
@@ -63,6 +67,7 @@ python -c "from langcrew.tools import ToolRegistry; print(ToolRegistry.list_tool
 **Best for**: Business-specific logic or unique workflows
 
 Create a `tools/` directory in your project:
+
 ```python
 # tools/my_tools.py
 from langchain_core.tools import BaseTool
@@ -77,6 +82,7 @@ class SalesReportTool(BaseTool):
 ```
 
 Use it immediately:
+
 ```python
 report_tool = ToolRegistry.get_tool("sales_report")
 result = report_tool.run("quarterly")
@@ -128,11 +134,13 @@ result = crew.kickoff(inputs={
 ### "Tool not found" Error
 
 **Step 1**: Install the required tool packages
+
 ```bash
 pip install crewai_tools langchain_community
 ```
 
 **Step 2**: Use the correct provider prefix
+
 ```python
 from langcrew.tools import ToolRegistry
 
@@ -145,6 +153,7 @@ tool = ToolRegistry.get_tool("sales_report")  # ✅
 ```
 
 **Step 3**: Debug with list_tools() if needed
+
 ```python
 from langcrew.tools import ToolRegistry
 
@@ -165,6 +174,7 @@ except ValueError as e:
 ### Missing Dependencies Error
 
 Some LangChain tools need additional packages:
+
 ```bash
 # For web search tools
 pip install duckduckgo-search
@@ -179,7 +189,8 @@ pip install numexpr
 ### Creating Custom Tools Not Working
 
 Make sure your tools directory structure is correct:
-```
+
+```text
 your_project/
 ├── tools/
 │   ├── __init__.py  # Can be empty
@@ -188,6 +199,7 @@ your_project/
 ```
 
 Your tool class must:
+
 - Inherit from `BaseTool`
 - Have a `name` attribute
 - Implement the `_run` method

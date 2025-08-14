@@ -11,7 +11,7 @@ LangCrew的Web模块将您的AI智能体转换为生产就绪的Web服务，支�
 有关详细的通信协议规范、消息格式和API端点，请参阅[通信协议](/zh/guides/web/protocol)文档。
 :::
 
-## 快速开始 - 只需3行代码！
+## 快速开始 - 只需3行代码
 
 只需3行代码即可让您的智能体作为Web服务运行：
 
@@ -117,6 +117,7 @@ pnpm dev
 ```
 
 Web UI包括：
+
 - **实时聊天界面**：带有输入指示器的流式响应
 - **工具调用可视化**：实时查看智能体工具使用情况
 - **文件上传支持**：上传文档进行分析
@@ -128,9 +129,11 @@ Web UI包括：
 :::
 
 ### 2. 访问API文档
+
 访问 `http://localhost:8000/docs` 查看自动生成的API文档
 
 ### 3. 发送测试消息
+
 ```bash
 # 开始新对话（不提供session_id）
 curl -X POST "http://localhost:8000/api/v1/chat" \
@@ -204,12 +207,14 @@ docker compose up --build
 ```
 
 **可用端点：**
-- **Web聊天界面**: http://localhost:3600
-- **后端API文档**: http://localhost:8000/docs
+
+- **Web聊天界面**: <http://localhost:3600>
+- **后端API文档**: <http://localhost:8000/docs>
 
 ### 本地开发设置
 
 **后端服务器：**
+
 ```bash
 # 1. 配置API密钥
 export OPENAI_API_KEY=your-openai-key   # 或 ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
@@ -219,9 +224,10 @@ cd examples/components/web/web_chat
 uv run run_server.py
 ```
 
-服务器将在 **http://localhost:8000** 启动
+服务器将在 **<http://localhost:8000>** 启动
 
 **前端界面：**
+
 ```bash
 # 1. 导航到web目录
 cd web/
@@ -231,7 +237,7 @@ pnpm install
 pnpm dev
 ```
 
-在浏览器中打开 **http://localhost:3000/chat**
+在浏览器中打开 **<http://localhost:3000/chat>**
 
 ## 下一步
 

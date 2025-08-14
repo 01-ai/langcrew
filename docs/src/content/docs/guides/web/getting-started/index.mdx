@@ -11,7 +11,7 @@ LangCrew's Web module transforms your AI agents into production-ready web servic
 For detailed communication protocol specifications, message formats, and API endpoints, see the [Communication Protocol](/guides/web/protocol) documentation.
 :::
 
-## Quick Start - Just 3 Lines!
+## Quick Start - Just 3 Lines
 
 Get your agent running as a web service in just 3 lines:
 
@@ -117,6 +117,7 @@ pnpm dev
 ```
 
 The web UI includes:
+
 - **Real-time Chat Interface**: Stream responses with typing indicators
 - **Tool Call Visualization**: See agent tool usage in real-time
 - **File Upload Support**: Upload documents for analysis
@@ -128,9 +129,11 @@ For production, run `pnpm build` and serve the `dist/` directory with your prefe
 :::
 
 ### 2. Access API Documentation
+
 Visit `http://localhost:8000/docs` to see the auto-generated API documentation
 
 ### 3. Send Test Messages
+
 ```bash
 # Start new conversation (no session_id)
 curl -X POST "http://localhost:8000/api/v1/chat" \
@@ -204,12 +207,14 @@ docker compose up --build
 ```
 
 **Available endpoints:**
-- **Web Chat Interface**: http://localhost:3600
-- **Backend API Documentation**: http://localhost:8000/docs
+
+- **Web Chat Interface**: <http://localhost:3600>
+- **Backend API Documentation**: <http://localhost:8000/docs>
 
 ### Local Development Setup
 
 **Backend Server:**
+
 ```bash
 # 1. Configure API Key
 export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
@@ -219,9 +224,10 @@ cd examples/components/web/web_chat
 uv run run_server.py
 ```
 
-The server will start at **http://localhost:8000**
+The server will start at **<http://localhost:8000>**
 
 **Frontend Interface:**
+
 ```bash
 # 1. Navigate to web directory
 cd web/
@@ -231,7 +237,7 @@ pnpm install
 pnpm dev
 ```
 
-Open your browser to **http://localhost:3000/chat**
+Open your browser to **<http://localhost:3000/chat>**
 
 ## Next Steps
 

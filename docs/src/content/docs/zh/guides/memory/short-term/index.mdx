@@ -10,6 +10,7 @@ description: 基于会话的对话历史管理
 ## 概述
 
 短期记忆适用于：
+
 - **对话连续性**在会话内
 - **上下文感知响应**基于近期交互
 - **多轮对话**维持状态
@@ -269,16 +270,19 @@ crew = Crew(agents=[agent], memory=memory_config)
 ## 故障排除
 
 ### 内存未加载
+
 - 验证调用之间thread_id的一致性
 - 检查数据库连接和权限
 - 确保checkpointer正确配置
 
 ### 上下文未注入
+
 - 确认short_term配置中`enabled: True`
 - 检查max_history > 0
 - 验证代理使用相同的crew实例
 
 ### 性能问题
+
 - 减少max_history以加快上下文加载
 - 为数据库提供商使用连接池
 - 单用户应用考虑SQLite

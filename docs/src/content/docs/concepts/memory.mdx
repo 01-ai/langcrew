@@ -41,23 +41,26 @@ crew = Crew(
 ## Key Components
 
 ### MemoryConfig
+
 Unified configuration class that manages all three memory types and storage providers.
 
 #### Core Parameters
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `enabled` | bool | Enable/disable memory functionality | True |
-| `provider` | str | Storage provider: "memory", "sqlite", "postgres", etc. | "memory" |
-| `connection_string` | str \| None | Database connection string | None |
-| `short_term` | dict | Short-term memory configuration | See below |
-| `long_term` | dict | Long-term memory configuration | See below |
-| `entity` | dict | Entity memory configuration | See below |
+| Parameter           | Type        | Description                                            | Default   |
+| ------------------- | ----------- | ------------------------------------------------------ | --------- |
+| `enabled`           | bool        | Enable/disable memory functionality                    | True      |
+| `provider`          | str         | Storage provider: "memory", "sqlite", "postgres", etc. | "memory"  |
+| `connection_string` | str \| None | Database connection string                             | None      |
+| `short_term`        | dict        | Short-term memory configuration                        | See below |
+| `long_term`         | dict        | Long-term memory configuration                         | See below |
+| `entity`            | dict        | Entity memory configuration                            | See below |
 
 ### Short-term Memory
+
 Session-based conversation history using LangGraph's Checkpointer system for immediate context retention.
 
 **Key Features:**
+
 - Thread-based session management
 - Automatic context injection
 - Configurable history limits
@@ -74,9 +77,11 @@ memory_config = MemoryConfig(
 ```
 
 ### Long-term Memory
+
 Persistent knowledge storage using LangGraph's Store system for cross-session information retention.
 
 **Key Features:**
+
 - Quality-based knowledge filtering
 - Task-based knowledge organization
 - Agent-specific namespaces
@@ -93,9 +98,11 @@ memory_config = MemoryConfig(
 ```
 
 ### Entity Memory
+
 Tracks entities (people, organizations, concepts) across conversations using structured storage.
 
 **Key Features:**
+
 - Automatic entity recognition and updates
 - Relationship tracking between entities
 - Mention counting and recency tracking
@@ -113,11 +120,13 @@ memory_config = MemoryConfig(
 ## Storage Providers
 
 **✅ Tested Providers:**
+
 - `memory` - In-memory storage (development/testing)
 - `postgresql` - PostgreSQL database (production)
 - `sqlite` - SQLite database (single-user/development)
 
 **⚠️ Experimental Providers:**
+
 - `redis` - Redis storage (not fully tested)
 - `mongodb` - MongoDB storage (not fully tested)
 - `mysql` - MySQL storage (not fully tested)

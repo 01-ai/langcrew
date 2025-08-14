@@ -8,6 +8,7 @@ Long-term memory provides persistent knowledge storage using LangGraph's Store s
 ## Overview
 
 Long-term memory is ideal for:
+
 - **Knowledge accumulation** across multiple sessions
 - **Learning from experiences** and storing insights
 - **Cross-session continuity** with important facts
@@ -32,10 +33,10 @@ memory_config = MemoryConfig(
 
 ### Configuration Parameters
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `enabled` | bool | Enable long-term memory | True |
-| `min_quality` | float | Minimum quality threshold for storage (0.0-1.0) | 0.7 |
+| Parameter     | Type  | Description                                     | Default |
+| ------------- | ----- | ----------------------------------------------- | ------- |
+| `enabled`     | bool  | Enable long-term memory                         | True    |
+| `min_quality` | float | Minimum quality threshold for storage (0.0-1.0) | 0.7     |
 
 ## How It Works
 
@@ -74,6 +75,7 @@ crew.kickoff(
 ### Knowledge Organization
 
 Long-term memory organizes knowledge by:
+
 - **Agent namespaces**: Each agent has its own knowledge space
 - **Task categories**: Knowledge grouped by task types
 - **Quality scores**: Weighted by importance and accuracy
@@ -366,16 +368,19 @@ crew = Crew(agents=[agent], memory=memory_config)
 ## Troubleshooting
 
 ### Knowledge Not Being Stored
+
 - Check `min_quality` threshold - may be too high
 - Verify information quality in task results
 - Ensure agent is providing quality metadata
 
 ### Poor Knowledge Retrieval
+
 - Lower `min_quality` if too restrictive
 - Use more specific search queries
 - Check if knowledge is properly categorized by task
 
 ### Storage Performance Issues
+
 - Use PostgreSQL for large knowledge bases
 - Implement connection pooling
 - Consider archiving old knowledge periodically
