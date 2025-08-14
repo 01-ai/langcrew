@@ -8,6 +8,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ## 1. 传输协议
 
 ### 流式传输（SSE）
+
 - 客户端调用发送消息API
 - 服务器通过该连接发送事件（SSE）流
 
@@ -39,6 +40,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 #### 起始消息
 
 **起始消息**
+
 ```json
 {
   "id": "uuid",
@@ -54,6 +56,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ```
 
 **结束消息**
+
 ```json
 {
   "id": "uuid",
@@ -71,6 +74,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 #### 资源
 
 **文本（结果交付也用）**
+
 ```json
 {
   "id": "uuid",
@@ -86,6 +90,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ```
 
 **图片（暂时没用）**
+
 ```json
 {
   "id": "uuid",
@@ -102,6 +107,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ```
 
 **音频（暂时没用）**
+
 ```json
 {
   "id": "uuid",
@@ -117,6 +123,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ```
 
 **视频（暂时没用）**
+
 ```json
 {
   "id": "uuid",
@@ -135,6 +142,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 #### 计划
 
 **生成**
+
 ```json
 {
   "id": "uuid",
@@ -162,6 +170,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ```
 
 **更新**
+
 ```json
 {
   "id": "uuid",
@@ -185,6 +194,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 #### 工具调用
 
 **开始调用**
+
 ```json
 {
   "id": "uuid",
@@ -207,6 +217,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ```
 
 **结束调用**
+
 ```json
 {
   "id": "uuid",
@@ -283,6 +294,7 @@ LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Event
 ### 2.2 工具类型
 
 **superagent用，持续增加中...**：
+
 - **terminal**: 终端操作
 - **file**: 文件操作
 - **search**: 搜索操作
@@ -340,6 +352,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 #### 发送消息 `/api/v1/chat`
 
 **请求：**
+
 ```json
 {
     "message": "用户发的消息",
@@ -349,6 +362,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 ```
 
 **参数说明：**
+
 - `message`（必需）：用户的消息内容
 - `session_id`（可选）：用于对话连续性的会话标识符。如果不提供或为空，将自动创建新会话，格式为 `session_{16位uuid字符}`
 - `interrupt_data`（可选）：用于恢复中断对话的附加数据
@@ -358,6 +372,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 #### 停止聊天 `/api/v1/chat/stop`
 
 **请求：**
+
 ```json
 {
     "session_id": "xxxxx"
@@ -365,6 +380,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 ```
 
 **响应：**
+
 ```json
 {
   "success": true,

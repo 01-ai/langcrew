@@ -10,6 +10,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 ## What We'll Build
 
 A content creation system where:
+
 1. A **Researcher** agent gathers information on a topic
 2. A **Writer** agent creates an article based on the research
 
@@ -186,7 +187,7 @@ langcrew run
 When you run this crew, you'll see:
 
 1. **Agent Initialization**: Both agents are created and ready
-2. **Task Execution**: 
+2. **Task Execution**:
    - Researcher searches and gathers information
    - Writer receives the research and creates content
 3. **Final Output**: The completed article
@@ -263,16 +264,19 @@ Congratulations! You've built your first langcrew application. Here's what to ex
 ## Common Patterns
 
 ### Research → Analysis → Action
+
 ```python
 researcher → analyst → implementer
 ```
 
 ### Review and Revision
+
 ```python
 creator → reviewer → creator (revision)
 ```
 
 ### Parallel Specialists
+
 ```python
 specialist1 ↘
 specialist2 → aggregator → final output

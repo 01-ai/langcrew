@@ -8,6 +8,7 @@ Tools are the **action capabilities** that enable agents to interact with the wo
 ## What are Tools?
 
 In langcrew, tools are functions or services that agents can invoke to:
+
 - **Gather information** - Search engines, databases, APIs
 - **Process data** - Calculators, parsers, analyzers  
 - **Take actions** - File operations, email sending, API calls
@@ -32,7 +33,9 @@ agent = Agent(
 langcrew supports multiple tool ecosystems:
 
 #### 1. **CrewAI Tools** (`crewai_tools`)
+
 Pre-built tools optimized for agent workflows:
+
 ```python
 from langcrew.tools import ToolRegistry
 
@@ -42,7 +45,9 @@ file_tool = ToolRegistry.get_tool("crewai:read_a_files_content")
 ```
 
 #### 2. **LangChain Tools** (`langchain_community`)
+
 Extensive ecosystem of community tools:
+
 ```python
 # LangChain community tools
 calculator = ToolRegistry.get_tool("langchain:calculator")
@@ -50,7 +55,9 @@ wikipedia = ToolRegistry.get_tool("langchain:wikipedia")
 ```
 
 #### 3. **Custom Tools**
+
 Application-specific tools you create:
+
 ```python
 from langcrew.tools import tool
 
@@ -62,7 +69,9 @@ def custom_database_query(query: str) -> str:
 ```
 
 #### 4. **MCP Tools** (Model Context Protocol)
+
 External services via standardized protocol:
+
 ```python
 agent = Agent(
     role="System Admin",
@@ -94,7 +103,9 @@ file_tools = ToolRegistry.search_tools("file")
 ## Tool Integration Patterns
 
 ### 1. **Agent-Level Tools**
+
 Tools assigned to specific agents:
+
 ```python
 researcher = Agent(
     role="Researcher",
@@ -104,7 +115,9 @@ researcher = Agent(
 ```
 
 ### 2. **Dynamic Tool Selection**
+
 Agents choose tools based on task requirements:
+
 ```python
 multi_tool_agent = Agent(
     role="General Assistant",
@@ -114,7 +127,9 @@ multi_tool_agent = Agent(
 ```
 
 ### 3. **Tool Handoffs**
+
 Tools can be passed between agents in a crew:
+
 ```python
 # Researcher uses search tools
 researcher = Agent(tools=[search_tools])
@@ -126,7 +141,9 @@ writer = Agent(tools=[writing_tools])
 ## Tool Security and Control
 
 ### Human-in-the-Loop (HITL)
+
 Control tool execution with human oversight:
+
 ```python
 from langcrew.hitl import HITLConfig
 
@@ -140,7 +157,9 @@ agent = Agent(
 ```
 
 ### Tool Filtering
+
 Restrict which tools agents can access:
+
 ```python
 # Only allow safe tools
 safe_tools = ToolRegistry.get_tools_by_safety_level("safe")
@@ -150,7 +169,9 @@ agent = Agent(tools=safe_tools)
 ## Tool Performance
 
 ### Async Support
+
 Tools support asynchronous execution:
+
 ```python
 @tool
 async def async_api_call(endpoint: str) -> str:
@@ -160,7 +181,9 @@ async def async_api_call(endpoint: str) -> str:
 ```
 
 ### Caching
+
 Automatic result caching for expensive operations:
+
 ```python
 @tool(cache=True, cache_ttl=3600)  # Cache for 1 hour
 def expensive_calculation(data: str) -> str:
@@ -172,7 +195,9 @@ def expensive_calculation(data: str) -> str:
 ## Best Practices
 
 ### 1. **Tool Selection**
+
 Choose tools that match agent capabilities:
+
 ```python
 # Good: Specialized tools for specialized agents
 data_scientist = Agent(
@@ -185,7 +210,9 @@ data_scientist = Agent(
 ```
 
 ### 2. **Error Handling**
+
 Tools should handle errors gracefully:
+
 ```python
 @tool
 def robust_file_reader(filepath: str) -> str:
@@ -200,7 +227,9 @@ def robust_file_reader(filepath: str) -> str:
 ```
 
 ### 3. **Clear Descriptions**
+
 Provide clear tool descriptions for agent understanding:
+
 ```python
 @tool
 def calculate_roi(investment: float, return_amount: float) -> float:

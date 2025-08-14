@@ -12,18 +12,23 @@ Every agent in langcrew is built around a flexible architecture that supports bo
 ### Core Components
 
 #### 1. Role, Goal, and Backstory (CrewAI Compatibility)
+
 For CrewAI-style agents, you define:
+
 - **Role**: The agent's specialization and expertise
 - **Goal**: The agent's primary objective  
 - **Backstory**: Context that shapes the agent's behavior
 
 #### 2. Executor System
+
 Agents use configurable executors to process tasks:
+
 - **executor_type**: Type of executor (default: "react")
 - **prompt**: Custom prompt or system message
 - **executor_kwargs**: Additional executor configuration
 
 #### 3. Tools and Capabilities
+
 - **tools**: List of tools available to the agent
 - **mcp_servers**: MCP (Model Context Protocol) server configurations
 - **llm**: Language model configuration
@@ -102,24 +107,24 @@ custom_agent = Agent(
 
 ### Core Parameters
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `role` | str | Agent's role/title | None |
-| `goal` | str | Primary objective | None |
-| `backstory` | str | Background context | None |
-| `name` | str | Custom name/identifier | None |
-| `tools` | List[BaseTool] | Available tools | [] |
-| `llm` | Any | Language model config | None |
-| `verbose` | bool | Show execution details | False |
-| `debug` | bool | Enable debug mode | True |
+| Parameter   | Type           | Description            | Default |
+| ----------- | -------------- | ---------------------- | ------- |
+| `role`      | str            | Agent's role/title     | None    |
+| `goal`      | str            | Primary objective      | None    |
+| `backstory` | str            | Background context     | None    |
+| `name`      | str            | Custom name/identifier | None    |
+| `tools`     | List[BaseTool] | Available tools        | []      |
+| `llm`       | Any            | Language model config  | None    |
+| `verbose`   | bool           | Show execution details | False   |
+| `debug`     | bool           | Enable debug mode      | True    |
 
 ### Executor Configuration
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `executor_type` | str | Executor type | "react" |
-| `prompt` | str/SystemMessage/Callable/Runnable | Custom prompt | None |
-| `executor_kwargs` | dict | Additional executor config | {} |
+| Parameter         | Type                                | Description                | Default |
+| ----------------- | ----------------------------------- | -------------------------- | ------- |
+| `executor_type`   | str                                 | Executor type              | "react" |
+| `prompt`          | str/SystemMessage/Callable/Runnable | Custom prompt              | None    |
+| `executor_kwargs` | dict                                | Additional executor config | {}      |
 
 ### Advanced Features
 
@@ -211,6 +216,7 @@ agent = Agent(
 ## Memory Configuration
 
 ### Basic Memory
+
 ```python
 # Enable simple memory
 agent = Agent(
@@ -221,6 +227,7 @@ agent = Agent(
 ```
 
 ### Advanced Memory Configuration
+
 ```python
 from langcrew.memory import MemoryConfig
 
@@ -360,6 +367,7 @@ except Exception as e:
 ## Agent Execution
 
 ### Synchronous Execution
+
 ```python
 result = agent.invoke({
     "messages": [],
@@ -368,6 +376,7 @@ result = agent.invoke({
 ```
 
 ### Asynchronous Execution
+
 ```python
 import asyncio
 
@@ -384,6 +393,7 @@ result = asyncio.run(run_agent())
 ## Best Practices
 
 ### 1. Choose the Right Configuration Style
+
 ```python
 # For CrewAI compatibility
 agent = Agent(
@@ -400,6 +410,7 @@ agent = Agent(
 ```
 
 ### 2. Use Appropriate Tools
+
 ```python
 # Match tools to agent capabilities
 data_agent = Agent(
@@ -410,6 +421,7 @@ data_agent = Agent(
 ```
 
 ### 3. Configure Memory When Needed
+
 ```python
 # For stateful interactions
 agent = Agent(
@@ -419,6 +431,7 @@ agent = Agent(
 ```
 
 ### 4. Use MCP for External Integration
+
 ```python
 # Connect to external systems
 agent = Agent(
@@ -433,6 +446,7 @@ agent = Agent(
 ## Debugging and Monitoring
 
 ### Verbose Mode
+
 ```python
 agent = Agent(
     role="Debugger",
@@ -441,6 +455,7 @@ agent = Agent(
 ```
 
 ### Debug Mode
+
 ```python
 agent = Agent(
     role="System Monitor",

@@ -21,13 +21,16 @@ class GuardrailError(Exception):
 ```
 
 **Parameters:**
+
 - `message` (str): Error message describing the failure
 - `guardrail_name` (str | None): Name of the guardrail that failed
 
 **Attributes:**
+
 - `guardrail_name`: Name of the guardrail that failed
 
 **Example:**
+
 ```python
 from langcrew.guardrail import GuardrailError
 
@@ -52,11 +55,13 @@ def my_input_guardrail(data: Any) -> Tuple[bool, str]:
 ```
 
 **Usage:**
+
 - Applied to functions that validate input data
 - Function must return `Tuple[bool, str]` (is_valid, message)
 - Automatically marked with `_is_input_guard` attribute
 
 **Example:**
+
 ```python
 from langcrew.guardrail import input_guard
 
@@ -80,11 +85,13 @@ def my_output_guardrail(data: Any) -> Tuple[bool, str]:
 ```
 
 **Usage:**
+
 - Applied to functions that validate output data
 - Function must return `Tuple[bool, str]` (is_valid, message)
 - Automatically marked with `_is_output_guard` attribute
 
 **Example:**
+
 ```python
 from langcrew.guardrail import output_guard
 
@@ -112,13 +119,16 @@ def check_guardrails_sync(
 ```
 
 **Parameters:**
+
 - `guardrails` (list[GuardrailFunc]): List of guardrail functions to check
 - `data` (Any): The data to check (input or output)
 
 **Raises:**
+
 - `GuardrailError`: If any guardrail check fails
 
 **Example:**
+
 ```python
 from langcrew.guardrail import check_guardrails_sync
 
@@ -143,13 +153,16 @@ async def check_guardrails(
 ```
 
 **Parameters:**
+
 - `guardrails` (list[GuardrailFunc]): List of guardrail functions to check
 - `data` (Any): The data to check (input or output)
 
 **Raises:**
+
 - `GuardrailError`: If any guardrail check fails
 
 **Example:**
+
 ```python
 from langcrew.guardrail import check_guardrails
 
@@ -168,12 +181,14 @@ def with_guardrails(func: Callable) -> Callable:
 ```
 
 **Usage:**
+
 - Automatically checks input_guards before method execution
 - Automatically checks output_guards after method execution
 - Handles both sync and async methods
 - Requires class to have `input_guards` and `output_guards` attributes
 
 **Example:**
+
 ```python
 from langcrew.guardrail import with_guardrails
 
@@ -204,10 +219,12 @@ GuardrailFunc: TypeAlias = Callable[
 ```
 
 **Signature:**
+
 - **Input**: `data: Any` - The data to validate
 - **Output**: `tuple[bool, str]` - (is_valid, message)
 
 **Requirements:**
+
 - Must be callable
 - Must accept one argument of any type
 - Must return a tuple with boolean and string
@@ -228,6 +245,7 @@ def check_no_sensitive_info(data: Any) -> Tuple[bool, str]:
 ```
 
 **Patterns Detected:**
+
 - SSN patterns
 - Credit card numbers
 - API keys
@@ -246,6 +264,7 @@ def check_input_length(data: Any) -> Tuple[bool, str]:
 ```
 
 **Default Limits:**
+
 - Maximum length: 1000 characters
 - Configurable via function modification
 
@@ -261,6 +280,7 @@ def check_language_support(data: Any) -> Tuple[bool, str]:
 ```
 
 **Language Detection:**
+
 - Based on non-Latin character ratio
 - Threshold: 30% non-Latin characters
 - Configurable via function modification
@@ -277,6 +297,7 @@ def check_content_category(data: Any) -> Tuple[bool, str]:
 ```
 
 **Supported Categories:**
+
 - Technical: code, programming, software, algorithm, database
 - Creative: story, poem, art, design, creative
 - Business: strategy, marketing, finance, business, analysis
@@ -294,6 +315,7 @@ def check_rate_limiting(data: Any) -> Tuple[bool, str]:
 ```
 
 **Limits:**
+
 - 5 requests per minute
 - Resets every minute
 - Configurable via function modification
@@ -310,11 +332,13 @@ def check_user_permissions(data: Any) -> Tuple[bool, str]:
 ```
 
 **Required Fields:**
+
 - `user_id`: User identifier
 - `user_role`: User role (user, admin)
 - `operation`: Operation to perform
 
 **Sensitive Operations:**
+
 - admin, delete, modify, access
 
 ### Output Guardrails
@@ -331,6 +355,7 @@ def check_output_quality(data: Any) -> Tuple[bool, str]:
 ```
 
 **Quality Checks:**
+
 - Non-empty output
 - Minimum length (10 characters)
 - No placeholder text (TODO, FIXME, etc.)
@@ -347,6 +372,7 @@ def filter_profanity(data: Any) -> Tuple[bool, str]:
 ```
 
 **Filtered Words:**
+
 - spam, junk, garbage
 - Configurable via function modification
 
@@ -362,6 +388,7 @@ def check_output_format(data: Any) -> Tuple[bool, str]:
 ```
 
 **Format Checks:**
+
 - At least 2 sentences
 - Starts with capital letter
 - Ends with proper punctuation
@@ -378,6 +405,7 @@ def check_factual_accuracy(data: Any) -> Tuple[bool, str]:
 ```
 
 **Accuracy Checks:**
+
 - No overly confident language
 - Balanced language indicators
 - Configurable thresholds
@@ -394,6 +422,7 @@ def check_ethical_guidelines(data: Any) -> Tuple[bool, str]:
 ```
 
 **Ethical Categories:**
+
 - Discrimination
 - Harmful content
 - Misinformation
@@ -411,6 +440,7 @@ def check_data_privacy(data: Any) -> Tuple[bool, str]:
 ```
 
 **PII Patterns:**
+
 - SSN format
 - Phone numbers
 - Email addresses
@@ -432,6 +462,7 @@ def conditional_sensitive_check(data: Any) -> Tuple[bool, str]:
 ```
 
 **Context Detection:**
+
 - Security-related tasks
 - Different validation rules per context
 - Configurable sensitivity levels
@@ -448,6 +479,7 @@ def context_aware_quality_check(data: Any) -> Tuple[bool, str]:
 ```
 
 **Content Types:**
+
 - Code content
 - Article content
 - General content
@@ -467,6 +499,7 @@ def adaptive_rate_limiting(data: Any) -> Tuple[bool, str]:
 ```
 
 **User Tiers:**
+
 - Basic: 5 requests/minute
 - Premium: 20 requests/minute
 - Enterprise: 100 requests/minute
@@ -489,6 +522,7 @@ class CustomGuardrailError(GuardrailError):
 ```
 
 **Additional Attributes:**
+
 - `error_code`: Structured error identifier
 - `suggestions`: List of recovery suggestions
 
@@ -504,6 +538,7 @@ def enhanced_sensitive_check(data: Any) -> Tuple[bool, str]:
 ```
 
 **Features:**
+
 - Regex-based pattern detection
 - Multiple data type detection
 - Custom error messages
@@ -521,6 +556,7 @@ def comprehensive_output_validation(data: Any) -> Tuple[bool, str]:
 ```
 
 **Validation Areas:**
+
 - Length validation
 - Structure validation
 - Content quality validation
@@ -542,6 +578,7 @@ agent = Agent(
 ```
 
 **Available Parameters:**
+
 - `input_guards`: List of input guardrail functions
 - `output_guards`: List of output guardrail functions
 
@@ -559,6 +596,7 @@ task = Task(
 ```
 
 **Available Parameters:**
+
 - `input_guards`: List of input guardrail functions
 - `output_guards`: List of output guardrail functions
 

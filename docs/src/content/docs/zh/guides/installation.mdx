@@ -177,14 +177,17 @@ config = Config(
 ### Common Issues
 
 **ImportError: No module named 'langcrew'**
+
 - Ensure you've activated your virtual environment
 - Verify installation with `pip list | grep langcrew`
 
 **API Key Errors**
+
 - Check your `.env` file is in the correct location
 - Verify environment variables are loaded: `echo $OPENAI_API_KEY`
 
 **Dependency Conflicts**
+
 - Create a fresh virtual environment
 - Use `pip install --upgrade langcrew`
 

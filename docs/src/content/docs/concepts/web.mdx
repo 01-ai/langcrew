@@ -5,7 +5,7 @@ description: Understanding Web - HTTP server for AI agents with streaming suppor
 
 Web provides HTTP server capabilities for exposing AI agents as web services with real-time streaming communication, built on FastAPI and integrated with LangGraph's execution engine.
 
-## Quick Start - Just 3 Lines!
+## Quick Start - Just 3 Lines
 
 Get your agent running as a web service in just 3 lines:
 
@@ -25,6 +25,7 @@ For detailed setup, configuration options, and examples, see the [Getting Starte
 ## What is Web?
 
 Web in langcrew provides:
+
 - **HTTP Server**: FastAPI-based server for agent communication
 - **Streaming Communication**: Real-time agent responses via SSE (Server-Sent Events)
 - **LangGraph Integration**: Direct integration with LangGraph's streaming capabilities
@@ -58,6 +59,7 @@ graph TD
 LangCrew includes a comprehensive React-based web interface:
 
 ### UI Features
+
 - **Real-time Chat Interface**: Stream agent responses with typing indicators
 - **Tool Call Visualization**: See agent tool usage and results in real-time
 - **Plan Execution Tracking**: Visualize multi-step agent planning and execution
@@ -67,6 +69,7 @@ LangCrew includes a comprehensive React-based web interface:
 - **Modern Design**: Built with Antd + Tailwind CSS for professional appearance
 
 ### UI Architecture
+
 - **Framework**: React 19 with TypeScript
 - **State Management**: Zustand for efficient state handling
 - **Build System**: Rspack for fast development and builds
@@ -74,6 +77,7 @@ LangCrew includes a comprehensive React-based web interface:
 - **Package Management**: pnpm for efficient dependency management
 
 ### Quick UI Setup
+
 ```bash
 cd web/
 pnpm install
@@ -96,6 +100,7 @@ For complete protocol specifications and message formats, see the [Communication
 ### Two Integration Approaches
 
 **1. LangCrew Integration**
+
 ```python
 from langcrew import Agent, Crew
 from langcrew.web import create_server
@@ -105,6 +110,7 @@ server = create_server(crew=crew)
 ```
 
 **2. LangGraph Integration**  
+
 ```python
 from langcrew.web import create_langgraph_server
 from langgraph.graph import StateGraph

@@ -10,6 +10,7 @@ description: 为内存管理配置不同的存储后端
 ## 概述
 
 LangCrew内存管理支持多种存储提供商：
+
 - **✅ 已测试**: `memory`, `sqlite`, `postgresql`
 - **⚠️ 实验性**: `redis`, `mongodb`, `mysql`
 
@@ -32,12 +33,14 @@ memory_config = MemoryConfig(
 ```
 
 **特性：**
+
 - ✅ **快速**：无磁盘I/O开销
 - ✅ **简单**：无需设置
 - ❌ **易失**：重启时数据丢失
 - ❌ **单进程**：实例间无法共享
 
 **最适合：**
+
 - 单元测试
 - 开发环境
 - 概念验证
@@ -59,6 +62,7 @@ memory_config = MemoryConfig(
 ```
 
 **连接字符串示例：**
+
 ```python
 # 相对路径
 "sqlite:///memory.db"
@@ -74,6 +78,7 @@ memory_config = MemoryConfig(
 ```
 
 **特性：**
+
 - ✅ **持久**：数据在重启后保持
 - ✅ **基于文件**：易于备份和迁移
 - ✅ **无服务器**：嵌入式数据库
@@ -81,6 +86,7 @@ memory_config = MemoryConfig(
 - ❌ **仅本地**：无网络访问
 
 **最适合：**
+
 - 个人应用程序
 - 本地开发
 - 小团队项目
@@ -102,6 +108,7 @@ memory_config = MemoryConfig(
 ```
 
 **连接字符串示例：**
+
 ```python
 # 基本连接
 "postgresql://user:password@localhost:5432/database"
@@ -121,6 +128,7 @@ connection_string = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWOR
 ```
 
 **特性：**
+
 - ✅ **可扩展**：处理大型数据集
 - ✅ **并发**：多个读写者
 - ✅ **ACID**：完整事务支持
@@ -129,6 +137,7 @@ connection_string = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWOR
 - ❌ **资源**：更高内存/CPU使用
 
 **最适合：**
+
 - 生产应用程序
 - 多用户系统
 - 大规模部署

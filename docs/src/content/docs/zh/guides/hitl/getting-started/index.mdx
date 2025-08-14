@@ -146,6 +146,7 @@ uv run hitl_example.py
 ```
 
 这个示例演示了：
+
 - 9 种不同的 HITL 配置模式
 - 带多语言支持的工具审批工作流
 - 参数和结果修改
@@ -197,6 +198,7 @@ result = crew.kickoff(inputs={"task": "创建一个测试文件"})
 ### 中断未触发
 
 检查工具名称是否完全匹配：
+
 ```python
 # ❌ 错误 - 工具名称不匹配
 hitl_config = HITLConfig(interrupt_before_tools=["file_writer"])
@@ -209,6 +211,7 @@ hitl_config = HITLConfig(interrupt_before_tools=["file_write"])
 ### 导入错误
 
 确保您从正确的模块导入：
+
 ```python
 # 核心 HITL 配置
 from langcrew.hitl import HITLConfig

@@ -8,6 +8,7 @@ Entity memory tracks entities (people, organizations, concepts) across conversat
 ## Overview
 
 Entity memory is ideal for:
+
 - **Person tracking** in customer service or CRM systems
 - **Organization management** in business applications
 - **Concept learning** in educational systems
@@ -31,9 +32,9 @@ memory_config = MemoryConfig(
 
 ### Configuration Parameters
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `enabled` | bool | Enable entity memory | True |
+| Parameter | Type | Description          | Default |
+| --------- | ---- | -------------------- | ------- |
+| `enabled` | bool | Enable entity memory | True    |
 
 ## How It Works
 
@@ -69,6 +70,7 @@ crew.kickoff(
 ### Entity Types and Organization
 
 Entity memory organizes entities by type:
+
 - **Person**: Individuals with names, roles, and attributes
 - **Organization**: Companies, departments, teams
 - **Location**: Cities, countries, addresses
@@ -413,21 +415,25 @@ memory_config = MemoryConfig(
 ## Troubleshooting
 
 ### Entities Not Being Recognized
+
 - Provide clear entity information in conversations
 - Use consistent naming conventions
 - Include entity types and relationships explicitly
 
 ### Duplicate Entities
+
 - Use consistent entity names across conversations
 - Check for variations in spelling or formatting
 - Implement entity normalization in your application
 
 ### Relationship Tracking Issues
+
 - Define clear relationship types
 - Provide explicit relationship information
 - Use structured metadata when saving entities
 
 ### Performance with Large Entity Sets
+
 - Use entity type filtering in searches
 - Implement pagination for large result sets
 - Consider archiving old or inactive entities

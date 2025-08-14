@@ -12,18 +12,23 @@ langcrew 中的每个智能体都构建在灵活的架构之上，既支持 Crew
 ### 核心组件
 
 #### 1. 角色、目标和背景故事（CrewAI 兼容性）
+
 对于 CrewAI 风格的智能体，您需要定义：
+
 - **Role（角色）**: 智能体的专业化和专长
 - **Goal（目标）**: 智能体的主要目标  
 - **Backstory（背景故事）**: 塑造智能体行为的上下文
 
 #### 2. 执行器系统
+
 智能体使用可配置的执行器来处理任务：
+
 - **executor_type**: 执行器类型（默认："react"）
 - **prompt**: 自定义提示或系统消息
 - **executor_kwargs**: 额外的执行器配置
 
 #### 3. 工具和能力
+
 - **tools**: 智能体可用的工具列表
 - **mcp_servers**: MCP（模型上下文协议）服务器配置
 - **llm**: 语言模型配置
@@ -211,6 +216,7 @@ agent = Agent(
 ## 内存配置
 
 ### 基础内存
+
 ```python
 # 启用简单内存
 agent = Agent(
@@ -221,6 +227,7 @@ agent = Agent(
 ```
 
 ### 高级内存配置
+
 ```python
 from langcrew.memory import MemoryConfig
 
@@ -362,6 +369,7 @@ except Exception as e:
 ## 智能体执行
 
 ### 同步执行
+
 ```python
 result = agent.invoke({
     "messages": [],
@@ -370,6 +378,7 @@ result = agent.invoke({
 ```
 
 ### 异步执行
+
 ```python
 import asyncio
 
@@ -386,6 +395,7 @@ result = asyncio.run(run_agent())
 ## 最佳实践
 
 ### 1. 选择合适的配置风格
+
 ```python
 # 用于 CrewAI 兼容性
 agent = Agent(
@@ -402,6 +412,7 @@ agent = Agent(
 ```
 
 ### 2. 使用合适的工具
+
 ```python
 # 将工具与智能体能力匹配
 data_agent = Agent(
@@ -412,6 +423,7 @@ data_agent = Agent(
 ```
 
 ### 3. 在需要时配置内存
+
 ```python
 # 用于有状态交互
 agent = Agent(
@@ -421,6 +433,7 @@ agent = Agent(
 ```
 
 ### 4. 使用 MCP 进行外部集成
+
 ```python
 # 连接到外部系统
 agent = Agent(
@@ -435,6 +448,7 @@ agent = Agent(
 ## 调试和监控
 
 ### 详细模式
+
 ```python
 agent = Agent(
     role="调试器",
@@ -443,6 +457,7 @@ agent = Agent(
 ```
 
 ### 调试模式
+
 ```python
 agent = Agent(
     role="系统监控器",

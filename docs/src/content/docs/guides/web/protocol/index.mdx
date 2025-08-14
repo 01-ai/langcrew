@@ -8,6 +8,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 ## 1. Transport Protocol
 
 ### Streaming Transport (SSE)
+
 - Client calls the send message API
 - Server sends event streams through SSE (Server-Sent Events) connection
 
@@ -39,6 +40,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 #### Session Messages
 
 **Session Init**
+
 ```json
 {
   "id": "uuid",
@@ -54,6 +56,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 ```
 
 **Finish Reason**
+
 ```json
 {
   "id": "uuid",
@@ -71,6 +74,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 #### Resource Messages
 
 **Text (also used for result delivery)**
+
 ```json
 {
   "id": "uuid",
@@ -86,6 +90,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 ```
 
 **Image (currently unused)**
+
 ```json
 {
   "id": "uuid",
@@ -102,6 +107,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 ```
 
 **Audio (currently unused)**
+
 ```json
 {
   "id": "uuid",
@@ -117,6 +123,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 ```
 
 **Video (currently unused)**
+
 ```json
 {
   "id": "uuid",
@@ -135,6 +142,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 #### Plan Messages
 
 **Plan Generation**
+
 ```json
 {
   "id": "uuid",
@@ -162,6 +170,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 ```
 
 **Plan Update**
+
 ```json
 {
   "id": "uuid",
@@ -185,6 +194,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 #### Tool Call Messages
 
 **Tool Call Start**
+
 ```json
 {
   "id": "uuid",
@@ -207,6 +217,7 @@ The LangCrew Web Component Communication Protocol defines how web clients commun
 ```
 
 **Tool Call End**
+
 ```json
 {
   "id": "uuid",
@@ -283,6 +294,7 @@ When this message is received, there is no subsequent finish_reason, requiring s
 ### 2.2 Tool Types
 
 **For superagent use, continuously expanding...**:
+
 - **terminal**: Terminal operations
 - **file**: File operations
 - **search**: Search operations
@@ -340,6 +352,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 #### Send Message `/api/v1/chat`
 
 **Request:**
+
 ```json
 {
     "message": "User message",
@@ -349,6 +362,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 ```
 
 **Parameters:**
+
 - `message` (required): User's message content
 - `session_id` (optional): Session identifier for conversation continuity. If not provided or empty, a new session will be automatically created with format `session_{16-character-uuid}`
 - `interrupt_data` (optional): Additional data for resuming interrupted conversations
@@ -358,6 +372,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 #### Stop Chat `/api/v1/chat/stop`
 
 **Request:**
+
 ```json
 {
     "session_id": "xxxxx"
@@ -365,6 +380,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
