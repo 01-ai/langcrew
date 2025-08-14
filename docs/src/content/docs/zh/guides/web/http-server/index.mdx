@@ -182,20 +182,9 @@ server.run(
 )
 ```
 
-### Docker部署
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000
-CMD ["python", "main.py"]
-```
+:::tip[完整部署指南]
+有关使用Docker Compose进行包含后端和前端的完整生产部署，请参阅[快速开始](/zh/guides/web/getting-started#生产部署)指南。
+:::
 
 ### 环境变量
 
@@ -298,6 +287,6 @@ async def load_test(concurrent_requests: int, total_requests: int):
 
 ## 下一步
 
-- **[快速开始](/zh/guides/web/getting-started)** - 基础示例和设置
+- **[快速开始](/zh/guides/web/getting-started)** - 基础示例和完整部署设置
 - **[通信协议](/zh/guides/web/protocol)** - 消息规范和API参考
 - **[Web概念](/zh/concepts/web)** - 理解Web架构

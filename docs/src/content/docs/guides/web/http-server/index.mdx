@@ -182,20 +182,9 @@ server.run(
 )
 ```
 
-### Docker Deployment
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000
-CMD ["python", "main.py"]
-```
+:::tip[Complete Deployment Guide]
+For full production deployment with both backend and frontend using Docker Compose, see the [Getting Started](/guides/web/getting-started#production-deployment) guide.
+:::
 
 ### Environment Variables
 
@@ -298,6 +287,6 @@ async def load_test(concurrent_requests: int, total_requests: int):
 
 ## Next Steps
 
-- **[Getting Started](/guides/web/getting-started)** - Basic examples and setup
+- **[Getting Started](/guides/web/getting-started)** - Basic examples and complete deployment setup
 - **[Communication Protocol](/guides/web/protocol)** - Message specifications and API reference
 - **[Web Concepts](/concepts/web)** - Understanding web architecture

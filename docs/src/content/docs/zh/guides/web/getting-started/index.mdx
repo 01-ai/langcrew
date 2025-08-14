@@ -1,12 +1,14 @@
 ---
-title: 快速开始
-description: 快速开始使用LangCrew Web服务
+title: Web服务 - 快速开始
+description: 5分钟快速上手Web服务指南
 ---
 
-LangCrew Web服务让您能够轻松地将AI智能体暴露为HTTP API，支持实时流式通信和丰富的Web界面。
+快速指南，让您的langcrew应用中的Web服务快速运行起来。
+
+LangCrew的Web模块将您的AI智能体转换为生产就绪的Web服务，支持实时流式通信。
 
 :::tip[协议参考]
-关于完整的通信协议规范和消息格式，请参见 [通信协议](/zh/guides/web/protocol) 文档。
+有关详细的通信协议规范、消息格式和API端点，请参阅[通信协议](/zh/guides/web/protocol)文档。
 :::
 
 ## 快速开始 - 只需3行代码！
@@ -22,11 +24,11 @@ server = create_server(Crew(agents=[agent]))
 server.run(port=8000)  # 访问 http://localhost:8000/docs
 ```
 
-就这样！您的智能体现在已经可以作为Web服务使用，并自动生成API文档。
+就是这样！您的智能体现在已经可以作为Web服务使用，并且有自动生成的API文档。
 
 ## 安装
 
-Web服务已包含在langcrew中，无需额外安装：
+Web服务已包含在langcrew中 - 无需额外安装：
 
 ```bash
 uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
@@ -34,9 +36,9 @@ uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/reposit
 
 ## 详细示例
 
-这里是针对不同使用场景的详细示例：
+以下是不同用例的详细示例：
 
-### 方式一：使用 LangCrew
+### 方式一：使用LangCrew
 
 ```python
 from langcrew import Agent, Crew
@@ -62,11 +64,11 @@ server = create_server(
 
 # 启动服务器
 if __name__ == "__main__":
-    print("在 http://localhost:8000 启动Web服务器")
+    print("正在启动Web服务器，地址：http://localhost:8000")
     server.run()
 ```
 
-### 方式二：使用 LangGraph
+### 方式二：使用LangGraph
 
 ```python
 from langcrew.web import create_langgraph_server
@@ -89,25 +91,53 @@ server = create_langgraph_server(
 
 # 启动服务器
 if __name__ == "__main__":
-    print("在 http://localhost:8000 启动LangGraph Web服务器")
+    print("正在启动LangGraph Web服务器，地址：http://localhost:8000")
     server.run()
 ```
 
-## 测试服务器
+## 测试您的服务器
 
 服务器运行后，您可以：
 
-### 1. 访问API文档
+### 1. 使用内置Web UI
+
+LangCrew提供了一个现成的基于React的Web界面：
+
+```bash
+# 导航到web目录
+cd web/
+
+# 安装依赖
+pnpm install
+
+# 启动开发服务器
+pnpm dev
+
+# 在浏览器中打开 http://localhost:3000/chat
+```
+
+Web UI包括：
+- **实时聊天界面**：带有输入指示器的流式响应
+- **工具调用可视化**：实时查看智能体工具使用情况
+- **文件上传支持**：上传文档进行分析
+- **会话管理**：维护对话历史
+- **现代React组件**：使用Antd + Tailwind CSS构建
+
+:::tip[生产部署]
+对于生产环境，运行 `pnpm build` 并使用您首选的Web服务器提供 `dist/` 目录服务。
+:::
+
+### 2. 访问API文档
 访问 `http://localhost:8000/docs` 查看自动生成的API文档
 
-### 2. 发送测试消息
+### 3. 发送测试消息
 ```bash
 curl -X POST "http://localhost:8000/api/v1/chat" \
      -H "Content-Type: application/json" \
      -d '{"message": "你好，你能帮我什么？"}'
 ```
 
-### 3. 客户端流式接收示例
+### 4. 客户端流式示例
 
 如果您需要在客户端处理流式响应：
 
@@ -128,7 +158,55 @@ for line in response.iter_lines():
         print(f"接收到: {message['type']} - {message['content']}")
 ```
 
+## 生产部署
+
+### Docker Compose（推荐）
+
+部署包含后端和前端的完整LangCrew的最简单方法：
+
+```bash
+# 从仓库根目录
+export OPENAI_API_KEY=your-openai-key   # 或 ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
+
+# 可选配置
+export LOG_LEVEL=info # debug|info|warning|error
+
+# 启动服务
+docker compose up --build
+```
+
+**可用端点：**
+- **Web聊天界面**: http://localhost:3600
+- **后端API文档**: http://localhost:8000/docs
+
+### 本地开发设置
+
+**后端服务器：**
+```bash
+# 1. 配置API密钥
+export OPENAI_API_KEY=your-openai-key   # 或 ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
+
+# 2. 运行服务器
+cd examples/components/web/web_chat
+uv run run_server.py
+```
+
+服务器将在 **http://localhost:8000** 启动
+
+**前端界面：**
+```bash
+# 1. 导航到web目录
+cd web/
+
+# 2. 安装依赖并启动开发服务器
+pnpm install
+pnpm dev
+```
+
+在浏览器中打开 **http://localhost:3000/chat**
+
 ## 下一步
 
-- 了解详细的消息格式，请参考 [通信协议](/zh/guides/web/protocol)
-- 查看高级服务器配置，请参考 [HTTP服务器](/zh/guides/web/http-server)
+- 在[通信协议](/zh/guides/web/protocol)中了解详细的消息格式
+- 在[HTTP服务器](/zh/guides/web/http-server)中查看高级服务器配置
+- 探索[Web UI组件](/zh/guides/web/ui-components)以进行自定义前端集成

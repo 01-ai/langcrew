@@ -30,6 +30,7 @@ Web in langcrew provides:
 - **LangGraph Integration**: Direct integration with LangGraph's streaming capabilities
 - **Protocol Communication**: Structured message protocols for frontend integration
 - **Production Ready**: Built-in CORS, error handling, and health checks
+- **Built-in Web UI**: Ready-to-use React-based interface for agent interaction
 
 ## Core Architecture
 
@@ -37,7 +38,7 @@ Web is built around a minimal HTTP server that bridges AI agents with web client
 
 ```mermaid
 graph TD
-    A[Web Client] -->|HTTP Request| B[FastAPI Server]
+    A[Web Client/UI] -->|HTTP Request| B[FastAPI Server]
     B -->|Create Session| C[LangGraph Adapter]
     C -->|Execute| D[LangCrew Agent]
     D -->|Stream Events| C
@@ -50,6 +51,34 @@ graph TD
 - **AdapterServer**: FastAPI-based HTTP server handling client requests
 - **LangGraphAdapter**: Streaming adapter bridging agents with LangGraph execution
 - **Communication Protocol**: Structured message formats for consistent frontend integration
+- **Web UI Components**: React-based interface components for agent visualization
+
+## Built-in Web UI
+
+LangCrew includes a comprehensive React-based web interface:
+
+### UI Features
+- **Real-time Chat Interface**: Stream agent responses with typing indicators
+- **Tool Call Visualization**: See agent tool usage and results in real-time
+- **Plan Execution Tracking**: Visualize multi-step agent planning and execution
+- **File Upload Support**: Upload and process documents through the interface
+- **Session Management**: Maintain conversation history across sessions
+- **HITL Integration**: Human-in-the-loop approval interfaces
+- **Modern Design**: Built with Antd + Tailwind CSS for professional appearance
+
+### UI Architecture
+- **Framework**: React 19 with TypeScript
+- **State Management**: Zustand for efficient state handling
+- **Build System**: Rspack for fast development and builds
+- **Styling**: Tailwind CSS with Antd component library
+- **Package Management**: pnpm for efficient dependency management
+
+### Quick UI Setup
+```bash
+cd web/
+pnpm install
+pnpm dev  # Opens at http://localhost:3000/chat
+```
 
 ## Communication Protocol
 
@@ -104,6 +133,7 @@ server = create_langgraph_server(graph=compiled_graph)
 - **Multi-session Applications** with conversation continuity
 - **Tool-rich Agents** requiring visual tool call feedback
 - **HITL Workflows** needing human approval interfaces
+- **Rapid Prototyping** with ready-to-use UI components
 
 ## Next Steps
 

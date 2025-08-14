@@ -99,17 +99,45 @@ if __name__ == "__main__":
 
 Once your server is running, you can:
 
-### 1. Access API Documentation
+### 1. Use the Built-in Web UI
+
+LangCrew provides a ready-to-use React-based web interface:
+
+```bash
+# Navigate to the web directory
+cd web/
+
+# Install dependencies
+pnpm install
+
+# Start the development server
+pnpm dev
+
+# Open your browser to http://localhost:3000/chat
+```
+
+The web UI includes:
+- **Real-time Chat Interface**: Stream responses with typing indicators
+- **Tool Call Visualization**: See agent tool usage in real-time
+- **File Upload Support**: Upload documents for analysis
+- **Session Management**: Maintain conversation history
+- **Modern React Components**: Built with Antd + Tailwind CSS
+
+:::tip[Production Deployment]
+For production, run `pnpm build` and serve the `dist/` directory with your preferred web server.
+:::
+
+### 2. Access API Documentation
 Visit `http://localhost:8000/docs` to see the auto-generated API documentation
 
-### 2. Send Test Messages
+### 3. Send Test Messages
 ```bash
 curl -X POST "http://localhost:8000/api/v1/chat" \
      -H "Content-Type: application/json" \
      -d '{"message": "Hello, how can you help me?"}'
 ```
 
-### 3. Client Streaming Example
+### 4. Client Streaming Example
 
 If you need to handle streaming responses on the client side:
 
@@ -130,7 +158,55 @@ for line in response.iter_lines():
         print(f"Received: {message['type']} - {message['content']}")
 ```
 
+## Production Deployment
+
+### Docker Compose (Recommended)
+
+The easiest way to deploy LangCrew with both backend and frontend:
+
+```bash
+# From the repository root
+export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
+
+# Optional configuration
+export LOG_LEVEL=info # debug|info|warning|error
+
+# Start services
+docker compose up --build
+```
+
+**Available endpoints:**
+- **Web Chat Interface**: http://localhost:3600
+- **Backend API Documentation**: http://localhost:8000/docs
+
+### Local Development Setup
+
+**Backend Server:**
+```bash
+# 1. Configure API Key
+export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
+
+# 2. Run the Server
+cd examples/components/web/web_chat
+uv run run_server.py
+```
+
+The server will start at **http://localhost:8000**
+
+**Frontend Interface:**
+```bash
+# 1. Navigate to web directory
+cd web/
+
+# 2. Install dependencies and start development server
+pnpm install
+pnpm dev
+```
+
+Open your browser to **http://localhost:3000/chat**
+
 ## Next Steps
 
 - Learn about detailed message formats in the [Communication Protocol](/guides/web/protocol)
 - Check advanced server configuration in the [HTTP Server](/guides/web/http-server)
+- Explore the [Web UI Components](/guides/web/ui-components) for custom frontend integration
