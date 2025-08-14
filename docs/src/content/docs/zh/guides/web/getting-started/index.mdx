@@ -1,27 +1,48 @@
 ---
-title: Web服务 - 快速开始
-description: 5分钟快速上手Web服务
+title: 快速开始
+description: 快速开始使用LangCrew Web服务
 ---
 
-快速指南，让Web服务在您的langcrew应用中工作。
+LangCrew Web服务让您能够轻松地将AI智能体暴露为HTTP API，支持实时流式通信和丰富的Web界面。
+
+:::tip[协议参考]
+关于完整的通信协议规范和消息格式，请参见 [通信协议](/zh/guides/web/protocol) 文档。
+:::
+
+## 快速开始 - 只需3行代码！
+
+只需3行代码即可让您的智能体作为Web服务运行：
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+agent = Agent(role="助手", goal="帮助用户", backstory="有用的AI")
+server = create_server(Crew(agents=[agent]))
+server.run(port=8000)  # 访问 http://localhost:8000/docs
+```
+
+就这样！您的智能体现在已经可以作为Web服务使用，并自动生成API文档。
 
 ## 安装
 
-Web服务包含在langcrew中 - 无需额外安装：
+Web服务已包含在langcrew中，无需额外安装：
 
 ```bash
 uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
 ```
 
-## 基础示例
+## 详细示例
 
-这是一个为智能体创建Web服务器的简单示例：
+这里是针对不同使用场景的详细示例：
+
+### 方式一：使用 LangCrew
 
 ```python
-from langcrew import Agent
+from langcrew import Agent, Crew
 from langcrew.web import create_server
 
-# 创建智能体
+# 创建智能体和团队
 agent = Agent(
     role="Web助手",
     goal="通过Web界面帮助用户",
@@ -29,9 +50,11 @@ agent = Agent(
     verbose=True
 )
 
+crew = Crew(agents=[agent])
+
 # 创建并启动服务器
 server = create_server(
-    agents=[agent],
+    crew=crew,
     host="0.0.0.0",
     port=8000,
     cors_origins=["http://localhost:3000"]
@@ -43,188 +66,69 @@ if __name__ == "__main__":
     server.run()
 ```
 
-## LangGraph 集成示例
-
-用于更高级的LangGraph工作流：
+### 方式二：使用 LangGraph
 
 ```python
-from langcrew import Agent, Crew
 from langcrew.web import create_langgraph_server
+from langgraph.graph import StateGraph
 
-# 创建智能体和团队
-researcher = Agent(
-    role="研究专家",
-    goal="收集主题信息",
-    backstory="具有Web访问权限的专业研究员"
-)
+# 创建您的LangGraph工作流
+def create_workflow():
+    workflow = StateGraph()
+    # 在这里添加您的节点和边
+    return workflow.compile()
 
-writer = Agent(
-    role="内容作家", 
-    goal="创建引人入胜的内容",
-    backstory="创建引人注目内容的熟练作家"
-)
-
-crew = Crew(agents=[researcher, writer])
-
-# 创建支持LangGraph的服务器
+# 使用LangGraph创建服务器
+compiled_graph = create_workflow()
 server = create_langgraph_server(
-    crew=crew,
+    graph=compiled_graph,
     host="0.0.0.0",
     port=8000,
-    enable_streaming=True,
-    tool_display=True
+    cors_origins=["http://localhost:3000"]
 )
 
 # 启动服务器
-server.run()
+if __name__ == "__main__":
+    print("在 http://localhost:8000 启动LangGraph Web服务器")
+    server.run()
 ```
 
-## 流式传输示例
+## 测试服务器
 
-启用实时流式响应：
+服务器运行后，您可以：
 
-```python
-from langcrew.web import AdapterServer, LangGraphAdapter
+### 1. 访问API文档
+访问 `http://localhost:8000/docs` 查看自动生成的API文档
 
-# 创建支持流式传输的适配器
-adapter = LangGraphAdapter(
-    crew=crew,
-    enable_streaming=True,
-    stream_tool_calls=True,
-    tool_display=True
-)
-
-# 创建服务器
-server = AdapterServer(
-    adapter=adapter,
-    host="0.0.0.0",
-    port=8000
-)
-
-server.run()
-```
-
-## 测试您的设置
-
-### 使用 cURL 测试
-
+### 2. 发送测试消息
 ```bash
-# 测试基本聊天端点
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "你好，你能帮我进行研究吗？"}'
-
-# 测试任务执行
-curl -X POST http://localhost:8000/execute \
-  -H "Content-Type: application/json" \
-  -d '{"task": "research_topic", "input": {"topic": "AI趋势"}}'
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{"message": "你好，你能帮我什么？"}'
 ```
 
-### 使用 SSE (Server-Sent Events) 测试
+### 3. 客户端流式接收示例
 
-```javascript
-// 使用 SSE 连接到流式端点
-const eventSource = new EventSource('http://localhost:8000/api/v1/chat', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        message: '来自SSE的问候！',
-        session_id: 'test-session'
-    })
-});
+如果您需要在客户端处理流式响应：
 
-eventSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    console.log('收到:', data);
-};
-
-eventSource.onerror = function(error) {
-    console.error('SSE错误:', error);
-};
-```
-
-### 运行完整示例
-
-```bash
-# 设置您的 OpenAI API 密钥
-export OPENAI_API_KEY=your_api_key_here
-
-# 从web示例目录运行
-cd examples/components/web
-uv run web_example.py
-```
-
-这个示例演示了：
-- 基本HTTP服务器设置
-- 智能体与Web端点集成
-- 流式响应
-- 工具调用可视化
-
-## 更多示例
-
-要了解更多示例，请查看：
-
-- **📁 `examples/components/web/`** - 完整的Web服务器实现
-- **📄 `examples/components/web/README.md`** - 设置说明
-- **🐍 `examples/components/web/web_example.py`** - 可运行的服务器代码
-- **🌐 `examples/components/web/web_chat/`** - 完整的聊天应用
-
-## 故障排除
-
-### 服务器无法启动
-
-检查端口是否可用：
-```bash
-# 检查端口8000是否被使用
-lsof -i :8000
-
-# 如需要使用不同端口
-server = create_server(port=8080)
-```
-
-### CORS 问题
-
-正确配置CORS源：
 ```python
-# ❌ 错误 - 限制性CORS
-server = create_server(cors_origins=[])
+import requests
+import json
 
-# ✅ 正确 - 允许您的前端
-server = create_server(
-    cors_origins=["http://localhost:3000", "https://yourdomain.com"]
-)
-```
+# 发送消息并处理流式响应
+response = requests.post('/api/v1/chat', json={
+    "message": "你好，能帮我分析这个文档吗？",
+    "session_id": "可选的会话ID"
+}, stream=True)
 
-### 流式传输不工作
-
-确保启用流式传输：
-```python
-# 在适配器中启用流式传输
-adapter = LangGraphAdapter(
-    crew=crew,
-    enable_streaming=True,
-    stream_tool_calls=True
-)
-```
-
-### 导入错误
-
-确保您从正确的模块导入：
-```python
-# 核心Web组件
-from langcrew.web import create_server, create_langgraph_server
-
-# 高级组件
-from langcrew.web import AdapterServer, LangGraphAdapter
-
-# 协议类型
-from langcrew.web import ChatRequest, StreamMessage
+# 处理流式响应
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"接收到: {message['type']} - {message['content']}")
 ```
 
 ## 下一步
 
-- **[配置指南](/zh/guides/web/configuration)** - 学习所有选项
-- **[Web服务概念](/zh/concepts/web)** - 理解架构
-- **示例** - 查看 `examples/components/web/` 了解实现案例
+- 了解详细的消息格式，请参考 [通信协议](/zh/guides/web/protocol)
+- 查看高级服务器配置，请参考 [HTTP服务器](/zh/guides/web/http-server)

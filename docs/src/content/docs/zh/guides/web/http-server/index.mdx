@@ -1,73 +1,73 @@
 ---
-title: HTTP Server
-description: FastAPI-based HTTP server for exposing AI agents as web services
+title: HTTP服务器
+description: 基于FastAPI的HTTP服务器，用于将AI智能体暴露为Web服务
 ---
 
-# HTTP Server
+# HTTP服务器
 
-LangCrew's HTTP Server provides FastAPI-based REST API endpoints for exposing AI agents as web services with real-time streaming communication.
+LangCrew的HTTP服务器提供基于FastAPI的REST API端点，用于将AI智能体暴露为Web服务，支持实时流式通信。
 
-:::tip[Protocol Reference]
-For complete communication protocol specifications and message formats, see the [Communication Protocol](/guides/web/protocol) documentation.
+:::tip[协议参考]
+有关完整的通信协议规范和消息格式，请参阅[通信协议](/zh/guides/web/protocol)文档。
 :::
 
-## HTTP Server Features
+## HTTP服务器特性
 
-LangCrew HTTP server module (`langcrew.web.http_server`) provides:
-- **FastAPI Integration**: Modern, fast web framework with automatic API documentation
-- **Agent Exposure**: Convert LangCrew agents/crews into HTTP endpoints
-- **Streaming Support**: Server-Sent Events (SSE) for real-time communication
-- **Production Ready**: Built-in CORS, error handling, and health checks
+LangCrew HTTP服务器模块 (`langcrew.web.http_server`) 提供：
+- **FastAPI集成**：现代、快速的Web框架，具有自动API文档
+- **智能体暴露**：将LangCrew智能体/团队转换为HTTP端点
+- **流式支持**：用于实时通信的Server-Sent Events (SSE)
+- **生产就绪**：内置CORS、错误处理和健康检查
 
-## Basic Usage
+## 基础使用
 
-### LangCrew Server
+### LangCrew服务器
 
 ```python
 from langcrew import Agent, Crew
 from langcrew.web import create_server
 
-# Create your crew
+# 创建您的团队
 agent = Agent(
-    role="Web Assistant",
-    goal="Help users through web interface",
-    backstory="You are a helpful web-based AI assistant"
+    role="Web助手",
+    goal="通过Web界面帮助用户",
+    backstory="您是一个有用的基于Web的AI助手"
 )
 crew = Crew(agents=[agent])
 
-# Create and run server
+# 创建并运行服务器
 server = create_server(crew)
 server.run(host="0.0.0.0", port=8000)
 ```
 
-### Direct LangGraph Server
+### 直接LangGraph服务器
 
 ```python
 from langcrew.web import create_langgraph_server
 from langgraph.graph import StateGraph
 
-# If you have a compiled LangGraph
-compiled_graph = your_compiled_graph  # Your LangGraph compilation
+# 如果您有编译好的LangGraph
+compiled_graph = your_compiled_graph  # 您的LangGraph编译结果
 
-# Create server directly from LangGraph
+# 直接从LangGraph创建服务器
 server = create_langgraph_server(compiled_graph)
 server.run(host="0.0.0.0", port=8000)
 ```
 
-## Server Configuration
+## 服务器配置
 
-### Advanced Server Setup
+### 高级服务器设置
 
 ```python
 from langcrew.web import AdapterServer, LangGraphAdapter
 
-# Create adapter with custom configuration
+# 使用自定义配置创建适配器
 adapter = LangGraphAdapter(crew)
 
-# Create server with custom FastAPI app
+# 使用自定义FastAPI应用创建服务器
 server = AdapterServer(adapter)
 
-# Add custom middleware or routes
+# 添加自定义中间件或路由
 @server.app.middleware("http")
 async def add_custom_header(request, call_next):
     response = await call_next(request)
@@ -76,21 +76,21 @@ async def add_custom_header(request, call_next):
 
 @server.app.get("/custom")
 async def custom_endpoint():
-    return {"message": "Custom endpoint"}
+    return {"message": "自定义端点"}
 
 server.run()
 ```
 
-### CORS Configuration
+### CORS配置
 
 ```python
 from langcrew.web import create_server
 from fastapi.middleware.cors import CORSMiddleware
 
-# Create server
+# 创建服务器
 server = create_server(crew)
 
-# Override CORS settings
+# 覆盖CORS设置
 server.app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://yourdomain.com"],
@@ -102,9 +102,9 @@ server.app.add_middleware(
 server.run()
 ```
 
-### Authentication Middleware
+### 身份验证中间件
 
-Since LangCrew provides no built-in authentication, you can add your own:
+由于LangCrew没有内置身份验证，您可以添加自己的：
 
 ```python
 from langcrew.web import create_server
@@ -114,75 +114,75 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 security = HTTPBearer()
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Add your token verification logic here"""
+    """在这里添加您的令牌验证逻辑"""
     if credentials.credentials != "your-secret-token":
         raise HTTPException(status_code=401, detail="Invalid token")
     return credentials
 
-# Create server
+# 创建服务器
 server = create_server(crew)
 
-# Add authentication to specific routes
+# 为特定路由添加身份验证
 @server.app.post("/api/v1/chat")
 async def protected_chat(request: dict, token: str = Depends(verify_token)):
-    # Your chat logic here
+    # 您的聊天逻辑
     pass
 
 server.run()
 ```
 
-## API Endpoints
+## API端点
 
-### Available Endpoints
+### 可用端点
 
-Once your server is running, the following endpoints are available:
+服务器运行后，以下端点可用：
 
-- **`GET /health`** - Health check endpoint
-- **`POST /api/v1/chat`** - Main chat interface with streaming response
-- **`POST /api/v1/chat/stop`** - Stop ongoing chat execution
-- **`GET /docs`** - Interactive API documentation (Swagger UI)
-- **`GET /redoc`** - Alternative API documentation (ReDoc)
-- **`GET /openapi.json`** - OpenAPI specification
+- **`GET /health`** - 健康检查端点
+- **`POST /api/v1/chat`** - 主要聊天接口，支持流式响应
+- **`POST /api/v1/chat/stop`** - 停止正在进行的聊天执行
+- **`GET /docs`** - 交互式API文档 (Swagger UI)
+- **`GET /redoc`** - 替代API文档 (ReDoc)
+- **`GET /openapi.json`** - OpenAPI规范
 
-### Chat Interface
+### 聊天接口
 
 ```bash
-# Send a message
+# 发送消息
 curl -X POST "http://localhost:8000/api/v1/chat" \
      -H "Content-Type: application/json" \
      -d '{
-       "message": "Hello, how can you help me?",
-       "session_id": "optional-session-id"
+       "message": "你好，你能帮我什么？",
+       "session_id": "可选的会话ID"
      }'
 
-# Stop execution
+# 停止执行
 curl -X POST "http://localhost:8000/api/v1/chat/stop" \
      -H "Content-Type: application/json" \
      -d '{"session_id": "your-session-id"}'
 ```
 
-## Production Deployment
+## 生产部署
 
-### Uvicorn Configuration
+### Uvicorn配置
 
 ```python
 from langcrew.web import create_server
 
 server = create_server(crew)
 
-# Production settings
+# 生产设置
 server.run(
     host="0.0.0.0",
     port=8000,
-    workers=4,                    # Multiple workers
-    access_log=True,             # Enable access logging
-    log_level="info",            # Set log level
-    ssl_keyfile="key.pem",       # SSL certificate
+    workers=4,                    # 多个工作进程
+    access_log=True,             # 启用访问日志
+    log_level="info",            # 设置日志级别
+    ssl_keyfile="key.pem",       # SSL证书
     ssl_certfile="cert.pem"
 )
 ```
 
-### Docker Deployment
+### Docker部署
 
 ```dockerfile
 FROM python:3.11-slim
@@ -197,22 +197,22 @@ EXPOSE 8000
 CMD ["python", "main.py"]
 ```
 
-### Environment Variables
+### 环境变量
 
 ```bash
-# Server configuration
+# 服务器配置
 LANGCREW_HOST=0.0.0.0
 LANGCREW_PORT=8000
 LANGCREW_WORKERS=4
 LANGCREW_LOG_LEVEL=info
 
-# CORS settings
+# CORS设置
 LANGCREW_CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
 ```
 
-## Monitoring and Logging
+## 监控和日志
 
-### Health Monitoring
+### 健康监控
 
 ```python
 import time
@@ -226,19 +226,19 @@ async def detailed_health():
         "status": "healthy",
         "timestamp": int(time.time() * 1000),
         "version": "1.0.0",
-        "uptime": "calculate_uptime_here"
+        "uptime": "在此处计算运行时间"
     }
 
 server.run()
 ```
 
-### Custom Logging
+### 自定义日志
 
 ```python
 import logging
 from langcrew.web import create_server
 
-# Configure logging
+# 配置日志
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -248,9 +248,9 @@ server = create_server(crew)
 server.run(access_log=True, log_level="info")
 ```
 
-## Performance Optimization
+## 性能优化
 
-### Load Testing Example
+### 负载测试示例
 
 ```python
 import asyncio
@@ -258,46 +258,46 @@ import aiohttp
 import time
 
 async def load_test(concurrent_requests: int, total_requests: int):
-    """Simple load testing function"""
+    """简单的负载测试函数"""
     
     async def send_request(session, request_id):
         try:
             async with session.post(
                 "http://localhost:8000/api/v1/chat",
-                json={"message": f"Test message {request_id}"}
+                json={"message": f"测试消息 {request_id}"}
             ) as response:
                 return await response.text()
         except Exception as e:
-            return f"Error: {e}"
+            return f"错误: {e}"
     
     start_time = time.time()
     
     async with aiohttp.ClientSession() as session:
-        # Create semaphore to limit concurrent requests
+        # 创建信号量来限制并发请求
         semaphore = asyncio.Semaphore(concurrent_requests)
         
         async def bounded_request(request_id):
             async with semaphore:
                 return await send_request(session, request_id)
         
-        # Execute requests
+        # 执行请求
         tasks = [bounded_request(i) for i in range(total_requests)]
         results = await asyncio.gather(*tasks)
     
     end_time = time.time()
     duration = end_time - start_time
     
-    print(f"Completed {total_requests} requests in {duration:.2f}s")
-    print(f"Average: {total_requests/duration:.2f} requests/second")
+    print(f"在 {duration:.2f}s 内完成了 {total_requests} 个请求")
+    print(f"平均: {total_requests/duration:.2f} 请求/秒")
     
     return results
 
-# Run load test
+# 运行负载测试
 # asyncio.run(load_test(10, 100))
 ```
 
-## Next Steps
+## 下一步
 
-- **[Getting Started](/guides/web/getting-started)** - Basic examples and setup
-- **[Communication Protocol](/guides/web/protocol)** - Message specifications and API reference
-- **[Web Concepts](/concepts/web)** - Understanding web architecture
+- **[快速开始](/zh/guides/web/getting-started)** - 基础示例和设置
+- **[通信协议](/zh/guides/web/protocol)** - 消息规范和API参考
+- **[Web概念](/zh/concepts/web)** - 理解Web架构

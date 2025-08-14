@@ -218,31 +218,24 @@ export default defineConfig({
 							},
 							items: [
 								{
+									label: '快速开始',
+									link: '/guides/web/getting-started',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '通信协议',
+									link: '/guides/web/protocol',
+									translations: {
+										en: 'Communication Protocol'
+									}
+								},
+								{
 									label: 'HTTP服务器',
 									link: '/guides/web/http-server',
 									translations: {
 										en: 'HTTP Server'
-									}
-								},
-								{
-									label: '流式协议',
-									link: '/guides/web/streaming',
-									translations: {
-										en: 'Streaming'
-									}
-								},
-								{
-									label: 'LangGraph集成',
-									link: '/guides/web/langgraph-integration',
-									translations: {
-										en: 'LangGraph Integration'
-									}
-								},
-								{
-									label: '工具展示',
-									link: '/guides/web/tool-display',
-									translations: {
-										en: 'Tool Display'
 									}
 								},
 							]

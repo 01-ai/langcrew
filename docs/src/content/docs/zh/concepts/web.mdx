@@ -1,218 +1,112 @@
 ---
 title: Web服务
-description: 理解Web服务 - 支持流式通信的AI代理HTTP服务器
+description: 理解Web服务 - 支持流式通信的AI智能体HTTP服务器
 ---
 
-Web服务为AI代理提供HTTP服务器功能，支持实时流式通信，基于FastAPI构建并与LangGraph执行引擎集成，将代理暴露为Web服务。
+Web服务为AI智能体提供HTTP服务器功能，支持实时流式通信，基于FastAPI构建并与LangGraph执行引擎集成，将智能体暴露为Web服务。
 
-## 什么是Web服务？
+## 快速开始 - 只需3行代码！
 
-langcrew中的Web服务提供：
-- **HTTP服务器**：基于FastAPI的服务器（AdapterServer）用于代理通信
-- **流式通信**：通过SSE（Server-Sent Events）实现实时代理响应
-- **LangGraph集成**：与LangGraph流式功能直接集成
-- **协议通信**：用于前端集成的结构化消息协议
-- **工具显示管理**：Web界面中工具调用的丰富可视化
-- **前端UI集成**：配套的React基础UI组件
-
-## 核心架构
-
-Web服务围绕最小化HTTP服务器构建，在AI代理和Web客户端之间建立桥梁：
+只需3行代码即可让您的智能体作为Web服务运行：
 
 ```python
 from langcrew import Agent, Crew
 from langcrew.web import create_server
 
-# 创建代理
-agent = Agent(
-    role="Web助手",
-    goal="通过Web界面帮助用户",
-    backstory="您是一个有用的基于Web的AI助手"
-)
-
-# 创建HTTP服务器
-server = create_server(crew=Crew(agents=[agent]))
-server.run(host="0.0.0.0", port=8000)
+agent = Agent(role="助手", goal="帮助用户", backstory="有用的AI")
+server = create_server(Crew(agents=[agent]))
+server.run(port=8000)  # 访问 http://localhost:8000/docs
 ```
 
-## 核心组件
+:::tip[完整指南]
+详细设置、配置选项和示例，请参阅[快速开始](/zh/guides/web/getting-started)指南。
+:::
 
-### AdapterServer
-基于FastAPI的HTTP服务器，处理客户端请求并将其转换为代理执行。
+## 什么是Web服务？
 
-**核心特性：**
-- 最小化、专注的设计
-- 内置CORS支持
-- 健康检查端点
-- 优雅错误处理
-- 自定义路由扩展性
+langcrew中的Web服务提供：
+- **HTTP服务器**：基于FastAPI的智能体通信服务器
+- **流式通信**：通过SSE（Server-Sent Events）实现实时智能体响应
+- **LangGraph集成**：与LangGraph流式功能直接集成
+- **协议通信**：用于前端集成的结构化消息协议
+- **生产就绪**：内置CORS、错误处理和健康检查
 
-```python
-from langcrew.web import AdapterServer, LangGraphAdapter
+## 核心架构
 
-# 自定义服务器配置
-adapter = LangGraphAdapter(crew=crew)
-server = AdapterServer(adapter=adapter)
+Web服务围绕最小化HTTP服务器构建，在AI智能体和Web客户端之间建立桥梁：
 
-# 添加自定义路由
-@server.app.get("/custom")
-async def custom_endpoint():
-    return {"message": "自定义端点"}
-
-server.run()
+```mermaid
+graph TD
+    A[Web客户端] -->|HTTP请求| B[FastAPI服务器]
+    B -->|创建会话| C[LangGraph适配器]
+    C -->|执行| D[LangCrew智能体]
+    D -->|流式事件| C
+    C -->|SSE流| B
+    B -->|SSE响应| A
 ```
 
-### LangGraphAdapter
-流式适配器，在LangCrew代理和LangGraph执行引擎之间建立桥梁。
+### 核心组件
 
-**核心特性：**
-- 直接LangGraph流式集成
-- 会话状态管理
-- 事件过滤和转换
-- 停止信号处理
-- 工具执行跟踪
-
-```python
-from langcrew.web import LangGraphAdapter
-
-# 高级适配器配置
-adapter = LangGraphAdapter(
-    crew=crew,
-    # 会话管理自动处理
-)
-
-# 与纯LangGraph一起使用
-from langcrew.web import create_langgraph_server
-server = create_langgraph_server(compiled_graph)
-```
-
-### 协议通信
-用于一致前后端通信的结构化消息协议。
-
-**核心消息类型：**
-- `SESSION_INIT` - 会话初始化
-- `TEXT` / `MARKDOWN` - 文本内容
-- `TOOL_CALL` / `TOOL_RESULT` - 工具执行
-- `USER_INPUT` - HITL用户输入请求
-- `FINISH_REASON` - 执行完成
-
-```python
-from langcrew.web.protocol import StreamMessage, MessageType
-
-# 消息结构示例
-message = StreamMessage(
-    id="msg_123",
-    role="assistant",
-    type=MessageType.TEXT,
-    content="您好，我如何帮助您？",
-    session_id="session_456"
-)
-```
-
-### 工具显示管理
-管理工具调用在Web前端的可视化，支持多语言。
-
-```python
-from langcrew.web import ToolDisplayManager
-
-# 注册工具显示
-ToolDisplayManager.register(
-    tool_name="web_search",
-    display_names={
-        "en": "Searching the web",
-        "zh": "正在搜索网页"
-    },
-    display_content_param="query"
-)
-```
+- **AdapterServer**：基于FastAPI的HTTP服务器，处理客户端请求
+- **LangGraphAdapter**：流式适配器，在智能体和LangGraph执行之间建立桥梁
+- **通信协议**：用于一致前端集成的结构化消息格式
 
 ## 通信协议
 
-Web使用**SSE（Server-Sent Events）**进行实时流式传输，不是WebSocket：
+Web使用**SSE（Server-Sent Events）**进行实时流式通信：
 
-```javascript
-// 使用SSE的前端集成
-const eventSource = new EventSource('/api/v1/chat', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        message: '你好！',
-        session_id: 'session_123'
-    })
-});
+- **传输方式**：带SSE流的HTTP
+- **身份验证**：无内置验证（用户可添加自定义中间件）
+- **消息格式**：带结构化类型的JSON（text、tool_call、plan等）
+- **会话管理**：使用唯一ID自动处理会话
 
-eventSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    console.log('收到:', data);
-};
+有关完整的协议规范和消息格式，请参阅[通信协议](/zh/guides/web/protocol)文档。
+
+## 使用模式
+
+### 两种集成方式
+
+**1. LangCrew集成**
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+crew = Crew(agents=[agent])
+server = create_server(crew=crew)
 ```
 
-## 前端UI集成
-
-Web包含位于`/web`目录中的完整React基础前端UI：
-
-**技术栈：**
-- React 19与现代hooks
-- Ant Design (Antd)组件
-- Tailwind CSS样式
-- Rspack快速打包
-
-**特性：**
-- 实时聊天界面
-- 工具调用可视化
-- 文件上传/预览支持
-- 多语言支持
-- 响应式设计
-
-**注意：**前端UI有自己的文档，可以独立使用。
-
-## 服务器部署选项
-
-### 开发服务器
+**2. LangGraph集成**  
 ```python
-# 快速开发设置
-server = create_server(crew)
-server.run(host="127.0.0.1", port=8000, reload=True)
-```
-
-### 生产服务器
-```python
-# 生产配置
-server = create_server(crew)
-server.run(
-    host="0.0.0.0", 
-    port=8000,
-    workers=4,
-    access_log=True
-)
-```
-
-### 纯LangGraph服务器
-```python
-# 直接LangGraph集成
+from langcrew.web import create_langgraph_server
 from langgraph.graph import StateGraph
 
-# 构建您的图
-compiled_graph = builder.compile(checkpointer=checkpointer)
-
-# 创建服务器
-server = create_langgraph_server(compiled_graph)
-server.run()
+compiled_graph = workflow.compile()
+server = create_langgraph_server(graph=compiled_graph)
 ```
+
+### 消息流程
+
+1. **客户端请求** → HTTP POST到 `/api/v1/chat`
+2. **会话初始化** → 服务器创建会话并返回session_id
+3. **智能体处理** → LangGraph执行智能体工作流
+4. **流式响应** → 服务器通过SSE流式传输事件：
+   - 计划消息（执行步骤）
+   - 工具调用消息（工具执行）
+   - 文本消息（智能体响应）
+   - 状态消息（进度更新）
+5. **会话结束** → 完成原因消息结束流程
 
 ## 何时使用Web服务
 
-- **交互式AI应用程序**需要实时用户交互
-- **基于代理的Web服务**需要HTTP API端点
-- **流式应用程序**有实时响应需求
-- **多会话应用程序**需要对话连续性
-- **工具丰富的代理**需要可视化工具调用反馈
-- **HITL工作流**需要人工审批界面
+- **交互式AI应用程序** 需要实时用户交互
+- **基于智能体的Web服务** 需要HTTP API端点
+- **流式应用程序** 有实时响应需求
+- **多会话应用程序** 需要对话连续性
+- **工具丰富的智能体** 需要可视化工具调用反馈
+- **HITL工作流** 需要人工审批界面
 
 ## 下一步
 
-- **[Web快速开始](/zh/guides/web/getting-started)** - 5分钟快速开始
-- **[部署指南](/zh/guides/web/deployment)** - 生产部署策略
-- **[配置指南](/zh/guides/web/configuration)** - 服务器和适配器配置
+- **[快速开始](/zh/guides/web/getting-started)** - 快速设置和基础示例
+- **[HTTP服务器](/zh/guides/web/http-server)** - 高级配置和生产部署
+- **[通信协议](/zh/guides/web/protocol)** - 完整消息规范

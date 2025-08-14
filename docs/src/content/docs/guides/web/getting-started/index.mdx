@@ -1,0 +1,136 @@
+---
+title: Web Services - Getting Started
+description: Quick guide to get started with Web services in 5 minutes
+---
+
+Quick guide to get Web services working in your langcrew application.
+
+LangCrew's Web module transforms your AI agents into production-ready web services with real-time streaming communication.
+
+:::tip[Protocol Reference]
+For detailed communication protocol specifications, message formats, and API endpoints, see the [Communication Protocol](/guides/web/protocol) documentation.
+:::
+
+## Quick Start - Just 3 Lines!
+
+Get your agent running as a web service in just 3 lines:
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+agent = Agent(role="Assistant", goal="Help users", backstory="Helpful AI")
+server = create_server(Crew(agents=[agent]))
+server.run(port=8000)  # Visit http://localhost:8000/docs
+```
+
+That's it! Your agent is now available as a web service with automatic API documentation.
+
+## Installation
+
+Web services are included in langcrew - no additional installation required:
+
+```bash
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+## Detailed Examples
+
+Here are more detailed examples for different use cases:
+
+### Method 1: Using LangCrew
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+# Create agent and crew
+agent = Agent(
+    role="Web Assistant",
+    goal="Help users through web interface",
+    backstory="You are a helpful web-based AI assistant",
+    verbose=True
+)
+
+crew = Crew(agents=[agent])
+
+# Create and start server
+server = create_server(
+    crew=crew,
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["http://localhost:3000"]
+)
+
+# Start server
+if __name__ == "__main__":
+    print("Starting web server at http://localhost:8000")
+    server.run()
+```
+
+### Method 2: Using LangGraph
+
+```python
+from langcrew.web import create_langgraph_server
+from langgraph.graph import StateGraph
+
+# Create your LangGraph workflow
+def create_workflow():
+    workflow = StateGraph()
+    # Add your nodes and edges here
+    return workflow.compile()
+
+# Create server with LangGraph
+compiled_graph = create_workflow()
+server = create_langgraph_server(
+    graph=compiled_graph,
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["http://localhost:3000"]
+)
+
+# Start server
+if __name__ == "__main__":
+    print("Starting LangGraph web server at http://localhost:8000")
+    server.run()
+```
+
+## Testing Your Server
+
+Once your server is running, you can:
+
+### 1. Access API Documentation
+Visit `http://localhost:8000/docs` to see the auto-generated API documentation
+
+### 2. Send Test Messages
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Hello, how can you help me?"}'
+```
+
+### 3. Client Streaming Example
+
+If you need to handle streaming responses on the client side:
+
+```python
+import requests
+import json
+
+# Send message and handle streaming response
+response = requests.post('/api/v1/chat', json={
+    "message": "Hello, can you help me analyze this document?",
+    "session_id": "optional session ID"
+}, stream=True)
+
+# Handle streaming response
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"Received: {message['type']} - {message['content']}")
+```
+
+## Next Steps
+
+- Learn about detailed message formats in the [Communication Protocol](/guides/web/protocol)
+- Check advanced server configuration in the [HTTP Server](/guides/web/http-server)
