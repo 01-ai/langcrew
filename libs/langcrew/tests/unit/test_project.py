@@ -152,7 +152,9 @@ class TestDecorators:
         @task
         def test_task(self):
             mock_agent = Mock()
-            return Task(agent=mock_agent, description="Test task", expected_output="Test output")
+            return Task(
+                agent=mock_agent, description="Test task", expected_output="Test output"
+            )
 
         assert hasattr(test_task, "is_task")
         assert hasattr(test_task, "_is_langcrew_task")
@@ -191,7 +193,7 @@ class TestDecorators:
             mock_agent = Mock()
             mock_agent.name = "test_agent"
             mock_agent.handoff_to = None
-            agents = [mock_agent]  
+            agents = [mock_agent]
             tasks = []
 
             @crew
@@ -299,7 +301,9 @@ class TestAgentManagement:
                 class TestCrew:
                     agents_config = "config/agents.yaml"
 
-                with patch.object(TestCrew, "_load_tools_from_config") as mock_load_tools:
+                with patch.object(
+                    TestCrew, "_load_tools_from_config"
+                ) as mock_load_tools:
                     mock_load_tools.return_value = []
 
                     instance = TestCrew()
@@ -332,14 +336,21 @@ class TestAgentManagement:
                 class TestCrew:
                     agents_config = "config/agents.yaml"
 
-                with patch.object(TestCrew, "_load_tools_from_config") as mock_load_tools:
+                with patch.object(
+                    TestCrew, "_load_tools_from_config"
+                ) as mock_load_tools:
                     mock_load_tools.return_value = []
 
                     instance = TestCrew()
                     agents = instance.agents
                     assert len(agents) == 1
-                    assert agents[0].prompt == "You are an expert data analyst with 10 years of experience."
-                    assert agents[0].role is None  # CrewAI attributes should be None in native mode
+                    assert (
+                        agents[0].prompt
+                        == "You are an expert data analyst with 10 years of experience."
+                    )
+                    assert (
+                        agents[0].role is None
+                    )  # CrewAI attributes should be None in native mode
 
     def test_agents_yaml_prompt_mutual_exclusivity(self):
         """Test that YAML configuration with both prompt and CrewAI attributes raises error."""
@@ -368,7 +379,10 @@ class TestAgentManagement:
                 class TestCrew:
                     agents_config = "config/agents.yaml"
 
-                with pytest.raises(ValueError, match="Cannot use both custom 'prompt' and CrewAI-style attributes"):
+                with pytest.raises(
+                    ValueError,
+                    match="Cannot use both custom 'prompt' and CrewAI-style attributes",
+                ):
                     instance = TestCrew()
                     # Trigger agent creation by accessing agents property
                     _ = instance.agents
@@ -411,8 +425,8 @@ class TestTaskManagement:
                 mock_agent = Mock()
                 return Task(
                     agent=mock_agent,
-                    description="Research the topic", 
-                    expected_output="Research report"
+                    description="Research the topic",
+                    expected_output="Research report",
                 )
 
             @task
@@ -420,8 +434,8 @@ class TestTaskManagement:
                 mock_agent = Mock()
                 return Task(
                     agent=mock_agent,
-                    description="Write the article", 
-                    expected_output="Written article"
+                    description="Write the article",
+                    expected_output="Written article",
                 )
 
         with patch.object(TestCrew, "load_configurations"):
@@ -464,9 +478,9 @@ class TestTaskManagement:
                         # Don't pass name to Task constructor so smart naming can work
                         task = Task(
                             agent=mock_agent,
-                            description="Research", 
+                            description="Research",
                             expected_output="Output",
-                            name=None  # None name so smart naming logic kicks in
+                            name=None,  # None name so smart naming logic kicks in
                         )
                         return task
 
@@ -474,7 +488,10 @@ class TestTaskManagement:
                 tasks = instance.tasks
                 # Task should be created successfully with a name (either from YAML or method name)
                 assert len(tasks) == 1
-                assert tasks[0].name in ["Primary Research", "research_task"]  # Accept either
+                assert tasks[0].name in [
+                    "Primary Research",
+                    "research_task",
+                ]  # Accept either
 
     def test_task_dependencies_sorting(self):
         """Test topological sorting of tasks based on dependencies."""
@@ -491,9 +508,7 @@ class TestTaskManagement:
             def task1(self):
                 mock_agent = Mock()
                 self.task1_obj = Task(
-                    agent=mock_agent,
-                    description="Task 1", 
-                    expected_output="Output 1"
+                    agent=mock_agent, description="Task 1", expected_output="Output 1"
                 )
                 return self.task1_obj
 
@@ -548,23 +563,34 @@ class TestTaskManagement:
             @task
             def task1(self):
                 mock_agent = Mock()
-                return Task(agent=mock_agent, description="Task 1", expected_output="Output 1")
+                return Task(
+                    agent=mock_agent, description="Task 1", expected_output="Output 1"
+                )
 
             @task
             def task2(self):
                 mock_agent = Mock()
-                return Task(agent=mock_agent, description="Task 2", expected_output="Output 2")
+                return Task(
+                    agent=mock_agent, description="Task 2", expected_output="Output 2"
+                )
 
         with patch.object(TestCrew, "load_configurations"):
             instance = TestCrew()
             # Create circular dependency
             mock_agent = Mock()
-            t1 = Task(agent=mock_agent, description="Task 1", expected_output="Output 1")
-            t2 = Task(agent=mock_agent, description="Task 2", expected_output="Output 2")
+            t1 = Task(
+                agent=mock_agent, description="Task 1", expected_output="Output 1"
+            )
+            t2 = Task(
+                agent=mock_agent, description="Task 2", expected_output="Output 2"
+            )
             t1.context = [t2]
             t2.context = [t1]
 
-            instance._original_tasks = {"task1": lambda self: t1, "task2": lambda self: t2}
+            instance._original_tasks = {
+                "task1": lambda self: t1,
+                "task2": lambda self: t2,
+            }
 
             with pytest.raises(ValueError, match="Circular dependency detected"):
                 _ = instance.tasks
@@ -599,29 +625,33 @@ class TestTaskManagement:
                 class TestCrew:
                     tasks_config = "config/tasks.yaml"
 
-                with patch.object(TestCrew, "_find_agent_by_name", return_value=Mock()) as mock_find_agent:
-                    with patch.object(TestCrew, "_create_tasks_from_config") as mock_create_tasks:
+                with patch.object(
+                    TestCrew, "_find_agent_by_name", return_value=Mock()
+                ) as mock_find_agent:
+                    with patch.object(
+                        TestCrew, "_create_tasks_from_config"
+                    ) as mock_create_tasks:
                         # Mock the task creation to return proper Task instances
                         mock_agent = Mock()
                         mock_find_agent.return_value = mock_agent
-                        
+
                         research_task = Task(
                             agent=mock_agent,
                             description="Research the topic",
-                            expected_output="Research report"
+                            expected_output="Research report",
                         )
                         writing_task = Task(
                             agent=mock_agent,
                             description="Write the article",
                             expected_output="Written article",
-                            context=[research_task]
+                            context=[research_task],
                         )
-                        
+
                         mock_create_tasks.return_value = {
                             "research_task": research_task,
-                            "writing_task": writing_task
+                            "writing_task": writing_task,
                         }
-                        
+
                         instance = TestCrew()
                         tasks = instance.tasks
                         assert len(tasks) == 2
@@ -698,7 +728,7 @@ class TestToolLoading:
 
             # Create a test tool file
             tool_file = tools_dir / "custom_tool.py"
-            tool_content = '''
+            tool_content = """
 from langchain_core.tools import BaseTool
 from typing import Optional, Type
 
@@ -708,7 +738,7 @@ class CustomSearchTool(BaseTool):
     
     def _run(self, query: str) -> str:
         return f"Searching for: {query}"
-'''
+"""
             tool_file.write_text(tool_content)
 
             test_file = base_dir / "test_crew.py"
@@ -728,19 +758,19 @@ class CustomSearchTool(BaseTool):
                     ToolRegistry._registered_tools.pop("custom_search", None)
 
                 # Test discovery - should not fail with missing method
-                if hasattr(instance, '_find_tool_class_in_file'):
+                if hasattr(instance, "_find_tool_class_in_file"):
                     tool_class = instance._find_tool_class_in_file(
                         tool_file, "custom_search"
                     )
                     # If the method works, verify the result
                     if tool_class is not None:
                         # Check the name using the same logic as _find_tool_class_in_file
-                        if hasattr(tool_class, 'name'):
+                        if hasattr(tool_class, "name"):
                             assert tool_class.name == "custom_search"
                         else:
                             # Try to instantiate and check name
                             instance_tool = tool_class()
-                            assert hasattr(instance_tool, 'name')
+                            assert hasattr(instance_tool, "name")
                             assert instance_tool.name == "custom_search"
                 else:
                     # Method doesn't exist, which is fine for this test
@@ -838,14 +868,14 @@ class TestCrewCreation:
         class TestCrew:
             @agent
             def researcher(self):
-                return Agent(
-                    role="Researcher", goal="Research", backstory="Researcher"
-                )
+                return Agent(role="Researcher", goal="Research", backstory="Researcher")
 
             @task
             def research_task(self):
                 mock_agent = Mock()
-                return Task(agent=mock_agent, description="Research", expected_output="Report")
+                return Task(
+                    agent=mock_agent, description="Research", expected_output="Report"
+                )
 
             @crew
             def crew(self):
@@ -869,14 +899,14 @@ class TestCrewCreation:
         class TestCrew:
             @agent
             def researcher(self):
-                return Agent(
-                    role="Researcher", goal="Research", backstory="Researcher"
-                )
+                return Agent(role="Researcher", goal="Research", backstory="Researcher")
 
             @task
             def research_task(self):
                 mock_agent = Mock()
-                return Task(agent=mock_agent, description="Research", expected_output="Report")
+                return Task(
+                    agent=mock_agent, description="Research", expected_output="Report"
+                )
 
         with patch.object(TestCrew, "load_configurations"):
             instance = TestCrew()
@@ -900,14 +930,14 @@ class TestEdgeCases:
             instance = EmptyCrew()
             assert instance.agents == []
             assert instance.tasks == []
-            
+
             # Mock the Crew constructor to bypass validation
-            with patch('langcrew.project.Crew') as MockCrew:
+            with patch("langcrew.project.Crew") as MockCrew:
                 mock_crew_instance = Mock()
                 mock_crew_instance.agents = []
                 mock_crew_instance.tasks = []
                 MockCrew.return_value = mock_crew_instance
-                
+
                 crew_obj = instance.crew()
                 assert crew_obj is mock_crew_instance
                 MockCrew.assert_called_once_with(agents=[], tasks=[])
@@ -974,15 +1004,17 @@ class TestEdgeCases:
                 class TestCrew:
                     tasks_config = "config/tasks.yaml"
 
-                with patch.object(TestCrew, "_create_tasks_from_config") as mock_create_tasks:
+                with patch.object(
+                    TestCrew, "_create_tasks_from_config"
+                ) as mock_create_tasks:
                     # Mock the task creation to handle None agent properly
                     mock_task = Mock()
                     mock_task.agent = None
                     mock_task.description = "Task 1"
                     mock_task.expected_output = "Output 1"
-                    
+
                     mock_create_tasks.return_value = {"task1": mock_task}
-                    
+
                     instance = TestCrew()
                     tasks = instance.tasks
                     assert len(tasks) == 1
@@ -996,27 +1028,33 @@ class TestEdgeCases:
             pass
 
         instance = TestCrew()
-        
+
         # Create test functions with different attributes
-        def func1(): return None
+        def func1():
+            return None
+
         func1.is_agent = True
         func1._is_langcrew_agent = True
-        
-        def func2(): return None
+
+        def func2():
+            return None
+
         func2.is_task = True
-        
-        def func3(): return None
+
+        def func3():
+            return None
+
         func3.other_attr = True
-        
+
         functions = {"func1": func1, "func2": func2, "func3": func3}
-        
+
         # Test filtering by agent attributes
         agent_funcs = instance._filter_functions(
             functions, ["is_agent", "_is_langcrew_agent"]
         )
         assert len(agent_funcs) == 1
         assert "func1" in agent_funcs
-        
+
         # Test filtering by task attributes
         task_funcs = instance._filter_functions(functions, ["is_task"])
         assert len(task_funcs) == 1
@@ -1080,27 +1118,31 @@ class TestComplexScenarios:
                             expected_output="Research report",
                         )
 
-                with patch.object(TestCrew, "_create_agents_from_config") as mock_create_agents:
-                    with patch.object(TestCrew, "_create_tasks_from_config") as mock_create_tasks:
+                with patch.object(
+                    TestCrew, "_create_agents_from_config"
+                ) as mock_create_agents:
+                    with patch.object(
+                        TestCrew, "_create_tasks_from_config"
+                    ) as mock_create_tasks:
                         # Mock YAML agent creation
                         writer_agent = Agent(
                             role="Writer",
-                            goal="Write content", 
-                            backstory="Expert writer"
+                            goal="Write content",
+                            backstory="Expert writer",
                         )
                         mock_create_agents.return_value = [writer_agent]
-                        
+
                         # Mock YAML task creation
                         editing_task = Task(
                             agent=writer_agent,
                             description="Edit the content",
-                            expected_output="Edited content"
+                            expected_output="Edited content",
                         )
                         mock_create_tasks.return_value = {"editing_task": editing_task}
-                        
+
                         instance = TestCrew()
-                        
-                        # Should have both decorated and YAML agents  
+
+                        # Should have both decorated and YAML agents
                         agents = instance.agents
                         # Note: The actual implementation may only include decorated agents
                         # or only YAML agents depending on the logic
@@ -1115,7 +1157,10 @@ class TestComplexScenarios:
                         assert len(tasks) >= 1  # At least one task should be present
                         descriptions = [t.description for t in tasks]
                         # Either task should be present
-                        assert "Research the topic" in descriptions or "Edit the content" in descriptions
+                        assert (
+                            "Research the topic" in descriptions
+                            or "Edit the content" in descriptions
+                        )
 
     def test_complex_task_dependencies(self):
         """Test complex task dependency graph."""
@@ -1164,7 +1209,7 @@ class TestComplexScenarios:
 
         with patch.object(TestCrew, "load_configurations"):
             instance = TestCrew()
-            
+
             # Create all tasks first
             instance.task_a()
             instance.task_b()

@@ -10,7 +10,7 @@ import os
 import tempfile
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -60,7 +60,7 @@ def sample_messages():
 
 
 @pytest.fixture
-def mock_config() -> Dict[str, Any]:
+def mock_config() -> dict[str, Any]:
     """Mock configuration for testing."""
     return {
         "llm": {
@@ -236,4 +236,4 @@ async def async_mock_crew():
 
 
 # Test markers
-pytestmark = pytest.mark.anyio 
+pytestmark = pytest.mark.anyio

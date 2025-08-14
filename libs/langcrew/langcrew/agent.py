@@ -5,10 +5,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from langchain_core.messages import (
-    HumanMessage,
-    SystemMessage,
-)
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.utils.runnable import RunnableLike
@@ -17,9 +14,9 @@ from .executors.base import BaseExecutor
 from .executors.factory import ExecutorFactory
 from .guardrail import GuardrailFunc, with_guardrails
 from .hitl import HITLConfig
-from .tools.mcp import MCPToolAdapter
 from .memory import MemoryConfig
 from .prompt_builder import PromptBuilder
+from .tools.mcp import MCPToolAdapter
 from .types import TaskSpec
 
 # Setup logger

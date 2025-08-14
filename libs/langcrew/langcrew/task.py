@@ -69,7 +69,7 @@ class Task(Runnable):
 
         # Handoff configuration
         self.handoff_to = handoff_to or []
-        
+
         # Guardrail configuration
         self.input_guards = input_guards or []
         self.output_guards = output_guards or []
@@ -86,7 +86,7 @@ class Task(Runnable):
     @property
     def name(self) -> str | None:
         return self._spec.name
-    
+
     @name.setter
     def name(self, value: str | None) -> None:
         self._spec.name = value
@@ -124,7 +124,7 @@ class Task(Runnable):
             else:
                 # Object-based context dependency
                 task_name = getattr(context_item, "name", None)
-            
+
             if task_name and task_name in output_map:
                 context_parts.append(
                     f"**Output from {task_name}:**\n{output_map[task_name]}"
@@ -189,15 +189,15 @@ class Task(Runnable):
         **kwargs: Any,
     ) -> Output:
         """Executor invoke method with guardrails applied to processed input.
-        
-        This method is called after input processing (context addition) and applies 
+
+        This method is called after input processing (context addition) and applies
         guardrails to the processed input before calling the agent.
-        
+
         Args:
             processed_input: Input data after context processing
             config: Optional runnable configuration
             **kwargs: Additional arguments
-            
+
         Returns:
             Output from agent execution
         """
@@ -218,15 +218,15 @@ class Task(Runnable):
         **kwargs: Any,
     ) -> Output:
         """Executor async invoke method with guardrails applied to processed input.
-        
-        This method is called after input processing (context addition) and applies 
+
+        This method is called after input processing (context addition) and applies
         guardrails to the processed input before calling the agent.
-        
+
         Args:
             processed_input: Input data after context processing
             config: Optional runnable configuration
             **kwargs: Additional arguments
-            
+
         Returns:
             Output from agent execution
         """

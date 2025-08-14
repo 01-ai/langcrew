@@ -622,7 +622,7 @@ def test_create_llm_with_proxy_openai(mock_async_client, mock_client, mock_chat_
     mock_llm._client._client = None
     mock_llm._async_client = Mock()
     mock_llm._async_client._client = None
-    
+
     mock_http_client = Mock()
     mock_async_http_client = Mock()
     mock_client.return_value = mock_http_client
@@ -638,17 +638,15 @@ def test_create_llm_with_proxy_openai(mock_async_client, mock_client, mock_chat_
     result = LLMFactory.create_llm(config)
 
     assert result == mock_llm
-    
+
     # Verify proxy clients are created
     mock_client.assert_called_once_with(
-        proxy="http://proxy.example.com:8080",
-        timeout=90.0
+        proxy="http://proxy.example.com:8080", timeout=90.0
     )
     mock_async_client.assert_called_once_with(
-        proxy="http://proxy.example.com:8080", 
-        timeout=90.0
+        proxy="http://proxy.example.com:8080", timeout=90.0
     )
-    
+
     # Verify clients are set on the LLM
     assert mock_llm._client._client == mock_http_client
     assert mock_llm._async_client._client == mock_async_http_client
@@ -658,7 +656,9 @@ def test_create_llm_with_proxy_openai(mock_async_client, mock_client, mock_chat_
 @patch("langchain_anthropic.ChatAnthropic")
 @patch("httpx.Client")
 @patch("httpx.AsyncClient")
-def test_create_llm_with_proxy_anthropic(mock_async_client, mock_client, mock_chat_anthropic):
+def test_create_llm_with_proxy_anthropic(
+    mock_async_client, mock_client, mock_chat_anthropic
+):
     """Test creating Anthropic LLM with proxy configuration."""
     mock_llm = Mock()
     mock_chat_anthropic.return_value = mock_llm
@@ -666,7 +666,7 @@ def test_create_llm_with_proxy_anthropic(mock_async_client, mock_client, mock_ch
     mock_llm._client._client = None
     mock_llm._async_client = Mock()
     mock_llm._async_client._client = None
-    
+
     mock_http_client = Mock()
     mock_async_http_client = Mock()
     mock_client.return_value = mock_http_client
@@ -681,15 +681,14 @@ def test_create_llm_with_proxy_anthropic(mock_async_client, mock_client, mock_ch
     result = LLMFactory.create_llm(config)
 
     assert result == mock_llm
-    
+
     # Verify proxy clients are created with default timeout
     mock_client.assert_called_once_with(
         proxy="http://proxy.example.com:8080",
-        timeout=120.0  # default timeout
+        timeout=120.0,  # default timeout
     )
     mock_async_client.assert_called_once_with(
-        proxy="http://proxy.example.com:8080", 
-        timeout=120.0
+        proxy="http://proxy.example.com:8080", timeout=120.0
     )
 
 
@@ -697,7 +696,9 @@ def test_create_llm_with_proxy_anthropic(mock_async_client, mock_client, mock_ch
 @patch("langchain_deepseek.ChatDeepSeek")
 @patch("httpx.Client")
 @patch("httpx.AsyncClient")
-def test_create_llm_with_proxy_deepseek(mock_async_client, mock_client, mock_chat_deepseek):
+def test_create_llm_with_proxy_deepseek(
+    mock_async_client, mock_client, mock_chat_deepseek
+):
     """Test creating DeepSeek LLM with proxy configuration."""
     mock_llm = Mock()
     mock_chat_deepseek.return_value = mock_llm
@@ -744,15 +745,18 @@ def test_create_llm_with_proxy_bedrock(mock_config, mock_chat_bedrock_converse):
     result = LLMFactory.create_llm(config)
 
     assert result == mock_llm
-    
+
     # Verify proxy config is created for Bedrock
     mock_config.assert_called_once_with(
-        proxies={"http": "http://proxy.example.com:8080", "https": "http://proxy.example.com:8080"},
+        proxies={
+            "http": "http://proxy.example.com:8080",
+            "https": "http://proxy.example.com:8080",
+        },
         read_timeout=120.0,
         connect_timeout=15.0,
         retries={"max_attempts": 3, "mode": "standard"},
     )
-    
+
     # Verify Bedrock client is created with proxy config
     mock_chat_bedrock_converse.assert_called_once_with(
         model_id="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -777,11 +781,14 @@ def test_create_llm_without_proxy(mock_chat_openai):
         # No proxy configuration
     }
 
-    with patch("httpx.Client") as mock_client, patch("httpx.AsyncClient") as mock_async_client:
+    with (
+        patch("httpx.Client") as mock_client,
+        patch("httpx.AsyncClient") as mock_async_client,
+    ):
         result = LLMFactory.create_llm(config)
 
         assert result == mock_llm
-        
+
         # Verify no proxy clients are created
         mock_client.assert_not_called()
         mock_async_client.assert_not_called()

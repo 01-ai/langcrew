@@ -208,7 +208,7 @@ class EntityMemory:
             for item_key, item_value in items:
                 if item_key == key:
                     return item_value
-        except:
+        except Exception:
             pass
         return None
 

@@ -275,7 +275,7 @@ class TestAgent:
 
             # Test with initial input
             input_data = {"messages": []}
-            result = agent.invoke(input_data)
+            agent.invoke(input_data)
 
             # Verify guardrails were called
             assert received_input_data is not None
@@ -335,7 +335,7 @@ class TestAgent:
 
             # Test with initial input
             input_data = {"messages": []}
-            result = await agent.ainvoke(input_data)
+            await agent.ainvoke(input_data)
 
             # Verify guardrails were called
             assert received_input_data is not None
@@ -391,7 +391,7 @@ class TestAgent:
 
             # Test with LangGraph-style input
             input_data = {"messages": [human_msg]}
-            result = agent.invoke(input_data)
+            agent.invoke(input_data)
 
             # Verify the guard received proper LangGraph messages
             assert received_input_data is not None
@@ -515,6 +515,7 @@ class TestAgent:
     ):
         """Test _prepare_executor_input in native prompt mode when messages already exist."""
         from langchain_core.messages import AIMessage, HumanMessage
+
         from langcrew.types import TaskSpec
 
         agent = Agent(prompt="You are a helpful assistant.", llm=mock_llm)
@@ -561,6 +562,7 @@ class TestAgent:
     def test_agent_prepare_executor_input_with_context_native_prompt(self, mock_llm):
         """Test _prepare_executor_input in native prompt mode with context."""
         from langchain_core.messages import AIMessage, HumanMessage
+
         from langcrew.types import TaskSpec
 
         agent = Agent(prompt="You are a helpful assistant.", llm=mock_llm)
@@ -770,7 +772,7 @@ class TestAgentExecution:
 
             # Test _create_executor method
             state = {"context": "test context"}
-            executor = agent._create_executor(state)
+            agent._create_executor(state)
 
             # The method returns None but sets the executor attribute
             assert agent.executor == mock_executor

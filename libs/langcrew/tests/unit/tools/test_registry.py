@@ -6,7 +6,7 @@ caching, naming conventions, and error handling.
 """
 
 import tempfile
-from pathlib import Path  
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -174,7 +174,7 @@ class TestToolRegistryCore:
         """Test that registering a tool clears its cache entry."""
         # First register and get the tool to cache it
         ToolRegistry.register("test_tool", MockTool)
-        tool_instance = ToolRegistry.get_tool("test_tool")
+        ToolRegistry.get_tool("test_tool")
         assert "test_tool" in ToolRegistry._tool_cache
 
         # Re-register should clear cache
@@ -279,10 +279,8 @@ class TestToolRegistryNaming:
         assert tool_name == "tool:name"
 
 
-
 class TestToolRegistryDiscovery:
     """Test tool discovery functionality."""
-
 
     def test_extract_tools_from_module(self, mock_module):
         """Test extracting tool classes from a module."""
@@ -457,10 +455,10 @@ class TestToolRegistryScanDirectory:
         # Create a temporary tools directory with a simple tool file
         tools_dir = tmp_path / "tools"
         tools_dir.mkdir()
-        
+
         # Create a Python file with a tool class
         tool_file = tools_dir / "test_tool.py"
-        tool_content = '''
+        tool_content = """
 from langchain_core.tools import BaseTool
 
 class TestScanTool(BaseTool):
@@ -469,16 +467,20 @@ class TestScanTool(BaseTool):
     
     def _run(self) -> str:
         return "scan test result"
-'''
+"""
         tool_file.write_text(tool_content)
-        
+
         # Scan the directory
-        ToolRegistry._scan_directory_for_tools(tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER)
-        
+        ToolRegistry._scan_directory_for_tools(
+            tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER
+        )
+
         # Verify tool was discovered
-        custom_tools = ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER]
+        custom_tools = ToolRegistry._discovered_tools[
+            ToolRegistryConfig.CUSTOM_PROVIDER
+        ]
         assert "test_scan_tool" in custom_tools
-        
+
         # Verify the tool class is correct
         tool_instance = custom_tools["test_scan_tool"]()
         assert tool_instance.name == "test_scan_tool"
@@ -487,13 +489,13 @@ class TestScanTool(BaseTool):
     def test_scan_directory_for_tools_recursive(self, tmp_path):
         """Test recursive scanning of subdirectories."""
         # Create nested directory structure
-        tools_dir = tmp_path / "tools" 
+        tools_dir = tmp_path / "tools"
         subdir = tools_dir / "subdir"
         subdir.mkdir(parents=True)
-        
+
         # Create tool in subdirectory
         tool_file = subdir / "nested_tool.py"
-        tool_content = '''
+        tool_content = """
 from langchain_core.tools import BaseTool
 
 class NestedTool(BaseTool):
@@ -502,23 +504,27 @@ class NestedTool(BaseTool):
     
     def _run(self) -> str:
         return "nested result"
-'''
+"""
         tool_file.write_text(tool_content)
-        
+
         # Scan should find tools in subdirectories
-        ToolRegistry._scan_directory_for_tools(tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER)
-        
-        custom_tools = ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER]
+        ToolRegistry._scan_directory_for_tools(
+            tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER
+        )
+
+        custom_tools = ToolRegistry._discovered_tools[
+            ToolRegistryConfig.CUSTOM_PROVIDER
+        ]
         assert "nested_tool" in custom_tools
 
     def test_scan_directory_for_tools_ignore_private_files(self, tmp_path):
         """Test that files starting with underscore are ignored."""
         tools_dir = tmp_path / "tools"
         tools_dir.mkdir()
-        
+
         # Create private file (should be ignored)
         private_file = tools_dir / "_private_tool.py"
-        private_content = '''
+        private_content = """
 from langchain_core.tools import BaseTool
 
 class PrivateTool(BaseTool):
@@ -527,12 +533,12 @@ class PrivateTool(BaseTool):
     
     def _run(self) -> str:
         return "private result"
-'''
+"""
         private_file.write_text(private_content)
-        
+
         # Create normal file (should be processed)
         normal_file = tools_dir / "normal_tool.py"
-        normal_content = '''
+        normal_content = """
 from langchain_core.tools import BaseTool
 
 class NormalTool(BaseTool):
@@ -541,12 +547,16 @@ class NormalTool(BaseTool):
     
     def _run(self) -> str:
         return "normal result"
-'''
+"""
         normal_file.write_text(normal_content)
-        
-        ToolRegistry._scan_directory_for_tools(tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER)
-        
-        custom_tools = ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER]
+
+        ToolRegistry._scan_directory_for_tools(
+            tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER
+        )
+
+        custom_tools = ToolRegistry._discovered_tools[
+            ToolRegistryConfig.CUSTOM_PROVIDER
+        ]
         assert "normal_tool" in custom_tools
         assert "private_tool" not in custom_tools
 
@@ -555,37 +565,39 @@ class NormalTool(BaseTool):
         """Test handling of files that cannot be imported."""
         tools_dir = tmp_path / "tools"
         tools_dir.mkdir()
-        
+
         # Create file with syntax error
         bad_file = tools_dir / "bad_syntax.py"
         bad_file.write_text("invalid python syntax !!!")
-        
+
         # Should not crash, should log error
-        ToolRegistry._scan_directory_for_tools(tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER)
-        
+        ToolRegistry._scan_directory_for_tools(
+            tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER
+        )
+
         # Should have logged the error
         mock_logger.debug.assert_called()
-        
+
     @patch("langcrew.tools.registry.importlib.util.spec_from_file_location")
     def test_scan_directory_for_tools_spec_creation_failure(self, mock_spec_from_file):
         """Test handling when spec creation returns None."""
         # Mock spec creation to return None
         mock_spec_from_file.return_value = None
-        
+
         # Create a valid directory structure
-        from pathlib import Path
-        import tempfile
-        
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             tools_dir = Path(tmp_dir) / "tools"
             tools_dir.mkdir()
-            
+
             tool_file = tools_dir / "test_tool.py"
             tool_file.write_text("# valid python file")
-            
+
             # Should handle None spec gracefully
-            ToolRegistry._scan_directory_for_tools(tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER)
-            
+            ToolRegistry._scan_directory_for_tools(
+                tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER
+            )
+
             # Verify spec creation was attempted
             mock_spec_from_file.assert_called()
 
@@ -593,24 +605,30 @@ class NormalTool(BaseTool):
         """Test handling of Python files without any tool classes."""
         tools_dir = tmp_path / "tools"
         tools_dir.mkdir()
-        
+
         # Create file with no tool classes
         no_tools_file = tools_dir / "no_tools.py"
-        no_tools_content = '''
+        no_tools_content = """
 # Just some regular Python code
 def helper_function():
     return "helper"
 
 class RegularClass:
     pass
-'''
+"""
         no_tools_file.write_text(no_tools_content)
-        
+
         # Should not crash or add anything
-        initial_count = len(ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER])
-        ToolRegistry._scan_directory_for_tools(tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER)
-        final_count = len(ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER])
-        
+        initial_count = len(
+            ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER]
+        )
+        ToolRegistry._scan_directory_for_tools(
+            tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER
+        )
+        final_count = len(
+            ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER]
+        )
+
         # No new tools should be added
         assert final_count == initial_count
 
@@ -713,7 +731,7 @@ class TestToolRegistryEdgeCases:
             ToolRegistry._discover_external_tools("langcrew_tools")
             # Should create entry for langcrew provider
 
-        # Test crewai_tools detection  
+        # Test crewai_tools detection
         with patch("langcrew.tools.registry.importlib.import_module"):
             ToolRegistry._discover_external_tools("crewai_tools")
             # Should create entry for crewai provider
@@ -732,7 +750,7 @@ class TestToolRegistryProviderPrefixes:
         ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCHAIN_PROVIDER][
             "langchain_test_tool"
         ] = MockTool
-        
+
         tool = ToolRegistry.get_tool("langchain:langchain_test_tool")
         assert isinstance(tool, MockTool)
         assert tool.name == "mock_tool"  # MockTool's actual name
@@ -742,7 +760,7 @@ class TestToolRegistryProviderPrefixes:
         ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCREW_PROVIDER][
             "langcrew_test_tool"
         ] = AnotherMockTool
-        
+
         tool = ToolRegistry.get_tool("langcrew:langcrew_test_tool")
         assert isinstance(tool, AnotherMockTool)
         assert tool.name == "another_mock_tool"
@@ -753,9 +771,9 @@ class TestToolRegistryProviderPrefixes:
         mock_module = Mock()
         mock_module.LangChainTestTool = MockTool
         mock_import.return_value = mock_module
-        
+
         ToolRegistry._discover_external_tools("langchain_community.tools")
-        
+
         # Should be assigned to langchain provider
         assert ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCHAIN_PROVIDER]
         mock_import.assert_called_once_with("langchain_community.tools")
@@ -763,12 +781,12 @@ class TestToolRegistryProviderPrefixes:
     @patch("langcrew.tools.registry.importlib.import_module")
     def test_provider_detection_langcrew_tools(self, mock_import):
         """Test correct provider detection for langcrew_tools package."""
-        mock_module = Mock() 
+        mock_module = Mock()
         mock_module.LangCrewTestTool = AnotherMockTool
         mock_import.return_value = mock_module
-        
+
         ToolRegistry._discover_external_tools("langcrew_tools")
-        
+
         # Should be assigned to langcrew provider
         assert ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCREW_PROVIDER]
         mock_import.assert_called_once_with("langcrew_tools")
@@ -779,12 +797,12 @@ class TestToolRegistryProviderPrefixes:
         provider, tool_name = ToolRegistry._parse_tool_name(":tool_name")
         assert provider == ""
         assert tool_name == "tool_name"
-        
+
         # Test multiple colons
         provider, tool_name = ToolRegistry._parse_tool_name("provider:tool:with:colons")
         assert provider == "provider"
         assert tool_name == "tool:with:colons"
-        
+
         # Test no colon (local)
         provider, tool_name = ToolRegistry._parse_tool_name("simple_tool")
         assert provider == ToolRegistryConfig.LOCAL_PROVIDER
@@ -793,13 +811,17 @@ class TestToolRegistryProviderPrefixes:
     def test_external_tool_loading_priority(self):
         """Test that external tools are loaded in correct priority order."""
         # Pre-populate different providers with same tool name
-        ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCHAIN_PROVIDER]["conflict_tool"] = MockTool
-        ToolRegistry._discovered_tools[ToolRegistryConfig.CREWAI_PROVIDER]["conflict_tool"] = AnotherMockTool
-        
+        ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCHAIN_PROVIDER][
+            "conflict_tool"
+        ] = MockTool
+        ToolRegistry._discovered_tools[ToolRegistryConfig.CREWAI_PROVIDER][
+            "conflict_tool"
+        ] = AnotherMockTool
+
         # When accessing with specific provider, should get that provider's tool
         langchain_tool = ToolRegistry.get_tool("langchain:conflict_tool")
         crewai_tool = ToolRegistry.get_tool("crewai:conflict_tool")
-        
+
         assert isinstance(langchain_tool, MockTool)
         assert isinstance(crewai_tool, AnotherMockTool)
 
@@ -809,50 +831,53 @@ class TestToolRegistryAdvancedErrorHandling:
 
     def test_tool_instantiation_failure(self):
         """Test handling when tool class constructor fails."""
+
         class FailingTool(BaseTool):
             name: str = "failing_tool"
             description: str = "A tool that fails to instantiate"
-            
+
             def __init__(self):
                 raise RuntimeError("Instantiation failed")
-                
+
             def _run(self) -> str:
                 return "never reached"
-        
+
         ToolRegistry.register("failing_tool", FailingTool)
-        
+
         # Should raise the instantiation error
         with pytest.raises(RuntimeError, match="Instantiation failed"):
             ToolRegistry.get_tool("failing_tool")
 
     def test_corrupted_tool_class_without_name(self):
         """Test handling of tool class without proper name attribute."""
+
         class CorruptedTool(BaseTool):
             # Missing name attribute
             description: str = "A corrupted tool"
-            
+
             def _run(self) -> str:
                 return "corrupted"
-        
+
         # Register the tool (this part might succeed)
         ToolRegistry.register("corrupted_tool", CorruptedTool)
-        
+
         # But accessing it should fail when trying to get tool name
         with pytest.raises((AttributeError, TypeError, ValueError)):
             ToolRegistry.get_tool("corrupted_tool")
 
     def test_tool_with_invalid_run_method(self):
         """Test tool with _run method that raises exception."""
+
         class InvalidRunTool(BaseTool):
             name: str = "invalid_run_tool"
             description: str = "A tool with invalid run method"
-            
+
             def _run(self) -> str:
                 raise ValueError("Run method failed")
-        
+
         ToolRegistry.register("invalid_run_tool", InvalidRunTool)
         tool = ToolRegistry.get_tool("invalid_run_tool")
-        
+
         # Tool should instantiate fine, but _run should fail
         assert isinstance(tool, InvalidRunTool)
         with pytest.raises(ValueError, match="Run method failed"):
@@ -862,16 +887,18 @@ class TestToolRegistryAdvancedErrorHandling:
     def test_module_from_spec_failure(self, mock_module_from_spec, tmp_path):
         """Test handling when module_from_spec fails."""
         mock_module_from_spec.side_effect = Exception("Module creation failed")
-        
+
         tools_dir = tmp_path / "tools"
         tools_dir.mkdir()
-        
+
         tool_file = tools_dir / "test_tool.py"
         tool_file.write_text("# valid content")
-        
+
         # Should handle the exception gracefully
         with patch("langcrew.tools.registry.logger") as mock_logger:
-            ToolRegistry._scan_directory_for_tools(tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER)
+            ToolRegistry._scan_directory_for_tools(
+                tools_dir, ToolRegistryConfig.CUSTOM_PROVIDER
+            )
             # Should log the error
             mock_logger.debug.assert_called()
 
@@ -879,7 +906,7 @@ class TestToolRegistryAdvancedErrorHandling:
         """Test behavior when provider tools dictionary is empty."""
         # Ensure provider dict is empty
         ToolRegistry._discovered_tools[ToolRegistryConfig.CREWAI_PROVIDER].clear()
-        
+
         # Should trigger loading attempt
         with patch.object(ToolRegistry, "_load_external_tools") as mock_load:
             result = ToolRegistry._find_tool_in_provider(
@@ -893,9 +920,11 @@ class TestToolRegistryAdvancedErrorHandling:
         # Test with provider that doesn't exist in external providers
         result = ToolRegistry._find_tool_in_provider("invalid_provider", "some_tool")
         assert result is None
-        
+
         # Test getting tool with invalid provider prefix
-        with pytest.raises(ValueError, match="Tool 'invalid_provider:some_tool' not found"):
+        with pytest.raises(
+            ValueError, match="Tool 'invalid_provider:some_tool' not found"
+        ):
             ToolRegistry.get_tool("invalid_provider:some_tool")
 
 
@@ -905,24 +934,25 @@ class TestToolRegistryPerformance:
     def test_large_tool_registry_performance(self):
         """Test performance with a large number of tools."""
         import time
-        
+
         # Register many tools
         num_tools = 50  # Reduced for CI performance
         for i in range(num_tools):
+
             class DynamicTool(BaseTool):
                 name: str = f"perf_tool_{i}"
                 description: str = f"Performance test tool {i}"
-                
+
                 def _run(self) -> str:
                     return f"result_{i}"
-                    
+
             ToolRegistry.register(f"perf_tool_{i}", DynamicTool)
-        
+
         # Test retrieval performance
         start_time = time.time()
         tools = ToolRegistry.list_tools()
         list_time = time.time() - start_time
-        
+
         # Should complete quickly (less than 1 second)
         assert list_time < 1.0
         assert len([t for t in tools if t.startswith("perf_tool_")]) == num_tools
@@ -930,13 +960,13 @@ class TestToolRegistryPerformance:
     def test_cache_efficiency(self):
         """Test that caching works efficiently."""
         ToolRegistry.register("cache_test_tool", MockTool)
-        
+
         # First call - should cache
         tool1 = ToolRegistry.get_tool("cache_test_tool")
-        
+
         # Second call - should be from cache
         tool2 = ToolRegistry.get_tool("cache_test_tool")
-        
+
         # Should return same instance (cached)
         assert tool1 is tool2
 
@@ -944,32 +974,36 @@ class TestToolRegistryPerformance:
         """Test that discovery only runs once."""
         # Reset discovery state
         ToolRegistry._discovery_complete = False
-        
+
         with patch.object(ToolRegistry, "_discover_project_tools") as mock_discover:
             # First call should trigger discovery
             ToolRegistry.list_tools()
             assert mock_discover.call_count == 1
-            
+
             # Second call should not trigger discovery
             ToolRegistry.list_tools()
             assert mock_discover.call_count == 1  # Still 1, not 2
-            
+
             # Discovery should be marked complete
             assert ToolRegistry._discovery_complete
 
     def test_tool_name_conflicts_resolution(self):
         """Test handling of tool name conflicts across providers."""
         # Add same-named tool to different providers
-        ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER]["conflict_tool"] = MockTool
-        ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCHAIN_PROVIDER]["conflict_tool"] = AnotherMockTool
-        
+        ToolRegistry._discovered_tools[ToolRegistryConfig.CUSTOM_PROVIDER][
+            "conflict_tool"
+        ] = MockTool
+        ToolRegistry._discovered_tools[ToolRegistryConfig.LANGCHAIN_PROVIDER][
+            "conflict_tool"
+        ] = AnotherMockTool
+
         # Local search should prioritize registered tools
         ToolRegistry.register("conflict_tool", MockCamelCaseTool)
-        
+
         # Without provider prefix, should get registered tool (highest priority)
         tool = ToolRegistry.get_tool("conflict_tool")
         assert isinstance(tool, MockCamelCaseTool)
-        
+
         # With provider prefix, should get provider-specific tool
         langchain_tool = ToolRegistry.get_tool("langchain:conflict_tool")
         assert isinstance(langchain_tool, AnotherMockTool)

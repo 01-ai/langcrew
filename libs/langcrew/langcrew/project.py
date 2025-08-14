@@ -150,26 +150,30 @@ def CrewBase(cls: T) -> T:
             # Return cached agents if available
             if self._cached_agents is not None:
                 return self._cached_agents
-            
+
             instantiated_agents = []
             agent_roles = set()
 
             for agent_name, agent_method in self._original_agents.items():
                 agent_instance = agent_method(self)
-                
+
                 # Apply smart name extraction: function parameter > YAML config > YAML key
                 if not agent_instance.name:
                     # Check if name can be extracted from YAML config by looking up the method name
                     config_name = None
-                    if hasattr(self, 'agents_config') and self.agents_config and agent_name in self.agents_config:
-                        config_name = self.agents_config[agent_name].get('name')
-                    
+                    if (
+                        hasattr(self, "agents_config")
+                        and self.agents_config
+                        and agent_name in self.agents_config
+                    ):
+                        config_name = self.agents_config[agent_name].get("name")
+
                     # Priority: YAML config name > YAML key (method name)
                     if config_name:
                         agent_instance.name = config_name
                     else:
                         agent_instance.name = agent_name
-                
+
                 if (
                     hasattr(agent_instance, "role")
                     and agent_instance.role not in agent_roles
@@ -180,7 +184,11 @@ def CrewBase(cls: T) -> T:
                     instantiated_agents.append(agent_instance)
 
             # Second, create agents from YAML configuration (if no decorated methods exist)
-            if not instantiated_agents and hasattr(self, 'agents_config') and self.agents_config:
+            if (
+                not instantiated_agents
+                and hasattr(self, "agents_config")
+                and self.agents_config
+            ):
                 instantiated_agents = self._create_agents_from_config()
 
             # Cache the result
@@ -198,24 +206,28 @@ def CrewBase(cls: T) -> T:
             all_tasks = {}
             for task_name, task_method in self._original_tasks.items():
                 task_instance = task_method(self)
-                
+
                 # Apply smart name extraction: function parameter > YAML config > YAML key
                 if not task_instance.name:
                     # Check if name can be extracted from YAML config by looking up the method name
                     config_name = None
-                    if hasattr(self, 'tasks_config') and self.tasks_config and task_name in self.tasks_config:
-                        config_name = self.tasks_config[task_name].get('name')
-                    
+                    if (
+                        hasattr(self, "tasks_config")
+                        and self.tasks_config
+                        and task_name in self.tasks_config
+                    ):
+                        config_name = self.tasks_config[task_name].get("name")
+
                     # Priority: YAML config name > YAML key (method name)
                     if config_name:
                         task_instance.name = config_name
                     else:
                         task_instance.name = task_name
-                
+
                 all_tasks[task_name] = task_instance
 
             # Second, create tasks from YAML configuration (if no decorated methods exist)
-            if not all_tasks and hasattr(self, 'tasks_config') and self.tasks_config:
+            if not all_tasks and hasattr(self, "tasks_config") and self.tasks_config:
                 all_tasks = self._create_tasks_from_config()
 
             # If only one task or no dependencies, return directly
@@ -232,7 +244,6 @@ def CrewBase(cls: T) -> T:
             # Handle empty case
             if not tasks_dict:
                 return []
-
 
             # Build dependency graph
             graph = defaultdict(list)  # task -> [list of tasks that depend on it]
@@ -252,7 +263,7 @@ def CrewBase(cls: T) -> T:
                         else:
                             # Object-based context dependency
                             context_task_name = getattr(context_item, "name", None)
-                        
+
                         if context_task_name and context_task_name in tasks_dict:
                             # context_task_name -> task_name has dependency relationship
                             graph[context_task_name].append(task_name)
@@ -281,8 +292,10 @@ def CrewBase(cls: T) -> T:
             # Check for circular dependencies
             if len(result) != len(tasks_dict):
                 # Find tasks involved in cycles for better error message
-                result_task_names = {getattr(task, 'name', '') for task in result}
-                remaining_tasks = [name for name in tasks_dict if name not in result_task_names]
+                result_task_names = {getattr(task, "name", "") for task in result}
+                remaining_tasks = [
+                    name for name in tasks_dict if name not in result_task_names
+                ]
                 raise ValueError(
                     f"Circular dependency detected in tasks. Tasks involved in cycle: {', '.join(remaining_tasks)}"
                 )
@@ -292,25 +305,25 @@ def CrewBase(cls: T) -> T:
         def _create_agents_from_config(self) -> list[Agent]:
             """Create agents from YAML configuration."""
             agents = []
-            
+
             for agent_name, agent_config in self.agents_config.items():
                 # Extract all possible agent parameters, let Agent class handle validation
-                name = agent_config.get('name', agent_name)
-                role = agent_config.get('role')
-                goal = agent_config.get('goal')
-                backstory = agent_config.get('backstory')
-                prompt = agent_config.get('prompt')
-                
+                name = agent_config.get("name", agent_name)
+                role = agent_config.get("role")
+                goal = agent_config.get("goal")
+                backstory = agent_config.get("backstory")
+                prompt = agent_config.get("prompt")
+
                 # Process tools configuration
                 tools = []
-                if 'tools' in agent_config:
-                    tools = self._load_tools_from_config(agent_config['tools'])
-                
+                if "tools" in agent_config:
+                    tools = self._load_tools_from_config(agent_config["tools"])
+
                 # Process LLM configuration
                 llm = None
-                if 'llm' in agent_config:
-                    llm = self._create_llm_from_config(agent_config['llm'])
-                
+                if "llm" in agent_config:
+                    llm = self._create_llm_from_config(agent_config["llm"])
+
                 # Create agent instance - Agent.__init__ handles mutual exclusivity validation
                 agent_instance = Agent(
                     name=name,
@@ -320,17 +333,17 @@ def CrewBase(cls: T) -> T:
                     prompt=prompt,
                     tools=tools,
                     llm=llm,
-                    config=agent_config  # Pass full config for other properties
+                    config=agent_config,  # Pass full config for other properties
                 )
-                
+
                 agents.append(agent_instance)
-                    
+
             return agents
 
         def _load_tools_from_config(self, tools_config: list[str]) -> list:
             """Load tools using ToolRegistry based on configuration."""
             from langcrew.tools.registry import ToolRegistry
-            
+
             tools = []
             for tool_name in tools_config:
                 tool_instance = ToolRegistry.get_tool(tool_name)
@@ -341,67 +354,69 @@ def CrewBase(cls: T) -> T:
         def _discover_and_register_local_tool(self, tool_name: str, ToolRegistry):
             """Discover and register a tool from local tools directory."""
             tools_dir = self.base_directory / "tools"
-            
+
             if not tools_dir.exists():
                 logging.debug(f"Local tools directory not found: {tools_dir}")
                 return None
-            
+
             # Scan all Python files in tools directory
             for py_file in tools_dir.glob("**/*.py"):
                 if py_file.name.startswith("_") or py_file.name == "__init__.py":
                     continue
-                
+
                 # Import the module dynamically
                 tool_class = self._find_tool_class_in_file(py_file, tool_name)
                 if tool_class:
                     # Register the tool and return instance
                     ToolRegistry.register(tool_name, tool_class)
                     return ToolRegistry.get_tool(tool_name)
-            
+
             return None
 
         def _find_tool_class_in_file(self, py_file: Path, tool_name: str):
             """Find a tool class in a Python file by tool name."""
             import importlib.util
-            
+
             # Create module spec from file
             spec = importlib.util.spec_from_file_location(
                 f"local_tools_{py_file.stem}", py_file
             )
             if not spec or not spec.loader:
                 return None
-            
+
             # Load the module
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-            
+
             # Find tool classes
             from langchain_core.tools import BaseTool
-            
+
             for name, obj in inspect.getmembers(module):
-                if (inspect.isclass(obj) and 
-                    issubclass(obj, BaseTool) and 
-                    obj != BaseTool and
-                    not name.startswith('_')):
-                    
+                if (
+                    inspect.isclass(obj)
+                    and issubclass(obj, BaseTool)
+                    and obj != BaseTool
+                    and not name.startswith("_")
+                ):
                     # Check if this tool matches the requested name
                     # Try to get the tool name from class attribute or instance
-                    if hasattr(obj, 'name'):
+                    if hasattr(obj, "name"):
                         # Class attribute
                         if obj.name == tool_name:
                             return obj
                     else:
                         # Try to instantiate and check name
                         instance = obj()
-                        if hasattr(instance, 'name') and instance.name == tool_name:
+                        if hasattr(instance, "name") and instance.name == tool_name:
                             return obj
- 
+
             return None
 
         def _create_llm_from_config(self, llm_config: dict):
             """Create LLM instance from configuration."""
             try:
                 from langcrew.llm_factory import LLMFactory
+
                 return LLMFactory.create_llm(llm_config)
             except Exception as e:
                 logging.warning(f"Failed to create LLM from config: {e}")
@@ -410,64 +425,67 @@ def CrewBase(cls: T) -> T:
         def _create_tasks_from_config(self) -> dict[str, Any]:
             """Create tasks from YAML configuration."""
             all_tasks = {}
-            
+
             # First pass: create all tasks without context
             for task_name, task_config in self.tasks_config.items():
                 # Extract basic task properties
-                description = task_config.get('description', '')
-                expected_output = task_config.get('expected_output', '')
-                agent_name = task_config.get('agent')
-                
+                description = task_config.get("description", "")
+                expected_output = task_config.get("expected_output", "")
+                agent_name = task_config.get("agent")
+
                 # Find the agent by name
                 agent = self._find_agent_by_name(agent_name) if agent_name else None
-                
+
                 # Create Task instance (without context for now)
                 task_instance = Task(
                     description=description,
                     expected_output=expected_output,
                     agent=agent,
-                    name=task_config.get('name', task_name)
+                    name=task_config.get("name", task_name),
                 )
-                
+
                 all_tasks[task_name] = task_instance
-            
+
             # Second pass: set context dependencies
             for task_name, task_config in self.tasks_config.items():
-                if 'context' in task_config and task_name in all_tasks:
+                if "context" in task_config and task_name in all_tasks:
                     context_list = []
-                    context_names = task_config['context']
-                    
+                    context_names = task_config["context"]
+
                     # Ensure context is a list
                     if isinstance(context_names, str):
                         context_names = [context_names]
-                    
+
                     # Find context tasks
                     for context_name in context_names:
                         if context_name in all_tasks:
                             context_list.append(all_tasks[context_name])
                         else:
-                            logging.warning(f"Context task '{context_name}' not found for task '{task_name}'")
-                    
+                            logging.warning(
+                                f"Context task '{context_name}' not found for task '{task_name}'"
+                            )
+
                     # Set the context on the task
                     if context_list:
                         all_tasks[task_name].context = context_list
-            
+
             return all_tasks
 
         def _find_agent_by_name(self, agent_name: str):
             """Find agent by name from the agents list."""
             if not agent_name:
                 return None
-                
+
             # Get agents (will create them if needed)
             agents = self.agents
-            
+
             for agent in agents:
                 # Check both name and role for matching
-                if (hasattr(agent, 'name') and agent.name == agent_name) or \
-                   (hasattr(agent, 'role') and agent.role == agent_name):
+                if (hasattr(agent, "name") and agent.name == agent_name) or (
+                    hasattr(agent, "role") and agent.role == agent_name
+                ):
                     return agent
-                    
+
             return None
 
     # Now add the crew method to WrappedClass, handling the original decorated method

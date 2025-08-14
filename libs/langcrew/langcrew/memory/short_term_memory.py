@@ -73,7 +73,6 @@ class ShortTermMemory:
         }
 
         # Get parent checkpoint id if exists
-        parent_config = checkpoint_tuple.parent_config if checkpoint_tuple else None
 
         self.checkpointer.put(
             config=config,

@@ -241,7 +241,6 @@ class ToolRegistry:
     # Utility Methods
     # =====================================
 
-
     @classmethod
     def _extract_tools_from_module(
         cls, module: Any, provider: str, prefix: str = ""

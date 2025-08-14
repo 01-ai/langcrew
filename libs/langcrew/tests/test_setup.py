@@ -5,10 +5,11 @@ This module contains basic tests to verify that the test environment
 is properly configured and working.
 """
 
-import pytest
-import sys
 import os
+import sys
 from pathlib import Path
+
+import pytest
 
 
 class TestSetup:
@@ -32,18 +33,20 @@ class TestSetup:
         project_root = Path(__file__).parent.parent
         src_dir = project_root / "src" / "langcrew"
         tests_dir = project_root / "tests"
-        
+
         assert src_dir.exists(), "Source directory should exist"
         assert tests_dir.exists(), "Tests directory should exist"
         assert (tests_dir / "unit").exists(), "Unit tests directory should exist"
-        assert (tests_dir / "integration").exists(), "Integration tests directory should exist"
+        assert (tests_dir / "integration").exists(), (
+            "Integration tests directory should exist"
+        )
 
     def test_imports(self):
         """Test that basic imports work."""
         try:
             import langcrew
-            import pytest
-            import unittest.mock
+
+            assert langcrew.__all__
         except ImportError as e:
             pytest.fail(f"Import failed: {e}")
 
@@ -52,7 +55,7 @@ class TestSetup:
         assert mock_config is not None
         assert mock_agent is not None
         assert mock_task is not None
-        
+
         # Test fixture content
         assert "llm" in mock_config
         assert mock_agent.name == "test_agent"
@@ -61,9 +64,10 @@ class TestSetup:
     @pytest.mark.asyncio
     async def test_async_support(self):
         """Test that async test support is working."""
+
         async def dummy_async_function():
             return "async_result"
-        
+
         result = await dummy_async_function()
         assert result == "async_result"
 
@@ -71,20 +75,23 @@ class TestSetup:
         """Test that temporary directory fixture works."""
         assert temp_dir.exists()
         assert temp_dir.is_dir()
-        
+
         # Create a test file
         test_file = temp_dir / "test.txt"
         test_file.write_text("test content")
-        
+
         assert test_file.exists()
         assert test_file.read_text() == "test content"
 
-    @pytest.mark.parametrize("test_input,expected", [
-        ("hello", 5),
-        ("world", 5),
-        ("", 0),
-        ("pytest", 6),
-    ])
+    @pytest.mark.parametrize(
+        "test_input,expected",
+        [
+            ("hello", 5),
+            ("world", 5),
+            ("", 0),
+            ("pytest", 6),
+        ],
+    )
     def test_parametrized_tests(self, test_input, expected):
         """Test that parametrized tests work."""
         assert len(test_input) == expected
@@ -92,7 +99,7 @@ class TestSetup:
     def test_mock_functionality(self, mock_llm):
         """Test that mock functionality works."""
         assert mock_llm is not None
-        assert hasattr(mock_llm, 'responses')
+        assert hasattr(mock_llm, "responses")
         assert len(mock_llm.responses) > 0
 
     @pytest.mark.unit
@@ -119,15 +126,15 @@ class TestSetup:
     def test_warnings_capture(self):
         """Test that warnings are properly captured."""
         import warnings
-        
+
         with pytest.warns(UserWarning, match="Test warning"):
             warnings.warn("Test warning", UserWarning)
 
     def test_configuration_validation(self):
         """Test that test configuration is valid."""
         # Check pytest configuration
-        import pytest
-        config = pytest.config if hasattr(pytest, 'config') else None
-        
+
+        pytest.config if hasattr(pytest, "config") else None
+
         # Basic validation that pytest is configured
-        assert pytest is not None 
+        assert pytest is not None

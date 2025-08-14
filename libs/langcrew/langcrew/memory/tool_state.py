@@ -86,7 +86,7 @@ class ToolStateManager:
 
         # Update the tool state
         tool_state[key] = value
-        
+
         # Update channel versions
         checkpoint["channel_versions"]["tool_state"] = str(datetime.now().timestamp())
 
@@ -127,7 +127,7 @@ class ToolStateManager:
 
         # Update the tool state
         tool_state.update(data)
-        
+
         # Update channel versions
         checkpoint["channel_versions"]["tool_state"] = str(datetime.now().timestamp())
 
@@ -177,7 +177,7 @@ class ToolStateManager:
 
         # Update channel versions
         checkpoint["channel_versions"]["tool_state"] = str(datetime.now().timestamp())
-        
+
         # Save the empty checkpoint
         self.checkpointer.put(
             config=config,

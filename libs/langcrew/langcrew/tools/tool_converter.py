@@ -461,7 +461,8 @@ class ToolConverter:
                         fields[param_name] = (
                             param_type,
                             Field(
-                                default=param.default, description=f"Parameter {param_name}"
+                                default=param.default,
+                                description=f"Parameter {param_name}",
                             ),
                         )
                     else:

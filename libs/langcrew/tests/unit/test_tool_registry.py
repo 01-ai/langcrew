@@ -172,7 +172,7 @@ class TestToolRegistryCore:
         """Test that registering a tool clears its cache entry."""
         # First register and get the tool to cache it
         ToolRegistry.register("test_tool", MockTool)
-        tool_instance = ToolRegistry.get_tool("test_tool")
+        ToolRegistry.get_tool("test_tool")
         assert "test_tool" in ToolRegistry._tool_cache
 
         # Re-register should clear cache
@@ -277,10 +277,8 @@ class TestToolRegistryNaming:
         assert tool_name == "tool:name"
 
 
-
 class TestToolRegistryDiscovery:
     """Test tool discovery functionality."""
-
 
     def test_extract_tools_from_module(self, mock_module):
         """Test extracting tool classes from a module."""
@@ -545,7 +543,7 @@ class TestToolRegistryEdgeCases:
             ToolRegistry._discover_external_tools("langcrew_tools")
             # Should create entry for langcrew provider
 
-        # Test crewai_tools detection  
+        # Test crewai_tools detection
         with patch("langcrew.tools.registry.importlib.import_module"):
             ToolRegistry._discover_external_tools("crewai_tools")
             # Should create entry for crewai provider
