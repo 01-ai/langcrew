@@ -275,12 +275,12 @@ def main():
     log_level = getattr(logging, args.log_level.upper())
     logging.getLogger().setLevel(log_level)
 
-    logger.info("🤖 Initializing Simplified Web Chat API Server...")
-    logger.info("🚀 Starting FastAPI Server")
-    logger.info(f"📡 Server: http://{args.host}:{args.port}")
-    logger.info(f"📚 API Docs: http://localhost:{args.port}/docs")
-    logger.info(f"📖 ReDoc: http://localhost:{args.port}/redoc")
-    logger.info(f"❤️  Health Check: http://localhost:{args.port}/api/v1/health")
+    logger.info("Initializing Simplified Web Chat API Server...")
+    logger.info("Starting FastAPI Server")
+    logger.info(f"Server: http://{args.host}:{args.port}")
+    logger.info(f"API Docs: http://localhost:{args.port}/docs")
+    logger.info(f"ReDoc: http://localhost:{args.port}/redoc")
+    logger.info(f"Health Check: http://localhost:{args.port}/api/v1/health")
 
     # Start server using the module-level app
     uvicorn.run(
