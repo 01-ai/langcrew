@@ -192,10 +192,10 @@ export default defineConfig({
 							},
 							items: [
 								{
-									label: '概览',
+									label: '快速开始',
 									link: '/guides/tools/',
 									translations: {
-										en: 'Overview'
+										en: 'Getting Started'
 									}
 								},
 								{
