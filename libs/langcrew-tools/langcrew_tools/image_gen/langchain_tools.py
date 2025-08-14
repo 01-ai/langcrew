@@ -89,7 +89,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
             sandbox_config: Optional sandbox configuration
         """
         super().__init__(**kwargs)
-
+        self.async_s3_client = async_s3_client
         # Load configuration with priority
         self.api_key = api_key or os.getenv("LANGCREW_IMAGE_GEN_API_KEY")
         self.base_url = (
