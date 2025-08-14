@@ -106,6 +106,13 @@ export default defineConfig({
 							}
 						},
 						{
+							label: '安全护栏',
+							link: '/concepts/guardrails',
+							translations: {
+								en: 'Guardrails'
+							}
+						},
+						{
 							label: 'Web服务',
 							link: '/concepts/web',
 							translations: {
@@ -210,6 +217,28 @@ export default defineConfig({
 									link: '/guides/tools/tool-mcp',
 									translations: {
 										en: 'MCP Integration'
+									}
+								},
+							]
+						},
+						{
+							label: '安全护栏',
+							translations: {
+								en: 'Guardrails'
+							},
+							items: [
+								{
+									label: '快速开始',
+									link: '/guides/guardrails',
+									translations: {
+										en: 'Getting Started'
+									}
+								},
+								{
+									label: '实用示例',
+									link: '/examples/guardrails',
+									translations: {
+										en: 'Examples'
 									}
 								},
 							]

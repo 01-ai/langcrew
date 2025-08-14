@@ -1,79 +1,135 @@
-# Guardrail Example
+# LangCrew Guardrail Examples
 
-Simple examples showing how to use guardrails in LangCrew.
+This directory contains comprehensive examples demonstrating the guardrail functionality in LangCrew.
 
-## What are Guardrails?
+## Overview
 
-Guardrails are safety checks that validate inputs and outputs:
-- **Input Guards**: Check data before processing
-- **Output Guards**: Validate results after processing
+Guardrails in LangCrew provide a robust way to validate inputs and outputs at both the agent and task levels, ensuring data quality, security, and compliance with business rules.
 
-## Types
+## Features Demonstrated
 
-### Agent-Level Guardrails
-Apply to ALL tasks executed by an agent.
+### Basic Guardrails
+- **Input Guardrails**: Validate incoming data before processing
+- **Output Guardrails**: Validate generated content before delivery
+- **Agent-Level Guardrails**: Apply to all tasks executed by an agent
+- **Task-Level Guardrails**: Apply only to specific tasks
+- **Combined Guardrails**: Layer multiple guardrail types for comprehensive protection
 
-```python
-agent = Agent(
-    role="Safe Agent",
-    goal="Process safely",
-    backstory="...",
-    input_guards=[check_sensitive_data],
-    output_guards=[check_quality]
-)
-```
+### Advanced Guardrails
+- **Language Support**: Detect and validate supported languages
+- **Content Categorization**: Validate content belongs to allowed categories
+- **Output Format Validation**: Ensure proper structure and formatting
+- **Factual Accuracy**: Check for balanced and accurate language
+- **Rate Limiting**: Prevent abuse through request throttling
+- **Ethical Guidelines**: Ensure content follows ethical standards
+- **Data Privacy**: Protect against PII exposure
+- **User Permissions**: Enforce access control based on user roles
 
-### Task-Level Guardrails  
-Apply only to specific tasks.
+### Conditional Guardrails
+- **Context-Aware Validation**: Adapt validation rules based on content type
+- **Security Context**: Apply stricter rules for security-sensitive operations
+- **Adaptive Rate Limiting**: Adjust limits based on user tier (basic/premium/enterprise)
 
-```python
-task = Task(
-    description="Process data",
-    expected_output="Result",
-    agent=agent,
-    input_guards=[validate_format],
-    output_guards=[filter_content]
-)
-```
+### Custom Error Handling
+- **Enhanced Error Messages**: Provide detailed feedback and suggestions
+- **Error Codes**: Include structured error information
+- **Recovery Suggestions**: Offer actionable guidance for fixing issues
 
-### Combined
-Agent and task guardrails work together in layers.
+## Examples Included
 
-## Creating Guards
+1. **Basic Functionality**
+   - Agent-level guardrails
+   - Task-level guardrails
+   - Combined guardrails
+   - Guardrail blocking behavior
 
-```python
-from langcrew.guardrail import input_guard, output_guard
+2. **Specialized Validation**
+   - Language and category validation
+   - Rate limiting demonstration
+   - Ethical and privacy protection
+   - User permission management
+   - Factual accuracy checking
 
-@input_guard
-def check_sensitive_data(data):
-    if "password" in str(data).lower():
-        return False, "Contains sensitive data"
-    return True, "Safe data"
+3. **Advanced Features**
+   - Conditional guardrail behavior
+   - Context-aware quality checking
+   - Adaptive rate limiting by user tier
+   - Custom error handling with suggestions
+   - Performance benchmarking
 
-@output_guard  
-def check_quality(data):
-    if len(str(data)) < 10:
-        return False, "Output too short"
-    return True, "Good quality"
-```
+4. **Error Handling**
+   - Comprehensive error testing
+   - Custom error types
+   - Recovery suggestions
+   - Performance analysis
 
-## Running the Example
+## Running the Examples
 
+### Prerequisites
+- Python 3.8+
+- OpenAI API key (for LLM-based examples)
+- LangCrew library installed
+
+### Setup
 ```bash
-# Set your OpenAI API key
-export OPENAI_API_KEY=your_api_key
+export OPENAI_API_KEY=your_api_key_here
+```
 
-# Run the example
+### Execution
+```bash
 python guardrail_example.py
 ```
 
-## Error Handling
+## Guardrail Types
 
-```python
-from langcrew.guardrail import GuardrailError
+### Input Guardrails
+- `check_no_sensitive_info`: Prevents processing of sensitive data
+- `check_input_length`: Limits input length to prevent abuse
+- `check_language_support`: Validates supported languages
+- `check_content_category`: Ensures content fits allowed categories
+- `check_rate_limiting`: Prevents request abuse
+- `check_user_permissions`: Enforces access control
+- `conditional_sensitive_check`: Context-aware sensitive data validation
+- `adaptive_rate_limiting`: Tier-based rate limiting
 
-try:
-    crew.kickoff()
-except GuardrailError as e:
-    print(f"Guardrail blocked: {e}")
-```
+### Output Guardrails
+- `check_output_quality`: Ensures output meets quality standards
+- `filter_profanity`: Filters inappropriate content
+- `check_output_format`: Validates output structure
+- `check_factual_accuracy`: Ensures balanced and accurate language
+- `check_ethical_guidelines`: Enforces ethical content standards
+- `check_data_privacy`: Prevents PII exposure
+- `context_aware_quality_check`: Adapts quality checks to content type
+- `comprehensive_output_validation`: Multi-faceted output validation
+
+## Use Cases
+
+- **Content Generation**: Ensure generated content meets quality and ethical standards
+- **Data Processing**: Validate inputs for sensitive information and format compliance
+- **API Security**: Implement rate limiting and access control
+- **Compliance**: Meet regulatory requirements for data handling
+- **Quality Assurance**: Maintain consistent output quality across all operations
+
+## Best Practices
+
+1. **Layer Guardrails**: Use both agent and task-level guardrails for comprehensive protection
+2. **Context Awareness**: Adapt validation rules based on the specific use case
+3. **Performance**: Keep guardrails lightweight to avoid impacting system performance
+4. **Error Handling**: Provide clear, actionable error messages
+5. **Testing**: Thoroughly test guardrails with various input scenarios
+6. **Monitoring**: Track guardrail performance and effectiveness
+
+## Customization
+
+Guardrails can be easily customized by:
+- Creating new guardrail functions with the `@input_guard` or `@output_guard` decorators
+- Extending the `GuardrailError` class for custom error handling
+- Implementing conditional logic based on context or user attributes
+- Adding performance monitoring and logging
+
+## Performance Considerations
+
+- Basic guardrails typically execute in <1ms
+- Complex regex-based guardrails may take longer
+- Consider caching results for expensive operations
+- Monitor guardrail performance in production environments
