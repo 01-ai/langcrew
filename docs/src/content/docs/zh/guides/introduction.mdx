@@ -80,7 +80,7 @@ market_analysis:
 # 配置哪些工具需要审批
 hitl_config = HITLConfig(
     enabled=True,
-    tools_requiring_approval=["WebSearchTool", "DatabaseTool"]
+    interrupt_before_tools=["WebSearchTool", "DatabaseTool"]
 )
 
 crew = Crew(agents=[agent], tasks=[tasks], hitl=hitl_config)

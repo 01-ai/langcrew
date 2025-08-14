@@ -7,153 +7,149 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 让我们构建您的第一个 langcrew 应用程序！在本教程中，我们将创建一个简单的内容创作团队，其中两个智能体协同工作。
 
-## What We'll Build
+## 我们要构建什么
 
-A content creation system where:
-1. A **Researcher** agent gathers information on a topic
-2. A **Writer** agent creates an article based on the research
+一个内容创作系统，其中：
+1. **研究员**智能体收集主题相关信息
+2. **作家**智能体基于研究创建文章
 
-## Step 1: Import Required Components
+## 步骤1：导入所需组件
 
 ```python
 from langcrew import Agent, Task, Crew
-from langcrew.tools import SearchTool, WebScrapeTool
+from langcrew_tools.search.langchain_tools import WebSearchTool
+from langcrew_tools.fetch.langchain_tools import WebFetchTool
 ```
 
-## Step 2: Create Your Agents
+## 步骤2：创建您的智能体
 
-### Research Agent
+### 研究智能体
 
 ```python
 researcher = Agent(
-    role="Senior Research Analyst",
-    goal="Gather comprehensive information on the given topic",
-    backstory="""You are an experienced researcher with a keen eye for 
-    credible sources and relevant information. You excel at finding and 
-    synthesizing data from multiple sources.""",
-    tools=[SearchTool(), WebScrapeTool()],
+    role="高级研究分析师",
+    goal="收集给定主题的全面信息",
+    backstory="""您是一位经验丰富的研究员，对可信来源和相关信息有敏锐的眼光。
+    您擅长从多个来源查找和综合数据。""",
+    tools=[WebSearchTool(), WebFetchTool()],
     verbose=True
 )
 ```
 
-### Writer Agent
+### 作家智能体
 
 ```python
 writer = Agent(
-    role="Content Writer",
-    goal="Create engaging and informative content based on research",
-    backstory="""You are a skilled writer who transforms research into 
-    compelling narratives. You have a talent for making complex topics 
-    accessible to readers.""",
+    role="内容作家",
+    goal="基于研究创建引人入胜且信息丰富的内容",
+    backstory="""您是一位技能娴熟的作家，能够将研究转化为引人入胜的叙述。
+    您有将复杂主题变得易于读者理解的天赋。""",
     verbose=True
 )
 ```
 
-## Step 3: Define Tasks
+## 步骤3：定义任务
 
-### Research Task
+### 研究任务
 
 ```python
 research_task = Task(
-    description="""Research the topic: 'The Impact of AI on Healthcare'
+    description="""研究主题：'人工智能对医疗保健的影响'
     
-    Your research should include:
-    - Current applications of AI in healthcare
-    - Benefits and challenges
-    - Future possibilities
-    - Real-world examples and case studies
+    您的研究应包括：
+    - AI在医疗保健中的当前应用
+    - 好处和挑战
+    - 未来的可能性
+    - 真实世界的例子和案例研究
     
-    Provide a comprehensive research summary.""",
+    提供全面的研究摘要。""",
     agent=researcher,
-    expected_output="A detailed research report on AI in healthcare"
+    expected_output="关于AI在医疗保健中的详细研究报告"
 )
 ```
 
-### Writing Task
+### 写作任务
 
 ```python
 writing_task = Task(
-    description="""Using the research provided, write an engaging article 
-    about 'The Impact of AI on Healthcare'.
+    description="""使用提供的研究，写一篇关于'人工智能对医疗保健的影响'的引人入胜的文章。
     
-    The article should:
-    - Have a compelling introduction
-    - Cover key points from the research
-    - Include specific examples
-    - Be approximately 500 words
-    - End with a thought-provoking conclusion""",
+    文章应该：
+    - 有一个引人入胜的介绍
+    - 涵盖研究中的关键要点
+    - 包含具体例子
+    - 大约500字
+    - 以发人深省的结论结束""",
     agent=writer,
-    context=[research_task],  # This task depends on research_task
-    expected_output="A well-written article on AI in healthcare"
+    context=[research_task],  # 此任务依赖于research_task
+    expected_output="一篇关于AI在医疗保健中的精心撰写的文章"
 )
 ```
 
-## Step 4: Assemble Your Crew
+## 步骤4：组建您的团队
 
 ```python
 crew = Crew(
     agents=[researcher, writer],
     tasks=[research_task, writing_task],
-    verbose=True,
-    process="sequential"  # Tasks run one after another
+    verbose=True
 )
 ```
 
-## Step 5: Execute the Crew
+## 步骤5：执行团队
 
 ```python
-# Start the crew's work
+# 开始团队工作
 result = crew.kickoff()
 
-# Display the final result
+# 显示最终结果
 print("=" * 50)
-print("FINAL ARTICLE:")
+print("最终文章：")
 print("=" * 50)
 print(result)
 ```
 
-## Complete Example
+## 完整示例
 
 <Tabs>
 <TabItem label="Python">
 
 ```python
 from langcrew import Agent, Task, Crew
-from langcrew.tools import SearchTool, WebScrapeTool
+from langcrew_tools.search.langchain_tools import WebSearchTool
+from langcrew_tools.fetch.langchain_tools import WebFetchTool
 
-# Create agents
+# 创建智能体
 researcher = Agent(
-    role="Senior Research Analyst",
-    goal="Gather comprehensive information on the given topic",
-    backstory="""You are an experienced researcher with a keen eye for 
-    credible sources and relevant information.""",
-    tools=[SearchTool(), WebScrapeTool()],
+    role="高级研究分析师",
+    goal="收集给定主题的全面信息",
+    backstory="""您是一位经验丰富的研究员，对可信来源和相关信息有敏锐的眼光。""",
+    tools=[WebSearchTool(), WebFetchTool()],
     verbose=True
 )
 
 writer = Agent(
-    role="Content Writer",
-    goal="Create engaging and informative content",
-    backstory="""You are a skilled writer who transforms research into 
-    compelling narratives.""",
+    role="内容作家",
+    goal="创建引人入胜且信息丰富的内容",
+    backstory="""您是一位技能娴熟的作家，能够将研究转化为引人入胜的叙述。""",
     verbose=True
 )
 
-# Define tasks
+# 定义任务
 research_task = Task(
-    description="Research the topic: 'The Impact of AI on Healthcare'",
+    description="研究主题：'人工智能对医疗保健的影响'",
     agent=researcher,
-    expected_output="A detailed research report"
+    expected_output="详细的研究报告"
 )
 
 writing_task = Task(
-    description="Write an engaging article based on the research",
+    description="基于研究写一篇引人入胜的文章",
     agent=writer,
     context=[research_task],
-    expected_output="A well-written article"
+    expected_output="一篇精心撰写的文章"
 )
 
-# Create and run crew
+# 创建并运行团队
 crew = Crew(
     agents=[researcher, writer],
     tasks=[research_task, writing_task],
@@ -165,118 +161,81 @@ print(result)
 ```
 
 </TabItem>
-<TabItem label="CLI">
+<TabItem label="命令行">
 
 ```bash
-# Create a new project
+# 创建新项目
 langcrew create my-content-crew
 
-# Navigate to project
+# 进入项目目录
 cd my-content-crew
 
-# Run the crew
+# 运行团队
 langcrew run
 ```
 
 </TabItem>
 </Tabs>
 
-## Understanding the Output
+## 理解输出
 
-When you run this crew, you'll see:
+运行此团队时，您将看到：
 
-1. **Agent Initialization**: Both agents are created and ready
-2. **Task Execution**: 
-   - Researcher searches and gathers information
-   - Writer receives the research and creates content
-3. **Final Output**: The completed article
+1. **智能体初始化**：两个智能体都已创建并准备就绪
+2. **任务执行**：
+   - 研究员搜索并收集信息
+   - 作家接收研究并创建内容
+3. **最终输出**：完成的文章
 
-## Customization Options
+## 自定义选项
 
-### Different Execution Modes
-
-```python
-# Parallel execution (when tasks are independent)
-crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    process="parallel"
-)
-
-# Hierarchical execution (with a manager agent)
-crew = Crew(
-    agents=[manager, worker1, worker2],
-    tasks=[task1, task2, task3],
-    process="hierarchical"
-)
-```
-
-### Adding Human Input
+### 添加人工输入
 
 ```python
 from langcrew.tools import HumanInputTool
 
 agent = Agent(
-    role="Interactive Agent",
+    role="交互式智能体",
     tools=[HumanInputTool()],
-    # ... other parameters
+    # ... 其他参数
 )
 ```
 
-### Custom Tools
+### 自定义工具
 
 ```python
 from langcrew.tools import tool
 
 @tool
 def custom_calculator(expression: str) -> str:
-    """Evaluate a mathematical expression."""
+    """计算数学表达式。"""
     try:
         result = eval(expression)
-        return f"The result is: {result}"
+        return f"结果是: {result}"
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"错误: {str(e)}"
 
 agent = Agent(
     tools=[custom_calculator],
-    # ... other parameters
+    # ... 其他参数
 )
 ```
 
-## Next Steps
+## 下一步
 
-Congratulations! You've built your first langcrew application. Here's what to explore next:
+恭喜！您已经构建了您的第一个 langcrew 应用程序。接下来可以探索：
 
-- **[Agents Deep Dive](/concepts/agents)**: Learn about agent capabilities and configuration
-- **[Task Management](/concepts/tasks)**: Understand task dependencies and execution flows
-- **[Tool Integration](/concepts/tools)**: Explore available tools and create custom ones
-- **[Examples](/examples/marketing-strategy)**: See more complex crew implementations
+- **[智能体深入了解](/zh/concepts/agents)**：了解智能体功能和配置
+- **[任务管理](/zh/concepts/tasks)**：理解任务依赖和执行流程
+- **[工具集成](/zh/concepts/tools)**：探索可用工具并创建自定义工具
+- **[示例](/examples/marketing-strategy)**：查看更复杂的团队实现
 
-## Tips for Success
+## 成功提示
 
-1. **Start Simple**: Begin with 2-3 agents and gradually add complexity
-2. **Clear Roles**: Give each agent a specific, well-defined role
-3. **Task Dependencies**: Use context to share information between tasks
-4. **Iterate**: Refine agent prompts and task descriptions based on results
-5. **Monitor Output**: Use verbose mode during development to understand agent behavior
+1. **从简单开始**：从2-3个智能体开始，逐渐增加复杂性
+2. **明确角色**：给每个智能体一个特定、明确定义的角色
+3. **任务依赖**：使用上下文在任务之间共享信息
+4. **迭代改进**：根据结果优化智能体提示和任务描述
+5. **监控输出**：在开发过程中使用详细模式了解智能体行为
 
-## Common Patterns
-
-### Research → Analysis → Action
-```python
-researcher → analyst → implementer
-```
-
-### Review and Revision
-```python
-creator → reviewer → creator (revision)
-```
-
-### Parallel Specialists
-```python
-specialist1 ↘
-specialist2 → aggregator → final output
-specialist3 ↗
-```
-
-Ready to build more complex crews? Check out our [advanced examples](/examples/game-builder)!
+准备构建更复杂的团队了吗？查看我们的[高级示例](/examples/game-builder)！

@@ -3,7 +3,7 @@ title: 欢迎使用 LangCrew
 description: 基于 LangGraph 的企业级多智能体框架 - 从原型到生产的完整解决方案
 template: splash
 hero:
-  tagline: 融合 CrewAI 的简洁性与 LangGraph 的强大功能 - 构建生产级 AI 智能体系统的唯一选择
+  tagline: 融合 CrewAI 的简洁性与 LangGraph 的强大功能 - 构建生产级 AI 智能体系统的理想选择
   actions:
     - text: 快速开始
       link: /zh/guides/quickstart/
@@ -18,123 +18,147 @@ import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
 
 <div class="hero-stats">
   <Badge text="Python 3.11+" variant="note" />
-  <Badge text="基于 LangGraph" variant="success" />
-  <Badge text="生产就绪" variant="caution" />
+  <Badge text="基于 LangGraph" variant="tip" />
+  <Badge text="生产就绪" variant="success" />
+  <Badge text="开箱即用" variant="caution" />
 </div>
 
 ## 为什么选择 LangCrew？
 
-**两全其美：** CrewAI 的简洁性遇见 LangGraph 的企业级能力
+<CardGrid>
 
-<CardGrid stagger>
-	<Card title="🚀 超越传统灵活范式">
-		**革命性智能体协作**：提供简单且高度可配置的开发体验，内置强大机制如人机协作、动态工作流编排和事件驱动流程，实现前所未有的智能体协调能力。
-	</Card>
-	<Card title="🎯 产品化的全栈支持">
-		**加速市场交付**：完整的 Agent-UI 协议和 React 组件库，支持前端可视化智能体规划、调度、执行和工具调用过程—显著缩短从开发到生产部署的时间。
-	</Card>
-	<Card title="⚡ 快速启动的应用模板">
-		**行业就绪解决方案**：丰富多样的生产级测试模板，支持跨行业场景的多智能体解决方案快速原型和部署—从概念到市场创纪录的快速实现。
-	</Card>
-	<Card title="🔗 集成的开发运维支持">
-		**无缝生命周期管理**：集成免费 SaaS 服务，覆盖系统构建、深度观测、沙箱环境和部署资源—简化从开发到运维的整个过程。
-	</Card>
+<Card title="🎯 企业就绪" icon="star">
+内置 HITL（人机协作）审批流程、审计跟踪和安全防护栏，满足生产环境的严格要求。
+</Card>
+
+<Card title="⚡ 开发友好" icon="rocket">
+CrewAI 兼容的装饰器语法，支持现有项目无缝迁移，大幅降低学习成本。
+</Card>
+
+<Card title="📊 全栈可视化" icon="laptop">
+完整的 Agent-UI 协议，提供实时执行监控和专业 React 组件库。
+</Card>
+
+<Card title="🔧 生产优化" icon="setting">
+基于 LangGraph 的坚实基础，提供企业级性能、可扩展性和可靠性保障。
+</Card>
+
 </CardGrid>
 
-## 框架对比
+## 核心特性
 
-| 方面 | LangGraph | CrewAI | LangCrew |
-|------|-----------|---------|----------|
-| **抽象层次** | 底层原语 | 高级模式 | **基于 LangGraph 的高级抽象** |
-| **开发方式** | 从零构建 | 简单但有限 | **内置最佳实践** |
-| **人机协作** | 基础中断/恢复 | 有限支持 | **高级审批系统 + 双语 UI** |
-| **记忆系统** | 完整原语/文档 | 简单上下文 | **LangGraph 原生 + mem0 集成** |
-| **工具生态** | 仅 LangChain | 仅自定义 | **统一注册中心 + LangCrew-Tools** |
-| **UI 支持** | 无 | 基础示例 | **完整 React 组件** |
-| **可观测性** | LangSmith 集成 | 仅企业版 | **LangTrace 支持** |
-| **部署方案** | 平台可用 | 仅企业版 | **平台规划中** |
+### 🚀 开箱即用的企业功能
 
+✅ **装饰器开发模式** - 熟悉的 `@agent`、`@task`、`@crew` 语法  
+✅ **YAML 配置管理** - 外部化智能体和任务定义  
+✅ **人机协作工作流** - 敏感操作的人工监督机制  
+✅ **实时执行监控** - 完整的执行流可视化和调试  
+✅ **智能记忆系统** - 智能体交互间的持久化上下文  
+✅ **原生 LangGraph 集成** - 图形化工作流编排能力  
+✅ **生产安全保障** - 内置审计跟踪和审批机制  
 
-## 快速开始示例
-
-**5分钟内构建你的第一个智能体团队：**
+### 💡 最佳开发体验
 
 ```python
-from langcrew import Agent, Crew, Task
-from langcrew.project import CrewBase, agent, crew, task
+from langcrew import CrewBase, agent, task
 from langcrew_tools import WebSearchTool
 
 @CrewBase
-class ResearchCrew:
+class MarketingCrew:
+    agents_config = "config/agents.yaml"
+    tasks_config = "config/tasks.yaml"
+    
     @agent
-    def researcher(self) -> Agent:
+    def researcher(self):
         return Agent(
-            role="市场研究员",
-            goal="发现AI自动化的最新趋势",
-            tools=[WebSearchTool()],
-            backstory="擅长发现市场洞察的专家"
+            config=self.agents_config["researcher"],
+            tools=[WebSearchTool()]
         )
     
-    @task
-    def research_task(self) -> Task:
+    @task  
+    def market_analysis(self):
         return Task(
-            description="研究 {topic} 的AI自动化趋势",
-            agent=self.researcher(),
-            expected_output="详细的市场分析报告"
-        )
-    
-    @crew
-    def crew(self) -> Crew:
-        return Crew(
-            agents=self.agents,
-            tasks=self.tasks,
-            memory=True,  # 启用记忆
-            verbose=True  # 查看执行详情
+            config=self.tasks_config["market_analysis"],
+            agent=self.researcher()
         )
 
-# 运行团队
-result = ResearchCrew().crew().kickoff(
-    inputs={"topic": "企业AI采用"}
-)
+# 3行代码启动 Web 服务
+from langcrew.web import create_server
+server = create_server(MarketingCrew().crew())
+server.run()  # 访问 http://localhost:8000/docs
 ```
 
-## 入门路径
+## 与其他框架对比
+
+| 特性 | LangGraph | CrewAI | **LangCrew** |
+|------|-----------|---------|-------------|
+| **抽象级别** | 低级原语 | 高级模式 | **基于 LangGraph 的高级抽象** |
+| **开发体验** | 从零构建 | 简单但有限 | **预构建最佳实践** |
+| **人机协作** | 基础中断/恢复 | 有限支持 | **高级审批系统 + 双语 UI** |
+| **记忆系统** | 完整原语/文档 | 简单上下文 | **LangGraph 原生 + mem0 集成** |
+| **工具生态** | 仅 LangChain | 仅自定义 | **统一注册表 + LangCrew-Tools** |
+| **用户界面** | 无 | 基础示例 | **完整 React 组件库** |
+| **可观测性** | LangSmith 集成 | 企业版 | **LangTrace 支持** |
+| **部署方案** | 平台可用 | 企业版 | **平台规划中** |
+
+## 快速开始
+
+### 🎯 5分钟体验
+
+```bash
+# 1. 安装 LangCrew
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+
+# 2. 设置 API 密钥
+export OPENAI_API_KEY=your_openai_key
+
+# 3. 运行示例
+python -m langcrew.examples.quickstart
+```
+
+### 🚀 完整应用体验
+
+使用 Docker Compose 启动完整的前后端服务：
+
+```bash
+git clone https://github.com/01-ai/langcrew.git
+cd langcrew
+export OPENAI_API_KEY=your_openai_key
+docker compose up --build
+
+# 访问 http://localhost:3600 体验 Web 界面
+# 访问 http://localhost:8000/docs 查看 API 文档
+```
+
+## 学习路径
 
 <CardGrid>
-	<Card title="🎯 快速开始指南">
-		**LangCrew 新手？** 从安装开始，通过分步指南在几分钟内构建你的第一个智能体团队。
-		
-		[安装指南 →](/zh/guides/installation/) | [快速开始 →](/zh/guides/quickstart/)
-	</Card>
-	<Card title="🧠 核心概念">
-		**理解框架基础** 学习智能体、任务、团队等核心概念，掌握多智能体协作的基本原理。
-		
-		[智能体 →](/zh/concepts/agents/) | [任务 →](/zh/concepts/tasks/) | [团队 →](/zh/concepts/crews/)
-	</Card>
-	<Card title="🔧 高级特性">
-		**准备投入生产？** 掌握记忆系统、人机协作工作流、工具集成和Web服务等高级功能。
-		
-		[记忆指南 →](/zh/guides/memory/getting-started/) | [人机协作 →](/zh/guides/hitl/getting-started/)
-	</Card>
-	<Card title="🚀 生产部署（即将推出）">
-		**扩展你的应用** 高级部署功能、企业级可观测性和生产级配置正在开发中。
-		
-		[Web服务 →](/zh/guides/web/getting-started/) | [工具集成 →](/zh/guides/tools/)
-	</Card>
+
+<Card title="📚 基础概念" icon="open-book">
+了解 [智能体](/zh/concepts/agents)、[任务](/zh/concepts/tasks) 和 [团队](/zh/concepts/crews) 的核心概念
+</Card>
+
+<Card title="🛠 实践指南" icon="puzzle">
+学习 [工具集成](/zh/guides/tools/)、[记忆系统](/zh/guides/memory/getting-started) 和 [人机协作](/zh/guides/hitl/getting-started)
+</Card>
+
+<Card title="🌐 Web 服务" icon="external">
+构建 [Web 应用](/zh/guides/web/getting-started) 和 [实时流式](/zh/guides/web/protocol) 界面
+</Card>
+
+<Card title="🎯 实际案例" icon="document">
+探索 [招聘系统](/examples/recruitment)、[营销策略](/examples/marketing-strategy) 等完整示例
+</Card>
+
 </CardGrid>
 
-## 成功案例
+## 社区与支持
 
-> **"LangCrew 将我们的开发时间从数周缩短到数天。生产级模板和 UI 组件是游戏规则改变者。"**  
-> — *陈莎拉，TechCorp 首席AI工程师*
-
-> **"终于找到了一个能够连接原型和生产的框架。人机协作功能正是我们所需要的。"**  
-> — *亚历克斯·罗德里格斯，StartupAI 首席技术官*
+- **📖 文档**: 全面的指南和 API 参考
+- **💬 GitHub**: [问题反馈](https://github.com/01-ai/langcrew/issues) 和功能请求  
+- **🔧 示例**: 丰富的 [实际用例](/examples/) 和最佳实践
+- **🚀 更新**: 关注最新功能和改进
 
 ---
 
-<div style="text-align: center; margin: 2rem 0;">
-  <strong>准备构建生产级AI智能体系统了吗？</strong><br/>
-  <a href="/zh/guides/quickstart/" style="margin: 0 1rem;">立即开始 →</a>
-  <a href="https://github.com/01-ai/langcrew" style="margin: 0 1rem;">在 GitHub 点星 →</a>
-</div>
+**准备开始了吗？** [立即安装 LangCrew](/zh/guides/installation) 并构建您的第一个智能体团队！
