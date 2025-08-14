@@ -32,7 +32,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - examples/components/web/super_agent/.env
+      - .env
     environment:
       - PORT=8000
       - MODE=full
