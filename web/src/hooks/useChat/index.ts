@@ -321,24 +321,24 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
     async ({ content, files = [], mcpTools = [], knowledgeBases = [] }: SendOptions) => {
       // let finalSessionId = sessionIdRef.current;
 
-      // if (useAgentStore.getState().senderSending) {
-      //   useAgentStore.getState().setSenderLoading(true);
-      //   try {
-      //     await sessionApi.addNewMessage(sessionIdRef.current, content);
-      //     useAgentStore.getState().addChunk({
-      //       id: Date.now().toString(),
-      //       role: 'user',
-      //       type: 'text',
-      //       content,
-      //       loading: true,
-      //       timestamp: Date.now(),
-      //     });
-      //   } catch (error) {
-      //     console.error('Failed to add new message:', error);
-      //     useAgentStore.getState().setSenderLoading(false);
-      //   }
-      //   return;
-      // }
+      if (useAgentStore.getState().senderSending) {
+        useAgentStore.getState().setSenderLoading(true);
+        try {
+          await sessionApi.addNewMessage(sessionIdRef.current, content);
+          useAgentStore.getState().addChunk({
+            id: Date.now().toString(),
+            role: 'user',
+            type: 'text',
+            content,
+            loading: true,
+            timestamp: Date.now(),
+          });
+        } catch (error) {
+          console.error('Failed to add new message:', error);
+          useAgentStore.getState().setSenderLoading(false);
+        }
+        return;
+      }
 
       // 如果sessionId为空，则创建新的sessionId
       // if (!finalSessionId) {

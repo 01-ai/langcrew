@@ -63,7 +63,10 @@ export const sessionApi = {
   },
 
   addNewMessage: (sessionId: string, message: string): Promise<any> => {
-    return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/sessions/${sessionId}/new_message`, { message });
+    return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/update_task`, {
+      session_id: sessionId,
+      message,
+    });
   },
 };
 
