@@ -211,8 +211,6 @@ def create_app() -> FastAPI:
             else "Stop not supported or failed",
         }
 
-    return app
-
     @app.post("/api/v1/update_task", summary="Update task", tags=["update task"])
     async def update_task(request: ChatRequest):
         """Update task - completely consistent with original version logic"""

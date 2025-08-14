@@ -1,6 +1,4 @@
-import asyncio
-import inspect
-from typing import Any, Callable, Final, Set
+from typing import Any, Final, Set
 from langcrew_tools.astream_tool import EventType
 
 
@@ -20,8 +18,6 @@ class SessionState:
     def update_state(self, updates: dict[str, Any]) -> None:
         """Update the state with new values."""
         self.state.update(updates)
-        for key, value in updates.items():
-            self.execute_event_callback(key, value)
 
     def set_state(self, new_state: dict[str, Any]) -> None:
         """Replace the entire state."""
@@ -34,7 +30,6 @@ class SessionState:
     def set_value(self, key: str, value: Any) -> None:
         """Set a specific value in state."""
         self.state[key] = value
-        self.execute_event_callback(key, value)
 
     def del_key(self, key: str) -> None:
         """Delete a specific key from state."""
@@ -47,22 +42,3 @@ class SessionState:
     def clear(self) -> None:
         """Clear all state."""
         self.state.clear()
-
-    def add_event_callback(self, callback: Callable[[str, Any], None]) -> None:
-        """Set a specific value in state."""
-        if EVENT_CALLBACK_KEY not in self.state:
-            self.state[EVENT_CALLBACK_KEY] = []
-        self.state[EVENT_CALLBACK_KEY].append(callback)
-
-    def execute_event_callback(self, key: str, value: Any) -> None:
-        """Execute all event callbacks"""
-        if key in SET_EVENT_CALLBACK_KEY and self.state.get(EVENT_CALLBACK_KEY):
-
-            async def execute_callback() -> None:
-                for callback in self.state[EVENT_CALLBACK_KEY]:
-                    if inspect.iscoroutinefunction(callback):
-                        await callback(key, value)
-                    else:
-                        callback(key, value)
-
-            asyncio.create_task(execute_callback())

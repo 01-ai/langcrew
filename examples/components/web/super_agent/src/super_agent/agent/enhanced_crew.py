@@ -39,6 +39,7 @@ class EnhancedCrew(Crew):
         self.tools = tools or []
         self.tools_info = {}
         self.register_after_execute_callback = []
+        self.trigger_external_completion_callback = []
         self.last_tool_name = None
         self.recursion_limit = 180
 
@@ -48,7 +49,9 @@ class EnhancedCrew(Crew):
             tool_name = getattr(tool, "name", "default")
             self.tools_info[tool_name] = tool
             if isinstance(tool, StreamingBaseTool):
-                self.session_state.add_event_callback(tool.trigger_external_completion)
+                self.trigger_external_completion_callback.append(
+                    tool.trigger_external_completion
+                )
                 self.register_after_execute_callback.append(tool.custom_event_hook)
 
         logger.info(f"EnhancedCrew initialized for session: {session_state.session_id}")
@@ -207,6 +210,9 @@ class EnhancedCrew(Crew):
         )
         try:
             self.session_state.set_value(EventType.STOP.value, True)
+            await self.execute_trigger_external_completion_callback(
+                EventType.STOP.value, True
+            )
             logger.info(
                 f"Successfully set stop flag for session: {self.session_state.session_id}"
             )
@@ -234,6 +240,9 @@ class EnhancedCrew(Crew):
         )
         try:
             self.session_state.set_value(EventType.NEW_MESSAGE.value, message)
+            await self.execute_trigger_external_completion_callback(
+                EventType.NEW_MESSAGE.value, message
+            )
             logger.info(
                 f"Successfully set new message for session {self.session_state.session_id}"
             )
@@ -243,6 +252,17 @@ class EnhancedCrew(Crew):
                 f"Failed to set new message for session {self.session_state.session_id}: {e}"
             )
             return False
+
+    async def execute_trigger_external_completion_callback(self, event, value) -> None:
+        """Execute all event callbacks"""
+        for callback in self.trigger_external_completion_callback:
+            try:
+                if inspect.iscoroutinefunction(callback):
+                    await callback(event, value)
+                else:
+                    callback(event, value)
+            except Exception as e:
+                logger.error(f"Error in trigger external completion callback: {e}")
 
     def __repr__(self) -> str:
         """Return string representation of the object"""

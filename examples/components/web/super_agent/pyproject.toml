@@ -53,6 +53,9 @@ super_agent = "super_agent.main:run_crew"
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/super_agent"]
+
 [build-system]
 requires = [
     "hatchling",
