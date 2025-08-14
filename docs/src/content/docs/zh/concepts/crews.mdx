@@ -56,49 +56,6 @@ crew = Crew(
 
 ### 核心参数
 
-<<<<<<< HEAD
-| 参数 | 类型 | 描述 | 默认值 |
-|------|------|------|--------|
-| `agents` | List[Agent] | 团队中的智能体列表 | 必需 |
-| `tasks` | List[Task] | 要执行的任务列表 | 必需 |
-| `process` | Process | 执行流程类型 | Process.sequential |
-| `verbose` | bool | 启用详细日志记录 | False |
-| `memory` | bool \| BaseMemory | 启用智能体间记忆 | False |
-| `cache` | bool | 启用任务结果缓存 | True |
-| `max_rpm` | int | 每分钟最大请求数 | None |
-| `language` | str | 智能体通信语言 | "en" |
-| `hitl` | bool \| HITLConfig | 人机交互 | None |
-| `full_output` | bool | 返回完整执行结果 | False |
-| `step_callback` | callable | 每步执行后的回调 | None |
-| `task_callback` | callable | 每个任务完成后的回调 | None |
-| `share_crew` | bool | 智能体间共享团队实例 | False |
-| `planning` | bool | 启用自动任务规划 | False |
-| `planning_llm` | BaseLLM | 规划专用的LLM | None |
-=======
-| 参数      | 类型        | 描述                    | 必需 |
-| --------- | ----------- | ----------------------- | ---- |
-| `agents`  | List[Agent] | 团队成员                | ❌   |
-| `tasks`   | List[Task]  | 要完成的工作            | ❌   |
-| `verbose` | bool        | 显示执行详情            | ❌   |
-| `graph`   | StateGraph  | 自定义 LangGraph 工作流 | ❌   |
-
-### 内存配置
-
-| 参数           | 类型                 | 描述         | 默认值 |
-| -------------- | -------------------- | ------------ | ------ |
-| `memory`       | bool \| MemoryConfig | 内存系统配置 | None   |
-| `embedder`     | dict                 | 嵌入配置     | None   |
-| `checkpointer` | BaseCheckpointSaver  | 状态持久化   | None   |
-| `store`        | BaseStore            | 长期存储     | None   |
-
-### 高级配置
-
-| 参数                 | 类型                | 描述       | 默认值 |
-| -------------------- | ------------------- | ---------- | ------ |
-| `async_checkpointer` | BaseCheckpointSaver | 异步检查点 | None   |
-| `async_store`        | BaseStore           | 异步存储   | None   |
-| `hitl`               | bool \| HITLConfig  | 人机交互   | None   |
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab
 
 ### 高级配置示例
 
@@ -506,14 +463,3 @@ distributed_crew = DistributedCrew(
 
 ## 下一步
 
-<<<<<<< HEAD
-- **[智能体概念](/zh/concepts/agents)** - 深入了解智能体设计
-- **[任务概念](/zh/concepts/tasks)** - 学习任务配置和管理
-- **[记忆系统](/zh/guides/memory/getting-started)** - 实现智能体记忆
-- **[HITL指南](/zh/guides/hitl/getting-started)** - 集成人机协作
-=======
-- 探索有状态团队的 [内存系统](/concepts/memory)
-- 了解 [智能体](/concepts/agents) 及其能力  
-- 理解 [任务](/concepts/tasks) 和工作流设计
-- 查看生产团队实现的 [示例](/examples)
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab

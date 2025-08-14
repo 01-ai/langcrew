@@ -199,6 +199,13 @@ export default defineConfig({
 							},
 							items: [
 								{
+									label: '概览',
+									link: '/guides/tools/',
+									translations: {
+										en: 'Overview'
+									}
+								},
+								{
 									label: '工具注册',
 									link: '/guides/tools/tool-registry',
 									translations: {
@@ -268,6 +275,13 @@ export default defineConfig({
 									link: '/guides/web/http-server',
 									translations: {
 										en: 'HTTP Server'
+									}
+								},
+								{
+									label: '配置指南',
+									link: '/guides/web/configuration',
+									translations: {
+										en: 'Configuration'
 									}
 								},
 							]

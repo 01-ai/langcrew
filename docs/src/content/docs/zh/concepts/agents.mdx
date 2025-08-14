@@ -93,121 +93,10 @@ from langcrew import Agent
 from langchain_openai import ChatOpenAI
 
 agent = Agent(
-<<<<<<< HEAD
-    role="高级分析师",
-    goal="进行深度数据分析",
-    backstory="拥有10年经验的数据科学专家",
-    tools=[DataAnalysisTool(), VisualizationTool()],
-    llm=ChatOpenAI(model="gpt-4", temperature=0.1),
-    verbose=True,
-    allow_delegation=False,
-    max_iter=15,
-    max_execution_time=300,
-=======
-    role="项目经理",
-    goal="协调团队并交付项目",
-    backstory="PMP认证，具有15年经验",
-    
-    # 执行器配置
-    executor_type="react",
-    executor_kwargs={
-        "max_iterations": 20,
-        "timeout": 300
-    },
-    
-    # 内存支持
-    memory=True,  # 启用基本内存
-    
-    # MCP 服务器集成
-    mcp_servers={
-        "filesystem": {
-            "command": "npx",
-            "args": ["@modelcontextprotocol/server-filesystem", "/path/to/files"]
-        }
-    },
-    
-    # 人机交互
-    hitl=True,
-    
-    # 交接配置
-    handoff_to=["developer", "tester"],
-    is_entry=True,  # 入口点智能体
-    
-    # 防护栏
-    input_guards=[],   # 输入验证函数
-    output_guards=[],  # 输出验证函数
-    
-    # 钩子
-    pre_model_hook=None,   # 执行前钩子
-    post_model_hook=None,  # 执行后钩子
-)
-```
-
-## CrewAI 配置风格
-
-您也可以使用配置字典来实现 CrewAI 兼容性：
-
-```python
-config = {
-    "role": "高级开发工程师",
-    "goal": "编写简洁高效的代码",
-    "backstory": "10年全栈开发经验",
-    "llm": {
-        "provider": "openai",
-        "model": "gpt-4",
-        "temperature": 0.1
-    },
-    "handoff_to": ["code_reviewer"],
-    "is_entry": False
-}
-
-agent = Agent(config=config)
-```
-
-## MCP（模型上下文协议）集成
-
-通过 MCP 服务器将智能体连接到外部工具和数据源：
-
-```python
-agent = Agent(
-    role="文件管理器",
-    goal="管理和组织文件",
-    backstory="文件系统操作专家",
-    mcp_servers={
-        "filesystem": {
-            "command": "npx",
-            "args": ["@modelcontextprotocol/server-filesystem", "/workspace"]
-        },
-        "database": {
-            "command": "python",
-            "args": ["-m", "mcp_server_sqlite", "database.db"]
-        }
-    },
-    mcp_tool_filter=["read_file", "write_file", "list_directory"]  # 可选过滤器
-)
-```
-
-## 内存配置
-
-### 基础内存
-
-```python
-# 启用简单内存
-agent = Agent(
-    role="助手",
-    goal="协助完成任务",
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab
     memory=True
 )
 ```
 
-<<<<<<< HEAD
-## 工具集成
-
-### 内置工具
-=======
-### 高级内存配置
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab
 
 ```python
 from langcrew_tools import (
@@ -487,11 +376,6 @@ except AgentExecutionError as e:
 
 ### 自定义错误处理
 
-<<<<<<< HEAD
-=======
-### 同步执行
-
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab
 ```python
 def custom_error_handler(error, context):
     if isinstance(error, ToolExecutionError):
@@ -506,13 +390,6 @@ agent = Agent(
 )
 ```
 
-<<<<<<< HEAD
-## 性能优化
-
-### 缓存配置
-=======
-### 异步执行
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab
 
 ```python
 agent = Agent(
@@ -538,104 +415,9 @@ agent = Agent(
 
 ## 最佳实践
 
-<<<<<<< HEAD
-### 1. 角色设计
-- 为每个智能体定义清晰、具体的角色
-- 避免角色职责重叠
-- 确保角色与任务需求匹配
-=======
-### 1. 选择合适的配置风格
-
-```python
-# 用于 CrewAI 兼容性
-agent = Agent(
-    role="具体角色",
-    goal="明确目标",
-    backstory="相关经验"
-)
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab
 
 ### 2. 工具选择
 - 只提供智能体执行任务所需的工具
 - 避免工具冗余
 - 考虑工具的安全性和权限
 
-<<<<<<< HEAD
-### 3. 提示工程
-- 编写清晰、具体的backstory
-- 使用相关的领域知识
-- 定期测试和改进提示
-
-### 4. 性能监控
-- 监控智能体执行时间
-- 跟踪工具使用模式
-- 优化缓存策略
-
-## 下一步
-
-- **[任务概念](/zh/concepts/tasks)** - 学习如何为智能体创建任务
-- **[团队概念](/zh/concepts/crews)** - 了解智能体协作
-- **[工具指南](/zh/guides/tools/getting-started)** - 集成和创建工具
-- **[记忆系统](/zh/guides/memory/getting-started)** - 实现智能体记忆
-=======
-### 2. 使用合适的工具
-
-```python
-# 将工具与智能体能力匹配
-data_agent = Agent(
-    role="数据科学家",
-    tools=[pandas_tool, visualization_tool, statistics_tool]
-    # 而不是：[email_tool, calendar_tool]
-)
-```
-
-### 3. 在需要时配置内存
-
-```python
-# 用于有状态交互
-agent = Agent(
-    role="个人助手",
-    memory=True  # 记住对话历史
-)
-```
-
-### 4. 使用 MCP 进行外部集成
-
-```python
-# 连接到外部系统
-agent = Agent(
-    role="系统管理员",
-    mcp_servers={
-        "filesystem": {...},
-        "database": {...}
-    }
-)
-```
-
-## 调试和监控
-
-### 详细模式
-
-```python
-agent = Agent(
-    role="调试器",
-    verbose=True  # 显示详细执行步骤
-)
-```
-
-### 调试模式
-
-```python
-agent = Agent(
-    role="系统监控器",
-    debug=True  # 启用调试输出
-)
-```
-
-## 下一步
-
-- 了解 [任务](/concepts/tasks) 以及智能体如何执行它们
-- 探索 [团队](/concepts/crews) 了解智能体如何协同工作
-- 理解有状态智能体的 [内存系统](/concepts/memory)
-- 发现高级智能体行为的 [执行器](/concepts/executors)
->>>>>>> 05fcc97d53f3e66a8215f57f55cd4dc92e91e3ab
