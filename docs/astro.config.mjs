@@ -277,13 +277,6 @@ export default defineConfig({
 										en: 'HTTP Server'
 									}
 								},
-								{
-									label: '配置指南',
-									link: '/guides/web/configuration',
-									translations: {
-										en: 'Configuration'
-									}
-								},
 							]
 						},
 						{
