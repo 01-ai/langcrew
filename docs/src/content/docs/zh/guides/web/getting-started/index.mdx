@@ -132,9 +132,18 @@ Web UI包括：
 
 ### 3. 发送测试消息
 ```bash
+# 开始新对话（不提供session_id）
 curl -X POST "http://localhost:8000/api/v1/chat" \
      -H "Content-Type: application/json" \
      -d '{"message": "你好，你能帮我什么？"}'
+
+# 继续现有对话
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "message": "能提供更多细节吗？",
+       "session_id": "session_abc123def456"
+     }'
 ```
 
 ### 4. 客户端流式示例
@@ -145,17 +154,36 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
 import requests
 import json
 
-# 发送消息并处理流式响应
+# 开始新对话
 response = requests.post('/api/v1/chat', json={
-    "message": "你好，能帮我分析这个文档吗？",
-    "session_id": "可选的会话ID"
+    "message": "你好，能帮我分析这个文档吗？"
+    # session_id是可选的 - 新对话时可省略
 }, stream=True)
+
+session_id = None
 
 # 处理流式响应
 for line in response.iter_lines():
     if line:
         message = json.loads(line)
         print(f"接收到: {message['type']} - {message['content']}")
+        
+        # 从session_init消息中提取session_id
+        if message['type'] == 'session_init':
+            session_id = message['detail']['session_id']
+            print(f"新会话已创建: {session_id}")
+
+# 使用相同的session_id继续对话
+if session_id:
+    response = requests.post('/api/v1/chat', json={
+        "message": "能提供更多细节吗？",
+        "session_id": session_id
+    }, stream=True)
+    
+    for line in response.iter_lines():
+        if line:
+            message = json.loads(line)
+            print(f"接收到: {message['type']} - {message['content']}")
 ```
 
 ## 生产部署

@@ -342,11 +342,16 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 **Request:**
 ```json
 {
-    "session_id": "xxxxx",
     "message": "User message",
+    "session_id": "xxxxx",
     "interrupt_data": {}
 }
 ```
+
+**Parameters:**
+- `message` (required): User's message content
+- `session_id` (optional): Session identifier for conversation continuity. If not provided or empty, a new session will be automatically created with format `session_{16-character-uuid}`
+- `interrupt_data` (optional): Additional data for resuming interrupted conversations
 
 **Response:** Streaming return of StreamMessage (see message definitions above)
 
@@ -375,10 +380,30 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 import requests
 import json
 
-# Send message
+# Start new conversation (no session_id provided)
 response = requests.post('/api/v1/chat', json={
-    "message": "Hello, can you help me analyze this document?",
-    "session_id": "optional session ID"
+    "message": "Hello, can you help me analyze this document?"
+})
+
+# Handle streaming response
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"Received: {message['type']} - {message['content']}")
+        
+        # Extract session_id from session_init message
+        if message['type'] == 'session_init':
+            session_id = message['detail']['session_id']
+            print(f"New session created: {session_id}")
+```
+
+### Continue Existing Conversation
+
+```python
+# Continue existing conversation with session_id
+response = requests.post('/api/v1/chat', json={
+    "message": "Can you provide more details?",
+    "session_id": "session_abc123def456"  # Use existing session
 })
 
 # Handle streaming response

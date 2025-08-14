@@ -342,11 +342,16 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 **请求：**
 ```json
 {
-    "session_id": "xxxxx",
     "message": "用户发的消息",
+    "session_id": "xxxxx",
     "interrupt_data": {}
 }
 ```
+
+**参数说明：**
+- `message`（必需）：用户的消息内容
+- `session_id`（可选）：用于对话连续性的会话标识符。如果不提供或为空，将自动创建新会话，格式为 `session_{16位uuid字符}`
+- `interrupt_data`（可选）：用于恢复中断对话的附加数据
 
 **响应：** 流式返回StreamMessage（见上方消息定义）
 
@@ -375,10 +380,30 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 import requests
 import json
 
-# 发送消息
+# 开始新对话（不提供session_id）
 response = requests.post('/api/v1/chat', json={
-    "message": "你好，能帮我分析这个文档吗？",
-    "session_id": "可选的会话ID"
+    "message": "你好，能帮我分析这个文档吗？"
+})
+
+# 处理流式响应
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"接收到: {message['type']} - {message['content']}")
+        
+        # 从session_init消息中提取session_id
+        if message['type'] == 'session_init':
+            session_id = message['detail']['session_id']
+            print(f"新会话已创建: {session_id}")
+```
+
+### 继续现有对话
+
+```python
+# 使用session_id继续现有对话
+response = requests.post('/api/v1/chat', json={
+    "message": "能提供更多细节吗？",
+    "session_id": "session_abc123def456"  # 使用现有会话
 })
 
 # 处理流式响应

@@ -132,9 +132,18 @@ Visit `http://localhost:8000/docs` to see the auto-generated API documentation
 
 ### 3. Send Test Messages
 ```bash
+# Start new conversation (no session_id)
 curl -X POST "http://localhost:8000/api/v1/chat" \
      -H "Content-Type: application/json" \
      -d '{"message": "Hello, how can you help me?"}'
+
+# Continue existing conversation
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "message": "Can you provide more details?",
+       "session_id": "session_abc123def456"
+     }'
 ```
 
 ### 4. Client Streaming Example
@@ -145,17 +154,36 @@ If you need to handle streaming responses on the client side:
 import requests
 import json
 
-# Send message and handle streaming response
+# Start new conversation
 response = requests.post('/api/v1/chat', json={
-    "message": "Hello, can you help me analyze this document?",
-    "session_id": "optional session ID"
+    "message": "Hello, can you help me analyze this document?"
+    # session_id is optional - omit for new conversation
 }, stream=True)
+
+session_id = None
 
 # Handle streaming response
 for line in response.iter_lines():
     if line:
         message = json.loads(line)
         print(f"Received: {message['type']} - {message['content']}")
+        
+        # Extract session_id from session_init message
+        if message['type'] == 'session_init':
+            session_id = message['detail']['session_id']
+            print(f"New session created: {session_id}")
+
+# Continue conversation with the same session_id
+if session_id:
+    response = requests.post('/api/v1/chat', json={
+        "message": "Can you provide more details?",
+        "session_id": session_id
+    }, stream=True)
+    
+    for line in response.iter_lines():
+        if line:
+            message = json.loads(line)
+            print(f"Received: {message['type']} - {message['content']}")
 ```
 
 ## Production Deployment
