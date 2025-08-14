@@ -55,6 +55,13 @@ export default defineConfig({
 								en: 'Quick Start'
 							}
 						},
+						{
+							label: '超级智能体',
+							link: '/guides/super-agent',
+							translations: {
+								en: 'Super Agent'
+							}
+						},
 					],
 				},
 				{
