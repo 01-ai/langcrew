@@ -35,20 +35,6 @@ export default defineConfig({
 					},
 					items: [
 						{
-							label: '介绍',
-							link: '/guides/introduction',
-							translations: {
-								en: 'Introduction'
-							}
-						},
-						{
-							label: '安装',
-							link: '/guides/installation',
-							translations: {
-								en: 'Installation'
-							}
-						},
-						{
 							label: '快速开始',
 							link: '/guides/quickstart',
 							translations: {

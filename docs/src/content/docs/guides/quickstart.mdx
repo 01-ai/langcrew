@@ -7,6 +7,43 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 Let's build your first langcrew application! In this tutorial, we'll create a simple content creation crew with two agents working together.
 
+## Prerequisites & Installation
+
+### System Requirements
+
+Before installing langcrew, ensure you have:
+
+- **Python**: 3.11 to 3.12
+- **uv**: Recommended package manager
+- **Virtual Environment**: Recommended for project isolation
+
+### Installation
+
+> **Note**: langcrew is currently not open source and requires access to a private package index.
+
+Install langcrew directly using uv with the private index:
+
+```bash
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+### Verify Installation
+
+```python
+import langcrew
+print(langcrew.__version__)
+
+# Test basic functionality
+from langcrew import Agent
+
+agent = Agent(
+    role="Test Agent",
+    goal="Verify installation",
+    backstory="A helpful test agent"
+)
+print(f"Agent created: {agent.role}")
+```
+
 ## What We'll Build
 
 A content creation system where:
@@ -115,9 +152,6 @@ print(result)
 
 ## Complete Example
 
-<Tabs>
-<TabItem label="Python">
-
 ```python
 from langcrew import Agent, Task, Crew
 from langcrew_tools.search.langchain_tools import WebSearchTool
@@ -166,33 +200,6 @@ result = crew.kickoff()
 print(result)
 ```
 
-</TabItem>
-<TabItem label="CLI">
-
-```bash
-# Create a new project
-langcrew create my-content-crew
-
-# Navigate to project
-cd my-content-crew
-
-# Run the crew
-langcrew run
-```
-
-</TabItem>
-</Tabs>
-
-## Understanding the Output
-
-When you run this crew, you'll see:
-
-1. **Agent Initialization**: Both agents are created and ready
-2. **Task Execution**:
-   - Researcher searches and gathers information
-   - Writer receives the research and creates content
-3. **Final Output**: The completed article
-
 ## Customization Options
 
 ### Adding Human Input
@@ -234,7 +241,6 @@ Congratulations! You've built your first langcrew application. Here's what to ex
 - **[Agents Deep Dive](/concepts/agents)**: Learn about agent capabilities and configuration
 - **[Task Management](/concepts/tasks)**: Understand task dependencies and execution flows
 - **[Tool Integration](/concepts/tools)**: Explore available tools and create custom ones
-- **[Examples](/examples/marketing-strategy)**: See more complex crew implementations
 
 ## Tips for Success
 
@@ -244,4 +250,4 @@ Congratulations! You've built your first langcrew application. Here's what to ex
 4. **Iterate**: Refine agent prompts and task descriptions based on results
 5. **Monitor Output**: Use verbose mode during development to understand agent behavior
 
-Ready to build more complex crews? Check out our [advanced examples](/examples/game-builder)!
+Ready to build more complex crews? Check out our [advanced examples](https://github.com/01-ai/langcrew/tree/main/examples)!

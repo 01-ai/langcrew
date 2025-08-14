@@ -1,465 +1,240 @@
 ---
-title: 团队 (Crews)
-description: 理解团队 - 协调智能体合作完成复杂任务的编排器
+title: 团队
+description: 理解团队 - 协调多个智能体协同工作
 ---
 
-团队是LangCrew的核心编排器，负责协调多个智能体之间的协作，确保任务按正确顺序执行，并管理整体工作流程。
+团队是 langcrew 中的编排层，将智能体和任务结合在一起。基于 LangGraph 构建，它们管理具有智能路由、记忆系统和动态执行模式的复杂工作流。
 
-## 什么是团队？
+## 快速开始 - 创建团队
 
-团队在langcrew中提供：
-- **智能体协调**：管理多个智能体之间的交互和协作
-- **任务编排**：确保任务按正确依赖顺序执行
-- **流程控制**：控制执行流程，包括并行和顺序处理
-- **共享上下文**：在智能体之间维护共享状态和信息
-
-## 基本用法
-
-### 简单团队
+用3行代码创建并运行您的第一个团队：
 
 ```python
 from langcrew import Agent, Task, Crew
 
-# 创建智能体
-researcher = Agent(
-    role="研究员",
-    goal="收集相关信息",
-    backstory="专门收集和分析信息的专家"
-)
-
-writer = Agent(
-    role="作家",
-    goal="创建引人入胜的内容",
-    backstory="专门创建高质量书面内容的专家"
-)
-
-# 创建任务
-research_task = Task(
-    description="研究AI在医疗保健中的最新趋势",
-    agent=researcher
-)
-
-write_task = Task(
-    description="基于研究写一篇关于AI在医疗保健中的文章",
-    agent=writer
-)
-
-# 创建团队
-crew = Crew(
-    agents=[researcher, writer],
-    tasks=[research_task, write_task],
-    verbose=True
-)
-```
-
-## 团队配置
-
-### 核心参数
-
-
-### 高级配置示例
-
-```python
-from langcrew import Crew, Process
-from langcrew.memory import LongTermMemory
-
-crew = Crew(
-    agents=[agent1, agent2, agent3],
-    tasks=[task1, task2, task3],
-    process=Process.hierarchical,
-    memory=LongTermMemory(),
-    verbose=True,
-    language="zh",
-    max_rpm=100,
-    step_callback=lambda step: print(f"步骤完成: {step}"),
-    task_callback=lambda task: print(f"任务完成: {task}")
-)
-```
-
-## 执行流程
-
-### 顺序流程 (Sequential)
-
-默认执行模式，任务按定义顺序依次执行：
-
-```python
-crew = Crew(
-    agents=[researcher, writer],
-    tasks=[research_task, write_task],
-    process=Process.sequential
-)
-
-# 执行：research_task -> write_task
+agents = [Agent(role="研究员", goal="收集数据"), Agent(role="写手", goal="创建内容")]
+tasks = [Task(agent=agents[0], description="研究AI趋势"), Task(agent=agents[1], description="撰写报告")]
+crew = Crew(agents=agents, tasks=tasks)
 result = crew.kickoff()
 ```
 
-### 并行流程 (Parallel)
+:::tip[完整指南]
+详细的工作流和编排模式请参考 [快速开始](/guides/quickstart) 指南。
+:::
 
-任务可以并行执行（如果没有依赖关系）：
+## 什么是团队？
 
-```python
-crew = Crew(
-    agents=[agent1, agent2, agent3],
-    tasks=[independent_task1, independent_task2],
-    process=Process.parallel
-)
+langcrew 中的团队代表一个智能编排系统，具有：
 
-result = crew.kickoff()
-```
+- **多智能体协调**: 多个智能体无缝协作
+- **工作流管理**: 自动任务排序和依赖解析
+- **上下文流转**: 信息在智能体和任务间自动流转
+- **记忆系统**: 跨对话和会话的持久记忆
+- **动态路由**: 智能体和任务间的智能移交
+- **人机集成**: 内置的人机协作能力
 
-### 层级流程 (Hierarchical)
+## 核心架构
 
-带有管理者智能体的层级结构：
+团队通过智能协调来编排智能体执行任务：
 
-```python
-manager = Agent(
-    role="项目经理",
-    goal="协调团队并确保质量",
-    backstory="经验丰富的项目管理专家"
-)
+![团队架构](/images/crew-architecture.svg)
 
-crew = Crew(
-    agents=[manager, researcher, writer],
-    tasks=[research_task, write_task],
-    process=Process.hierarchical,
-    manager_llm=ChatOpenAI(model="gpt-4")
-)
-```
+### 设计理念
 
-## 记忆系统
+LangCrew 团队遵循三个编排原则：
 
-### 短期记忆
+**1. 智能协调**
+- 基于依赖关系的自动任务排序
+- 动态智能体选择和路由
+- 上下文感知的信息流
 
-```python
-crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    memory=True  # 启用默认短期记忆
-)
-```
+**2. 有状态执行** 
+- 跨会话的记忆持久化
+- 上下文积累和共享
+- 对话连续性
 
-### 长期记忆
+**3. 人机协作**
+- 无缝的人工监督集成
+- 审批工作流和干预
+- 交互式决策制定
 
-```python
-from langcrew.memory import LongTermMemory
+## 团队模式
 
-crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    memory=LongTermMemory(
-        provider="chroma",
-        config={
-            "chroma_db_path": "./crew_memory"
-        }
-    )
-)
-```
+### 顺序工作流
 
-### 自定义记忆
+智能体和任务按依赖顺序执行：
 
 ```python
-from langcrew.memory import BaseMemory
+from langcrew import Agent, Task, Crew
 
-class CustomMemory(BaseMemory):
-    def save(self, data):
-        # 自定义保存逻辑
-        pass
-    
-    def search(self, query):
-        # 自定义搜索逻辑
-        pass
+# 创建工作流
+researcher = Agent(role="研究员", goal="收集信息")
+analyst = Agent(role="分析师", goal="分析数据")
+writer = Agent(role="写手", goal="创建报告")
+
+research_task = Task(agent=researcher, description="研究市场趋势", name="research")
+analysis_task = Task(agent=analyst, description="分析发现", context=[research_task], name="analysis")
+report_task = Task(agent=writer, description="写最终报告", context=[analysis_task], name="report")
 
 crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    memory=CustomMemory()
+    agents=[researcher, analyst, writer],
+    tasks=[research_task, analysis_task, report_task]
 )
 ```
 
-## 人机协作 (HITL)
+### 智能体驱动工作流
 
-### 基本HITL配置
+当未指定任务时，智能体按顺序工作：
+
+```python
+crew = Crew(
+    agents=[researcher, analyst, writer]  # 无任务 - 智能体按顺序处理输入
+)
+
+# 每个智能体按顺序处理用户输入
+result = crew.kickoff({"messages": [HumanMessage(content="分析市场趋势")]})
+```
+
+### 动态移交
+
+智能体可以将控制权转移给专家：
+
+```python
+# 配置智能体移交
+coordinator = Agent(
+    role="协调员",
+    goal="将工作路由给专家",
+    handoff_to=["specialist", "reviewer"],  # 可以转移到这些智能体
+    is_entry=True,  # 工作流的入口点
+    name="coordinator"
+)
+
+specialist = Agent(role="领域专家", name="specialist")
+reviewer = Agent(role="质量审核员", name="reviewer")
+
+crew = Crew(agents=[coordinator, specialist, reviewer])
+```
+
+## 核心能力
+
+### 记忆系统
+
+团队在对话间维护持久记忆：
+
+```python
+# 启用基础记忆
+crew = Crew(
+    agents=[assistant],
+    tasks=[support_task],
+    memory=True
+)
+
+# 记忆在会话间持久化
+result1 = crew.kickoff(thread_id="conversation_1")
+result2 = crew.kickoff(thread_id="conversation_1")  # 记住之前的上下文
+```
+
+### 人机协作
+
+在需要时启用人工监督：
 
 ```python
 from langcrew.hitl import HITLConfig
 
-hitl_config = HITLConfig(
-    enabled=True,
-    interrupt_before_tools=["critical_decision"],
-    interrupt_after_tools=["analysis_complete"]
-)
-
 crew = Crew(
-    agents=[decision_agent, analysis_agent],
-    tasks=[decision_task, analysis_task],
-    hitl=hitl_config
+    agents=[decision_agent],
+    tasks=[critical_task],
+    hitl=HITLConfig(enabled=True)  # 需要人工批准
 )
 ```
 
-## 执行方法
+### 上下文管理
 
-### 同步执行
+智能体和任务间的自动上下文流转：
 
 ```python
-# 基本执行
+# 上下文通过依赖关系自动流转
+tasks = [
+    Task(agent=collector, description="收集数据", name="collect"),
+    Task(agent=processor, description="处理数据", context=["collect"], name="process"),
+    Task(agent=reporter, description="生成报告", context=["process"], name="report")
+]
+
+crew = Crew(agents=[collector, processor, reporter], tasks=tasks)
+```
+
+## 何时使用团队
+
+团队非常适合：
+
+- **多步骤工作流** - 需要多个智能体的复杂流程
+- **协作任务** - 受益于不同专业知识的工作
+- **有状态对话** - 需要记忆和上下文的应用
+- **质量控制流程** - 需要审核和批准的工作流
+- **动态路由** - 工作流程取决于内容的流程
+- **人机协作** - 需要人工监督的应用
+
+## 执行模式
+
+### 基础执行
+```python
+# 简单执行
 result = crew.kickoff()
 
-# 带输入的执行
-result = crew.kickoff(inputs={"topic": "人工智能"})
-
-# 带回调的执行
-def step_callback(step):
-    print(f"步骤: {step}")
-
-result = crew.kickoff(step_callback=step_callback)
+# 带输入
+result = crew.kickoff(inputs={"topic": "AI趋势", "deadline": "2024-12-31"})
 ```
 
-### 异步执行
-
+### 线程管理
 ```python
-import asyncio
-
-async def run_crew():
-    result = await crew.kickoff_async()
-    return result
-
-# 运行异步团队
-result = asyncio.run(run_crew())
+# 持久对话
+result = crew.kickoff(
+    inputs={"query": "分析这些数据"},
+    thread_id="project_123"  # 维护对话历史
+)
 ```
 
 ### 流式执行
-
 ```python
-# 流式获取执行事件
-for event in crew.kickoff_for_each():
-    print(f"事件: {event}")
-
-# 异步流式执行
-async for event in crew.kickoff_async_for_each():
-    print(f"异步事件: {event}")
+# 流式团队执行以进行实时监控
+for chunk in crew.stream(input={"messages": [HumanMessage(content="处理请求")]}):
+    print(f"步骤：{chunk}")
 ```
 
-## 回调系统
+## 集成模式
 
-### 步骤回调
-
-在每个执行步骤后调用：
-
-```python
-def step_callback(step):
-    print(f"完成步骤: {step.description}")
-    print(f"输出: {step.output}")
-
-crew = Crew(
-    agents=[agent],
-    tasks=[task],
-    step_callback=step_callback
-)
-```
-
-### 任务回调
-
-在每个任务完成后调用：
-
-```python
-def task_callback(task):
-    print(f"任务完成: {task.description}")
-    print(f"智能体: {task.agent.role}")
-    print(f"结果: {task.output}")
-
-crew = Crew(
-    agents=[agent],
-    tasks=[task],
-    task_callback=task_callback
-)
-```
-
-## 错误处理
-
-### 基本错误处理
-
-```python
-try:
-    result = crew.kickoff()
-except Exception as e:
-    print(f"团队执行失败: {e}")
-```
-
-### 自定义错误处理
-
-```python
-from langcrew.exceptions import TaskExecutionError
-
-def error_handler(error, task, agent):
-    if isinstance(error, TaskExecutionError):
-        print(f"任务 {task.description} 在智能体 {agent.role} 上失败")
-        # 自定义恢复逻辑
-        return "默认输出"
-    raise error
-
-crew = Crew(
-    agents=[agent],
-    tasks=[task],
-    error_handler=error_handler
-)
-```
-
-## 性能优化
-
-### 缓存配置
-
+### 研究管道
 ```python
 crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    cache=True,  # 启用结果缓存
-    cache_handler=CustomCacheHandler()  # 自定义缓存处理器
+    agents=[
+        Agent(role="研究员", goal="收集数据"),
+        Agent(role="分析师", goal="分析发现"), 
+        Agent(role="写手", goal="创建报告")
+    ],
+    tasks=[
+        Task(agent=researcher, description="研究主题", name="research"),
+        Task(agent=analyst, description="分析数据", context=["research"], name="analyze"),
+        Task(agent=writer, description="写报告", context=["analyze"], name="report")
+    ]
 )
 ```
 
-### 速率限制
-
+### 审核工作流
 ```python
 crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    max_rpm=60,  # 每分钟最大60个请求
-    max_execution_time=300  # 最大执行时间5分钟
+    agents=[
+        Agent(role="作者", goal="创建内容"),
+        Agent(role="审核员", goal="审核质量"),
+        Agent(role="批准者", goal="最终批准")
+    ],
+    tasks=[
+        Task(agent=author, description="创建草稿", name="draft"),
+        Task(agent=reviewer, description="审核内容", context=["draft"], name="review"),
+        Task(agent=approver, description="最终批准", context=["review"], name="approve")
+    ]
 )
 ```
-
-## 监控和日志
-
-### 详细日志
-
-```python
-crew = Crew(
-    agents=[agent],
-    tasks=[task],
-    verbose=True,  # 启用详细日志
-    output_log_file="crew_execution.log"
-)
-```
-
-### 自定义日志
-
-```python
-import logging
-
-# 配置自定义日志器
-logger = logging.getLogger("crew_logger")
-handler = logging.FileHandler("custom_crew.log")
-logger.addHandler(handler)
-
-crew = Crew(
-    agents=[agent],
-    tasks=[task],
-    logger=logger
-)
-```
-
-## 高级模式
-
-### 条件执行
-
-```python
-def should_execute_task(task, context):
-    return context.get("condition", False)
-
-crew = Crew(
-    agents=[agent],
-    tasks=[conditional_task],
-    task_condition=should_execute_task
-)
-```
-
-### 动态任务生成
-
-```python
-def generate_tasks(context):
-    tasks = []
-    for item in context.get("items", []):
-        task = Task(
-            description=f"处理 {item}",
-            agent=processor_agent
-        )
-        tasks.append(task)
-    return tasks
-
-crew = Crew(
-    agents=[processor_agent],
-    tasks=[],
-    dynamic_task_generator=generate_tasks
-)
-```
-
-### 智能体协作模式
-
-```python
-# 智能体间共享上下文
-crew = Crew(
-    agents=[agent1, agent2, agent3],
-    tasks=[task1, task2, task3],
-    share_crew=True,  # 智能体可以访问团队上下文
-    collaboration_mode="consensus"  # 需要智能体达成共识
-)
-```
-
-## 部署考虑
-
-### 生产配置
-
-```python
-from langcrew.monitoring import MetricsCollector
-from langcrew.security import SecurityManager
-
-crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    metrics_collector=MetricsCollector(),
-    security_manager=SecurityManager(),
-    max_retries=3,
-    retry_delay=5.0,
-    timeout=600
-)
-```
-
-### 分布式执行
-
-```python
-from langcrew.distributed import DistributedCrew
-
-distributed_crew = DistributedCrew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2],
-    cluster_config={
-        "nodes": ["node1", "node2", "node3"],
-        "load_balancer": "round_robin"
-    }
-)
-```
-
-## 最佳实践
-
-### 1. 任务设计
-- 将复杂任务分解为更小、更易管理的子任务
-- 确保任务描述清晰明确
-- 为任务设置合理的预期输出
-
-### 2. 智能体分工
-- 根据专业领域分配智能体角色
-- 避免智能体职责重叠
-- 确保每个智能体都有明确的目标
-
-### 3. 错误恢复
-- 实现健壮的错误处理机制
-- 设置合理的重试策略
-- 监控执行性能和失败率
-
-### 4. 资源管理
-- 合理设置速率限制
-- 使用缓存减少重复计算
-- 监控内存和CPU使用情况
 
 ## 下一步
 
+继续学习 [内存管理](/concepts/memory) - 理解有状态工作流的持久记忆系统。

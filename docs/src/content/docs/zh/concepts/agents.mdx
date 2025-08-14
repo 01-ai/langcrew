@@ -3,421 +3,143 @@ title: 智能体 (Agents)
 description: 理解智能体 - 具有特定角色、目标和能力的AI实体
 ---
 
-智能体是LangCrew的核心构建块，代表具有特定角色、目标和能力的AI实体。每个智能体都设计用于执行特定任务，并可以与其他智能体协作以实现复杂的目标。
+智能体是 langcrew 的核心构建模块。它们是由AI驱动的自主实体，能够理解任务、使用工具、与人类协作，并在团队中协作以实现复杂目标。
+
+## 快速开始 - 创建智能体
+
+用3行代码创建并运行您的第一个智能体：
+
+```python
+from langcrew import Agent
+
+agent = Agent(role="助手", goal="帮助用户", backstory="有用的AI助手")
+result = agent.invoke({"messages": []})
+```
+
+:::tip[完整指南]
+详细的智能体配置和高级功能请参考 [快速开始](/guides/quickstart) 指南。
+:::
 
 ## 什么是智能体？
 
-langcrew中的智能体提供：
-- **角色定义**：明确定义的职责和专业领域
-- **目标导向**：具体的目标和成功标准
-- **工具集成**：访问执行任务所需的工具和资源
-- **上下文感知**：理解其在更大工作流中的位置
+langcrew 中的智能体代表一个AI驱动的实体，具有：
 
-## 基本用法
+- **明确角色**: 特定的职责和专业领域
+- **目标导向**: 明确的目标和成功标准  
+- **工具集成**: 访问执行任务所需的工具
+- **协作能力**: 与其他智能体和人类协作
+- **记忆系统**: 跨对话的上下文记忆
+- **人机协作支持**: 内置的人工监督机制
+- **企业级可靠性**: 生产环境的稳定性
 
-#### 1. 角色、目标和背景故事（CrewAI 兼容性）
+## 智能体类型
 
-对于 CrewAI 风格的智能体，您需要定义：
+### CrewAI风格智能体
 
-- **Role（角色）**: 智能体的专业化和专长
-- **Goal（目标）**: 智能体的主要目标  
-- **Backstory（背景故事）**: 塑造智能体行为的上下文
-
-#### 2. 执行器系统
-
-智能体使用可配置的执行器来处理任务：
-
-- **executor_type**: 执行器类型（默认："react"）
-- **prompt**: 自定义提示或系统消息
-- **executor_kwargs**: 额外的执行器配置
-
-#### 3. 工具和能力
-
-- **tools**: 智能体可用的工具列表
-- **mcp_servers**: MCP（模型上下文协议）服务器配置
-- **llm**: 语言模型配置
-
-## 创建智能体
-
-### 基础 CrewAI 风格智能体
+非常适合协作工作流：
 
 ```python
 from langcrew import Agent
 
-agent = Agent(
-    role="数据分析师",
-    goal="分析数据并提供洞察",
-    backstory="您是一位经验丰富的数据分析师，专门从复杂数据集中提取有意义的洞察。"
+researcher = Agent(
+    role="研究专员",
+    goal="找到准确和相关的信息",
+    backstory="具有学术背景的专业研究员",
+    tools=[search_tool, web_scraper]
 )
 ```
 
-### 带工具的智能体
+### 原生智能体
+
+用于自定义行为和专业化任务：
 
 ```python
-from langcrew import Agent
-from langcrew_tools import FileReadTool, WebSearchTool
+from langchain_core.messages import SystemMessage
 
-agent = Agent(
-    role="研究员",
-    goal="收集和分析信息",
-    backstory="您是一位彻底的研究员，擅长收集和综合来自多个来源的信息。",
-    tools=[FileReadTool(), WebSearchTool()],
-    verbose=True
+code_reviewer = Agent(
+    prompt=SystemMessage(content="您是一名高级代码审查员..."),
+    tools=[code_analysis_tool],
+    executor_type="react"
 )
 ```
 
-## 智能体配置
+## 核心能力
 
-### 核心参数
+### 工具集成
 
-| 参数 | 类型 | 描述 | 默认值 |
-|------|------|------|--------|
-| `role` | str | 智能体的角色和职责 | 必需 |
-| `goal` | str | 智能体的主要目标 | 必需 |
-| `backstory` | str | 智能体的背景和专业知识 | 必需 |
-| `tools` | List[Tool] | 智能体可用的工具 | [] |
-| `llm` | BaseLLM | 要使用的语言模型 | None |
-| `verbose` | bool | 启用详细日志记录 | False |
-| `allow_delegation` | bool | 允许委托给其他智能体 | True |
-| `max_iter` | int | 最大迭代次数 | 25 |
-| `max_execution_time` | int | 最大执行时间（秒） | None |
-| `memory` | bool | 启用智能体记忆 | True |
-| `system_template` | str | 自定义系统提示模板 | None |
-| `prompt_template` | str | 自定义提示模板 | None |
-| `response_template` | str | 自定义响应模板 | None |
-
-### 高级配置示例
+智能体可以使用任何兼容LangChain的工具：
 
 ```python
-from langcrew import Agent
-from langchain_openai import ChatOpenAI
+from langcrew_tools.search.langchain_tools import WebSearchTool
 
 agent = Agent(
-    memory=True
+    role="分析师",
+    tools=[WebSearchTool()]
 )
 ```
 
+### 记忆系统
 
-```python
-from langcrew_tools import (
-    FileReadTool, FileWriteTool,
-    WebSearchTool, WebScrapeTool,
-    DatabaseTool, APITool
-)
-
-agent = Agent(
-    role="多功能助手",
-    goal="执行各种任务",
-    backstory="能够处理文件、网络和数据库操作的通用助手",
-    tools=[
-        FileReadTool(),
-        FileWriteTool(),
-        WebSearchTool(),
-        DatabaseTool()
-    ]
-)
-```
-
-### 自定义工具
-
-```python
-from langcrew.tools import BaseTool
-from pydantic import Field
-
-class CustomCalculatorTool(BaseTool):
-    name: str = "calculator"
-    description: str = "用于数学计算的工具"
-    
-    def _run(self, expression: str) -> str:
-        """执行数学计算"""
-        try:
-            result = eval(expression)
-            return f"结果: {result}"
-        except Exception as e:
-            return f"错误: {e}"
-
-agent = Agent(
-    role="数学家",
-    goal="解决数学问题",
-    backstory="专门解决复杂数学问题的专家",
-    tools=[CustomCalculatorTool()]
-)
-```
-
-### 工具权限控制
-
-```python
-from langcrew.tools import ToolPermission
-
-agent = Agent(
-    role="受限操作员",
-    goal="执行受控操作",
-    backstory="只能执行特定操作的受限智能体",
-    tools=[
-        FileReadTool(permissions=ToolPermission.READ_ONLY),
-        DatabaseTool(permissions=ToolPermission.QUERY_ONLY)
-    ]
-)
-```
-
-## 记忆系统
-
-### 短期记忆
+为对话维护上下文：
 
 ```python
 agent = Agent(
-    role="对话助手",
-    goal="维护有意义的对话",
-    backstory="能够记住对话历史的助手",
-    memory=True  # 启用默认短期记忆
+    role="助手", 
+    memory=True  # 启用对话记忆
 )
 ```
 
-### 长期记忆
+### 人机协作
 
-```python
-from langcrew.memory import LongTermMemory
-
-agent = Agent(
-    role="知识工作者",
-    goal="积累和利用长期知识",
-    backstory="能够学习和记住长期信息的智能体",
-    memory=LongTermMemory(
-        provider="chroma",
-        config={"collection_name": "agent_knowledge"}
-    )
-)
-```
-
-### 自定义记忆
-
-```python
-from langcrew.memory import BaseMemory
-
-class CustomMemory(BaseMemory):
-    def save(self, data):
-        # 自定义保存逻辑
-        pass
-    
-    def retrieve(self, query):
-        # 自定义检索逻辑
-        pass
-
-agent = Agent(
-    role="专家系统",
-    goal="提供专家级建议",
-    backstory="具有自定义知识存储的专家系统",
-    memory=CustomMemory()
-)
-```
-
-## 人机协作 (HITL)
-
-启用人工监督和干预：
+在需要时启用人工监督：
 
 ```python
 from langcrew.hitl import HITLConfig
 
 agent = Agent(
-    role="关键决策者",
-    goal="做出重要的业务决策",
-    hitl=HITLConfig(
-        enabled=True,
-        interrupt_before_tools=["decision_tool", "database_tool"],
-        interrupt_after_tools=["analysis_tool"]
-    )
+    role="决策者",
+    hitl=HITLConfig(enabled=True)
 )
 ```
 
-## 防护栏
+### 智能体移交
 
-使用防护栏装饰器添加输入和输出验证：
-
-```python
-from langcrew.guardrails import input_guardrail, output_guardrail
-
-@input_guardrail(max_length=1000)
-@output_guardrail(contains_keywords=["分析", "结论"])
-def create_analyst():
-    return Agent(
-        role="分析师",
-        goal="提供数据分析",
-        backstory="专注于数据驱动洞察的分析师"
-    )
-
-agent = create_analyst()
-```
-
-## 智能体协作
-
-### 委托模式
+智能体可以将任务委托给专家：
 
 ```python
-senior_agent = Agent(
-    role="高级经理",
-    goal="监督项目执行",
-    backstory="经验丰富的项目经理",
-    allow_delegation=True
-)
-
-junior_agent = Agent(
-    role="初级分析师",
-    goal="执行具体分析任务",
-    backstory="新手分析师，渴望学习",
-    allow_delegation=False
-)
-
-# 高级智能体可以将任务委托给初级智能体
-```
-
-### 协作工具
-
-```python
-from langcrew_tools import CollaborationTool
-
-team_agent = Agent(
-    role="团队协调员",
-    goal="协调团队工作",
-    backstory="专门管理团队协作的智能体",
-    tools=[CollaborationTool(team_members=["analyst", "researcher"])]
+coordinator = Agent(
+    role="项目协调员",
+    handoff_to=["开发者", "测试员", "审查员"]
 )
 ```
 
-## 执行控制
+## 何时使用智能体
 
-### 迭代控制
+智能体非常适合：
 
-```python
-agent = Agent(
-    role="迭代处理器",
-    goal="通过多次迭代改进结果",
-    backstory="通过反复改进达到最佳结果的智能体",
-    max_iter=10,  # 最多10次迭代
-    max_execution_time=120  # 最多2分钟
-)
-```
+- **专业任务** - 需要特定专业知识的工作
+- **工具密集型工作** - 需要多种工具协调的任务
+- **协作工作流** - 需要与其他智能体协作的流程
+- **人工监督场景** - 需要人类监督和干预的工作
+- **状态化对话** - 需要记住上下文的应用
+- **复杂决策制定** - 需要多步推理的任务
 
-### 回调函数
+## 与其他组件的集成
 
-```python
-def step_callback(step):
-    print(f"智能体步骤: {step}")
-
-def completion_callback(result):
-    print(f"智能体完成: {result}")
-
-agent = Agent(
-    role="监控智能体",
-    goal="执行监控任务",
-    backstory="提供执行反馈的智能体",
-    step_callback=step_callback,
-    callbacks=[completion_callback]
-)
-```
-
-## 自定义提示
-
-### 系统提示自定义
+智能体无缝集成所有 langcrew 组件：
 
 ```python
-custom_system_template = """
-您是一位{role}，专门从事{specialty}。
-您的主要目标是{goal}。
-始终保持专业和准确。
+from langcrew import Agent, Task, Crew
 
-当前上下文: {context}
-"""
+# 创建专业智能体
+researcher = Agent(role="研究员", goal="收集数据")
+writer = Agent(role="写手", goal="创建内容")
 
-agent = Agent(
-    role="专家顾问",
-    goal="提供专业建议",
-    backstory="各领域的专业顾问",
-    system_template=custom_system_template
-)
+# 组织成一个团队
+crew = Crew(agents=[researcher, writer])
+result = crew.kickoff(inputs={"task": "分析市场数据"})
 ```
 
-### 响应格式化
+## 下一步
 
-```python
-response_template = """
-基于我的分析，这里是我的发现：
-
-## 主要发现
-{main_findings}
-
-## 建议
-{recommendations}
-
-## 置信度
-{confidence_level}
-"""
-
-agent = Agent(
-    role="结构化分析师",
-    goal="提供结构化分析",
-    backstory="提供格式化输出的分析师",
-    response_template=response_template
-)
-```
-
-## 错误处理
-
-### 基本错误处理
-
-```python
-from langcrew.exceptions import AgentExecutionError
-
-try:
-    result = agent.execute(task)
-except AgentExecutionError as e:
-    print(f"智能体执行失败: {e}")
-    # 处理错误
-```
-
-### 自定义错误处理
-
-```python
-def custom_error_handler(error, context):
-    if isinstance(error, ToolExecutionError):
-        return "工具执行失败，使用默认方法"
-    return None
-
-agent = Agent(
-    role="容错智能体",
-    goal="处理错误情况",
-    backstory="能够优雅处理错误的健壮智能体",
-    error_handler=custom_error_handler
-)
-```
-
-
-```python
-agent = Agent(
-    role="高效处理器",
-    goal="快速处理请求",
-    backstory="优化性能的智能体",
-    cache=True,
-    cache_handler=CustomCacheHandler()
-)
-```
-
-### 并发控制
-
-```python
-agent = Agent(
-    role="并发处理器",
-    goal="并行处理多个任务",
-    backstory="支持并发操作的智能体",
-    max_concurrent_tasks=5,
-    rate_limit={"requests_per_minute": 60}
-)
-```
-
-## 最佳实践
-
-
-### 2. 工具选择
-- 只提供智能体执行任务所需的工具
-- 避免工具冗余
-- 考虑工具的安全性和权限
-
+继续学习 [任务](/concepts/tasks) - 理解智能体执行的工作单元。

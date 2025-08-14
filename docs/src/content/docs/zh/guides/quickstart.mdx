@@ -7,6 +7,43 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 让我们构建您的第一个 langcrew 应用程序！在本教程中，我们将创建一个简单的内容创作团队，其中两个智能体协同工作。
 
+## 前置要求与安装
+
+### 系统要求
+
+在安装 langcrew 之前，请确保您具备：
+
+- **Python**: 3.11 到 3.12 版本
+- **uv**: 推荐的包管理器
+- **虚拟环境**: 建议用于项目隔离
+
+### 安装方法
+
+> **注意**: langcrew 目前不是开源的，需要访问私有包索引。
+
+使用 uv 和私有索引直接安装 langcrew：
+
+```bash
+uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+```
+
+### 验证安装
+
+```python
+import langcrew
+print(langcrew.__version__)
+
+# 测试基本功能
+from langcrew import Agent
+
+agent = Agent(
+    role="测试智能体",
+    goal="验证安装",
+    backstory="一个有用的测试智能体"
+)
+print(f"智能体已创建: {agent.role}")
+```
+
 ## 我们要构建什么
 
 一个内容创作系统，其中：

@@ -3,469 +3,166 @@ title: Agents
 description: Understanding agents - the intelligent actors in your langcrew system
 ---
 
-Agents are the core building blocks of langcrew. They are autonomous AI-powered entities that can understand tasks, use tools, and work within crews to achieve complex goals.
+Agents are the core building blocks of langcrew. They are autonomous AI-powered entities that can understand tasks, use tools, collaborate with humans, and work within crews to achieve complex goals.
 
-## Agent Architecture
+## Quick Start - Create an Agent
 
-Every agent in langcrew is built around a flexible architecture that supports both CrewAI-compatible configuration and native langcrew features.
-
-### Core Components
-
-#### 1. Role, Goal, and Backstory (CrewAI Compatibility)
-
-For CrewAI-style agents, you define:
-
-- **Role**: The agent's specialization and expertise
-- **Goal**: The agent's primary objective  
-- **Backstory**: Context that shapes the agent's behavior
-
-#### 2. Executor System
-
-Agents use configurable executors to process tasks:
-
-- **executor_type**: Type of executor (default: "react")
-- **prompt**: Custom prompt or system message
-- **executor_kwargs**: Additional executor configuration
-
-#### 3. Tools and Capabilities
-
-- **tools**: List of tools available to the agent
-- **mcp_servers**: MCP (Model Context Protocol) server configurations
-- **llm**: Language model configuration
-
-## Creating Agents
-
-### Basic CrewAI-Style Agent
+Get your first agent running in just 3 lines:
 
 ```python
 from langcrew import Agent
 
-# Simple agent with role, goal, and backstory
+agent = Agent(role="Assistant", goal="Help users", backstory="Helpful AI")
+result = agent.invoke({"messages": []})
+```
+
+:::tip[Complete Guide]
+For detailed examples and setup, see the [Quick Start](/guides/quickstart) guide.
+:::
+
+## What is an Agent?
+
+An Agent in langcrew represents a specialized AI entity with:
+
+- **Identity**: Role, goal, and backstory that define its personality and expertise
+- **Capabilities**: Tools and skills it can use to accomplish tasks
+- **Intelligence**: LLM-powered reasoning and decision making
+- **Collaboration**: Ability to work with other agents and humans
+- **Safety**: Built-in guardrails and human oversight capabilities
+
+## Core Architecture
+
+Agents are built around a flexible, modular architecture:
+
+![Agent Architecture](/images/agent-architecture.svg)
+
+### Design Philosophy
+
+LangCrew agents follow three core principles:
+
+**1. CrewAI Compatibility**
+- Drop-in replacement for CrewAI agents
+- Familiar role/goal/backstory pattern
+- Seamless migration path
+
+**2. Native Flexibility** 
+- Custom prompts for specialized behavior
+- Direct LangGraph integration
+- Configurable execution strategies
+
+**3. Production-Ready**
+- Built-in safety with guardrails
+- Human-in-the-loop support
+- Enterprise-grade reliability
+
+## Agent Types
+
+### CrewAI-Style Agents
+
+Perfect for collaborative workflows:
+
+```python
+from langcrew import Agent
+
 researcher = Agent(
     role="Research Specialist",
     goal="Find accurate and relevant information",
-    backstory="Expert researcher with academic background"
+    backstory="Expert researcher with academic background",
+    tools=[search_tool, web_scraper]
 )
 ```
 
-### Agent with Tools
+### Native Agents
 
-```python
-from langcrew import Agent
-from langchain_core.tools import BaseTool
-
-# Custom tool example
-class SearchTool(BaseTool):
-    name = "search"
-    description = "Search for information"
-    
-    def _run(self, query: str) -> str:
-        return f"Search results for: {query}"
-
-analyst = Agent(
-    role="Business Analyst",
-    goal="Analyze market trends and competitor data",
-    backstory="Former Fortune 500 analyst with expertise in market research",
-    tools=[SearchTool()],
-    verbose=True
-)
-```
-
-### Agent with Custom Executor
-
-```python
-from langcrew import Agent
-
-# Agent with custom executor configuration
-agent = Agent(
-    role="Data Processor",
-    goal="Process and analyze data efficiently",
-    backstory="Expert in data processing and analysis",
-    executor_type="react",  # Default executor type
-    executor_kwargs={
-        "max_iterations": 15,
-        "early_stopping": True
-    }
-)
-```
-
-### Agent with Custom Prompt
+For custom behavior and specialized tasks:
 
 ```python
 from langchain_core.messages import SystemMessage
-from langcrew import Agent
 
-# Agent with native prompt (cannot use role/goal/backstory with custom prompt)
-custom_agent = Agent(
-    prompt=SystemMessage(content="You are a helpful assistant specialized in code review."),
-    tools=[],  # Add relevant tools
+code_reviewer = Agent(
+    prompt=SystemMessage(content="You are a senior code reviewer..."),
+    tools=[code_analysis_tool],
     executor_type="react"
 )
 ```
 
-## Configuration Parameters
+## Core Capabilities
 
-### Core Parameters
+### Tool Integration
 
-| Parameter   | Type           | Description            | Default |
-| ----------- | -------------- | ---------------------- | ------- |
-| `role`      | str            | Agent's role/title     | None    |
-| `goal`      | str            | Primary objective      | None    |
-| `backstory` | str            | Background context     | None    |
-| `name`      | str            | Custom name/identifier | None    |
-| `tools`     | List[BaseTool] | Available tools        | []      |
-| `llm`       | Any            | Language model config  | None    |
-| `verbose`   | bool           | Show execution details | False   |
-| `debug`     | bool           | Enable debug mode      | True    |
-
-### Executor Configuration
-
-| Parameter         | Type                                | Description                | Default |
-| ----------------- | ----------------------------------- | -------------------------- | ------- |
-| `executor_type`   | str                                 | Executor type              | "react" |
-| `prompt`          | str/SystemMessage/Callable/Runnable | Custom prompt              | None    |
-| `executor_kwargs` | dict                                | Additional executor config | {}      |
-
-### Advanced Features
+Agents can use any LangChain-compatible tool:
 
 ```python
+from langcrew_tools.search.langchain_tools import WebSearchTool
+
 agent = Agent(
-    role="Project Manager",
-    goal="Coordinate team and deliver projects",
-    backstory="PMP certified with 15 years experience",
-    
-    # Executor configuration
-    executor_type="react",
-    executor_kwargs={
-        "max_iterations": 20,
-        "timeout": 300
-    },
-    
-    # Memory support
-    memory=True,  # Enable basic memory
-    
-    # MCP server integration
-    mcp_servers={
-        "filesystem": {
-            "command": "npx",
-            "args": ["@modelcontextprotocol/server-filesystem", "/path/to/files"]
-        }
-    },
-    
-    # Human-in-the-loop
-    hitl=True,
-    
-    # Handoff configuration
-    handoff_to=["developer", "tester"],
-    is_entry=True,  # Entry point agent
-    
-    # Guardrails
-    input_guards=[],   # Input validation functions
-    output_guards=[],  # Output validation functions
-    
-    # Hooks
-    pre_model_hook=None,   # Pre-execution hook
-    post_model_hook=None,  # Post-execution hook
+    role="Analyst",
+    tools=[WebSearchTool()]
 )
 ```
 
-## CrewAI Configuration Style
+### Memory & Context
 
-You can also use a configuration dictionary for CrewAI compatibility:
-
-```python
-config = {
-    "role": "Senior Developer",
-    "goal": "Write clean, efficient code",
-    "backstory": "10 years of full-stack development experience",
-    "llm": {
-        "provider": "openai",
-        "model": "gpt-4",
-        "temperature": 0.1
-    },
-    "handoff_to": ["code_reviewer"],
-    "is_entry": False
-}
-
-agent = Agent(config=config)
-```
-
-## MCP (Model Context Protocol) Integration
-
-Connect agents to external tools and data sources via MCP servers:
+Agents maintain conversation history and context:
 
 ```python
 agent = Agent(
-    role="File Manager",
-    goal="Manage and organize files",
-    backstory="Expert in file system operations",
-    mcp_servers={
-        "filesystem": {
-            "command": "npx",
-            "args": ["@modelcontextprotocol/server-filesystem", "/workspace"]
-        },
-        "database": {
-            "command": "python",
-            "args": ["-m", "mcp_server_sqlite", "database.db"]
-        }
-    },
-    mcp_tool_filter=["read_file", "write_file", "list_directory"]  # Optional filter
+    role="Assistant", 
+    memory=True  # Enable conversation memory
 )
 ```
 
-## Memory Configuration
+### Human Collaboration
 
-### Basic Memory
-
-```python
-# Enable simple memory
-agent = Agent(
-    role="Assistant",
-    goal="Help with tasks",
-    memory=True
-)
-```
-
-### Advanced Memory Configuration
-
-```python
-from langcrew.memory import MemoryConfig
-
-agent = Agent(
-    role="Customer Service",
-    goal="Assist customers",
-    memory=MemoryConfig(
-        enabled=True,
-        provider="redis",
-        connection="redis://localhost:6379",
-        ttl=3600  # 1 hour
-    )
-)
-```
-
-## Human-in-the-Loop (HITL)
-
-Enable human oversight and intervention:
+Enable human oversight when needed:
 
 ```python
 from langcrew.hitl import HITLConfig
 
 agent = Agent(
-    role="Critical Decision Maker",
-    goal="Make important business decisions",
-    hitl=HITLConfig(
-        enabled=True,
-        interrupt_before_tools=["decision_tool", "database_tool"],
-        interrupt_after_tools=["analysis_tool"]
-    )
+    role="Decision Maker",
+    hitl=HITLConfig(enabled=True)
 )
 ```
 
-## Guardrails
+### Agent Handoffs
 
-Add input and output validation using guardrail decorators:
+Agents can delegate tasks to specialists:
 
 ```python
-from typing import Any, Tuple
-from langcrew.guardrail import input_guard, output_guard, GuardrailError
-
-@input_guard
-def check_no_sensitive_info(data: Any) -> Tuple[bool, str]:
-    """Prevent processing of sensitive information"""
-    # Extract content from LangGraph input format
-    content = str(data)
-    if isinstance(data, dict) and "messages" in data:
-        messages = data.get("messages", [])
-        if messages and hasattr(messages[-1], "content"):
-            content = str(messages[-1].content)
-    
-    # Check for sensitive patterns
-    sensitive_patterns = [
-        "password:", "api_key:", "secret_key:", 
-        "credit card", "ssn:", "social security"
-    ]
-    
-    for pattern in sensitive_patterns:
-        if pattern.lower() in content.lower():
-            return False, f"❌ Input contains sensitive information: {pattern}"
-    
-    return True, "✅ No sensitive information detected"
-
-@output_guard
-def check_output_quality(data: Any) -> Tuple[bool, str]:
-    """Ensure output meets quality standards"""
-    # Extract content from LangGraph output format
-    output_str = str(data)
-    if isinstance(data, dict) and "messages" in data:
-        messages = data.get("messages", [])
-        if messages and hasattr(messages[-1], "content"):
-            output_str = str(messages[-1].content)
-    
-    if not output_str or len(output_str) < 10:
-        return False, "❌ Output too short or empty"
-    
-    # Check for placeholder text
-    placeholders = ["TODO", "FIXME", "[INSERT", "[PLACEHOLDER"]
-    for placeholder in placeholders:
-        if placeholder in output_str.upper():
-            return False, f"❌ Output contains placeholder: {placeholder}"
-    
-    return True, "✅ Output quality check passed"
-
-@input_guard
-def check_input_length(data: Any) -> Tuple[bool, str]:
-    """Limit input length to prevent abuse"""
-    content = str(data)
-    if isinstance(data, dict) and "messages" in data:
-        messages = data.get("messages", [])
-        if messages and hasattr(messages[-1], "content"):
-            content = str(messages[-1].content)
-    
-    max_length = 1000
-    if len(content) > max_length:
-        return False, f"❌ Input too long: {len(content)} > {max_length} chars"
-    
-    return True, f"✅ Input length OK: {len(content)} characters"
-
-# Use guardrails in agent
-agent = Agent(
-    role="Data Processor",
-    goal="Process data safely",
-    backstory="Security-conscious data processor",
-    input_guards=[check_no_sensitive_info, check_input_length],
-    output_guards=[check_output_quality]
-)
-
-# Guardrails can also be applied at task level
-from langcrew import Task
-
-task = Task(
-    description="Process user data",
-    expected_output="Clean processed data",
-    agent=agent,
-    input_guards=[check_input_length],  # Task-specific guards
-    output_guards=[check_output_quality]
+coordinator = Agent(
+    role="Project Coordinator",
+    handoff_to=["developer", "tester", "reviewer"]
 )
 ```
 
-### Guardrail Error Handling
+## When to Use Agents
+
+Agents are ideal for:
+
+- **Autonomous Task Execution** - Tasks requiring reasoning and tool use
+- **Collaborative Workflows** - Multi-agent crews working together  
+- **Human-AI Collaboration** - Workflows needing human oversight
+- **Specialized Expertise** - Domain-specific knowledge and skills
+- **Complex Reasoning** - Multi-step problem solving
+- **Tool-Rich Environments** - Applications with many available tools
+
+## Integration with Crews
+
+Agents work best when organized into crews for collaborative workflows:
 
 ```python
-from langcrew import Crew
+from langcrew import Agent, Crew
 
-crew = Crew(agents=[agent], tasks=[task])
+# Create specialized agents
+researcher = Agent(role="Researcher", goal="Gather information")
+writer = Agent(role="Writer", goal="Create content")
 
-try:
-    result = crew.kickoff()
-    print("✅ Task completed successfully")
-except GuardrailError as e:
-    print(f"❌ Guardrail blocked execution: {e}")
-except Exception as e:
-    print(f"❌ Other error: {e}")
-```
-
-## Agent Execution
-
-### Synchronous Execution
-
-```python
-result = agent.invoke({
-    "messages": [],
-    "context": "Process this data"
-})
-```
-
-### Asynchronous Execution
-
-```python
-import asyncio
-
-async def run_agent():
-    result = await agent.ainvoke({
-        "messages": [],
-        "context": "Process this data"
-    })
-    return result
-
-result = asyncio.run(run_agent())
-```
-
-## Best Practices
-
-### 1. Choose the Right Configuration Style
-
-```python
-# For CrewAI compatibility
-agent = Agent(
-    role="Specific Role",
-    goal="Clear objective",
-    backstory="Relevant experience"
-)
-
-# For custom behavior
-agent = Agent(
-    prompt=SystemMessage(content="Custom instructions"),
-    tools=[custom_tools]
-)
-```
-
-### 2. Use Appropriate Tools
-
-```python
-# Match tools to agent capabilities
-data_agent = Agent(
-    role="Data Scientist",
-    tools=[pandas_tool, visualization_tool, statistics_tool]
-    # Not: [email_tool, calendar_tool]
-)
-```
-
-### 3. Configure Memory When Needed
-
-```python
-# For stateful interactions
-agent = Agent(
-    role="Personal Assistant",
-    memory=True  # Remember conversation history
-)
-```
-
-### 4. Use MCP for External Integration
-
-```python
-# Connect to external systems
-agent = Agent(
-    role="System Administrator",
-    mcp_servers={
-        "filesystem": {...},
-        "database": {...}
-    }
-)
-```
-
-## Debugging and Monitoring
-
-### Verbose Mode
-
-```python
-agent = Agent(
-    role="Debugger",
-    verbose=True  # Shows detailed execution steps
-)
-```
-
-### Debug Mode
-
-```python
-agent = Agent(
-    role="System Monitor",
-    debug=True  # Enables debug output
-)
+# Organize into a crew
+crew = Crew(agents=[researcher, writer])
+result = crew.kickoff(inputs={"task": "Analyze market data"})
 ```
 
 ## Next Steps
 
-- Learn about [Tasks](/concepts/tasks) and how agents execute them
-- Explore [Crews](/concepts/crews) to see how agents work together
-- Understand [Memory Systems](/concepts/memory) for stateful agents
-- Discover [Executors](/concepts/executors) for advanced agent behavior
+Continue with [Tasks](/concepts/tasks) - Understanding the work units that agents execute.

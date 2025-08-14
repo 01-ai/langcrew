@@ -3,503 +3,231 @@ title: Tasks
 description: Understanding tasks - the work units that agents execute in langcrew
 ---
 
-Tasks are the fundamental units of work in langcrew. They define what needs to be done, who should do it, and how the results should be structured.
+Tasks are the fundamental units of work in langcrew. They define what needs to be done, who should do it, how results should be structured, and how work flows between agents in a crew.
 
-## Task Architecture
+## Quick Start - Create a Task
 
-Tasks in langcrew are built on the Runnable interface and work seamlessly with the LangGraph execution system. Each task wraps an agent and provides context management, guardrails, and handoff capabilities.
-
-## Creating Tasks
-
-### Basic Task
+Get your first task running in just 3 lines:
 
 ```python
-from langcrew import Task, Agent
+from langcrew import Agent, Task
 
-# Create an agent
-agent = Agent(
-    role="Research Specialist",
-    goal="Find accurate information",
-    backstory="Expert researcher with academic background"
-)
+agent = Agent(role="Assistant", goal="Help users", backstory="Helpful AI")
+task = Task(agent=agent, description="Analyze data", expected_output="Analysis report")
+result = task.invoke({"messages": []})
+```
 
-# Create a task
+:::tip[Complete Guide]
+For detailed examples and workflows, see the [Quick Start](/guides/quickstart) guide.
+:::
+
+## What is a Task?
+
+A Task in langcrew represents a discrete unit of work with:
+
+- **Clear Definition**: Specific description of what needs to be accomplished
+- **Agent Assignment**: The agent responsible for executing the work
+- **Expected Output**: Well-defined expectations for the result
+- **Context Awareness**: Ability to use outputs from previous tasks
+- **Quality Control**: Built-in guardrails and validation
+- **Flow Control**: Handoff capabilities to other tasks or agents
+
+## Core Architecture
+
+Tasks are built on the Runnable interface and integrate seamlessly with LangGraph's execution system:
+
+![Task Architecture](/images/task-architecture.svg)
+
+### Design Philosophy
+
+LangCrew tasks follow three core principles:
+
+**1. Explicit Workflow Design**
+- Clear task descriptions and expected outputs
+- Explicit dependencies between tasks
+- Predictable execution flows
+
+**2. Contextual Intelligence**
+- Tasks can access outputs from previous tasks
+- Automatic context management and passing
+- Smart dependency resolution
+
+**3. Quality Assurance**
+- Built-in input/output validation
+- Structured output schemas
+- Guardrails for safety and compliance
+
+## Task Types
+
+### Basic Tasks
+
+Simple, self-contained work units:
+
+```python
+from langcrew import Agent, Task
+
 task = Task(
-    agent=agent,
-    description="Research the latest trends in AI technology",
-    expected_output="A comprehensive report with key findings and trends"
+    agent=Agent(role="Analyst", goal="Analyze data", backstory="Expert analyst"),
+    description="Analyze Q3 sales performance and identify trends",
+    expected_output="Sales analysis report with key insights"
 )
 ```
 
-### Task with Context Dependencies
+### Sequential Tasks
+
+Tasks that depend on previous work:
 
 ```python
 # First task
 research_task = Task(
     agent=researcher,
     description="Research competitor pricing strategies",
-    expected_output="Detailed analysis of competitor pricing"
+    expected_output="Competitor pricing analysis",
+    name="research"
 )
 
-# Second task depends on first
-analysis_task = Task(
-    agent=analyst,
-    description="Analyze our pricing based on competitor data",
-    expected_output="Pricing recommendations with justification",
-    context=[research_task]  # Receives output from research_task
+# Second task uses first task's output
+strategy_task = Task(
+    agent=strategist,
+    description="Develop pricing strategy based on research",
+    expected_output="Pricing strategy recommendations",
+    context=[research_task]  # Uses research_task output
 )
 ```
 
-## Task Parameters
+### Structured Output Tasks
 
-### Core Parameters
-
-| Parameter         | Type  | Description                           | Required |
-| ----------------- | ----- | ------------------------------------- | -------- |
-| `agent`           | Agent | The agent that will execute this task | ✅       |
-| `description`     | str   | What needs to be accomplished         | ✅       |
-| `expected_output` | str   | What the task should produce          | ✅       |
-| `name`            | str   | Unique identifier for the task        | ❌       |
-| `verbose`         | bool  | Show execution details                | ❌       |
-| `metadata`        | dict  | Additional metadata                   | ❌       |
-
-### Advanced Parameters
-
-| Parameter       | Type                    | Description                 | Default |
-| --------------- | ----------------------- | --------------------------- | ------- |
-| `config`        | dict                    | CrewAI-style configuration  | None    |
-| `output_json`   | type[BaseModel]         | Structured output schema    | None    |
-| `context`       | List[Task] \| List[str] | Task dependencies           | []      |
-| `handoff_to`    | List[str]               | Tasks this can hand off to  | []      |
-| `input_guards`  | List[GuardrailFunc]     | Input validation functions  | []      |
-| `output_guards` | List[GuardrailFunc]     | Output validation functions | []      |
-
-## Advanced Features
-
-### Structured Output
-
-Use Pydantic models to enforce output structure:
+Tasks that enforce specific output formats:
 
 ```python
 from pydantic import BaseModel
 from typing import List
 
-class ProductInfo(BaseModel):
-    name: str
-    price: float
-    category: str
-    in_stock: bool
+class Insight(BaseModel):
+    title: str
+    description: str
+    impact: str
 
-class ProductList(BaseModel):
-    products: List[ProductInfo]
-    total_count: int
-
-task = Task(
-    agent=data_extractor,
-    description="Extract product information from the website",
-    expected_output="Structured product data",
-    output_json=ProductList  # Enforces this schema
-)
-```
-
-### CrewAI Configuration Style
-
-```python
-# Using config dictionary for CrewAI compatibility
-task_config = {
-    "description": "Analyze customer feedback",
-    "expected_output": "Summary of key insights",
-    "handoff_to": ["report_task"]
-}
+class AnalysisReport(BaseModel):
+    insights: List[Insight]
+    summary: str
 
 task = Task(
     agent=analyst,
-    config=task_config
+    description="Analyze customer feedback",
+    expected_output="Structured analysis with insights",
+    output_json=AnalysisReport  # Enforces this schema
 )
 ```
+
+## Core Capabilities
 
 ### Context Dependencies
 
-Tasks can depend on outputs from other tasks:
+Tasks automatically receive and process outputs from previous tasks:
 
 ```python
-# Sequential dependency chain
-data_collection = Task(
-    agent=collector,
-    description="Collect raw data from APIs",
-    expected_output="Raw data in JSON format",
-    name="data_collection"
-)
-
-data_analysis = Task(
-    agent=analyst,
-    description="Analyze the collected data",
-    expected_output="Analysis report with insights",
-    context=[data_collection],  # Receives data_collection output
-    name="data_analysis"
-)
-
-report_generation = Task(
-    agent=writer,
-    description="Create final report",
-    expected_output="Executive summary report",
-    context=[data_analysis],  # Receives analysis output
-    name="report_generation"
-)
+# Chain of dependent tasks
+tasks = [
+    Task(agent=collector, description="Collect data", name="collect"),
+    Task(agent=processor, description="Process data", context=["collect"], name="process"),
+    Task(agent=reporter, description="Generate report", context=["process"], name="report")
+]
 ```
 
-### Handoff Configuration
+### Quality Control
 
-Tasks can hand off execution to other tasks:
-
-```python
-# Primary processing task
-primary_task = Task(
-    agent=primary_processor,
-    description="Process the main workflow",
-    expected_output="Primary processing results",
-    handoff_to=["error_handler", "quality_check"],  # Can transfer to these tasks
-    name="primary_task"
-)
-
-# Error handling task (handoff target)
-error_handler = Task(
-    agent=error_specialist,
-    description="Handle processing errors",
-    expected_output="Error resolution report",
-    name="error_handler"
-)
-
-# Quality check task (handoff target)
-quality_check = Task(
-    agent=qa_specialist,
-    description="Perform quality assurance",
-    expected_output="Quality assessment report", 
-    name="quality_check"
-)
-```
-
-### Guardrails
-
-Add input and output validation:
+Built-in validation and guardrails:
 
 ```python
-from typing import Any, Tuple
 from langcrew.guardrail import input_guard, output_guard
 
 @input_guard
-def validate_task_input(data: Any) -> Tuple[bool, str]:
-    """Validate task input data"""
-    if not isinstance(data, dict):
-        return False, "Input must be a dictionary"
-    
-    if "messages" in data and data["messages"]:
-        return True, "Valid input format"
-    
-    return False, "No messages found in input"
+def validate_input(data):
+    # Validate incoming data
+    return True, "Input valid"
 
-@output_guard
-def ensure_output_quality(data: Any) -> Tuple[bool, str]:
-    """Ensure output meets quality standards"""
-    # Extract output content
-    content = str(data)
-    if isinstance(data, dict) and "messages" in data:
-        messages = data.get("messages", [])
-        if messages and hasattr(messages[-1], "content"):
-            content = str(messages[-1].content)
-    
-    if len(content) < 50:
-        return False, "Output too short - needs more detail"
-    
-    return True, "Output quality approved"
+@output_guard  
+def validate_output(data):
+    # Ensure output quality
+    return True, "Output approved"
 
 task = Task(
     agent=processor,
-    description="Process complex data",
-    expected_output="Detailed analysis report",
-    input_guards=[validate_task_input],
-    output_guards=[ensure_output_quality]
+    description="Process sensitive data",
+    expected_output="Processed results",
+    input_guards=[validate_input],
+    output_guards=[validate_output]
 )
 ```
 
-## Task Execution
+### Task Handoffs
 
-### Direct Execution
-
-```python
-# Execute task directly
-result = task.invoke({"messages": []})
-print(result)
-```
-
-### Async Execution
+Tasks can delegate work to specialized agents:
 
 ```python
-import asyncio
-
-async def run_task():
-    result = await task.ainvoke({"messages": []})
-    return result
-
-result = asyncio.run(run_task())
-```
-
-### Within a Crew
-
-```python
-from langcrew import Crew
-
-crew = Crew(
-    agents=[agent1, agent2],
-    tasks=[task1, task2]
+primary_task = Task(
+    agent=coordinator,
+    description="Coordinate project workflow",
+    expected_output="Coordination results",
+    handoff_to=["specialist_task", "reviewer_task"]  # Can delegate to these
 )
-
-# Execute all tasks
-result = crew.kickoff()
 ```
 
-## Task Patterns
+## When to Use Tasks
 
-### Research and Analysis Pattern
+Tasks are ideal for:
+
+- **Structured Workflows** - Multi-step processes with clear dependencies
+- **Quality-Controlled Work** - Processes requiring validation and compliance
+- **Collaborative Processes** - Work that flows between multiple agents
+- **Data Processing Pipelines** - Sequential data transformation and analysis
+- **Content Creation Workflows** - Research → Analysis → Writing → Review
+- **Complex Problem Solving** - Breaking large problems into manageable steps
+
+## Integration with Crews
+
+Tasks work seamlessly with Crew orchestration to create powerful workflows:
 
 ```python
-# 1. Data gathering
+from langcrew import Agent, Task, Crew
+
+# Create a research and analysis workflow
 research_task = Task(
-    agent=researcher,
-    description="Research market trends in renewable energy",
-    expected_output="Market research report with data and trends",
+    agent=Agent(role="Researcher", goal="Gather information"),
+    description="Research market trends",
+    expected_output="Market research report",
     name="research"
 )
 
-# 2. Analysis
 analysis_task = Task(
-    agent=analyst,
-    description="Analyze market opportunities from research data",
-    expected_output="Investment opportunity analysis",
+    agent=Agent(role="Analyst", goal="Analyze data"),
+    description="Analyze market opportunities",
+    expected_output="Opportunity analysis",
     context=[research_task],
     name="analysis"
 )
 
-# 3. Reporting
-report_task = Task(
-    agent=writer,
-    description="Create executive summary of findings",
-    expected_output="Executive report with recommendations",
-    context=[analysis_task],
-    name="report"
-)
-```
-
-### Review and Revision Pattern
-
-```python
-# 1. Initial work
-draft_task = Task(
-    agent=writer,
-    description="Write technical documentation draft",
-    expected_output="Initial documentation draft",
-    name="draft"
-)
-
-# 2. Review
-review_task = Task(
-    agent=reviewer,
-    description="Review documentation for accuracy and clarity",
-    expected_output="Review feedback and suggestions",
-    context=[draft_task],
-    name="review"
-)
-
-# 3. Final revision
-final_task = Task(
-    agent=writer,
-    description="Incorporate feedback and finalize documentation",
-    expected_output="Final polished documentation",
-    context=[review_task],
-    name="final"
-)
-```
-
-### Parallel Processing Pattern
-
-```python
-# Multiple independent analysis tasks
-market_analysis = Task(
-    agent=market_analyst,
-    description="Analyze market conditions",
-    expected_output="Market analysis report",
-    name="market_analysis"
-)
-
-competitor_analysis = Task(
-    agent=competitor_analyst,
-    description="Analyze competitor landscape",
-    expected_output="Competitor analysis report", 
-    name="competitor_analysis"
-)
-
-risk_analysis = Task(
-    agent=risk_analyst,
-    description="Assess potential risks",
-    expected_output="Risk assessment report",
-    name="risk_analysis"
-)
-
-# Synthesis task that depends on all parallel tasks
-synthesis_task = Task(
-    agent=senior_analyst,
-    description="Synthesize all analyses into strategic recommendations",
-    expected_output="Strategic recommendations document",
-    context=[market_analysis, competitor_analysis, risk_analysis],
-    name="synthesis"
-)
-```
-
-## Best Practices
-
-### 1. Clear and Specific Descriptions
-
-```python
-# Good - Specific and actionable
-task = Task(
-    agent=analyst,
-    description="""Analyze Q3 sales performance:
-    1. Calculate total revenue by product category
-    2. Compare with Q2 and Q3 previous year
-    3. Identify top 5 performing products
-    4. Highlight any anomalies or concerning trends
-    5. Use the sales_data.csv file in the data folder""",
-    expected_output="Q3 sales analysis report with charts and key insights"
-)
-
-# Avoid - Too vague
-task = Task(
-    agent=analyst,
-    description="Analyze sales",
-    expected_output="A report"
-)
-```
-
-### 2. Well-Defined Expected Outputs
-
-```python
-# Good - Detailed expectations
-expected_output = """A comprehensive market analysis containing:
-- Executive summary (200-300 words)
-- Market size and growth projections (with charts)
-- Key player analysis (top 5 competitors)
-- SWOT analysis for our position
-- 3-5 actionable recommendations
-Format: Markdown with embedded data visualizations"""
-
-task = Task(
-    agent=market_researcher,
-    description="Research the AI automation market",
-    expected_output=expected_output
-)
-```
-
-### 3. Logical Task Naming
-
-```python
-# Use descriptive names for tasks that will be referenced
-tasks = [
-    Task(agent=researcher, description="...", name="market_research"),
-    Task(agent=analyst, description="...", name="data_analysis"),
-    Task(agent=writer, description="...", name="report_writing")
-]
-
-# Reference by name in context
-final_task = Task(
-    agent=reviewer,
-    description="Final review and approval",
-    context=["market_research", "data_analysis"],  # Reference by name
-    name="final_review"
-)
-```
-
-### 4. Appropriate Guardrails
-
-```python
-# Use input guards for data validation
-@input_guard
-def validate_data_format(data: Any) -> Tuple[bool, str]:
-    """Ensure input data is in expected format"""
-    # Add validation logic
-    return True, "Data format valid"
-
-# Use output guards for quality control
-@output_guard  
-def check_output_completeness(data: Any) -> Tuple[bool, str]:
-    """Ensure output meets completeness requirements"""
-    # Add quality checks
-    return True, "Output complete"
-
-sensitive_task = Task(
-    agent=data_processor,
-    description="Process sensitive customer data",
-    expected_output="Anonymized analysis results",
-    input_guards=[validate_data_format],
-    output_guards=[check_output_completeness]
-)
-```
-
-## Task State and Output
-
-### Accessing Task Results
-
-Tasks automatically save their outputs to the crew state:
-
-```python
-# Task outputs are available in crew state as task_outputs
-# Each output includes: name, description, expected_output, raw, agent
-crew = Crew(agents=[agent], tasks=[task])
-result = crew.kickoff()
-
-# Access task outputs from crew state
-if "task_outputs" in result:
-    for output in result["task_outputs"]:
-        print(f"Task: {output['name']}")
-        print(f"Agent: {output['agent']}")
-        print(f"Result: {output['raw']}")
-```
-
-### Task Properties
-
-```python
-# Access task properties
-print(f"Task name: {task.name}")
-print(f"Description: {task.description}")
-print(f"Expected output: {task.expected_output}")
-print(f"Metadata: {task.metadata}")
-```
-
-## Integration with Crews
-
-Tasks work seamlessly with Crew orchestration:
-
-```python
-from langcrew import Crew, Agent, Task
-
-# Create tasks with dependencies
-tasks = [
-    Task(agent=agent1, description="Step 1", name="step1"),
-    Task(agent=agent2, description="Step 2", context=["step1"], name="step2"),
-    Task(agent=agent3, description="Step 3", context=["step2"], name="step3")
-]
-
-# Execute in crew
+# Execute tasks in crew
 crew = Crew(
-    agents=[agent1, agent2, agent3],
-    tasks=tasks
+    agents=[researcher, analyst],
+    tasks=[research_task, analysis_task]
 )
 
 result = crew.kickoff()
+```
+
+## Common Patterns
+
+### Research → Analysis → Report
+```python
+workflow = [
+    Task(agent=researcher, description="Gather data", name="research"),
+    Task(agent=analyst, description="Analyze findings", context=["research"], name="analyze"),
+    Task(agent=writer, description="Write report", context=["analyze"], name="report")
+]
 ```
 
 ## Next Steps
 
-- Learn about [Crews](/concepts/crews) and task orchestration
-- Explore [Memory Systems](/concepts/memory) for stateful tasks
-- Understand [Agents](/concepts/agents) and their capabilities
-- See [Examples](/examples) of complex task workflows
+Continue with [Crews](/concepts/crews) - Understanding how teams orchestrate agents and tasks.
