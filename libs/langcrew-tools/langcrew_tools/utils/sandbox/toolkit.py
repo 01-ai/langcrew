@@ -113,9 +113,6 @@ class SandboxToolkit:
         final_config = SandboxToolkit._build_base_config(**config)
         # Filter valid parameters for the operation function
         input_config = env_config.filter_valid_parameters(operation_func, final_config)
-        _logger.info(
-            f"Executing sandbox final_config {final_config} operation with config: {input_config}"
-        )
         # Execute the async operation
         return await operation_func(**input_config)
 

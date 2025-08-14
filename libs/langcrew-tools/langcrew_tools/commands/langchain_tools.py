@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import ClassVar
 
@@ -115,6 +116,16 @@ class RunCommandTool(BaseTool, SandboxMixin):
                 command=command, output=f"Error: {str(e)}", success=False
             )
 
+    def _run(
+        self,
+        command: str,
+        user: str = "user",
+        background: bool = False,
+        brief: str = "",
+    ) -> str:
+        """Perform document parsing synchronously."""
+        return asyncio.run(self._arun(command, user, background, brief))
+
 
 class KillCommandTool(BaseTool, SandboxMixin):
     """Tool for killing background processes in the sandbox."""
@@ -135,3 +146,7 @@ class KillCommandTool(BaseTool, SandboxMixin):
             return f"Attempted to kill process: {process_id}"
         except Exception as e:
             return f"Failed to kill process '{process_id}': {str(e)}"
+
+    def _run(self, process_id: str) -> str:
+        """Perform document parsing synchronously."""
+        return asyncio.run(self._arun(process_id))

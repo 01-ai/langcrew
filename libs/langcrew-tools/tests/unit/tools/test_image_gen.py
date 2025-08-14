@@ -252,7 +252,7 @@ class TestImageGenerationLocalMode:
                 tool, "_save_to_local", return_value="/tmp/test_image.png"
             ) as mock_save,
         ):
-            result = await tool._arun(prompt="a sunset", file_path="test_image.png")
+            result = await tool._arun(prompt="a sunset", path="test_image.png")
             result_data = json.loads(result)
 
             mock_save.assert_called_once_with(b64_data, "test_image.png")
@@ -333,7 +333,7 @@ class TestImageGenerationSandboxIntegration:
                 AsyncMock(return_value="https://s3.example.com/new-sandbox.png"),
             ),
         ):
-            result = await tool._arun(prompt="a sunset", file_path="test.png")
+            result = await tool._arun(prompt="a sunset", path="test.png")
             result_data = json.loads(result)
 
             # Should have called create_async_sandbox with config
@@ -382,7 +382,7 @@ class TestImageGenerationSandboxIntegration:
                 AsyncMock(return_value="https://s3.example.com/existing.png"),
             ),
         ):
-            result = await tool._arun(prompt="a sunset", file_path="test.png")
+            result = await tool._arun(prompt="a sunset", path="test.png")
             result_data = json.loads(result)
 
             # Should connect to existing sandbox, not create new

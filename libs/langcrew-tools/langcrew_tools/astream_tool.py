@@ -159,7 +159,6 @@ class EventType(str, Enum):
 
     NEW_MESSAGE = "new_message"
     STOP = "stop"
-    HUMAN_IN_LOOP = "human_in_loop"
 
 
 class StreamEventType(str, Enum):
@@ -203,7 +202,7 @@ class StreamingBaseTool(BaseTool, ABC):
         Subclasses should implement this method to customize external event handling.
 
         Args:
-            event_type: External event type (STOP, NEW_MESSAGE, HUMAN_IN_LOOP)
+            event_type: External event type (STOP, NEW_MESSAGE)
             event_data: Data carried by the event
 
         Returns:
@@ -221,13 +220,13 @@ class StreamingBaseTool(BaseTool, ABC):
             result = "Agent stopped by user"
         elif event_type == EventType.NEW_MESSAGE:
             result = f"Agent add new task: {event_data}"
-        elif event_type == EventType.HUMAN_IN_LOOP:
-            result = "Agent need human active intervention"
         return {
             "is_complete": False,
             "stop_reason": result,
         }
-
+    async def get_handover_info(self) -> dict | None:
+        pass
+    
     async def trigger_external_completion(self, event_type: EventType, event_data: Any):  # type: ignore
         if (
             not self._external_completion_future

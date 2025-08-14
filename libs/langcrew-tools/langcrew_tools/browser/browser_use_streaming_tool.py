@@ -26,7 +26,8 @@ from ..astream_tool import (
     StreamingBaseTool,
 )
 from ..utils.s3 import AsyncS3Client
-from ..utils.sandbox import SandboxMixin, sandbox_toolkit
+from ..utils.sandbox import SandboxMixin
+from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 from .browser_manager import browser_registry
 from .browser_use_patches import (
     HumanInterventionAction,
@@ -127,7 +128,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         agent_kwargs: dict[str, Any] | None = None,
         first_screenshot_url: str | None = None,
         page_extraction_llm: BrowserBaseChatModel | None = None,
-        request_language: str = "zh",
+        request_language: str = "en",
         browser_profile: BrowserProfile | None = None,
         desktop_resolution: tuple[int, int] = DESKTOP_RESOLUTION,
         async_s3_client: AsyncS3Client | None = None,
@@ -190,8 +191,6 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             result = "Agent stopped by user"
         elif event_type == EventType.NEW_MESSAGE:
             result = "Agent add new task"
-        elif event_type == EventType.HUMAN_IN_LOOP:
-            result = "Agent needs human intervention"
 
         agent_result = "nothing"
         if self._agent.state.last_model_output:
@@ -434,6 +433,18 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             if self._agent_finished is not None:
                 self._agent_finished.set()
 
+    @override
+    async def get_handover_info(self) -> dict | None:
+        if self._vnc_url:
+            intervention_url = self._vnc_url.replace(
+                "view_only=true", "view_only=false"
+            )
+            return {
+                "type": "take_over_browser",
+                "intervention_info": {"intervention_url": intervention_url},
+            }
+        return None
+
     async def _intervention_callback(self, history: AgentHistoryList) -> None:
         """Handle human intervention callback"""
         human_intervention_action: HumanInterventionAction = (
@@ -461,7 +472,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         """Convert suggestion to human-readable prompt"""
         return (
             f"Execution paused. Reason: {suggestion}.\n"
-            "You MUST now use the 'ask_user' tool to request instructions from the user on how to proceed. This is a mandatory next step."
+            "You MUST now use tool to request instructions from the user on how to proceed. This is a mandatory next step."
         )
 
     async def _status_callback(self) -> bool:
@@ -684,7 +695,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                             screenshot_url = data_iamge
                         else:
                             # Use SandboxS3Toolkit's upload_base64_image method to asynchronously convert image to url
-                            screenshot_url = await sandbox_toolkit.upload_base64_image(
+                            screenshot_url = await SandboxS3Toolkit.upload_base64_image(
                                 async_s3_client=self.async_s3_client,
                                 base64_data=data_content["screenshot"],
                                 sandbox_id=sandbox_id,

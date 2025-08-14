@@ -11,6 +11,7 @@ import httpx
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ..utils.s3.client import AsyncS3Client
 from ..utils.sandbox.base_sandbox import SandboxMixin
 from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 
@@ -54,6 +55,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
     enable_sandbox: bool = Field(
         default=False, description="Whether to enable sandbox integration"
     )
+    async_s3_client: AsyncS3Client = Field(default=None, description="Async S3 client")
 
     def __init__(
         self,
@@ -64,6 +66,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
         default_quality: str | None = None,
         default_n: int | None = None,
         enable_sandbox: bool = False,
+        async_s3_client: AsyncS3Client | None = None,
         **kwargs,
     ):
         """Initialize ImageGenerationTool with optional configuration.
@@ -81,6 +84,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
             default_quality: Default image quality
             default_n: Default number of images to generate
             enable_sandbox: Whether to enable sandbox integration
+            async_s3_client: Async S3 client
             sandbox_id: Existing sandbox ID to connect to (if None, creates new sandbox)
             sandbox_config: Optional sandbox configuration
         """
@@ -134,13 +138,13 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
     async def _arun(
         self,
         prompt: str,
-        file_path: str | None = None,
+        path: str | None = None,
     ) -> str:
         """Use the tool asynchronously.
 
         Args:
             prompt: Text description of the desired image(s)
-            file_path: Optional relative file path for the generated image
+            path: Optional relative file path for the generated image
 
         Returns:
             JSON string containing image URLs and any warnings
@@ -171,9 +175,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
         for model_config in models_to_try:
             logger.info(f"Trying model: {model_config['name']}")
             try:
-                result = await self._generate_with_model(
-                    prompt, file_path, model_config
-                )
+                result = await self._generate_with_model(prompt, path, model_config)
                 if result and not result.startswith("[ERROR]"):
                     return result
                 last_error = result
@@ -303,10 +305,15 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
                     f"Image saved to sandbox: {sandbox_path}, sandbox_id: {sandbox_id}"
                 )
 
-                # Upload to S3 with the sandbox_id
-                s3_image_url = await SandboxS3Toolkit.upload_base64_image(
-                    base64_data=image_b64, sandbox_id=sandbox_id
-                )
+                if self.async_s3_client:
+                    # Upload to S3 with the sandbox_id
+                    s3_image_url = await SandboxS3Toolkit.upload_base64_image(
+                        async_s3_client=self.async_s3_client,
+                        base64_data=image_b64,
+                        sandbox_id=sandbox_id,
+                    )
+                else:
+                    s3_image_url = image_url
                 logger.info(f"Image uploaded to S3: {s3_image_url}")
 
                 result = {
@@ -329,6 +336,8 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
                         "image_b64": image_b64,
                         "message": "Image generated successfully, returned as base64 data",
                     }
+                if image_url:
+                    result["image_url"] = image_url
 
             return json.dumps(result, ensure_ascii=False)
 

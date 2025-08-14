@@ -16,7 +16,6 @@ class WriteFileInput(BaseModel):
         description="Path to the file to write, absolute path /workspace (e.g.'/workspace/report.txt')",
     )
     content: str = Field(..., description="Content to write to the file")
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class WriteMultipleFilesInput(BaseModel):
@@ -34,7 +33,6 @@ class ReadFileInput(BaseModel):
     path: str = Field(
         ..., description="Path to the file to read, absolute path /workspace"
     )
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class ListFilesInput(BaseModel):
@@ -51,7 +49,6 @@ class DeleteFileInput(BaseModel):
         ...,
         description="Path to the file or directory to delete, absolute path /workspace",
     )
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class CreateDirectoryInput(BaseModel):
@@ -93,7 +90,6 @@ class FileReplaceTextInput(BaseModel):
         ..., description="text to replace (must appear exactly once in the file)"
     )
     new_str: str = Field(..., description="New text")
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class FileAppendTextInput(BaseModel):
@@ -104,7 +100,6 @@ class FileAppendTextInput(BaseModel):
     )
     content: str = Field(..., description="Text content to append to the file")
     append_newline: bool = Field(default=True, description="Add newline at the end")
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class WriteFileTool(BaseTool, SandboxMixin):
