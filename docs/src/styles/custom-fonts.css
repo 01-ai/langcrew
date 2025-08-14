@@ -45,12 +45,11 @@ body {
 /* Headings with proper font weights */
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-  font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.35;
 }
 
-/* Different weights for heading hierarchy */
+/* Different weights for heading hierarchy - proper cascading */
 h1 {
   font-weight: 700;
 }
@@ -59,8 +58,20 @@ h2 {
   font-weight: 600;
 }
 
-h3, h4 {
+h3 {
+  font-weight: 600;
+}
+
+h4 {
   font-weight: 500;
+}
+
+h5 {
+  font-weight: 500;
+}
+
+h6 {
+  font-weight: 400;
 }
 
 /* Code blocks with Monaco */
@@ -71,20 +82,20 @@ pre, code, kbd, samp {
 
 /* Inline code styling */
 :not(pre) > code {
-  font-size: 0.85em;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
 /* Optimize Chinese text rendering if needed */
 :lang(zh-CN) {
   font-family: 'Poppins', 'PingFang SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
 }
 
 /* Improve sidebar font rendering */
 .sidebar {
   font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-  font-weight: 450;
+  font-weight: 400;
 }
 
 /* Better font rendering for navigation */
@@ -121,6 +132,12 @@ header .sl-flex,
 }
 
 /* Optimize font size for different screen sizes */
+@media (max-width: 49.9rem) {
+  body {
+    font-size: 0.875rem; /* 14px on small screens */
+  }
+}
+
 @media (min-width: 50rem) {
   body {
     font-size: 1rem; /* 16px on medium screens */
