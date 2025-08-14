@@ -28,7 +28,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
     datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True)]
+    handlers=[RichHandler(console=console, rich_tracebacks=True)],
 )
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,12 @@ def setup_llm():
 
         # Check for OpenAI API key
         if not os.getenv("OPENAI_API_KEY"):
-            console.print("[red]❌ OPENAI_API_KEY not found in environment variables[/red]")
-            console.print("Please set your OpenAI API key: export OPENAI_API_KEY='your-key-here'")
+            console.print(
+                "[red]❌ OPENAI_API_KEY not found in environment variables[/red]"
+            )
+            console.print(
+                "Please set your OpenAI API key: export OPENAI_API_KEY='your-key-here'"
+            )
             sys.exit(1)
 
         llm = ChatOpenAI(
@@ -96,41 +100,44 @@ async def run_browser_task(browser_tool, instruction: str):
     try:
         # Create input for the tool
         from langcrew_tools.browser import BrowserUseInput
+
         BrowserUseInput(instruction=instruction)
 
         # Run the streaming tool
         with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
         ) as progress:
-
             task_progress = progress.add_task("Processing browser task...", total=None)
 
-            async for event_type, event_data in browser_tool._astream_events(instruction):
-
+            async for event_type, event_data in browser_tool._astream_events(
+                instruction
+            ):
                 # Update progress description based on event type
-                if hasattr(event_data, 'event'):
+                if hasattr(event_data, "event"):
                     event_name = event_data.event
                     progress.update(task_progress, description=f"Event: {event_name}")
 
                     # Display event details
                     if event_name == "on_tool_start":
                         console.print(f"[cyan]🎬 Started: {event_data.name}[/cyan]")
-                        if hasattr(event_data, 'data') and event_data.data:
-                            input_data = event_data.data.get('input', {})
-                            if 'brief' in input_data:
+                        if hasattr(event_data, "data") and event_data.data:
+                            input_data = event_data.data.get("input", {})
+                            if "brief" in input_data:
                                 console.print(f"   Brief: {input_data['brief']}")
 
                     elif event_name == "on_tool_end":
                         console.print(f"[green]✅ Completed: {event_data.name}[/green]")
-                        if hasattr(event_data, 'data') and event_data.data:
-                            output_data = event_data.data.get('output', {})
-                            if 'final_result' in output_data:
-                                console.print(f"   Result: {output_data['final_result']}")
-                            if 'url' in output_data:
+                        if hasattr(event_data, "data") and event_data.data:
+                            output_data = event_data.data.get("output", {})
+                            if "final_result" in output_data:
+                                console.print(
+                                    f"   Result: {output_data['final_result']}"
+                                )
+                            if "url" in output_data:
                                 console.print(f"   URL: {output_data['url']}")
-                            if 'title' in output_data:
+                            if "title" in output_data:
                                 console.print(f"   Title: {output_data['title']}")
 
                 # Handle streaming events
@@ -170,7 +177,7 @@ async def interactive_demo():
         try:
             instruction = console.input("\n[bold cyan]Enter task:[/bold cyan] ")
 
-            if instruction.lower() in ['quit', 'exit', 'q']:
+            if instruction.lower() in ["quit", "exit", "q"]:
                 console.print("[yellow]👋 Goodbye![/yellow]")
                 break
 
@@ -201,7 +208,7 @@ async def run_predefined_demos():
     demo_tasks = [
         "访问百度首页并搜索'Python编程'",
         "Go to github.com and search for 'browser-use'",
-        "打开谷歌首页并搜索'AI tools'"
+        "打开谷歌首页并搜索'AI tools'",
     ]
 
     console.print(Panel("🎭 Running Predefined Demo Tasks", style="green"))
@@ -244,7 +251,9 @@ def display_help():
 
 async def main():
     """Main entry point"""
-    console.print(Panel("🌐 BrowserStreamingTool Demo", title="Welcome", style="bold blue"))
+    console.print(
+        Panel("🌐 BrowserStreamingTool Demo", title="Welcome", style="bold blue")
+    )
 
     # Parse command line arguments
     mode = "interactive"

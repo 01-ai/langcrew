@@ -11,11 +11,13 @@ from pydantic import BaseModel, Field, ValidationError
 # Define test models locally
 class BrowserUseInput(BaseModel):
     """Input for BrowserStreamingTool."""
+
     instruction: str = Field(..., description="The instruction to use browser")
 
 
 class BrowserStepEvent(BaseModel):
     """Event data for agent step completion"""
+
     step_number: int
     url: str = ""
     title: str = ""
@@ -31,6 +33,7 @@ class BrowserStepEvent(BaseModel):
 
 class BrowserCompletionEvent(BaseModel):
     """Event data for agent completion"""
+
     success: bool
     final_result: str | None = None
     total_steps: int
@@ -43,6 +46,7 @@ class BrowserCompletionEvent(BaseModel):
 
 class MockLLM:
     """Mock LLM for testing"""
+
     def __init__(self, model="test-model"):
         self.model = model
 
@@ -103,9 +107,9 @@ class TestBrowserStepEvent:
             actions=actions,
             screenshot="base64_screenshot_data",
             interactive_elements_count=5,
-            previous_goal="Navigate to page"
+            previous_goal="Navigate to page",
         )
-        
+
         assert event.step_number == 2
         assert event.url == "https://example.com"
         assert event.title == "Example Page"
@@ -150,7 +154,7 @@ class TestBrowserCompletionEvent:
         errors = ["Network timeout", "Element not found"]
         urls = ["https://example.com", "https://test.com"]
         intervention_info = {"type": "human_required", "reason": "CAPTCHA"}
-        
+
         event = BrowserCompletionEvent(
             success=True,
             final_result="Task completed successfully",
@@ -159,9 +163,9 @@ class TestBrowserCompletionEvent:
             urls=urls,
             previous_goal="Complete form",
             screenshot="final_screenshot",
-            intervention_info=intervention_info
+            intervention_info=intervention_info,
         )
-        
+
         assert event.success is True
         assert event.final_result == "Task completed successfully"
         assert event.total_steps == 10
@@ -177,12 +181,12 @@ def test_basic_models_functionality():
     # Test input validation
     input_data = BrowserUseInput(instruction="Test instruction")
     assert input_data.instruction == "Test instruction"
-    
+
     # Test step event
     step_event = BrowserStepEvent(step_number=1, url="https://test.com")
     assert step_event.step_number == 1
     assert step_event.url == "https://test.com"
-    
+
     # Test completion event
     completion_event = BrowserCompletionEvent(success=True, total_steps=5)
     assert completion_event.success is True
