@@ -1,0 +1,718 @@
+---
+title: Guardrails API Reference
+description: Complete API reference for langcrew guardrails
+---
+
+This document provides the complete API reference for langcrew guardrails, including all classes, functions, and decorators.
+
+## Core Classes
+
+### GuardrailError
+
+Exception raised when a guardrail check fails.
+
+```python
+class GuardrailError(Exception):
+    """Exception raised when a guardrail check fails"""
+    
+    def __init__(self, message: str, guardrail_name: str | None = None):
+        self.guardrail_name = guardrail_name
+        super().__init__(message)
+```
+
+**Parameters:**
+- `message` (str): Error message describing the failure
+- `guardrail_name` (str | None): Name of the guardrail that failed
+
+**Attributes:**
+- `guardrail_name`: Name of the guardrail that failed
+
+**Example:**
+```python
+from langcrew.guardrail import GuardrailError
+
+try:
+    # Some guardrail check
+    raise GuardrailError("Input validation failed", "check_input_length")
+except GuardrailError as e:
+    print(f"Guardrail '{e.guardrail_name}' failed: {e}")
+```
+
+## Decorators
+
+### @input_guard
+
+Decorator to mark a function as an input guardrail.
+
+```python
+@input_guard
+def my_input_guardrail(data: Any) -> Tuple[bool, str]:
+    # Validation logic here
+    pass
+```
+
+**Usage:**
+- Applied to functions that validate input data
+- Function must return `Tuple[bool, str]` (is_valid, message)
+- Automatically marked with `_is_input_guard` attribute
+
+**Example:**
+```python
+from langcrew.guardrail import input_guard
+
+@input_guard
+def check_no_sensitive_info(data: Any) -> Tuple[bool, str]:
+    content = str(data).lower()
+    if "password" in content:
+        return False, "Contains sensitive information"
+    return True, "Safe data"
+```
+
+### @output_guard
+
+Decorator to mark a function as an output guardrail.
+
+```python
+@output_guard
+def my_output_guardrail(data: Any) -> Tuple[bool, str]:
+    # Validation logic here
+    pass
+```
+
+**Usage:**
+- Applied to functions that validate output data
+- Function must return `Tuple[bool, str]` (is_valid, message)
+- Automatically marked with `_is_output_guard` attribute
+
+**Example:**
+```python
+from langcrew.guardrail import output_guard
+
+@output_guard
+def check_output_quality(data: Any) -> Tuple[bool, str]:
+    output_str = str(data)
+    if len(output_str) < 10:
+        return False, "Output too short"
+    return True, "Quality check passed"
+```
+
+## Core Functions
+
+### check_guardrails_sync
+
+Synchronous version: Check a list of guardrails and raise GuardrailError if any fail.
+
+```python
+def check_guardrails_sync(
+    guardrails: list[GuardrailFunc],
+    data: Any
+) -> None:
+    """Check guardrails synchronously"""
+    pass
+```
+
+**Parameters:**
+- `guardrails` (list[GuardrailFunc]): List of guardrail functions to check
+- `data` (Any): The data to check (input or output)
+
+**Raises:**
+- `GuardrailError`: If any guardrail check fails
+
+**Example:**
+```python
+from langcrew.guardrail import check_guardrails_sync
+
+# Check input guardrails
+check_guardrails_sync(agent.input_guards, input_data)
+
+# Check output guardrails
+check_guardrails_sync(agent.output_guards, output_data)
+```
+
+### check_guardrails
+
+Async version: Check a list of guardrails and raise GuardrailError if any fail.
+
+```python
+async def check_guardrails(
+    guardrails: list[GuardrailFunc],
+    data: Any
+) -> None:
+    """Check guardrails asynchronously"""
+    pass
+```
+
+**Parameters:**
+- `guardrails` (list[GuardrailFunc]): List of guardrail functions to check
+- `data` (Any): The data to check (input or output)
+
+**Raises:**
+- `GuardrailError`: If any guardrail check fails
+
+**Example:**
+```python
+from langcrew.guardrail import check_guardrails
+
+# Check guardrails asynchronously
+await check_guardrails(agent.input_guards, input_data)
+```
+
+### with_guardrails
+
+Decorator to automatically apply guardrail checks to methods.
+
+```python
+def with_guardrails(func: Callable) -> Callable:
+    """Automatically apply guardrail checks to methods"""
+    pass
+```
+
+**Usage:**
+- Automatically checks input_guards before method execution
+- Automatically checks output_guards after method execution
+- Handles both sync and async methods
+- Requires class to have `input_guards` and `output_guards` attributes
+
+**Example:**
+```python
+from langcrew.guardrail import with_guardrails
+
+class MyAgent:
+    def __init__(self):
+        self.input_guards = [check_no_sensitive_info]
+        self.output_guards = [check_output_quality]
+    
+    @with_guardrails
+    def process_data(self, data):
+        # Input guardrails checked automatically before execution
+        result = self._process(data)
+        # Output guardrails checked automatically after execution
+        return result
+```
+
+## Type Definitions
+
+### GuardrailFunc
+
+Type alias for guardrail functions.
+
+```python
+GuardrailFunc: TypeAlias = Callable[
+    [Any], 
+    tuple[bool, str]
+]
+```
+
+**Signature:**
+- **Input**: `data: Any` - The data to validate
+- **Output**: `tuple[bool, str]` - (is_valid, message)
+
+**Requirements:**
+- Must be callable
+- Must accept one argument of any type
+- Must return a tuple with boolean and string
+
+## Built-in Guardrail Functions
+
+### Input Guardrails
+
+#### check_no_sensitive_info
+
+Prevents processing of sensitive information.
+
+```python
+@input_guard
+def check_no_sensitive_info(data: Any) -> Tuple[bool, str]:
+    """Prevent processing of sensitive information"""
+    pass
+```
+
+**Patterns Detected:**
+- SSN patterns
+- Credit card numbers
+- API keys
+- Passwords
+- Private keys
+
+#### check_input_length
+
+Limits input length to prevent abuse.
+
+```python
+@input_guard
+def check_input_length(data: Any) -> Tuple[bool, str]:
+    """Limit input length to prevent abuse"""
+    pass
+```
+
+**Default Limits:**
+- Maximum length: 1000 characters
+- Configurable via function modification
+
+#### check_language_support
+
+Checks if input language is supported.
+
+```python
+@input_guard
+def check_language_support(data: Any) -> Tuple[bool, str]:
+    """Check if input language is supported"""
+    pass
+```
+
+**Language Detection:**
+- Based on non-Latin character ratio
+- Threshold: 30% non-Latin characters
+- Configurable via function modification
+
+#### check_content_category
+
+Validates content category for specialized processing.
+
+```python
+@input_guard
+def check_content_category(data: Any) -> Tuple[bool, str]:
+    """Validate content category for specialized processing"""
+    pass
+```
+
+**Supported Categories:**
+- Technical: code, programming, software, algorithm, database
+- Creative: story, poem, art, design, creative
+- Business: strategy, marketing, finance, business, analysis
+- Educational: learn, teach, education, tutorial, course
+
+#### check_rate_limiting
+
+Implements basic rate limiting.
+
+```python
+@input_guard
+def check_rate_limiting(data: Any) -> Tuple[bool, str]:
+    """Simple rate limiting guardrail"""
+    pass
+```
+
+**Limits:**
+- 5 requests per minute
+- Resets every minute
+- Configurable via function modification
+
+#### check_user_permissions
+
+Checks user permissions for specific operations.
+
+```python
+@input_guard
+def check_user_permissions(data: Any) -> Tuple[bool, str]:
+    """Check user permissions for specific operations"""
+    pass
+```
+
+**Required Fields:**
+- `user_id`: User identifier
+- `user_role`: User role (user, admin)
+- `operation`: Operation to perform
+
+**Sensitive Operations:**
+- admin, delete, modify, access
+
+### Output Guardrails
+
+#### check_output_quality
+
+Ensures output meets quality standards.
+
+```python
+@output_guard
+def check_output_quality(data: Any) -> Tuple[bool, str]:
+    """Ensure output meets quality standards"""
+    pass
+```
+
+**Quality Checks:**
+- Non-empty output
+- Minimum length (10 characters)
+- No placeholder text (TODO, FIXME, etc.)
+
+#### filter_profanity
+
+Filters inappropriate language from output.
+
+```python
+@output_guard
+def filter_profanity(data: Any) -> Tuple[bool, str]:
+    """Filter inappropriate language from output"""
+    pass
+```
+
+**Filtered Words:**
+- spam, junk, garbage
+- Configurable via function modification
+
+#### check_output_format
+
+Validates output format and structure.
+
+```python
+@output_guard
+def check_output_format(data: Any) -> Tuple[bool, str]:
+    """Validate output format and structure"""
+    pass
+```
+
+**Format Checks:**
+- At least 2 sentences
+- Starts with capital letter
+- Ends with proper punctuation
+
+#### check_factual_accuracy
+
+Basic factual accuracy check.
+
+```python
+@output_guard
+def check_factual_accuracy(data: Any) -> Tuple[bool, str]:
+    """Basic factual accuracy check"""
+    pass
+```
+
+**Accuracy Checks:**
+- No overly confident language
+- Balanced language indicators
+- Configurable thresholds
+
+#### check_ethical_guidelines
+
+Checks output against ethical guidelines.
+
+```python
+@output_guard
+def check_ethical_guidelines(data: Any) -> Tuple[bool, str]:
+    """Check output against ethical guidelines"""
+    pass
+```
+
+**Ethical Categories:**
+- Discrimination
+- Harmful content
+- Misinformation
+- Inappropriate content
+
+#### check_data_privacy
+
+Ensures output doesn't contain private user data.
+
+```python
+@output_guard
+def check_data_privacy(data: Any) -> Tuple[bool, str]:
+    """Ensure output doesn't contain private user data"""
+    pass
+```
+
+**PII Patterns:**
+- SSN format
+- Phone numbers
+- Email addresses
+- Credit card numbers
+
+## Advanced Guardrail Functions
+
+### Conditional Guardrails
+
+#### conditional_sensitive_check
+
+Context-aware sensitive data validation.
+
+```python
+@input_guard
+def conditional_sensitive_check(data: Any) -> Tuple[bool, str]:
+    """Conditional sensitive data check based on context"""
+    pass
+```
+
+**Context Detection:**
+- Security-related tasks
+- Different validation rules per context
+- Configurable sensitivity levels
+
+#### context_aware_quality_check
+
+Quality check that adapts based on content type.
+
+```python
+@output_guard
+def context_aware_quality_check(data: Any) -> Tuple[bool, str]:
+    """Quality check that adapts based on content type"""
+    pass
+```
+
+**Content Types:**
+- Code content
+- Article content
+- General content
+- Different quality metrics per type
+
+### Adaptive Guardrails
+
+#### adaptive_rate_limiting
+
+Rate limiting that adapts based on user tier.
+
+```python
+@input_guard
+def adaptive_rate_limiting(data: Any) -> Tuple[bool, str]:
+    """Rate limiting that adapts based on user tier"""
+    pass
+```
+
+**User Tiers:**
+- Basic: 5 requests/minute
+- Premium: 20 requests/minute
+- Enterprise: 100 requests/minute
+
+### Custom Error Handling
+
+#### CustomGuardrailError
+
+Extended error class with additional context.
+
+```python
+class CustomGuardrailError(GuardrailError):
+    """Custom guardrail error with additional context"""
+    
+    def __init__(self, message: str, guardrail_name: str | None = None, 
+                 error_code: str | None = None, suggestions: list[str] | None = None):
+        self.error_code = error_code
+        self.suggestions = suggestions or []
+        super().__init__(message, guardrail_name)
+```
+
+**Additional Attributes:**
+- `error_code`: Structured error identifier
+- `suggestions`: List of recovery suggestions
+
+#### enhanced_sensitive_check
+
+Enhanced sensitive data check with custom error handling.
+
+```python
+@input_guard
+def enhanced_sensitive_check(data: Any) -> Tuple[bool, str]:
+    """Enhanced sensitive data check with custom error handling"""
+    pass
+```
+
+**Features:**
+- Regex-based pattern detection
+- Multiple data type detection
+- Custom error messages
+- Recovery suggestions
+
+#### comprehensive_output_validation
+
+Multi-faceted output validation with detailed feedback.
+
+```python
+@output_guard
+def comprehensive_output_validation(data: Any) -> Tuple[bool, str]:
+    """Comprehensive output validation with detailed feedback"""
+    pass
+```
+
+**Validation Areas:**
+- Length validation
+- Structure validation
+- Content quality validation
+- Detailed error reporting
+
+## Integration with LangCrew Components
+
+### Agent Integration
+
+```python
+from langcrew import Agent
+
+agent = Agent(
+    role="Content Creator",
+    goal="Generate safe content",
+    input_guards=[check_no_sensitive_info, check_input_length],
+    output_guards=[check_output_quality, filter_profanity]
+)
+```
+
+**Available Parameters:**
+- `input_guards`: List of input guardrail functions
+- `output_guards`: List of output guardrail functions
+
+### Task Integration
+
+```python
+from langcrew import Task
+
+task = Task(
+    description="Generate content about technology",
+    agent=agent,
+    input_guards=[check_content_category],
+    output_guards=[check_output_format]
+)
+```
+
+**Available Parameters:**
+- `input_guards`: List of input guardrail functions
+- `output_guards`: List of output guardrail functions
+
+### Crew Integration
+
+Guardrails work automatically within crew workflows:
+
+```python
+from langcrew import Crew
+
+crew = Crew(
+    agents=[agent],
+    tasks=[task]
+)
+
+try:
+    crew.kickoff()
+except GuardrailError as e:
+    print(f"Guardrail blocked execution: {e}")
+```
+
+## Error Handling Patterns
+
+### Basic Error Handling
+
+```python
+try:
+    crew.kickoff()
+except GuardrailError as e:
+    print(f"Guardrail '{e.guardrail_name}' failed: {e}")
+```
+
+### Enhanced Error Handling
+
+```python
+try:
+    crew.kickoff()
+except CustomGuardrailError as e:
+    print(f"Enhanced error: {e}")
+    if e.error_code:
+        print(f"Error code: {e.error_code}")
+    if e.suggestions:
+        print("Suggestions:")
+        for suggestion in e.suggestions:
+            print(f"  - {suggestion}")
+```
+
+### Error Recovery
+
+```python
+def handle_guardrail_error(error: GuardrailError):
+    """Handle guardrail errors with recovery logic"""
+    if "sensitive" in str(error).lower():
+        # Handle sensitive data error
+        return sanitize_input(error.data)
+    elif "rate limit" in str(error).lower():
+        # Handle rate limiting error
+        return wait_and_retry()
+    else:
+        # Handle other errors
+        return log_and_report(error)
+```
+
+## Performance Considerations
+
+### Execution Time
+
+- **Target**: &lt;1ms per guardrail execution
+- **Measurement**: Use `time.time()` for profiling
+- **Optimization**: Implement caching for expensive operations
+
+### Memory Usage
+
+- **Minimal**: Guardrails should use minimal memory
+- **Caching**: Use function attributes for simple caching
+- **Cleanup**: Avoid accumulating state over time
+
+### Scalability
+
+- **Stateless**: Design guardrails to be stateless
+- **Parallel**: Guardrails can run in parallel
+- **Batching**: Consider batching for multiple validations
+
+## Testing and Debugging
+
+### Unit Testing
+
+```python
+def test_guardrail():
+    """Test guardrail function"""
+    # Test valid input
+    is_valid, message = my_guardrail("valid input")
+    assert is_valid == True
+    
+    # Test invalid input
+    is_valid, message = my_guardrail("invalid input")
+    assert is_valid == False
+    assert "invalid" in message.lower()
+```
+
+### Integration Testing
+
+```python
+def test_agent_with_guardrails():
+    """Test agent with guardrails"""
+    agent = Agent(
+        role="Test Agent",
+        input_guards=[check_no_sensitive_info]
+    )
+    
+    # Test guardrail blocking
+    try:
+        task = Task(description="password: secret123", agent=agent)
+        crew = Crew(agents=[agent], tasks=[task])
+        crew.kickoff()
+        assert False, "Should have been blocked"
+    except GuardrailError:
+        pass  # Expected
+```
+
+### Debug Mode
+
+```python
+agent = Agent(
+    role="Debug Agent",
+    input_guards=[check_no_sensitive_info],
+    debug=True  # Enable debug mode
+)
+```
+
+## Migration and Compatibility
+
+### Backward Compatibility
+
+- All existing guardrail functions continue to work
+- New features are additive and optional
+- No breaking changes to existing APIs
+
+### Upgrading
+
+- Gradually adopt new guardrail features
+- Test new guardrails in development first
+- Monitor performance impact in production
+
+### Best Practices
+
+- Start with basic guardrails
+- Add advanced features as needed
+- Monitor and optimize performance
+- Document guardrail behavior
+
+## Related Documentation
+
+- [Guardrails Concepts](/concepts/guardrails)
+- [Guardrails Guide](/guides/guardrails)
+- [Examples](/examples/guardrails)
+- [Best Practices](/guides/guardrails#best-practices)

@@ -1,0 +1,432 @@
+---
+title: Guardrails
+description: Learn how to implement and use guardrails in your langcrew applications
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Guardrails are a safety and validation system in langcrew that ensures data quality, security, and compliance. They act as protective barriers that validate inputs before processing and outputs before delivery.
+
+## Quick Start
+
+Let's implement basic guardrails in your langcrew application in just a few minutes.
+
+### Step 1: Import Required Modules
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew.guardrail import input_guard, output_guard, GuardrailError
+from langcrew.llm_factory import LLMFactory
+```
+
+### Step 2: Define Your First Guardrails
+
+```python
+@input_guard
+def check_no_sensitive_info(data):
+    """Prevent processing of sensitive information"""
+    content = str(data).lower()
+    
+    sensitive_patterns = ["password:", "api_key:", "secret:", "ssn:"]
+    for pattern in sensitive_patterns:
+        if pattern in content:
+            return False, f"Contains sensitive information: {pattern}"
+    
+    return True, "No sensitive information detected"
+
+@output_guard
+def check_output_quality(data):
+    """Ensure output meets quality standards"""
+    output_str = str(data)
+    
+    if not output_str:
+        return False, "Empty output not allowed"
+    
+    if len(output_str) < 10:
+        return False, "Output too short (minimum 10 characters)"
+    
+    return True, "Output quality check passed"
+```
+
+### Step 3: Apply Guardrails to an Agent
+
+```python
+# Create LLM
+llm = LLMFactory.create_llm({
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.3
+})
+
+# Create agent with guardrails
+agent = Agent(
+    role="Content Creator",
+    goal="Generate safe content",
+    backstory="Professional content creator with safety checks.",
+    llm=llm,
+    input_guards=[check_no_sensitive_info],
+    output_guards=[check_output_quality]
+)
+```
+
+### Step 4: Create and Execute a Task
+
+```python
+# Create task
+task = Task(
+    description="Write an article about artificial intelligence",
+    expected_output="A well-written article about AI",
+    agent=agent
+)
+
+# Create crew and execute
+crew = Crew(agents=[agent], tasks=[task])
+
+try:
+    result = crew.kickoff()
+    print("✅ Task completed successfully")
+except GuardrailError as e:
+    print(f"❌ Guardrail blocked execution: {e}")
+```
+
+## Creating Guardrails
+
+### Input Guardrails
+
+Input guardrails validate data before it reaches your AI agents:
+
+```python
+@input_guard
+def check_input_length(data):
+    """Limit input length to prevent abuse"""
+    content = str(data)
+    max_length = 1000
+    
+    if len(content) > max_length:
+        return False, f"Input too long: {len(content)} > {max_length} characters"
+    
+    return True, f"Input length OK: {len(content)} characters"
+
+@input_guard
+def check_language_support(data):
+    """Check if input language is supported"""
+    content = str(data)
+    
+    # Simple language detection
+    non_latin_chars = sum(1 for char in content if ord(char) > 127)
+    total_chars = len(content)
+    
+    if total_chars > 0 and non_latin_chars / total_chars > 0.3:
+        return False, "Language not supported"
+    
+    return True, "Language supported"
+```
+
+### Output Guardrails
+
+Output guardrails validate content after AI processing:
+
+```python
+@output_guard
+def check_output_quality(data):
+    """Ensure output meets quality standards"""
+    output_str = str(data)
+    
+    if not output_str:
+        return False, "Empty output not allowed"
+    
+    if len(output_str) < 10:
+        return False, "Output too short (minimum 10 characters)"
+    
+    # Check for placeholder text
+    placeholders = ["TODO", "FIXME", "[INSERT", "[PLACEHOLDER"]
+    for placeholder in placeholders:
+        if placeholder in output_str.upper():
+            return False, f"Contains placeholder text: {placeholder}"
+    
+    return True, "Output quality check passed"
+
+@output_guard
+def filter_profanity(data):
+    """Filter inappropriate language"""
+    inappropriate_words = ["spam", "junk", "garbage"]
+    output_str = str(data).lower()
+    
+    for word in inappropriate_words:
+        if word in output_str:
+            return False, f"Contains inappropriate content: {word}"
+    
+    return True, "Content appropriate"
+```
+
+## Applying Guardrails
+
+<Tabs>
+<TabItem label="Agent-Level">
+
+Apply guardrails to all tasks executed by an agent:
+
+```python
+agent = Agent(
+    role="Content Creator",
+    goal="Generate safe content",
+    llm=llm,
+    input_guards=[check_no_sensitive_info, check_input_length],
+    output_guards=[check_output_quality, filter_profanity]
+)
+```
+
+</TabItem>
+<TabItem label="Task-Level">
+
+Apply specific guardrails to individual tasks:
+
+```python
+task = Task(
+    description="Generate content about technology",
+    agent=agent,
+    input_guards=[check_content_category],  # Task-specific
+    output_guards=[check_output_format]
+)
+```
+
+</TabItem>
+<TabItem label="Combined">
+
+Layer agent and task guardrails for comprehensive protection:
+
+```python
+# Agent with global protection
+agent = Agent(
+    role="Processor",
+    goal="Process content safely",
+    llm=llm,
+    input_guards=[check_no_sensitive_info],  # Global
+    output_guards=[filter_profanity]  # Global
+)
+
+# Task with additional protection
+task = Task(
+    description="Generate content about cybersecurity",
+    agent=agent,
+    input_guards=[check_input_length],  # Task-specific
+    output_guards=[check_output_quality]  # Task-specific
+)
+```
+
+</TabItem>
+</Tabs>
+
+## Advanced Patterns
+
+### Conditional Guardrails
+
+Guardrails that adapt based on context:
+
+```python
+@input_guard
+def conditional_sensitive_check(data):
+    """Conditional sensitive data check based on context"""
+    content = str(data).lower()
+    
+    # Check if this is a security-related task
+    security_keywords = ["security", "authentication", "login"]
+    is_security_task = any(keyword in content for keyword in security_keywords)
+    
+    if is_security_task:
+        # For security tasks, be more strict
+        strict_patterns = ["password:", "pwd:", "secret:", "key:"]
+        for pattern in strict_patterns:
+            if pattern in content:
+                return False, f"Security task contains sensitive data: {pattern}"
+    else:
+        # For non-security tasks, be more lenient
+        lenient_patterns = ["password:", "pwd:"]
+        for pattern in lenient_patterns:
+            if pattern in content:
+                return False, f"Contains sensitive data: {pattern}"
+    
+    return True, "Conditional check passed"
+```
+
+### Rate Limiting
+
+Implement rate limiting to prevent abuse:
+
+```python
+@input_guard
+def check_rate_limiting(data):
+    """Simple rate limiting guardrail"""
+    import time
+    
+    if not hasattr(check_rate_limiting, "_request_count"):
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = time.time()
+    
+    current_time = time.time()
+    
+    # Reset counter every minute
+    if current_time - check_rate_limiting._last_reset > 60:
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = current_time
+    
+    # Allow max 5 requests per minute
+    max_requests = 5
+    check_rate_limiting._request_count += 1
+    
+    if check_rate_limiting._request_count > max_requests:
+        return False, f"Rate limit exceeded: {check_rate_limiting._request_count} > {max_requests}"
+    
+    return True, f"Rate limit OK: {check_rate_limiting._request_count}/{max_requests}"
+```
+
+## Error Handling
+
+### Basic Error Handling
+
+```python
+try:
+    crew.kickoff()
+except GuardrailError as e:
+    print(f"Guardrail failed: {e}")
+    print(f"Guardrail name: {e.guardrail_name}")
+    # Handle the error appropriately
+```
+
+### Custom Error Handling
+
+Create custom guardrail errors with additional context:
+
+```python
+class CustomGuardrailError(GuardrailError):
+    """Custom guardrail error with additional context"""
+    
+    def __init__(self, message: str, guardrail_name: str | None = None, 
+                 error_code: str | None = None, suggestions: list[str] | None = None):
+        self.error_code = error_code
+        self.suggestions = suggestions or []
+        super().__init__(message, guardrail_name)
+    
+    def __str__(self):
+        base_msg = super().__str__()
+        if self.error_code:
+            base_msg += f" (Code: {self.error_code})"
+        if self.suggestions:
+            base_msg += f"\nSuggestions: {', '.join(self.suggestions)}"
+        return base_msg
+
+@input_guard
+def enhanced_sensitive_check(data):
+    """Enhanced sensitive data check with custom error handling"""
+    content = str(data)
+    
+    # Enhanced pattern detection
+    import re
+    sensitive_patterns = {
+        "credit_card": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
+        "ssn": r"\b\d{3}[\s-]?\d{2}[\s-]?\d{4}\b",
+        "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+    }
+    
+    detected_patterns = []
+    for pattern_type, pattern in sensitive_patterns.items():
+        if re.search(pattern, content, re.IGNORECASE):
+            detected_patterns.append(pattern_type)
+    
+    if detected_patterns:
+        suggestions = [
+            "Remove or redact sensitive information",
+            "Use placeholder text (e.g., [REDACTED])",
+            "Consider using a secure data handling process"
+        ]
+        
+        raise CustomGuardrailError(
+            message=f"Detected sensitive data types: {', '.join(detected_patterns)}",
+            guardrail_name="enhanced_sensitive_check",
+            error_code="SENSITIVE_DATA_DETECTED",
+            suggestions=suggestions
+        )
+    
+    return True, "Enhanced check passed"
+```
+
+## Best Practices
+
+### Performance Optimization
+
+- Keep guardrails lightweight (&lt;1ms execution time)
+- Use efficient validation algorithms
+- Implement caching for expensive operations
+- Avoid blocking operations
+
+### Error Messages
+
+- Write descriptive error messages
+- Include recovery suggestions
+- Use consistent error formatting
+- Provide actionable guidance
+
+### Testing
+
+- Test with various input scenarios
+- Validate error handling
+- Check performance characteristics
+- Ensure backward compatibility
+
+### Monitoring
+
+- Track guardrail performance
+- Monitor error rates and patterns
+- Update validation rules as needed
+- Optimize based on usage patterns
+
+## Common Use Cases
+
+### Content Generation
+
+```python
+@output_guard
+def validate_content_quality(data):
+    """Validate AI-generated content"""
+    content = str(data)
+    
+    # Check minimum length
+    if len(content) < 50:
+        return False, "Content too short"
+    
+    # Check for proper structure
+    if not content[0].isupper():
+        return False, "Content should start with capital letter"
+    
+    # Check for balanced language
+    if "definitely" in content.lower() or "100%" in content:
+        return False, "Content should use balanced language"
+    
+    return True, "Content quality validated"
+```
+
+### Data Processing
+
+```python
+@input_guard
+def validate_data_format(data):
+    """Validate input data format"""
+    if not isinstance(data, dict):
+        return False, "Input must be a dictionary"
+    
+    required_fields = ["task_type", "priority"]
+    for field in required_fields:
+        if field not in data:
+            return False, f"Missing required field: {field}"
+    
+    if data.get("priority") not in ["low", "medium", "high"]:
+        return False, "Priority must be 'low', 'medium', or 'high'"
+    
+    return True, "Data format valid"
+```
+
+## Next Steps
+
+- [Guardrails Concepts](/concepts/guardrails) - Understand core concepts
+- [Guardrails Examples](/examples/guardrails) - See practical examples
+- [API Reference](/reference/guardrails) - Complete API documentation
