@@ -10,31 +10,35 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+
 class PlanItem(BaseModel):
     """A single plan item with status tracking."""
-    
-    id: str = Field(description="Unique identifier for the plan item (e.g., '1', '2', '3')")
+
+    id: str = Field(
+        description="Unique identifier for the plan item (e.g., '1', '2', '3')"
+    )
     content: str = Field(min_length=1, description="The plan item description")
     status: Literal["pending", "running", "done"] = Field(
-        ...,
-        description="The current status of the plan item (pending/running/done)"
+        ..., description="The current status of the plan item (pending/running/done)"
     )
 
 
 class PlanInput(BaseModel):
     """Input for Plan tool."""
-    
-    plans: list[PlanItem] = Field(description="The updated plan list (e.g., [{\"id\": \"1\", \"content\": \"plan 1\", \"status\": \"pending\"}, {\"id\": \"2\", \"content\": \"plan 2\", \"status\": \"pending\"}])")
+
+    plans: list[PlanItem] = Field(
+        description='The updated plan list (e.g., [{"id": "1", "content": "plan 1", "status": "pending"}, {"id": "2", "content": "plan 2", "status": "pending"}])'
+    )
 
 
 class PlanTool(BaseTool):
     """
     Tool for creating and managing a structured plan list for task.
-    
+
     This tool helps track progress, organize complex tasks, and demonstrate thoroughness.
     It should be used proactively for multi-step tasks and complex operations.
     """
-    
+
     name: str = "plan"
     description: str = """Create and manage a structured task list to track progress and organize work.
         **When to use:**
@@ -58,20 +62,25 @@ class PlanTool(BaseTool):
         - Only mark 'done' when fully accomplished
         - Update status in real-time
         - Break complex tasks into specific, actionable items"""
-    
+
     args_schema: type[PlanInput] = PlanInput
-    
-    callback: Callable[[list[PlanItem]], None] | Callable[[list[PlanItem]], Awaitable[None]] | None = None
-    
+
+    callback: (
+        Callable[[list[PlanItem]], None]
+        | Callable[[list[PlanItem]], Awaitable[None]]
+        | None
+    ) = None
+
     def __init__(
-        self, 
-        callback: Callable[[list[PlanItem]], None] | Callable[[list[PlanItem]], Awaitable[None]] | None = None,
-        **kwargs
+        self,
+        callback: Callable[[list[PlanItem]], None]
+        | Callable[[list[PlanItem]], Awaitable[None]]
+        | None = None,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.callback = callback
-    
-    
+
     async def _arun(self, plans: list[PlanItem], **kwargs: Any) -> str:
         """Execute the plan operation."""
         try:
@@ -89,10 +98,10 @@ class PlanTool(BaseTool):
                 except Exception as e:
                     logger.error(f"Error: callback on_plan_update: {str(e)}")
             return result.rstrip()
-        
+
         except Exception as e:
             return f"Error: updating plan list: {str(e)}"
-    
+
     def _run(self, plans: list[PlanItem], **kwargs: Any) -> str:
         """Execute the plan operation."""
         try:
@@ -110,6 +119,6 @@ class PlanTool(BaseTool):
                 else:
                     self.callback(plans)
             return result.rstrip()
-        
+
         except Exception as e:
             return f"Error: updating plan list: {str(e)}"

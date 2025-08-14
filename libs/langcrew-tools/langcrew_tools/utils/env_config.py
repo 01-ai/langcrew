@@ -18,7 +18,6 @@ class ConfigError(Exception):
 class ConfigManager:
     """Unified configuration manager for environment variables"""
 
-
     def _get_typed_value(
         self,
         key: str,
@@ -145,11 +144,8 @@ class ConfigManager:
                 )
 
         return result
-    
-    
-    def filter_valid_parameters(
-        self, func, params: dict[str, Any]
-    ) -> dict[str, Any]:
+
+    def filter_valid_parameters(self, func, params: dict[str, Any]) -> dict[str, Any]:
         """
         Filter parameters to only include those that are valid for the given function,
         and convert values according to their type annotations.
@@ -186,22 +182,22 @@ class ConfigManager:
     def _convert_parameter_value(self, value: Any, annotation: Any) -> Any:
         """
         Convert a parameter value based on its type annotation.
-        
+
         Args:
             value: The value to convert
             annotation: The type annotation from the function signature
-            
+
         Returns:
             Converted value or original value if conversion fails
         """
         # If no annotation or annotation is Any, return as-is
         if annotation == inspect.Parameter.empty or annotation == Any:
             return value
-            
+
         # If value is already the correct type, return as-is
         if isinstance(value, annotation):
             return value
-            
+
         # Handle string values that need conversion
         if isinstance(value, str):
             try:
@@ -211,29 +207,31 @@ class ConfigManager:
                 elif annotation is float:
                     return float(value)
                 elif annotation is bool:
-                    return value.lower() in ('true', '1', 'yes', 'on')
+                    return value.lower() in ("true", "1", "yes", "on")
                 elif annotation is str:
                     return value
                 # Handle Union types (including Optional which is Union[T, None])
-                elif hasattr(annotation, '__origin__'):
+                elif hasattr(annotation, "__origin__"):
                     # Handle both typing.Union and types.UnionType (Python 3.10+)
                     union_types = [typing.Union]
-                    if hasattr(types, 'UnionType'):
+                    if hasattr(types, "UnionType"):
                         union_types.append(types.UnionType)
-                    
+
                     if annotation.__origin__ in union_types:
-                        args = getattr(annotation, '__args__', ())
+                        args = getattr(annotation, "__args__", ())
                         # Try converting to the first non-None type
                         for arg_type in args:
                             if arg_type is not type(None):
                                 try:
-                                    return self._convert_parameter_value(value, arg_type)
+                                    return self._convert_parameter_value(
+                                        value, arg_type
+                                    )
                                 except (ValueError, TypeError):
                                     continue
             except (ValueError, TypeError):
                 # If conversion fails, return original value
                 pass
-                
+
         return value
 
 

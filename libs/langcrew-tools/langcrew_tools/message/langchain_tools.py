@@ -15,6 +15,7 @@ from .config import MessageConfig, default_config
 
 logger = logging.getLogger(__name__)
 
+
 class MessageToUserInput(BaseModel):
     """Input for MessageToUserTool."""
 
@@ -23,7 +24,9 @@ class MessageToUserInput(BaseModel):
         default=None,
         description="List of file paths or URLs to send as attachments (must be absolute paths within sandbox, ordered by importance). Can also be a JSON string containing an array of paths.",
     )
-    intent_type: Literal["task_completed", "asking_user", "progress_update", "general"] | None = Field(
+    intent_type: (
+        Literal["task_completed", "asking_user", "progress_update", "general"] | None
+    ) = Field(
         default="general",
         description="The intent of this message. Use 'task_completed' when task is finished, 'asking_user' when expecting user response, 'progress_update' for status updates, 'general' for other messages",
     )
@@ -59,7 +62,7 @@ class MessageToUserTool(SandboxMixin):
 
     def __init__(self, config: MessageConfig | None = None, **kwargs):
         """Initialize MessageToUserTool.
-        
+
         Args:
             config: MessageConfig instance. If None, uses default_config.
             **kwargs: Additional arguments passed to parent class.
@@ -98,7 +101,7 @@ class MessageToUserTool(SandboxMixin):
                         "status": "error",
                         "message": f"Invalid JSON in attachments: {str(e)}",
                     }
-            
+
             logger.debug(f"Including {len(attachments)} attachments: {attachments}")
             # Validate attachment paths are absolute
             for attachment in attachments:
@@ -120,7 +123,7 @@ class MessageToUserTool(SandboxMixin):
                     dir_path=self.config.sandbox_workspace_path,
                     s3_prefix=s3_prefix,
                 )
-                
+
                 # Get filenames from original attachments for comparison
                 original_filenames = []
                 if original_attachments:

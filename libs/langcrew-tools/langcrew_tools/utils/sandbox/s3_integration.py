@@ -25,9 +25,7 @@ class SandboxS3Toolkit:
     """Sandbox S3 operation toolkit class"""
 
     @staticmethod
-    def _get_s3_path(
-        sandbox: AsyncSandbox, s3_path: str | None = None
-    ) -> str:
+    def _get_s3_path(sandbox: AsyncSandbox, s3_path: str | None = None) -> str:
         """Generate S3 path"""
         if not s3_path:
             raise ValueError("s3_path is required")
@@ -36,11 +34,11 @@ class SandboxS3Toolkit:
         ) + s3_path.lstrip("/")
 
     @staticmethod
-    async def upload_base64_image(async_s3_client: AsyncS3Client,base64_data: str, sandbox_id: str = "empty") -> str:
+    async def upload_base64_image(
+        async_s3_client: AsyncS3Client, base64_data: str, sandbox_id: str = "empty"
+    ) -> str:
         """Upload base64 image to S3"""
-        s3_path = (
-            SANDBOX_S3_ADDRESS.format(sandbox_id=sandbox_id) + "images"
-        )
+        s3_path = SANDBOX_S3_ADDRESS.format(sandbox_id=sandbox_id) + "images"
         data: bytes = base64.b64decode(base64_data)
         md5 = hashlib.md5(base64_data.encode()).hexdigest()
         if await async_s3_client.object_exists(object_key=f"{s3_path}/{md5}.png"):
@@ -57,8 +55,8 @@ class SandboxS3Toolkit:
 
     @staticmethod
     async def upload_file_to_s3(
-        async_sandbox: AsyncSandbox ,
-        async_s3_client: AsyncS3Client ,
+        async_sandbox: AsyncSandbox,
+        async_s3_client: AsyncS3Client,
         file_path: str | None = None,
         s3_path: str | None = None,
         expires_in: int | None = None,
@@ -140,10 +138,9 @@ class SandboxS3Toolkit:
             logger.error(f"Error uploading file to S3: {e}")
             return None
 
-
     @staticmethod
     async def _get_file_list(
-        async_sandbox: AsyncSandbox  | None, dir_path: str
+        async_sandbox: AsyncSandbox | None, dir_path: str
     ) -> list[str]:
         """Get file list from sandbox or local directory"""
         if async_sandbox is not None:
@@ -177,7 +174,7 @@ class SandboxS3Toolkit:
 
     @staticmethod
     async def _upload_files_to_s3(
-        sandbox: AsyncSandbox| None,
+        sandbox: AsyncSandbox | None,
         file_list: list[str],
         dir_path: str,
         final_s3_path: str,

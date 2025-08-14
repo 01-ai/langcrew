@@ -53,9 +53,7 @@ PROMPT_GEMINI = PROMPT_BASEV_V1
 
 _gemini_name = "gemini"
 # --- Model-specific prompts dictionary ---
-MODEL_PROMPTS = {
-    _gemini_name: PROMPT_GEMINI
-}
+MODEL_PROMPTS = {_gemini_name: PROMPT_GEMINI}
 
 
 def get_browser_tool_prompt(
@@ -87,7 +85,7 @@ def get_browser_tool_prompt(
 
     # 3. Format prompt with parameters
     try:
-        formatted_prompt =  prompt_base.format(
+        formatted_prompt = prompt_base.format(
             task_name=task_name, request_language=request_language
         )
         if request_language == "zh":

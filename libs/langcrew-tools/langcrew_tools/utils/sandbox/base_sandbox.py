@@ -1,4 +1,3 @@
-
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, TypeVar, Union
 
@@ -22,9 +21,7 @@ class SandboxMixin(BaseModel):
     ] = Field(default=None, description="AsyncSandbox instance")
 
     _sandbox: AsyncSandbox | None = PrivateAttr(default=None)
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True
-    )
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __init__(self, **kwargs):
         """Initialize the E2B tool with proper multiple inheritance support."""

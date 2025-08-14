@@ -90,8 +90,6 @@ sys.modules["langcrew.utils.sandbox.sandbox_create_config"] = mock_sandbox_creat
 mock_language.detect_chinese = mock_detect_chinese
 
 
-
-
 class TestImageGenerationInput:
     """Test ImageGenerationInput model."""
 
@@ -396,7 +394,11 @@ class TestImageGenerationSandboxIntegration:
     @pytest.mark.asyncio
     async def test_sandbox_mode_with_additional_config(self):
         """Test sandbox mode with additional config when connecting to existing sandbox."""
-        config = {"sandbox_id": "existing-sandbox-456", "api_key": "test-api", "domain": "test.domain"}
+        config = {
+            "sandbox_id": "existing-sandbox-456",
+            "api_key": "test-api",
+            "domain": "test.domain",
+        }
         tool = ImageGenerationTool(
             api_key="test-key",
             enable_sandbox=True,

@@ -3,6 +3,6 @@ from .langchain_tools import MessageToUserTool
 
 __all__ = [
     "MessageToUserTool",
-    "MessageConfig", 
+    "MessageConfig",
     "default_config",
 ]

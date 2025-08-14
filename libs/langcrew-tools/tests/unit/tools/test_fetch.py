@@ -37,7 +37,9 @@ class TestWebFetchTool:
         tool = WebFetchTool()
         assert tool.timeout == 120
         assert tool.max_content_length == 128000
-        assert tool.filter_type == "pruning"  # Should fallback to pruning when no API key
+        assert (
+            tool.filter_type == "pruning"
+        )  # Should fallback to pruning when no API key
         assert tool.crawl4ai_service_url == "http://localhost:11235"
         assert tool.crawl4ai_llm_provider == "openai/gpt-4o-mini"
         assert tool.crawl4ai_llm_api_key is None
@@ -232,7 +234,8 @@ class TestWebFetchTool:
     async def test_arun_with_proxy(self):
         """Test async fetch request with proxy configuration."""
         tool = WebFetchTool(
-            crawl4ai_service_url="https://api.example.com", proxy="http://proxy.example.com:8080"
+            crawl4ai_service_url="https://api.example.com",
+            proxy="http://proxy.example.com:8080",
         )
 
         mock_response_data = {
@@ -547,21 +550,21 @@ class TestWebFetchTool:
         """Test that tool automatically falls back to pruning mode when no API key is provided."""
         # Create tool with default llm filter but no API key
         tool = WebFetchTool()
-        
+
         # Should automatically fallback to pruning mode
         assert tool.filter_type == "pruning"
 
     def test_auto_fallback_to_pruning_with_llm_filter_but_no_key(self):
         """Test fallback when explicitly setting llm filter but providing no API key."""
         tool = WebFetchTool(filter_type="llm")  # No crawl4ai_llm_api_key provided
-        
+
         # Should automatically fallback to pruning mode
         assert tool.filter_type == "pruning"
 
     def test_no_fallback_when_api_key_provided(self):
         """Test that no fallback occurs when API key is provided."""
         tool = WebFetchTool(filter_type="llm", crawl4ai_llm_api_key="test-key")
-        
+
         # Should keep llm filter_type
         assert tool.filter_type == "llm"
         assert tool.crawl4ai_llm_api_key == "test-key"
@@ -569,9 +572,9 @@ class TestWebFetchTool:
     def test_openai_api_key_fallback(self, monkeypatch):
         """Test that OPENAI_API_KEY is used as fallback for crawl4ai_llm_api_key."""
         monkeypatch.setenv("OPENAI_API_KEY", "openai-fallback-key")
-        
+
         tool = WebFetchTool(filter_type="llm")
-        
+
         # Should use OPENAI_API_KEY as fallback and keep llm mode
         assert tool.filter_type == "llm"
         assert tool.crawl4ai_llm_api_key == "openai-fallback-key"
@@ -580,9 +583,9 @@ class TestWebFetchTool:
         """Test that LANGCREW_CRAWL4AI_LLM_API_KEY overrides OPENAI_API_KEY."""
         monkeypatch.setenv("OPENAI_API_KEY", "openai-fallback-key")
         monkeypatch.setenv("LANGCREW_CRAWL4AI_LLM_API_KEY", "crawl4ai-specific-key")
-        
+
         tool = WebFetchTool(filter_type="llm")
-        
+
         # Should use the specific crawl4ai key, not the OPENAI_API_KEY
         assert tool.filter_type == "llm"
         assert tool.crawl4ai_llm_api_key == "crawl4ai-specific-key"

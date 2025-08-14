@@ -20,11 +20,11 @@ from langcrew_tools.astream_tool import StreamingBaseTool, StreamEventType
 class MyStreamingTool(StreamingBaseTool):
     name = "my_streaming_tool"
     description = "A custom streaming tool that processes data incrementally"
-    
+
     async def _astream_events(self, input_data: str, **kwargs):
         # Start event
         yield StreamEventType.START, self.start_standard_stream_event(input_data)
-        
+
         # Intermediate processing events
         for i in range(5):
             await asyncio.sleep(1)  # Simulate processing
@@ -34,7 +34,7 @@ class MyStreamingTool(StreamingBaseTool):
                 name=self.name,
                 data=intermediate_data
             )
-        
+
         # Final result
         result = {"status": "completed", "result": f"Processed: {input_data}"}
         yield StreamEventType.END, self.end_standard_stream_event(result)
@@ -45,15 +45,15 @@ class MyStreamingTool(StreamingBaseTool):
 class InterruptibleTool(StreamingBaseTool):
     name = "interruptible_tool"
     stream_event_timeout_seconds = 30  # 30 second timeout
-    
+
     async def handle_external_completion(self, event_type: EventType, event_data: Any):
         if event_type == EventType.STOP:
             return {"interrupted": True, "reason": "User requested stop"}
         return await super().handle_external_completion(event_type, event_data)
-    
+
     async def _astream_events(self, task: str, **kwargs):
         yield StreamEventType.START, self.start_standard_stream_event(task)
-        
+
         # Long-running process that can be interrupted
         for i in range(100):
             await asyncio.sleep(0.5)
@@ -62,7 +62,7 @@ class InterruptibleTool(StreamingBaseTool):
                 name=self.name,
                 data={"iteration": i, "task": task}
             )
-        
+
         yield StreamEventType.END, self.end_standard_stream_event("Task completed")
 
 # Usage with external interruption
@@ -76,12 +76,12 @@ tool = InterruptibleTool()
 class WaitForUserTool(ExternalCompletionBaseTool):
     name = "wait_for_user"
     description = "Waits for user input or external completion"
-    
+
     async def _arun_custom_event(self, prompt: str, **kwargs):
         # This tool waits for external completion
         # The actual result comes from trigger_external_completion()
         return f"Waiting for user response to: {prompt}"
-    
+
     async def handle_external_completion(self, event_type: EventType, event_data: Any):
         if event_type == EventType.NEW_MESSAGE:
             return {"user_response": event_data, "completed": True}
@@ -94,12 +94,12 @@ Error Handling Examples:
 ```python
 class TimeoutAwareTool(StreamingBaseTool):
     stream_event_timeout_seconds = 10
-    
+
     def handle_timeout_error(self, error: Exception):
         logger.error(f"Tool timed out: {error}")
         # Custom cleanup or notification logic
         self.send_timeout_notification()
-    
+
     def send_timeout_notification(self):
         # Custom timeout handling
         pass
@@ -112,7 +112,7 @@ class ConfigurableTool(StreamingBaseTool):
         # Extract custom configuration
         self.custom_setting = config.get("configurable", {}).get("custom_setting", "default")
         self.debug_mode = config.get("configurable", {}).get("debug", False)
-        
+
         if self.debug_mode:
             logger.setLevel(logging.DEBUG)
 ```
@@ -198,7 +198,7 @@ class StreamingBaseTool(BaseTool, ABC):
     ) -> Any:
         """
         Handle external completion events and return context data to the agent.
-        
+
         Subclasses should implement this method to customize external event handling.
 
         Args:
@@ -207,7 +207,7 @@ class StreamingBaseTool(BaseTool, ABC):
 
         Returns:
             Context data to return to the stream processing caller
-            
+
         Example:
             async def handle_external_completion(self, event_type: EventType, event_data: Any):
                 if event_type == EventType.STOP:
@@ -224,9 +224,10 @@ class StreamingBaseTool(BaseTool, ABC):
             "is_complete": False,
             "stop_reason": result,
         }
+
     async def get_handover_info(self) -> dict | None:
         pass
-    
+
     async def trigger_external_completion(self, event_type: EventType, event_data: Any):  # type: ignore
         if (
             not self._external_completion_future
@@ -281,13 +282,13 @@ class StreamingBaseTool(BaseTool, ABC):
     async def handle_custom_event(self, custom_event: dict) -> StandardStreamEvent:
         """
         Handle custom event and convert it to StandardStreamEvent format.
-        
+
         Args:
             custom_event: Dictionary containing custom event data
-            
+
         Returns:
             StandardStreamEvent: Formatted stream event
-            
+
         Example:
             custom_event = {
                 "data": {
@@ -317,10 +318,10 @@ class StreamingBaseTool(BaseTool, ABC):
     ) -> StandardStreamEvent:
         """
         Handle standard stream event - pass through by default.
-        
+
         Args:
             standard_stream_event: Standard stream event dictionary
-            
+
         Returns:
             StandardStreamEvent: The same event passed through
         """
@@ -331,11 +332,11 @@ class StreamingBaseTool(BaseTool, ABC):
     ) -> StandardStreamEvent:
         """
         Create a standard stream event for tool start.
-        
+
         Args:
             data: Input data for the tool
             event_name: Name of the event (default: "on_tool_start")
-            
+
         Returns:
             StandardStreamEvent: Formatted start event
         """
@@ -350,11 +351,11 @@ class StreamingBaseTool(BaseTool, ABC):
     ) -> StandardStreamEvent:
         """
         Create a standard stream event for tool completion.
-        
+
         Args:
             data: Output data from the tool
             event_name: Name of the event (default: "on_tool_end")
-            
+
         Returns:
             StandardStreamEvent: Formatted end event
         """
@@ -367,7 +368,7 @@ class StreamingBaseTool(BaseTool, ABC):
     async def custom_event_hook(self, custom_event: dict) -> Any:
         """
         Crew callback custom event hook for processing stream events.
-        
+
         This method is called by the crew system to handle custom events
         generated during tool execution.
 
@@ -376,10 +377,10 @@ class StreamingBaseTool(BaseTool, ABC):
                 - event: Literal["on_custom_event"] - event type
                 - name: str - tool name (should match self.name)
                 - data: Any - event data that will be converted to StandardStreamEvent
-                
+
         Returns:
             Any: Processed event data or original event if not handled
-            
+
         Example:
             custom_event = {
                 "event": "on_custom_event",
@@ -408,12 +409,12 @@ class StreamingBaseTool(BaseTool, ABC):
     def configure_runnable(self, config: RunnableConfig):
         """
         Hook method for configuring runtime parameters.
-        
+
         Subclasses can override this method to handle configuration initialization logic.
 
         Args:
             config: LangChain runtime configuration
-            
+
         Example:
             def configure_runnable(self, config: RunnableConfig):
                 self.debug_mode = config.get("configurable", {}).get("debug", False)
@@ -424,12 +425,12 @@ class StreamingBaseTool(BaseTool, ABC):
     def handle_timeout_error(self, error: Exception) -> None:
         """
         Hook method for handling stream processing timeout errors.
-        
+
         Subclasses can override this method to implement custom timeout handling logic.
 
         Args:
             error: Timeout exception object
-            
+
         Example:
             def handle_timeout_error(self, error: Exception) -> None:
                 logger.error(f"Tool {self.name} timed out: {error}")

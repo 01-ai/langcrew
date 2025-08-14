@@ -15,8 +15,6 @@ from langcrew_tools.image_parser.langchain_tools import (
 sys.modules["langchain_openai"] = MagicMock()
 
 
-
-
 class TestImageParserInput:
     """Test ImageParserInput model."""
 
@@ -24,7 +22,7 @@ class TestImageParserInput:
         """Test required fields for ImageParserInput."""
         input_model = ImageParserInput(
             image_url="https://example.com/image.jpg",
-            question="What do you see in this image?"
+            question="What do you see in this image?",
         )
         assert input_model.image_url == "https://example.com/image.jpg"
         assert input_model.question == "What do you see in this image?"
@@ -33,9 +31,11 @@ class TestImageParserInput:
         """Test field validation."""
         with pytest.raises(ValueError):
             ImageParserInput(question="What do you see?")  # Missing image_url
-        
+
         with pytest.raises(ValueError):
-            ImageParserInput(image_url="https://example.com/image.jpg")  # Missing question
+            ImageParserInput(
+                image_url="https://example.com/image.jpg"
+            )  # Missing question
 
 
 class TestImageParserConfig:
@@ -122,7 +122,7 @@ class TestImageParserTool:
         """Test initialization with default configuration."""
         mock_llm = Mock()
         mock_create_llm.return_value = mock_llm
-        
+
         tool = ImageParserTool()
         assert tool.config is not None
         assert tool.llm == mock_llm
@@ -135,7 +135,7 @@ class TestImageParserTool:
         custom_config.vision_model = "custom-model"
         mock_llm = Mock()
         mock_create_llm.return_value = mock_llm
-        
+
         tool = ImageParserTool(config=custom_config)
         assert tool.config == custom_config
         assert tool.config.vision_model == "custom-model"
@@ -151,15 +151,17 @@ class TestImageParserTool:
         config = ImageParserConfig()
         config.vision_api_key = "test-key"
         config.vision_base_url = "https://api.test.com"
-        
+
         tool_instance = ImageParserTool.__new__(ImageParserTool)
-        object.__setattr__(tool_instance, 'config', config)
-        
+        object.__setattr__(tool_instance, "config", config)
+
         # Mock the dynamic import of ChatOpenAI
         mock_llm = Mock()
-        with patch("langchain_openai.ChatOpenAI", return_value=mock_llm) as mock_chat_openai:
+        with patch(
+            "langchain_openai.ChatOpenAI", return_value=mock_llm
+        ) as mock_chat_openai:
             result = tool_instance._create_default_llm()
-            
+
             assert result == mock_llm
             mock_chat_openai.assert_called_once_with(
                 model="gpt-4o",
@@ -167,16 +169,19 @@ class TestImageParserTool:
                 max_tokens=4096,
                 request_timeout=60,
                 api_key="test-key",
-                base_url="https://api.test.com"
+                base_url="https://api.test.com",
             )
 
     def test_create_default_llm_import_error(self):
         """Test handling of import error when creating default LLM."""
         tool_instance = ImageParserTool.__new__(ImageParserTool)
-        object.__setattr__(tool_instance, 'config', ImageParserConfig())
+        object.__setattr__(tool_instance, "config", ImageParserConfig())
 
         # Mock the import to raise ImportError
-        with patch("langchain_openai.ChatOpenAI", side_effect=ImportError("No module named 'langchain_openai'")):
+        with patch(
+            "langchain_openai.ChatOpenAI",
+            side_effect=ImportError("No module named 'langchain_openai'"),
+        ):
             with pytest.raises(ImportError, match="langchain_openai is required"):
                 tool_instance._create_default_llm()
 
@@ -209,7 +214,7 @@ class TestImageDownloadAndValidation:
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
         image_data = b"fake-image-data"
-        
+
         mock_response = Mock()
         mock_response.content = image_data
         mock_response.headers = {"content-type": "image/jpeg"}
@@ -225,7 +230,7 @@ class TestImageDownloadAndValidation:
             result_data, mime_type = await tool._download_and_validate_image(
                 "https://example.com/image.jpg"
             )
-            
+
             assert result_data == image_data
             assert mime_type == "image/jpeg"
             mock_client.get.assert_called_once_with("https://example.com/image.jpg")
@@ -236,7 +241,7 @@ class TestImageDownloadAndValidation:
         """Test handling of invalid URL."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         with pytest.raises(ValueError, match="Invalid URL format"):
             await tool._download_and_validate_image("not-a-valid-url")
 
@@ -246,19 +251,23 @@ class TestImageDownloadAndValidation:
         """Test handling of HTTP errors."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         with patch("httpx.AsyncClient") as mock_client_class:
             # Import httpx to get the proper exceptions
             import httpx
-            
+
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_client.get = AsyncMock(
+                side_effect=httpx.RequestError("Connection failed")
+            )
             mock_client_class.return_value = mock_client
 
             with pytest.raises(ValueError, match="Failed to download image"):
-                await tool._download_and_validate_image("https://example.com/nonexistent.jpg")
+                await tool._download_and_validate_image(
+                    "https://example.com/nonexistent.jpg"
+                )
 
     @pytest.mark.asyncio
     @patch.object(ImageParserTool, "_create_default_llm")
@@ -267,7 +276,7 @@ class TestImageDownloadAndValidation:
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
         large_image_data = b"x" * (25 * 1024 * 1024)  # 25MB, exceeds default 20MB limit
-        
+
         mock_response = Mock()
         mock_response.content = large_image_data
         mock_response.headers = {"content-type": "image/jpeg"}
@@ -288,8 +297,10 @@ class TestImageDownloadAndValidation:
         """Test content type validation with proper header."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
-        mime_type = tool._validate_content_type("image/png", "https://example.com/test.jpg")
+
+        mime_type = tool._validate_content_type(
+            "image/png", "https://example.com/test.jpg"
+        )
         assert mime_type == "image/png"
 
     @patch.object(ImageParserTool, "_create_default_llm")
@@ -297,7 +308,7 @@ class TestImageDownloadAndValidation:
         """Test content type validation by guessing from file extension."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         test_cases = [
             ("https://example.com/test.jpg", "image/jpeg"),
             ("https://example.com/test.png", "image/png"),
@@ -308,7 +319,7 @@ class TestImageDownloadAndValidation:
             ("https://example.com/test.svg", "image/svg+xml"),
             ("https://example.com/test", "image/jpeg"),  # Default fallback
         ]
-        
+
         for url, expected_mime in test_cases:
             mime_type = tool._validate_content_type("", url)
             assert mime_type == expected_mime
@@ -318,9 +329,11 @@ class TestImageDownloadAndValidation:
         """Test handling of unsupported image formats."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         with pytest.raises(ValueError, match="Unsupported image format"):
-            tool._validate_content_type("image/unsupported", "https://example.com/test.xyz")
+            tool._validate_content_type(
+                "image/unsupported", "https://example.com/test.xyz"
+            )
 
 
 class TestVisionModelIntegration:
@@ -334,23 +347,23 @@ class TestVisionModelIntegration:
         image_data = b"fake-image-data"
         mime_type = "image/jpeg"
         question = "What do you see in this image?"
-        
+
         message = tool._create_vision_message(image_data, mime_type, question)
-        
+
         assert isinstance(message, HumanMessage)
         assert isinstance(message.content, list)
         assert len(message.content) == 2
-        
+
         # Check image content
         image_content = message.content[0]
         assert image_content["type"] == "image_url"
         assert "image_url" in image_content
         assert image_content["image_url"]["detail"] == "high"
-        
+
         expected_b64 = base64.b64encode(image_data).decode("utf-8")
         expected_url = f"data:{mime_type};base64,{expected_b64}"
         assert image_content["image_url"]["url"] == expected_url
-        
+
         # Check text content
         text_content = message.content[1]
         assert text_content["type"] == "text"
@@ -363,12 +376,12 @@ class TestVisionModelIntegration:
         mock_response = Mock()
         mock_response.content = "I see a beautiful sunset over the ocean."
         mock_llm.ainvoke = AsyncMock(return_value=mock_response)
-        
+
         tool = ImageParserTool(llm=mock_llm)
         message = HumanMessage(content="test")
-        
+
         result = await tool._query_vision_model(message)
-        
+
         assert result == "I see a beautiful sunset over the ocean."
         mock_llm.ainvoke.assert_called_once_with([message])
 
@@ -380,32 +393,36 @@ class TestVisionModelIntegration:
         mock_response.content = "I see a mountain landscape."
         mock_llm.invoke = Mock(return_value=mock_response)
         # Remove ainvoke to force fallback
-        if hasattr(mock_llm, 'ainvoke'):
-            delattr(mock_llm, 'ainvoke')
-        
+        if hasattr(mock_llm, "ainvoke"):
+            delattr(mock_llm, "ainvoke")
+
         tool = ImageParserTool(llm=mock_llm)
         message = HumanMessage(content="test")
-        
-        with patch('asyncio.get_event_loop') as mock_get_loop:
+
+        with patch("asyncio.get_event_loop") as mock_get_loop:
             mock_loop = AsyncMock()
             mock_loop.run_in_executor = AsyncMock(return_value=mock_response)
             mock_get_loop.return_value = mock_loop
-            
+
             result = await tool._query_vision_model(message)
-            
+
             assert result == "I see a mountain landscape."
-            mock_loop.run_in_executor.assert_called_once_with(None, mock_llm.invoke, [message])
+            mock_loop.run_in_executor.assert_called_once_with(
+                None, mock_llm.invoke, [message]
+            )
 
     @pytest.mark.asyncio
     async def test_query_vision_model_error(self):
         """Test handling of vision model query errors."""
         mock_llm = AsyncMock()
         mock_llm.ainvoke = AsyncMock(side_effect=Exception("Model API error"))
-        
+
         tool = ImageParserTool(llm=mock_llm)
         message = HumanMessage(content="test")
-        
-        with pytest.raises(ValueError, match="Failed to get response from vision model"):
+
+        with pytest.raises(
+            ValueError, match="Failed to get response from vision model"
+        ):
             await tool._query_vision_model(message)
 
 
@@ -418,7 +435,7 @@ class TestErrorHandling:
         """Test handling of empty image URL."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         result = await tool._arun("", "What do you see?")
         assert "Error: No image URL provided" in result
 
@@ -428,7 +445,7 @@ class TestErrorHandling:
         """Test handling of empty question."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         result = await tool._arun("https://example.com/image.jpg", "")
         assert "Error: No question provided" in result
 
@@ -438,10 +455,15 @@ class TestErrorHandling:
         """Test handling of download failures in main flow."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
-        with patch.object(tool, '_download_and_validate_image', 
-                         AsyncMock(side_effect=ValueError("Download failed"))):
-            result = await tool._arun("https://example.com/image.jpg", "What do you see?")
+
+        with patch.object(
+            tool,
+            "_download_and_validate_image",
+            AsyncMock(side_effect=ValueError("Download failed")),
+        ):
+            result = await tool._arun(
+                "https://example.com/image.jpg", "What do you see?"
+            )
             assert "Analysis failed: Download failed" in result
 
     @pytest.mark.asyncio
@@ -450,12 +472,20 @@ class TestErrorHandling:
         """Test handling of vision model failures in main flow."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
-        with patch.object(tool, '_download_and_validate_image',
-                         AsyncMock(return_value=(b"fake-data", "image/jpeg"))):
-            with patch.object(tool, '_query_vision_model',
-                             AsyncMock(side_effect=ValueError("Model failed"))):
-                result = await tool._arun("https://example.com/image.jpg", "What do you see?")
+
+        with patch.object(
+            tool,
+            "_download_and_validate_image",
+            AsyncMock(return_value=(b"fake-data", "image/jpeg")),
+        ):
+            with patch.object(
+                tool,
+                "_query_vision_model",
+                AsyncMock(side_effect=ValueError("Model failed")),
+            ):
+                result = await tool._arun(
+                    "https://example.com/image.jpg", "What do you see?"
+                )
                 assert "Analysis failed: Model failed" in result
 
     @patch.object(ImageParserTool, "_create_default_llm")
@@ -463,11 +493,11 @@ class TestErrorHandling:
         """Test the synchronous _run method wrapper."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         async def mock_arun(image_url, question):
             return "Analysis complete"
-        
-        with patch.object(tool, '_arun', mock_arun):
+
+        with patch.object(tool, "_arun", mock_arun):
             result = tool._run("https://example.com/image.jpg", "What do you see?")
             assert result == "Analysis complete"
 
@@ -477,16 +507,21 @@ class TestErrorHandling:
         """Test complete successful analysis flow."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
-        
+
         # Mock successful download
         image_data = b"fake-image-data"
-        with patch.object(tool, '_download_and_validate_image',
-                         AsyncMock(return_value=(image_data, "image/jpeg"))):
+        with patch.object(
+            tool,
+            "_download_and_validate_image",
+            AsyncMock(return_value=(image_data, "image/jpeg")),
+        ):
             # Mock successful vision model response
-            with patch.object(tool, '_query_vision_model',
-                             AsyncMock(return_value="I see a beautiful landscape with mountains.")):
+            with patch.object(
+                tool,
+                "_query_vision_model",
+                AsyncMock(return_value="I see a beautiful landscape with mountains."),
+            ):
                 result = await tool._arun(
-                    "https://example.com/image.jpg",
-                    "What do you see in this image?"
+                    "https://example.com/image.jpg", "What do you see in this image?"
                 )
                 assert result == "I see a beautiful landscape with mountains."
