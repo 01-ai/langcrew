@@ -394,6 +394,11 @@ class LangGraphAdapter:
             tool_input = data.get("input", {}) or {}
             brief = tool_input.get("brief", "")
 
+            # Skip sending tool_result message for user_input tool
+            # This prevents the tool_result message from being sent to frontend
+            if tool_name == "user_input":
+                return None
+
             return StreamMessage(
                 id=message_id,
                 type=MessageType.TOOL_RESULT,
