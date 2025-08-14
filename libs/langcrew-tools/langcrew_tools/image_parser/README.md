@@ -70,6 +70,7 @@ def visual_analyst(self) -> Agent:
 The `ImageParserTool` provides comprehensive image analysis capabilities using vision models to understand and interpret visual content.
 
 **Features:**
+
 - Automatic image download and validation from URLs
 - Support for multiple image formats (JPG, PNG, GIF, WEBP, BMP, TIFF, SVG)
 - Configurable vision model integration (GPT-4o, GPT-4 Vision, etc.)
@@ -79,6 +80,7 @@ The `ImageParserTool` provides comprehensive image analysis capabilities using v
 - Customizable request timeouts and model parameters
 
 **Configuration Options:**
+
 - `vision_model`: Vision model to use (default: "gpt-4o")
 - `vision_base_url`: Base URL for vision model API
 - `vision_api_key`: API key for vision model
@@ -90,6 +92,7 @@ The `ImageParserTool` provides comprehensive image analysis capabilities using v
 **Usage Examples:**
 
 Basic image analysis:
+
 ```python
 from langcrew_tools.image_parser import ImageParserTool
 
@@ -103,6 +106,7 @@ result = await tool.arun(
 ```
 
 Advanced configuration:
+
 ```python
 from langcrew_tools.image_parser import ImageParserTool, ImageParserConfig
 
@@ -125,6 +129,7 @@ result = await tool.arun(
 ```
 
 **Environment Variables:**
+
 - `VISION_MODEL`: Vision model to use (default: gpt-4o)
 - `VISION_BASE_URL`: Base URL for vision model API
 - `VISION_API_KEY`: API key for vision model
@@ -136,6 +141,7 @@ result = await tool.arun(
 ## Supported Image Formats
 
 The tool supports a wide range of image formats:
+
 - **JPEG/JPG** - Common photographic format
 - **PNG** - Lossless image format with transparency
 - **GIF** - Animated and static images
@@ -147,6 +153,7 @@ The tool supports a wide range of image formats:
 ## Image Validation
 
 The tool includes comprehensive image validation:
+
 - **URL Format Validation** - Ensures valid URL structure
 - **Content Type Validation** - Verifies proper image MIME types
 - **Size Validation** - Checks image size against configurable limits
@@ -156,6 +163,7 @@ The tool includes comprehensive image validation:
 ## Error Handling
 
 The tool provides robust error handling for various scenarios:
+
 - Invalid or malformed URLs
 - Network connection issues
 - HTTP errors (404, 403, etc.)
@@ -174,10 +182,11 @@ The tool provides robust error handling for various scenarios:
 ## Integration with Vision Models
 
 The tool is designed to work with various vision models:
+
 - **OpenAI GPT-4o** - Default model with excellent visual understanding
 - **GPT-4 Vision** - Alternative model for specific use cases
 - **Custom Models** - Configurable for other vision model APIs
 
 ## License
 
-This module is part of the LangCrew project and is released under the MIT License. 
+This module is part of the LangCrew project and is released under the MIT License.

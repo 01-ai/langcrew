@@ -42,12 +42,14 @@ utils/
 Robust environment variable handling with type conversion and validation.
 
 #### Features
+
 - ✅ Type-safe environment variable parsing
 - ✅ Nested configuration from prefixed variables
 - ✅ Parameter filtering for function compatibility
 - ✅ Comprehensive error handling
 
 #### Usage Example
+
 ```python
 from langcrew_tools.utils.env_config import env_config
 
@@ -74,6 +76,7 @@ valid_params = env_config.filter_valid_parameters(create_client, params)
 ```
 
 #### Advanced Features
+
 ```python
 # Dataclass integration
 @dataclass
@@ -91,6 +94,7 @@ db_config = env_config.get_dict("DB_", target_type=DatabaseConfig)
 Complete E2B sandbox lifecycle management with connection pooling and integration capabilities.
 
 #### SandboxMixin
+
 Base mixin for all tools that need sandbox access.
 
 ```python
@@ -105,6 +109,7 @@ class MyTool(BaseTool, SandboxMixin):
 ```
 
 #### Sandbox Toolkit
+
 Advanced sandbox management with connection pooling.
 
 ```python
@@ -131,6 +136,7 @@ sandbox = await sandbox_s3_toolkit.get_sandbox_with_s3(
 Production-ready S3-compatible storage client with advanced features.
 
 #### AsyncS3Client
+
 High-performance async S3 operations with automatic retry and error handling.
 
 ```python
@@ -165,6 +171,7 @@ async with AsyncS3Client(config) as client:
 ```
 
 #### S3 Factory Pattern
+
 Simplified client creation with environment-based configuration.
 
 ```python
@@ -187,6 +194,7 @@ client = await create_s3_client(
 Unified vector database operations with embedding support.
 
 #### VectorManager
+
 Central manager for vector storage and similarity search.
 
 ```python
@@ -221,6 +229,7 @@ for result in results:
 ```
 
 #### Error Handling
+
 ```python
 from langcrew_tools.utils.vector import VectorError
 
@@ -235,6 +244,7 @@ except VectorError as e:
 SiliconFlow AI service integration for embeddings and reranking.
 
 #### SiliconFlowClient
+
 Unified client for SiliconFlow AI services.
 
 ```python
@@ -262,6 +272,7 @@ reranked = await client.rerank(
 ```
 
 #### Custom Configuration
+
 ```python
 config = SiliconFlowConfig(
     url="https://api.siliconflow.cn",
@@ -278,6 +289,7 @@ client = SiliconFlowClient(config=config)
 ### Required Variables
 
 #### E2B Sandbox
+
 ```bash
 export E2B_API_KEY=your_e2b_api_key
 export E2B_TEMPLATE=python-3.11  # Optional, default template
@@ -286,6 +298,7 @@ export E2B_TIMEOUT=300            # Optional, seconds
 ```
 
 #### S3 Storage
+
 ```bash
 export AWS_ACCESS_KEY_ID=your_access_key
 export AWS_SECRET_ACCESS_KEY=your_secret_key
@@ -294,12 +307,14 @@ export AWS_ENDPOINT_URL=https://s3.amazonaws.com  # Optional
 ```
 
 #### SiliconFlow
+
 ```bash
 export SILICONFLOW_URL=https://api.siliconflow.cn
 export SILICONFLOW_TOKEN=your_api_token
 ```
 
 #### Vector Database (PGVector example)
+
 ```bash
 export VECTOR_CONNECTION_STRING=postgresql://user:pass@localhost/vectordb
 export VECTOR_EMBEDDING_MODEL=text-embedding-3-small
@@ -393,6 +408,7 @@ class DocumentSearchService:
 ## Best Practices
 
 ### 1. Environment Configuration
+
 ```python
 # Good: Use typed configuration with defaults
 timeout = env_config.get_int("TIMEOUT", default=30)
@@ -403,6 +419,7 @@ debug = env_config.get_bool("DEBUG", default=False)
 ```
 
 ### 2. Sandbox Resource Management
+
 ```python
 # Good: Use context managers or proper cleanup
 async def process_files():
@@ -422,6 +439,7 @@ class MultiStepTool(BaseTool, SandboxMixin):
 ```
 
 ### 3. Error Handling
+
 ```python
 from langcrew_tools.utils.vector import VectorError
 from langcrew_tools.utils.siliconflow import SiliconFlowError
@@ -437,6 +455,7 @@ except VectorError as e:
 ```
 
 ### 4. Async Resource Management
+
 ```python
 # Good: Proper async context managers
 async with AsyncS3Client(config) as client:
@@ -453,16 +472,19 @@ finally:
 ## Performance Considerations
 
 ### Connection Pooling
+
 - Sandbox connections are pooled and reused
 - S3 clients use connection pooling internally
 - Vector managers maintain persistent connections
 
 ### Async Operations
+
 - All operations are async-first for better concurrency
 - Use `asyncio.gather()` for parallel operations
 - Proper resource cleanup prevents memory leaks
 
 ### Caching
+
 - Configuration values are cached after first load
 - Vector embeddings can be cached at application level
 - S3 operations support conditional requests
@@ -472,27 +494,35 @@ finally:
 ### Common Issues
 
 1. **E2B Connection Failed**
+
    ```
    Error: Failed to connect to E2B sandbox
    ```
+
    **Solution**: Check E2B_API_KEY and network connectivity
 
 2. **S3 Authentication Failed**
+
    ```
    Error: Access Denied
    ```
+
    **Solution**: Verify AWS credentials and bucket permissions
 
 3. **Vector Database Connection**
+
    ```
    Error: Connection to vector database failed
    ```
+
    **Solution**: Check connection string and database availability
 
 4. **SiliconFlow API Error**
+
    ```
    Error: API authentication failed
    ```
+
    **Solution**: Verify SILICONFLOW_TOKEN and API endpoint
 
 ### Debug Mode
