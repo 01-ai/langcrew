@@ -6,8 +6,11 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
 	integrations: [
 		starlight({
-			title: 'langcrew',
+			title: 'LangCrew',
 			description: 'A powerful framework for building AI agent crews',
+			customCss: [
+				'./src/styles/custom-fonts.css',
+			],
 			locales: {
 				root: {
 					label: 'English',
@@ -19,7 +22,7 @@ export default defineConfig({
 				},
 			},
 			logo: {
-				src: './src/assets/langcrew-logo.svg',
+				src: './src/assets/langcrew-logo.png',
 			},
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/01-ai/langcrew' }

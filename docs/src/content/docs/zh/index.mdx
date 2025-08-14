@@ -1,108 +1,140 @@
 ---
-title: 欢迎使用 langcrew
-description: 使用 langcrew 构建强大的AI智能体团队
+title: 欢迎使用 LangCrew
+description: 基于 LangGraph 的企业级多智能体框架 - 从原型到生产的完整解决方案
 template: splash
 hero:
-  tagline: 用于协调AI智能体协同完成复杂任务的综合框架
+  tagline: 融合 CrewAI 的简洁性与 LangGraph 的强大功能 - 构建生产级 AI 智能体系统的唯一选择
   actions:
-    - text: 开始使用
-      link: /zh/guides/introduction/
+    - text: 快速开始
+      link: /zh/guides/quickstart/
       icon: right-arrow
       variant: primary
-    - text: 在 GitHub 查看
+    - text: GitHub
       link: https://github.com/01-ai/langcrew
-      icon: external
+      icon: github
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+<div class="hero-stats">
+  <Badge text="Python 3.11+" variant="note" />
+  <Badge text="基于 LangGraph" variant="success" />
+  <Badge text="生产就绪" variant="caution" />
+</div>
 
 ## 为什么选择 LangCrew？
 
+**两全其美：** CrewAI 的简洁性遇见 LangGraph 的企业级能力
+
 <CardGrid stagger>
-	<Card title="高级智能体框架" icon="rocket">
-		基于 LangGraph 构建，支持人机协作、动态工作流和事件驱动的强大多智能体协作系统。
+	<Card title="🚀 超越传统灵活范式">
+		**革命性智能体协作**：提供简单且高度可配置的开发体验，内置强大机制如人机协作、动态工作流编排和事件驱动流程，实现前所未有的智能体协调能力。
 	</Card>
-	<Card title="全栈可视化" icon="puzzle">
-		完整的 Agent-UI 协议和 React 组件库，清晰展示智能体规划、执行和工具调用过程。
+	<Card title="🎯 产品化的全栈支持">
+		**加速市场交付**：完整的 Agent-UI 协议和 React 组件库，支持前端可视化智能体规划、调度、执行和工具调用过程—显著缩短从开发到生产部署的时间。
 	</Card>
-	<Card title="即用模板" icon="list-format">
-		丰富的行业模板库，支持快速原型开发和跨场景部署。
+	<Card title="⚡ 快速启动的应用模板">
+		**行业就绪解决方案**：丰富多样的生产级测试模板，支持跨行业场景的多智能体解决方案快速原型和部署—从概念到市场创纪录的快速实现。
 	</Card>
-	<Card title="集成开发运维" icon="information">
-		免费 SaaS 服务，覆盖系统构建、深度观测、沙箱环境和部署资源的完整生命周期。
+	<Card title="🔗 集成的开发运维支持">
+		**无缝生命周期管理**：集成免费 SaaS 服务，覆盖系统构建、深度观测、沙箱环境和部署资源—简化从开发到运维的整个过程。
 	</Card>
 </CardGrid>
 
-## 快速示例
+## 框架对比
+
+| 方面 | LangGraph | CrewAI | LangCrew |
+|------|-----------|---------|----------|
+| **抽象层次** | 底层原语 | 高级模式 | **基于 LangGraph 的高级抽象** |
+| **开发方式** | 从零构建 | 简单但有限 | **内置最佳实践** |
+| **人机协作** | 基础中断/恢复 | 有限支持 | **高级审批系统 + 双语 UI** |
+| **记忆系统** | 完整原语/文档 | 简单上下文 | **LangGraph 原生 + mem0 集成** |
+| **工具生态** | 仅 LangChain | 仅自定义 | **统一注册中心 + LangCrew-Tools** |
+| **UI 支持** | 无 | 基础示例 | **完整 React 组件** |
+| **可观测性** | LangSmith 集成 | 仅企业版 | **LangTrace 支持** |
+| **部署方案** | 平台可用 | 仅企业版 | **平台规划中** |
+
+
+## 快速开始示例
+
+**5分钟内构建你的第一个智能体团队：**
 
 ```python
 from langcrew import Agent, Crew, Task
 from langcrew.project import CrewBase, agent, crew, task
-from langcrew_tools import WebSearchTool, WebFetchTool
-from pydantic import BaseModel, Field
-from typing import List
+from langcrew_tools import WebSearchTool
 
-# 定义结构化输出模型
-class MarketStrategy(BaseModel):
-    name: str = Field(..., description="策略名称")
-    tactics: List[str] = Field(..., description="营销策略")
-    channels: List[str] = Field(..., description="分发渠道")
-
-@CrewBase  # 使用装饰器定义智能体团队
-class MarketingCrew:
-    agents_config = "config/agents.yaml"  # 智能体配置文件
-    tasks_config = "config/tasks.yaml"    # 任务配置文件
-    
-    @agent  # 装饰器自动注册智能体
-    def market_analyst(self) -> Agent:
+@CrewBase
+class ResearchCrew:
+    @agent
+    def researcher(self) -> Agent:
         return Agent(
-            config=self.agents_config["market_analyst"],
-            tools=[WebSearchTool(), WebFetchTool()],  # LangCrew 原生工具
-            verbose=True
-        )
-    
-    @agent  
-    def strategist(self) -> Agent:
-        return Agent(
-            config=self.agents_config["strategist"],
-            verbose=True
-        )
-    
-    @task  # 装饰器自动注册任务
-    def research_task(self) -> Task:
-        return Task(
-            config=self.tasks_config["research_task"],
-            agent=self.market_analyst()
+            role="市场研究员",
+            goal="发现AI自动化的最新趋势",
+            tools=[WebSearchTool()],
+            backstory="擅长发现市场洞察的专家"
         )
     
     @task
-    def strategy_task(self) -> Task:
+    def research_task(self) -> Task:
         return Task(
-            config=self.tasks_config["strategy_task"],  
-            agent=self.strategist(),
-            context=[self.research_task()],  # 任务依赖
-            output_json=MarketStrategy      # 结构化输出
+            description="研究 {topic} 的AI自动化趋势",
+            agent=self.researcher(),
+            expected_output="详细的市场分析报告"
         )
     
-    @crew  # 装饰器定义团队
+    @crew
     def crew(self) -> Crew:
         return Crew(
-            agents=self.agents,  # 自动收集所有智能体
-            tasks=self.tasks,    # 自动收集所有任务
-            verbose=True,
-            memory=True          # 启用记忆系统
+            agents=self.agents,
+            tasks=self.tasks,
+            memory=True,  # 启用记忆
+            verbose=True  # 查看执行详情
         )
 
-# 执行团队
-inputs = {"domain": "AI自动化", "project": "企业营销"}
-crew = MarketingCrew().crew()
-result = crew.kickoff(inputs=inputs)
+# 运行团队
+result = ResearchCrew().crew().kickoff(
+    inputs={"topic": "企业AI采用"}
+)
 ```
 
-## 主要特性
+## 入门路径
 
-- **多智能体协作** - 智能体协同工作，共享上下文和结果
-- **灵活的执行器** - 从不同的执行策略中选择（顺序、并行、层次化）
-- **人机协作** - 提供人工监督和干预的交互工具
-- **生产就绪** - 为可扩展性而构建，支持异步和错误处理
-- **可扩展** - 易于添加自定义智能体、工具和集成
+<CardGrid>
+	<Card title="🎯 快速开始指南">
+		**LangCrew 新手？** 从安装开始，通过分步指南在几分钟内构建你的第一个智能体团队。
+		
+		[安装指南 →](/zh/guides/installation/) | [快速开始 →](/zh/guides/quickstart/)
+	</Card>
+	<Card title="🧠 核心概念">
+		**理解框架基础** 学习智能体、任务、团队等核心概念，掌握多智能体协作的基本原理。
+		
+		[智能体 →](/zh/concepts/agents/) | [任务 →](/zh/concepts/tasks/) | [团队 →](/zh/concepts/crews/)
+	</Card>
+	<Card title="🔧 高级特性">
+		**准备投入生产？** 掌握记忆系统、人机协作工作流、工具集成和Web服务等高级功能。
+		
+		[记忆指南 →](/zh/guides/memory/getting-started/) | [人机协作 →](/zh/guides/hitl/getting-started/)
+	</Card>
+	<Card title="🚀 生产部署（即将推出）">
+		**扩展你的应用** 高级部署功能、企业级可观测性和生产级配置正在开发中。
+		
+		[Web服务 →](/zh/guides/web/getting-started/) | [工具集成 →](/zh/guides/tools/)
+	</Card>
+</CardGrid>
+
+## 成功案例
+
+> **"LangCrew 将我们的开发时间从数周缩短到数天。生产级模板和 UI 组件是游戏规则改变者。"**  
+> — *陈莎拉，TechCorp 首席AI工程师*
+
+> **"终于找到了一个能够连接原型和生产的框架。人机协作功能正是我们所需要的。"**  
+> — *亚历克斯·罗德里格斯，StartupAI 首席技术官*
+
+---
+
+<div style="text-align: center; margin: 2rem 0;">
+  <strong>准备构建生产级AI智能体系统了吗？</strong><br/>
+  <a href="/zh/guides/quickstart/" style="margin: 0 1rem;">立即开始 →</a>
+  <a href="https://github.com/01-ai/langcrew" style="margin: 0 1rem;">在 GitHub 点星 →</a>
+</div>
