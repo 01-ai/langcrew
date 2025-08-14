@@ -2,11 +2,10 @@
 Simple test cases for browser_use_streaming_tool to verify basic functionality.
 """
 
-import asyncio
-import pytest
-from unittest.mock import MagicMock
-from pydantic import ValidationError, BaseModel, Field
 from typing import Any
+
+import pytest
+from pydantic import BaseModel, Field, ValidationError
 
 
 # Define test models locally

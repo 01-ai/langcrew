@@ -1,11 +1,9 @@
-import asyncio
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
-
 from langcrew.hitl import UserInputTool
 from langcrew.hitl.langchain_tools import UserInputRequest
+from pydantic import ValidationError
 
 
 class TestUserInputRequest:
@@ -174,7 +172,7 @@ class TestUserInputTool:
         question = "Sync question?"
         options = ["A", "B"]
         
-        with patch.object(tool, "_arun", return_value=expected_result) as mock_arun:
+        with patch.object(tool, "_arun", return_value=expected_result):
             result = tool._run(question=question, options=options)
             
             # Note: Since _run uses asyncio.run(), we can't directly verify the call
@@ -188,7 +186,7 @@ class TestUserInputTool:
         expected_result = "Sync result without options"
         question = "Simple question?"
         
-        with patch.object(tool, "_arun", return_value=expected_result) as mock_arun:
+        with patch.object(tool, "_arun", return_value=expected_result):
             result = tool._run(question=question)
             assert result == expected_result
 
@@ -220,7 +218,7 @@ class TestUserInputTool:
         tool = UserInputTool()
         
         with patch("langcrew.hitl.langchain_tools.adispatch_custom_event"), \
-             patch("langcrew.hitl.langchain_tools.interrupt", return_value=None) as mock_interrupt:
+             patch("langcrew.hitl.langchain_tools.interrupt", return_value=None):
             
             result = await tool._arun(question="Question?")
             

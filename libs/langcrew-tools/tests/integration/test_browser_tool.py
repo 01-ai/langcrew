@@ -96,7 +96,7 @@ async def run_browser_task(browser_tool, instruction: str):
     try:
         # Create input for the tool
         from langcrew_tools.browser import BrowserUseInput
-        browser_input = BrowserUseInput(instruction=instruction)
+        BrowserUseInput(instruction=instruction)
 
         # Run the streaming tool
         with Progress(

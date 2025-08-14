@@ -3,6 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+# Import the actual tool classes after mocking dependencies
+from langcrew_tools.message import MessageConfig, MessageToUserTool
+from langcrew_tools.message.langchain_tools import MessageToUserInput
+
 
 # Create mock classes for S3 and Sandbox functionality
 class MockAsyncS3Client:
@@ -40,10 +44,6 @@ sys.modules["langcrew_tools.utils.s3.client"] = mock_s3_client
 sys.modules["langcrew_tools.utils.sandbox.base_sandbox"] = mock_sandbox_base
 sys.modules["e2b"] = MagicMock()
 sys.modules["aiobotocore.session"] = MagicMock()
-
-# Import the actual tool classes after mocking dependencies
-from langcrew_tools.message import MessageConfig, MessageToUserTool
-from langcrew_tools.message.langchain_tools import MessageToUserInput
 
 
 class TestMessageToUserInput:
@@ -174,7 +174,7 @@ class TestMessageToUserTool:
 
         # Test valid JSON string parsing
         attachments_json = '["/workspace/file1.txt", "/workspace/file2.png"]'
-        
+
         with patch(
             "langcrew_tools.utils.s3.client.AsyncS3Client.upload_directory_to_s3",
             AsyncMock(
@@ -322,20 +322,24 @@ class TestMessageToUserTool:
         """Test multiple attachments when S3 is disabled."""
         config_disabled = MessageConfig(s3_upload_enabled=False)
         tool = MessageToUserTool(config=config_disabled)
-        
-        attachments = ["/workspace/doc.pdf", "/workspace/image.png", "/workspace/data.csv"]
-        
+
+        attachments = [
+            "/workspace/doc.pdf",
+            "/workspace/image.png",
+            "/workspace/data.csv",
+        ]
+
         result = await tool._arun(text="Multiple files", attachments=attachments)
-        
+
         assert result["status"] == "success"
         assert len(result["attachments"]) == 3
-        
+
         # Check all attachments are preserved
         filenames = [att["filename"] for att in result["attachments"]]
         assert "doc.pdf" in filenames
         assert "image.png" in filenames
         assert "data.csv" in filenames
-        
+
         # Check all have empty URLs and show_user=1
         for attachment in result["attachments"]:
             assert attachment["url"] == ""

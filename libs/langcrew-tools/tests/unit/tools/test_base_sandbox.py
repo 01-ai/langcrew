@@ -2,11 +2,11 @@
 Test cases for SandboxMixin class
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Any
+from unittest.mock import AsyncMock, patch
 
+import pytest
 from e2b import AsyncSandbox
+
 from langcrew_tools.utils.sandbox.base_sandbox import SandboxMixin
 from langcrew_tools.utils.sandbox.toolkit import SandboxToolkit
 

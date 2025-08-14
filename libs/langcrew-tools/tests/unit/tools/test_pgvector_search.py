@@ -185,7 +185,7 @@ class TestPgVectorSearchTool:
             siliconflow_client=client
         )
         
-        result = await tool._arun("test query", ["kb1"], 10)
+        await tool._arun("test query", ["kb1"], 10)
         
         # Verify custom config was passed to create_vector_manager
         mock_create.assert_called_once_with(
