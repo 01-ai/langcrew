@@ -10,15 +10,15 @@ The search tools support multiple languages, configurable result limits, and int
 
 1. Install the `langcrew-tools` package:
 
-```shell
-pip install langcrew-tools
-```
+    ```shell
+    pip install langcrew-tools
+    ```
 
 2. Install additional dependencies for web search:
 
-```shell
-pip install requests
-```
+    ```shell
+    pip install requests
+    ```
 
 3. Set up required API credentials and environment variables:
 
@@ -51,6 +51,7 @@ print(results)
 The `WebSearchTool` provides comprehensive web search capabilities with support for multiple languages and configurable search parameters.
 
 **Features:**
+
 - Real-time web search functionality
 - Multi-language support (English and Chinese)
 - Configurable result limits
@@ -61,6 +62,7 @@ The `WebSearchTool` provides comprehensive web search capabilities with support 
 - Asynchronous and synchronous operation
 
 **Usage Example:**
+
 ```python
 from langcrew_tools.search import WebSearchTool
 
@@ -97,12 +99,14 @@ results = await custom_tool.arun(
 ## Search Configuration
 
 ### Environment Variables
+
 - `LANGCREW_WEB_SEARCH_ENDPOINT` - Web search service endpoint URL
 - `LANGCREW_WEB_SEARCH_API_KEY` - API key for authentication
 - `LANGCREW_WEB_SEARCH_TIMEOUT` - Request timeout in seconds
 - `LANGCREW_WEB_SEARCH_LANGUAGE` - Default search language
 
 ### Configuration Priority
+
 1. Constructor parameters (highest priority)
 2. Environment variables
 3. Field default values (lowest priority)
@@ -110,12 +114,14 @@ results = await custom_tool.arun(
 ## Search Parameters
 
 ### Query Configuration
+
 - **Query Text** - Search keywords and phrases
 - **Result Count** - Number of search results to return
 - **Language** - Search language preference
 - **Timeout** - Request timeout settings
 
 ### Search Sources
+
 - **search_one_v3** - Primary search connector
 - **Online Crawler** - Real-time web crawling
 - **Database** - Stored search results
@@ -169,6 +175,7 @@ The search tool returns results in a structured format:
 ## Error Handling
 
 The tools include comprehensive error handling:
+
 - Authentication failures (401/403 errors)
 - Network connectivity issues
 - Request timeout handling
@@ -194,11 +201,13 @@ The tools include comprehensive error handling:
 ## Language Support
 
 ### English Search
+
 - Default language configuration
 - English-specific search optimization
 - International result sources
 
 ### Chinese Search
+
 - Chinese language support with "zh" configuration
 - Chinese-specific search sources (bocha)
 - Localized result ranking
@@ -206,12 +215,14 @@ The tools include comprehensive error handling:
 ## Advanced Features
 
 ### Search Customization
+
 - **Custom Queries** - Advanced query formatting
 - **Source Selection** - Configurable search sources
 - **Result Filtering** - Post-search result filtering
 - **Relevance Ranking** - Intelligent result ranking
 
 ### Service Integration
+
 - **External Services** - Integration with various search services
 - **API Compatibility** - Standard API interface
 - **Service Discovery** - Automatic service detection
@@ -220,12 +231,14 @@ The tools include comprehensive error handling:
 ## Configuration Examples
 
 ### Basic Configuration
+
 ```python
 # Using environment variables
 tool = WebSearchTool()
 ```
 
 ### Custom Configuration
+
 ```python
 # Using constructor parameters
 tool = WebSearchTool(
@@ -237,6 +250,7 @@ tool = WebSearchTool(
 ```
 
 ### Language-Specific Configuration
+
 ```python
 # English search
 en_tool = WebSearchTool(language="en")
@@ -247,4 +261,4 @@ zh_tool = WebSearchTool(language="zh")
 
 ## License
 
-This module is part of the LangCrew project and is released under the MIT License. 
+This module is part of the LangCrew project and is released under the MIT License.

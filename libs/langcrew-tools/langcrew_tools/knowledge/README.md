@@ -51,6 +51,7 @@ print(result)
 The `PgVectorSearchTool` provides comprehensive knowledge base search capabilities using PgVector with automatic embedding and reranking.
 
 **Features:**
+
 - Semantic search across knowledge bases
 - Automatic embedding generation
 - Intelligent result reranking
@@ -61,6 +62,7 @@ The `PgVectorSearchTool` provides comprehensive knowledge base search capabiliti
 - Error handling and logging
 
 **Usage Example:**
+
 ```python
 from langcrew_tools.knowledge import PgVectorSearchTool
 from ..utils.vector import VectorConfig
@@ -92,12 +94,14 @@ result = await custom_tool.arun(
 ## Knowledge Base Management
 
 ### Knowledge Base Structure
+
 - **Knowledge IDs** - Unique identifiers for different knowledge bases
 - **Document Storage** - Vectorized document storage in PostgreSQL
 - **Metadata Management** - Document metadata and indexing
 - **Version Control** - Knowledge base versioning and updates
 
 ### Search Capabilities
+
 - **Semantic Search** - Meaning-based search using embeddings
 - **Multi-base Search** - Search across multiple knowledge bases
 - **Reranking** - Intelligent result ranking and relevance scoring
@@ -135,6 +139,7 @@ The knowledge tools support a complete search workflow:
 ## Configuration Options
 
 ### Vector Configuration
+
 - **Database URL** - PostgreSQL connection string
 - **Index Name** - Vector index name for storage
 - **Embedding Model** - Model for generating embeddings
@@ -142,6 +147,7 @@ The knowledge tools support a complete search workflow:
 - **Reranking Settings** - Result reranking configuration
 
 ### Search Parameters
+
 - **Top K** - Number of results to return
 - **Knowledge IDs** - Target knowledge bases for search
 - **Query Processing** - Query preprocessing options
@@ -150,6 +156,7 @@ The knowledge tools support a complete search workflow:
 ## Error Handling
 
 The tools include comprehensive error handling:
+
 - Database connection failures
 - Vector functionality availability checks
 - Query validation and processing errors
@@ -176,12 +183,14 @@ The tools include comprehensive error handling:
 ## Advanced Features
 
 ### Semantic Search
+
 - **Embedding Models** - State-of-the-art embedding generation
 - **Similarity Metrics** - Advanced similarity calculation methods
 - **Context Awareness** - Context-aware search capabilities
 - **Multi-modal Search** - Support for text and structured data
 
 ### Result Enhancement
+
 - **Reranking Algorithms** - Intelligent result ranking
 - **Relevance Scoring** - Advanced relevance calculation
 - **Result Clustering** - Grouped and organized results
@@ -190,12 +199,14 @@ The tools include comprehensive error handling:
 ## Database Requirements
 
 ### PostgreSQL Setup
+
 - **PgVector Extension** - Vector similarity search extension
 - **Database Schema** - Optimized schema for knowledge storage
 - **Index Configuration** - Vector index optimization
 - **Connection Management** - Efficient connection handling
 
 ### Performance Tuning
+
 - **Index Optimization** - Vector index performance tuning
 - **Query Optimization** - Search query optimization
 - **Resource Management** - Database resource allocation
@@ -203,4 +214,4 @@ The tools include comprehensive error handling:
 
 ## License
 
-This module is part of the LangCrew project and is released under the MIT License. 
+This module is part of the LangCrew project and is released under the MIT License.

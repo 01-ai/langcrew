@@ -48,3 +48,7 @@ tool._arun(3)
 ```bash
 pip install langcrew-tools
 ```
+
+## License
+
+This module is part of the LangCrew project and is released under the MIT License.

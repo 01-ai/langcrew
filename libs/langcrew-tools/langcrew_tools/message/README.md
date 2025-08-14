@@ -44,6 +44,7 @@ custom_tool = MessageToUserTool(config=config)
 ## Configuration
 
 Environment variables:
+
 - `MESSAGE_SANDBOX_WORKSPACE_PATH`: Sandbox workspace path (default: `/workspace`)
 - `MESSAGE_S3_PREFIX_TEMPLATE`: S3 prefix template (default: `user_attachments/{sandbox_id}`)
 
