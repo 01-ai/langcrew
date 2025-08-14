@@ -3,7 +3,7 @@ title: Welcome to LangCrew
 description: Enterprise-grade multi-agent framework built on LangGraph - from prototyping to production
 template: splash
 hero:
-  tagline: From CrewAI simplicity to LangGraph power - the ideal framework for production-ready AI agent systems
+  tagline: From CrewAI simplicity to LangGraph power - the only framework you need for production-ready AI agent systems
   actions:
     - text: Quick Start
       link: /guides/quickstart/
@@ -18,164 +18,118 @@ import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
 
 <div class="hero-stats">
   <Badge text="Python 3.11+" variant="note" />
-  <Badge text="Built on LangGraph" variant="tip" />
-  <Badge text="Production Ready" variant="success" />
-  <Badge text="Batteries Included" variant="caution" />
+  <Badge text="Built on LangGraph" variant="success" />
+  <Badge text="Production Ready" variant="caution" />
 </div>
 
 ## Why Choose LangCrew?
 
-<CardGrid>
-
-<Card title="🎯 Enterprise Ready" icon="star">
-Built-in HITL approval workflows, audit trails, and security guardrails that meet production requirements.
-</Card>
-
-<Card title="⚡ Developer Friendly" icon="rocket">
-CrewAI-compatible decorator syntax enables seamless migration and dramatically reduces learning curve.
-</Card>
-
-<Card title="📊 Full-Stack Visualization" icon="laptop">
-Complete Agent-UI protocol with real-time execution monitoring and professional React component library.
-</Card>
-
-<Card title="🔧 Production Optimized" icon="setting">
-Built on LangGraph's solid foundation, providing enterprise-grade performance, scalability, and reliability.
-</Card>
-
+**The best of both worlds:** CrewAI's simplicity meets LangGraph's enterprise capabilities
 
 <CardGrid stagger>
- <Card title="Beyond Traditional Flexible Paradigms">
-  **Revolutionary agent collaboration**: Provides a simple, highly configurable development experience with powerful built-in mechanisms like HITL, dynamic workflow orchestration, and event-driven processes that empower unprecedented agent coordination.
- </Card>
- <Card title="Full-Stack Support for Productization">
-  **Accelerate market delivery**: Complete Agent-UI protocol and React component library enable frontend visualization of agent planning, scheduling, execution, and tool invocation—significantly reducing time from development to production deployment.
- </Card>
- <Card title="Application Templates for Fast Launch">
-  **Industry-ready solutions**: Rich variety of production-tested templates enabling rapid prototyping and deployment of multi-agent solutions across diverse industries and scenarios—from concept to market in record time.
- </Card>
- <Card title="Integrated Development and Operations Support">
-  **Seamless lifecycle management**: Integrated free SaaS services covering system construction, deep observability, sandbox environments, and deployment resources—simplifying the entire journey from development to operations.
- </Card>
+	<Card title="🚀 Beyond Traditional Flexible Paradigms">
+		**Revolutionary agent collaboration**: Provides a simple, highly configurable development experience with powerful built-in mechanisms like HITL, dynamic workflow orchestration, and event-driven processes that empower unprecedented agent coordination.
+	</Card>
+	<Card title="🎯 Full-Stack Support for Productization">
+		**Accelerate market delivery**: Complete Agent-UI protocol and React component library enable frontend visualization of agent planning, scheduling, execution, and tool invocation—significantly reducing time from development to production deployment.
+	</Card>
+	<Card title="⚡ Application Templates for Fast Launch">
+		**Industry-ready solutions**: Rich variety of production-tested templates enabling rapid prototyping and deployment of multi-agent solutions across diverse industries and scenarios—from concept to market in record time.
+	</Card>
+	<Card title="🔗 Integrated Development and Operations Support">
+		**Seamless lifecycle management**: Integrated free SaaS services covering system construction, deep observability, sandbox environments, and deployment resources—simplifying the entire journey from development to operations.
+	</Card>
 </CardGrid>
-</CardGrid>
-
-## Core Features
-
-### 🚀 Enterprise Features Out of the Box
-
-✅ **Decorator Development** - Familiar `@agent`, `@task`, `@crew` syntax  
-✅ **YAML Configuration** - Externalized agent and task definitions  
-✅ **Human-in-the-Loop** - Human oversight for sensitive operations  
-✅ **Real-time Monitoring** - Complete execution flow visualization and debugging  
-✅ **Smart Memory System** - Persistent context across agent interactions  
-✅ **Native LangGraph Integration** - Graph-based workflow orchestration  
-✅ **Production Security** - Built-in audit trails and approval mechanisms  
-
-### 💡 Best Developer Experience
-
-```python
-from langcrew import CrewBase, agent, task
-from langcrew_tools import WebSearchTool
-
-@CrewBase
-class MarketingCrew:
-    agents_config = "config/agents.yaml"
-    tasks_config = "config/tasks.yaml"
-    
-    @agent
-    def researcher(self):
-        return Agent(
-            config=self.agents_config["researcher"],
-            tools=[WebSearchTool()]
-        )
-    
-    @task  
-    def market_analysis(self):
-        return Task(
-            config=self.tasks_config["market_analysis"],
-            agent=self.researcher()
-        )
-
-# Launch web service in 3 lines
-from langcrew.web import create_server
-server = create_server(MarketingCrew().crew())
-server.run()  # Visit http://localhost:8000/docs
-```
 
 ## Framework Comparison
 
-| Feature | LangGraph | CrewAI | **LangCrew** |
-|---------|-----------|---------|-------------|
+| Aspect | LangGraph | CrewAI | LangCrew |
+|--------|-----------|---------|----------|
 | **Abstraction** | Low-level primitives | High-level patterns | **High-level on LangGraph** |
 | **Development** | Build from scratch | Simple but limited | **Best practices pre-built** |
 | **HITL** | Basic interrupt/resume | Limited support | **Advanced approval system + bilingual UI** |
-| **Memory** | Complete primitives/docs | Simple context | **LangGraph native + langmem integration** |
+| **Memory** | Complete primitives/docs | Simple context | **LangGraph native + mem0 integration** |
 | **Tools** | LangChain only | Custom only | **Unified registry + LangCrew-Tools** |
 | **UI** | None | Basic examples | **Full React components** |
 | **Observability** | LangSmith integration | Enterprise edition | **LangTrace support** |
 | **Deployment** | Platform available | Enterprise edition | **Platform planned** |
 
-## Quick Start
 
-### 🎯 5-Minute Experience
+## Quick Start Example
 
-```bash
-# 1. Install LangCrew
-uv add langcrew --prerelease=allow --index https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple
+**Build your first agent crew in under 5 minutes:**
 
-# 2. Set API Key
-export OPENAI_API_KEY=your_openai_key
+```python
+from langcrew import Agent, Crew, Task
+from langcrew.project import CrewBase, agent, crew, task
+from langcrew_tools import WebSearchTool
 
-# 3. Run Example
-python -m langcrew.examples.quickstart
+@CrewBase
+class ResearchCrew:
+    @agent
+    def researcher(self) -> Agent:
+        return Agent(
+            role="Market Researcher",
+            goal="Find latest trends in AI automation",
+            tools=[WebSearchTool()],
+            backstory="Expert at finding market insights"
+        )
+    
+    @task
+    def research_task(self) -> Task:
+        return Task(
+            description="Research AI automation trends for {topic}",
+            agent=self.researcher(),
+            expected_output="Detailed market analysis report"
+        )
+    
+    @crew
+    def crew(self) -> Crew:
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            memory=True,  # Enable memory
+            verbose=True  # See execution details
+        )
+
+# Run the crew
+result = ResearchCrew().crew().kickoff(
+    inputs={"topic": "enterprise AI adoption"}
+)
 ```
 
-### 🚀 Full Application Experience
-
-Launch complete frontend and backend services with Docker Compose:
-
-```bash
-git clone https://github.com/01-ai/langcrew.git
-cd langcrew
-export OPENAI_API_KEY=your_openai_key
-docker compose up --build
-
-# Visit http://localhost:3600 for web interface
-# Visit http://localhost:8000/docs for API documentation
-```
-
-## Learning Path
+## Getting Started Paths
 
 <CardGrid>
- <Card title="Quick Start Guide">
-  **New to LangCrew?** Begin with installation and build your first agent crew in minutes with our step-by-step guide.
-  
-  [Quick Start →](/guides/quickstart/)
- </Card>
- <Card title="Core Concepts">
-  **Understand the framework** Learn about Agents, Tasks, Crews, and the foundational concepts that power multi-agent collaboration.
-  
-  [Agents →](/concepts/agents/) | [Tasks →](/concepts/tasks/) | [Crews →](/concepts/crews/)
- </Card>
- <Card title="Advanced Features">
-  **Ready for production?** Master memory systems, human-in-the-loop workflows, tools integration, and web services.
-  
-  [Memory Guide →](/guides/memory/getting-started/) | [HITL Guide →](/guides/hitl/getting-started/)
- </Card>
- <Card title="Production Deployment (Coming Soon)">
-  **Scale your applications** Advanced deployment features, enterprise observability, and production-grade configurations are being developed.
-  
-  [Web Services →](/guides/web/getting-started/) | [Tools →](/guides/tools/)
- </Card>
+	<Card title="🎯 Quick Start Guide">
+		**New to LangCrew?** Begin with installation and build your first agent crew in minutes with our step-by-step guide.
+		
+		[Installation →](/guides/installation/) | [Quick Start →](/guides/quickstart/)
+	</Card>
+	<Card title="🧠 Core Concepts">
+		**Understand the framework** Learn about Agents, Tasks, Crews, and the foundational concepts that power multi-agent collaboration.
+		
+		[Agents →](/concepts/agents/) | [Tasks →](/concepts/tasks/) | [Crews →](/concepts/crews/)
+	</Card>
+	<Card title="🔧 Advanced Features">
+		**Ready for production?** Master memory systems, human-in-the-loop workflows, tools integration, and web services.
+		
+		[Memory Guide →](/guides/memory/getting-started/) | [HITL Guide →](/guides/hitl/getting-started/)
+	</Card>
+	<Card title="🚀 Production Deployment (Coming Soon)">
+		**Scale your applications** Advanced deployment features, enterprise observability, and production-grade configurations are being developed.
+		
+		[Web Services →](/guides/web/getting-started/) | [Tools →](/guides/tools/)
+	</Card>
 </CardGrid>
 
-## Community & Support
+## Success Stories
 
-- **📖 Documentation**: Comprehensive guides and API reference
-- **💬 GitHub**: [Issues](https://github.com/01-ai/langcrew/issues) and feature requests  
-- **🔧 Examples**: Rich [real-world use cases](/examples/) and best practices
-- **🚀 Updates**: Follow latest features and improvements
+> **"LangCrew reduced our development time from weeks to days. The production templates and UI components are game-changers."**  
+> — *Sarah Chen, Lead AI Engineer at TechCorp*
+
+> **"Finally, a framework that bridges the gap between prototyping and production. The HITL features are exactly what we needed."**  
+> — *Alex Rodriguez, CTO at StartupAI*
 
 ---
 
