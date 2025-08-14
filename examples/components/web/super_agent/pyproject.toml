@@ -1,0 +1,60 @@
+[project]
+name = "super_agent"
+version = "0.1.0"
+description = "Super Agent using LangCrew with browser automation"
+authors = [
+    { name = "Your Name", email = "you@example.com" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    # Local packages
+    "langcrew",
+    "langcrew-tools",
+    # LangChain ecosystem
+    "langchain-core>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.1.0",
+    "langgraph>=0.2.0",
+    # Multi-agent framework
+    "crewai>=0.30.0",
+    "crewai-tools>=0.4.0",
+    # Web framework
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+    # Core utilities
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0",
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.24.0",
+    "tenacity>=8.2.0",
+    # Browser automation
+    "browser-use==0.5.5",
+]
+
+[tool.uv]
+extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+prerelease = "allow"
+index-strategy = "unsafe-best-match"
+
+[tool.uv.sources]
+langcrew = { path = "../../../../libs/langcrew", editable = true }
+langcrew-tools = { path = "../../../../libs/langcrew-tools", editable = true }
+
+[[tool.uv.index]]
+url = "https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"
+publish-url = "https://nexus.lingyiwanwu.net/repository/pypi-hosted/"
+explicit = true
+
+[project.scripts]
+super_agent = "super_agent.main:run_crew"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"
