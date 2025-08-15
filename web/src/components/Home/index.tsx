@@ -12,7 +12,7 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ senderVisible = true, headerNode, footerNode }) => {
   return (
     <div
-      className="h-full w-full py-14 bg-top bg-no-repeat bg-[size:100%] overflow-auto"
+      className="h-full w-full py-14 bg-cover bg-no-repeat overflow-auto"
       style={{ backgroundImage: `url(${bgUrl})` }}
     >
       <div
