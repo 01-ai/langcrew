@@ -143,12 +143,13 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from enum import Enum
-from typing import Any
+from typing import Any, override
 
 from langchain_core.callbacks import adispatch_custom_event
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import StandardStreamEvent
 from langchain_core.tools.base import BaseTool
+from langgraph.graph.state import CompiledStateGraph
 from pydantic import Field
 
 logger = logging.getLogger(__name__)
@@ -498,8 +499,10 @@ class StreamingBaseTool(BaseTool, ABC):
                     )
                 else:
                     # StandardStreamEvent - extract final output data
-                    final_event_data = custom_event_data.get("data", {}).get(
-                        "output", {}
+                    final_event_data = (
+                        custom_event_data.get("data", {}).get("output", {})
+                        if custom_event_data
+                        else None
                     )
         except Exception as e:
             logger.exception(f"Error in _astream_events: {e}")
@@ -533,8 +536,10 @@ class StreamingBaseTool(BaseTool, ABC):
                     *args, **kwargs
                 ):
                     if event_type == StreamEventType.END:
-                        final_event_data = custom_event_data.get("data", {}).get(
-                            "output", {}
+                        final_event_data = (
+                            custom_event_data.get("data", {}).get("output", {})
+                            if custom_event_data
+                            else None
                         )
                         break
                     # Notify that a new event was received
@@ -731,6 +736,7 @@ class ExternalCompletionBaseTool(StreamingBaseTool, ABC):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    @override
     async def _astream_events(
         self, *args: Any, **kwargs: Any
     ) -> AsyncIterator[tuple[StreamEventType, StandardStreamEvent]]:
@@ -742,3 +748,86 @@ class ExternalCompletionBaseTool(StreamingBaseTool, ABC):
         """
         Run the tool asynchronously and return the result.
         """
+
+
+class GraphStreamingBaseTool(StreamingBaseTool, ABC):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @abstractmethod
+    async def _arun_graph_astream_events(
+        self, graph: CompiledStateGraph, *args: Any, **kwargs: Any
+    ) -> AsyncIterator[dict[str, Any]]:
+        """
+        Run the tool asynchronously and return the result.
+        """
+        pass
+
+    @abstractmethod
+    async def init_graph(self) -> CompiledStateGraph:
+        """
+        Get the graph.
+        """
+        pass
+
+    # tool不用输出任何事件给外层调用(langgraph.astream_events),langgraph会将内部graph的event输出(无论什么时候初始化的内部graph)
+
+    @override
+    async def handle_standard_stream_event(
+        self, standard_stream_event: dict
+    ) -> StandardStreamEvent:
+        pass
+
+    @override
+    async def handle_custom_event(self, custom_event: dict) -> StandardStreamEvent:
+        pass
+
+    @override
+    async def _astream_events(
+        self, *args: Any, **kwargs: Any
+    ) -> AsyncIterator[tuple[StreamEventType, StandardStreamEvent]]:
+        # Stream events from the compiled graph
+        graph = await self.init_graph()
+        async for event in self._arun_graph_astream_events(graph, *args, **kwargs):
+            pre_event = event
+            yield StreamEventType.INTERMEDIATE, event
+        stream_event = self.get_last_event_content(pre_event)
+        logger.info(f"graph stream tool get last event content: {stream_event}")
+        yield StreamEventType.END, stream_event
+
+    def _extract_message_content(self, message) -> str | None:
+        if isinstance(message, dict):
+            return message.get("content")
+        return getattr(message, "content", None)
+
+    def _is_valid_ai_message(self, message) -> bool:
+        has_tool_call_id = hasattr(message, "tool_call_id") or (
+            isinstance(message, dict) and "tool_call_id" in message
+        )
+
+        if has_tool_call_id:
+            return False
+
+        if isinstance(message, dict):
+            return message.get("type") != "tool"
+        else:
+            return type(message).__name__ == "AIMessage"
+
+    def get_last_event_content(self, event_data: dict) -> StandardStreamEvent:
+        try:
+            if not isinstance(event_data, dict):
+                return event_data
+
+            messages = event_data.get("data", {}).get("output", {}).get("messages", [])
+            if not messages:
+                return event_data
+
+            for message in reversed(messages):
+                content = self._extract_message_content(message)
+                if content and self._is_valid_ai_message(message):
+                    return self.end_standard_stream_event(content)
+
+            return event_data
+        except Exception as e:
+            logging.exception(f"Error in get_last_event_content: {e}")
+            return event_data
