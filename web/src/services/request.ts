@@ -50,7 +50,7 @@ request.interceptors.response.use(
     }
 
     // 处理业务错误
-    if (data.code !== 200 && data.code !== 0) {
+    if (!data.success) {
       const errorMessage = data.message || '请求失败';
 
       // 根据配置决定是否显示错误提示
