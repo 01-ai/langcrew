@@ -16,10 +16,9 @@ dependencies = [
     "fastmcp>=2.11.2",
 ]
 
-[tool.uv]
-extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
-prerelease = "allow"
-index-strategy = "unsafe-best-match"
+[tool.uv.sources]
+langcrew = { path = "../../../libs/langcrew", editable = true }
+langcrew-tools = { path = "../../../libs/langcrew-tools", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp"]
