@@ -1,5 +1,5 @@
 import asyncio
-from asyncio.log import logger
+import logging
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
@@ -19,6 +19,8 @@ from .actions import (
     user_takeover,
 )
 from .base import CloudPhoneBaseTool
+
+logger = logging.getLogger(__name__)
 
 
 class TapToolInput(BaseModel):
@@ -570,28 +572,21 @@ class GetClickablesTool(CloudPhoneBaseTool):
 
 
 ALL_PHONE_TOOLS = [
-    # Basic interaction tools
     TapTool,
     TapByCoordinatesTool,
     SwipeTool,
     InputTextTool,
     PressKeyTool,
     ClearTextTool,
-    # Application management tools
     StartAppTool,
     ListPackagesTool,
-    # Navigation tools
     EnterTool,
     SwitchAppTool,
     BackTool,
     HomeTool,
-    # Composite operation tools
     TapInputAndEnterTool,
-    # Control tools
     WaitTool,
-    # Screenshot tools
     TaskScreenShotTool,
-    # Get clickable elements tools
     GetClickablesTool,
 ]
 
