@@ -12,7 +12,7 @@ Super Agent is a powerful intelligent agent system built on the LangCrew framewo
 Before using Super Agent, you need to configure environment variables.
 
 **Important Note**: Please refer to the environment variable configuration example file in the project:
-- **Configuration Example File**: [`examples/components/web/super_agent/.env.example`](https://code.lingyiwanwu.net/oma/boway/langcrew/-/blob/github-main/examples/components/web/super_agent/.env.example)
+- **Configuration Example File**: [`examples/components/web/super_agent/.env.example`](https://github.com/01-ai/langcrew/blob/main/examples/components/web/super_agent/.env.example)
 
 **Please configure all the following environment variables to ensure Super Agent runs properly**:
 
@@ -23,7 +23,7 @@ OPENAI_API_KEY=
 # E2B Sandbox Environment Configuration
 E2B_API_KEY=
 E2B_TEMPLATE=e2b-20250806-v1
-E2B_DOMAIN=console-lingyiwanwu.org
+E2B_DOMAIN=your-e2b-domain.example.com
 E2B_TIMEOUT=3600
 
 # S3 Storage Configuration
@@ -52,7 +52,7 @@ LANGCREW_IMAGE_GEN_API_KEY=
 - **E2B Sandbox Environment Configuration**: Used for secure code execution environment
   - `E2B_API_KEY`: Requires applying for E2B API key
   - `E2B_TEMPLATE`: **Must use `e2b-20250806-v1`** (designated sandbox template provided by 01)
-  - `E2B_DOMAIN`: **Must use `console-lingyiwanwu.org`** (designated domain provided by 01)
+  - `E2B_DOMAIN`: Your E2B domain (e.g., `your-e2b-domain.example.com`)
   - `E2B_TIMEOUT`: Sandbox timeout, set to 3600 seconds
 
 - **S3 Storage Configuration**: For file storage and image saving, requires configuring S3-compatible object storage service
@@ -65,22 +65,26 @@ LANGCREW_IMAGE_GEN_API_KEY=
 
 ## Quick Start
 
-One-click deployment based on the `compose-super-agent.yaml` configuration file in the project root:
+### Step 1: Navigate to the Example Project Directory
 
-### Step 1: Configure Environment Variables
+```bash
+cd examples/components/web/super_agent
+```
 
-Create a `.env` file in the project root directory, referring to `examples/components/web/super_agent/.env.example`:
+### Step 2: Configure Environment Variables
+
+Create a `.env` file in the current directory:
 
 ```bash
 # Copy configuration example file
-cp examples/components/web/super_agent/.env.example .env
+cp .env.example .env
+# Edit the .env file to fill in necessary configurations
 ```
 
-### Step 2: Start Services
+### Step 3: Start Services
 
 ```bash
-# Execute in project root directory
-docker-compose -f compose-super-agent.yaml up --build -d
+docker-compose -f compose-super-agent.yaml up --build
 ```
 
 ### Step 3: Access Services
@@ -93,7 +97,7 @@ After startup is complete, you can access:
 
 ### Docker Compose Architecture Overview
 
-[`compose-super-agent.yaml`](https://code.lingyiwanwu.net/oma/boway/langcrew/-/blob/github-main/compose-super-agent.yaml) defines the complete full-stack architecture:
+The `compose-super-agent.yaml` file in the example directory defines the complete full-stack architecture:
 
 **frontend service**:
 - Based on Node.js 18 Alpine image
@@ -103,9 +107,9 @@ After startup is complete, you can access:
 - Mounts `./web` directory as frontend code
 
 **super-agent service**:
-- Built based on [`examples/components/web/super_agent/Dockerfile`](https://code.lingyiwanwu.net/oma/boway/langcrew/-/blob/github-main/examples/components/web/super_agent/Dockerfile)
+- Built based on the `Dockerfile` in the current directory
 - Port mapping: 8000:8000
-- Loads environment variables from `examples/components/web/super_agent/.env` file
+- Loads environment variables from `.env` file
 - Run mode: full, log level: info
 - Network: langcrew-network (for communication with frontend service)
 

@@ -66,7 +66,6 @@ Industry-specific solutions ready for deployment:
 Comprehensive guides and API references built with Astro Starlight.
 - [Getting Started](./docs/src/content/docs/guides/quickstart.mdx) - Build your first agent
 - [Core Concepts](./docs/src/content/docs/concepts/) - Understanding agents, tasks, and crews
-- [Installation Guide](./docs/src/content/docs/guides/installation.mdx) - Detailed setup instructions
 
 ## Quick Start
 
@@ -75,8 +74,7 @@ Comprehensive guides and API references built with Astro Starlight.
 **Backend Server:**
 ```bash
 # 1. Clone repository
-git clone git@code.lingyiwanwu.net:oma/boway/langcrew.git
-git checkout github-main
+git clone https://github.com/01-ai/langcrew.git
 
 # 2. Install uv (choose one method)
 # Option A: Official installer (recommended)

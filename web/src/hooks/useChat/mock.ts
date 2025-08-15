@@ -707,8 +707,9 @@ export const mockInnerMessageChunk: InnerMessageChunk = {
     session_id: 'dcc8b24ea48445b0',
     sandbox_id: 'ib0ywjc0c00x4thwu79qi-BRD-81686B43867A4F4A',
     instance_no: 'INS-7CB5FCDE48084B41',
-    access_key: '978e075cd17343bbb9d732648fa8c8e3-odm0mzk1nzk3mjk1nzu5mzq4oa',
-    access_secret_key: '12bba797ce4d44f68a1b731b56aa133c',
+    // Mock testing credentials - NOT real API keys
+    access_key: 'mock_access_key_for_testing_only',
+    access_secret_key: 'mock_secret_key_for_testing_only',
     expire_time: '2025-08-06 16:55:10',
     user_id: '198111d5-dc05-437c-afa6-274986b907c9',
   },

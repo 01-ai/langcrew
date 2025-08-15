@@ -114,7 +114,7 @@ class VectorConfig:
         """Get database URL with fallback to default."""
         return (
             self.database_url
-            or "postgresql+asyncpg://user:password@localhost/knowledge_db"
+            or "postgresql+asyncpg://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST/YOUR_DATABASE"
         )
 
     def create_engine(self, echo: bool = False):

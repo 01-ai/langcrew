@@ -203,7 +203,7 @@ from langcrew_tools.utils.vector import create_vector_manager, VectorConfig
 # Create vector manager
 config = VectorConfig(
     provider="pgvector",  # or "chroma", "pinecone", etc.
-    connection_string="postgresql://user:pass@localhost/vectordb",
+    connection_string="postgresql://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST/YOUR_DATABASE",
     embedding_model="text-embedding-3-small"
 )
 
@@ -316,7 +316,7 @@ export SILICONFLOW_TOKEN=your_api_token
 #### Vector Database (PGVector example)
 
 ```bash
-export VECTOR_CONNECTION_STRING=postgresql://user:pass@localhost/vectordb
+export VECTOR_CONNECTION_STRING=postgresql://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST/YOUR_DATABASE
 export VECTOR_EMBEDDING_MODEL=text-embedding-3-small
 ```
 

@@ -14,8 +14,8 @@ dependencies = [
     "langcrew>=0.1.0",
 ]
 
-[tool.uv]
-extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+[tool.uv.sources]
+langcrew = { path = "../../libs/langcrew", editable = true }
 
 [project.scripts]
 marketing_posts = "marketing_posts.main:run"

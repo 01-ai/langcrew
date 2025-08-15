@@ -33,19 +33,9 @@ dependencies = [
     "browser-use==0.5.5",
 ]
 
-[tool.uv]
-extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
-prerelease = "allow"
-index-strategy = "unsafe-best-match"
-
 [tool.uv.sources]
 langcrew = { path = "../../../../libs/langcrew", editable = true }
 langcrew-tools = { path = "../../../../libs/langcrew-tools", editable = true }
-
-[[tool.uv.index]]
-url = "https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"
-publish-url = "https://nexus.lingyiwanwu.net/repository/pypi-hosted/"
-explicit = true
 
 [project.scripts]
 super_agent = "super_agent.main:run_crew"

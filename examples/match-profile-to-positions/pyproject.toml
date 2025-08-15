@@ -14,8 +14,9 @@ dependencies = [
     "langcrew-tools>=0.1.0",
 ]
 
-[tool.uv]
-extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+[tool.uv.sources]
+langcrew = { path = "../../libs/langcrew", editable = true }
+langcrew-tools = { path = "../../libs/langcrew-tools", editable = true }
 
 [project.scripts]
 match_to_proposal = "match_to_proposal.main:run"

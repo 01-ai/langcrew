@@ -38,8 +38,9 @@ web_chat_server = "web_chat.server:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+[tool.uv.sources]
+langcrew = { path = "../../../../libs/langcrew", editable = true }
+langcrew-tools = { path = "../../../../libs/langcrew-tools", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/web_chat"]
