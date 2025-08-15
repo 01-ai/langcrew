@@ -1,11 +1,16 @@
-# 张伟 - 高级软件工程师
+<!--
+注意：本文件包含的所有数据均为示例数据，仅供演示使用
+不代表任何真实的公司、个人或职位信息
+-->
+
+# John Smith - 高级软件工程师
 
 ## 个人信息
-- **姓名**：张伟
+- **姓名**：John Smith
 - **年龄**：29岁
 - **工作年限**：6年
-- **手机**：138-0013-8000
-- **邮箱**：zhangwei.dev@example.com
+- **手机**：138-XXXX-XXXX
+- **邮箱**：john.smith@example.com
 - **地址**：北京市朝阳区
 - **期望薪资**：25-35K
 
@@ -22,7 +27,7 @@
 - **前端**：React、Vue.js、TypeScript、HTML5/CSS3
 - **后端**：Django、Flask、FastAPI、Spring Boot、Express.js
 - **数据库**：MySQL、PostgreSQL、Redis、MongoDB
-- **云服务**：AWS（EC2、S3、RDS）、阿里云、腾讯云
+- **云服务**：AWS（EC2、S3、RDS）、AWS、Azure
 - **容器化**：Docker、Kubernetes、Docker Compose
 - **DevOps**：Jenkins、GitLab CI/CD、Nginx
 - **开发工具**：Git、PyCharm、VSCode、Postman
@@ -35,7 +40,7 @@
 
 ## 工作经验
 
-### 高级软件工程师 | 北京科技创新有限公司
+### 高级软件工程师 | TechInnovation Corp
 **2021.03 - 至今 (3年)**
 
 **主要职责：**
@@ -65,7 +70,7 @@
 - 制定代码规范和最佳实践，降低bug率60%
 - 培养了2名初级工程师成长为独立开发者
 
-### 软件工程师 | 上海互联网科技公司
+### 软件工程师 | InternetTech Solutions
 **2018.07 - 2021.02 (2.5年)**
 
 **主要职责：**
@@ -89,7 +94,7 @@
 - 学习了系统设计和架构思维
 - 培养了良好的代码质量意识
 
-### 初级开发工程师 | 北京软件外包公司
+### 初级开发工程师 | SoftwareDev Outsourcing
 **2017.06 - 2018.06 (1年)**
 
 **主要工作：**
@@ -99,7 +104,7 @@
 
 ## 教育背景
 
-### 北京理工大学 | 计算机科学与技术 | 本科
+### Tech University | 计算机科学与技术 | 本科
 **2013.09 - 2017.06**
 
 **主要课程：**

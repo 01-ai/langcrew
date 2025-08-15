@@ -88,7 +88,8 @@ all = [
 ]
 
 [tool.uv]
-extra-index-url = ["https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"]
+# Note: If you need to use internal PyPI sources, please set via environment variables:
+# UV_EXTRA_INDEX_URL=https://your-private-pypi.example.com/simple
 prerelease = "allow"
 dev-dependencies = [
     "pytest>=7.0.0",

@@ -75,8 +75,7 @@ Comprehensive guides and API references built with Astro Starlight.
 **Backend Server:**
 ```bash
 # 1. Clone repository
-git clone git@code.lingyiwanwu.net:oma/boway/langcrew.git
-git checkout github-main
+git clone https://github.com/langcrew/langcrew.git
 
 # 2. Install uv (choose one method)
 # Option A: Official installer (recommended)

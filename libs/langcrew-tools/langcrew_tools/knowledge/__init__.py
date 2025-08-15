@@ -19,7 +19,7 @@ Usage:
 
     # Using custom configuration
     config = VectorConfig(
-        database_url="postgresql://user:pass@localhost/db",
+        database_url="postgresql://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST/YOUR_DATABASE",
         index_name="custom_vectors"
     )
     tool = PgVectorSearchTool(vector_config=config)

@@ -23,7 +23,7 @@ pip install pgvector psycopg2-binary
 3. Set up required environment variables for database connection:
 
 ```shell
-export VECTOR_DATABASE_URL="postgresql://user:pass@localhost/db"
+export VECTOR_DATABASE_URL="postgresql://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST/YOUR_DATABASE"
 export VECTOR_INDEX_NAME="knowledge_vectors"
 ```
 
@@ -79,7 +79,7 @@ result = await tool.arun(
 
 # Using custom configuration
 config = VectorConfig(
-    database_url="postgresql://user:pass@localhost/knowledge_db",
+    database_url="postgresql://YOUR_USERNAME:YOUR_PASSWORD@YOUR_HOST/YOUR_DATABASE",
     index_name="custom_vectors"
 )
 custom_tool = PgVectorSearchTool(vector_config=config)
