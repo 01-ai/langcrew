@@ -43,6 +43,11 @@ LANGCREW_CRAWL4AI_SERVICE_URL=
 
 # ImageGenerationTool Configuration
 LANGCREW_IMAGE_GEN_API_KEY=
+
+# Cloud Phone Automation Configuration
+AGENTBOX_API_KEY=
+AGENTBOX_TEMPLATE=
+AGENTBOX_TIMEOUT=1800
 ```
 
 ### Variable Descriptions
@@ -60,6 +65,10 @@ LANGCREW_IMAGE_GEN_API_KEY=
 - **Search Tool Configuration**: For web search functionality, requires configuring search service endpoint and key
 
 - **Image Generation Configuration**: For AI image generation functionality, requires configuring image generation service key
+
+- **Cloud Phone Automation Configuration**: For mobile device automation operations
+  - `AGENTBOX_API_KEY`: AgentBox cloud phone service API key
+  - `AGENTBOX_TEMPLATE`: Cloud phone template
 
 **Important Note**: `E2B_TEMPLATE` and `E2B_DOMAIN` must use the specified values above. These are dedicated sandbox environment configurations provided by 01 for the current demo. Please do not modify them.
 
@@ -166,6 +175,16 @@ Content-Type: application/json
 - Support for user takeover control and manual intervention for login pages
 - Built-in error recovery and retry mechanisms to ensure stable task execution
 
+#### Cloud Phone Automation
+- Intelligent mobile device operation and app automation based on AgentBox
+- Complete Android device UI interaction and application management support
+- Intelligent screenshot and clickable element recognition, providing real-time visual context
+- Comprehensive mobile operation capabilities: tap, swipe, text input, key operations
+- Application lifecycle management: start apps, switch apps, get app lists
+- Support for complex mobile tasks: shopping, social, search, content browsing, etc.
+- Intelligent error handling and task recovery mechanisms
+- Support for user takeover control for handling verification codes, logins, and other sensitive operations
+
 #### Information Retrieval and Processing
 - Web search and content scraping
 - Multi-source information integration and verification
@@ -220,6 +239,16 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   }'
 ```
 
+### Cloud Phone Automation Tasks
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Launch Taobao app, search for iPhone 15 Pro, check prices of the first three products and save screenshots",
+    "session_id": "shopping_session"
+  }'
+```
+
 ## Project Architecture
 
 ```
@@ -233,6 +262,8 @@ src/super_agent/
 ├── config/
 │   ├── config.py           # Configuration class definitions
 │   └── prompt.py           # System prompts
+├── tool/
+│   └── cloud_phone_streaming_tool.py           # Custom tools
 ├── main.py                 # Direct execution entry point
 └── server.py              # FastAPI server
 ```

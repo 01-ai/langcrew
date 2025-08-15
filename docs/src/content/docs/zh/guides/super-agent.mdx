@@ -43,6 +43,11 @@ LANGCREW_CRAWL4AI_SERVICE_URL=
 
 # ImageGenerationTool 配置
 LANGCREW_IMAGE_GEN_API_KEY=
+
+# 云手机自动化配置
+AGENTBOX_API_KEY=
+AGENTBOX_TEMPLATE=
+AGENTBOX_TIMEOUT=1800
 ```
 
 ### 变量说明
@@ -60,6 +65,10 @@ LANGCREW_IMAGE_GEN_API_KEY=
 - **搜索工具配置**：用于网络搜索功能，需要配置搜索服务端点和密钥
 
 - **图像生成配置**：用于 AI 图像生成功能，需要配置图像生成服务密钥
+
+- **云手机自动化配置**：用于移动设备自动化操作
+  - `AGENTBOX_API_KEY`：AgentBox 云手机服务 API 密钥
+  - `AGENTBOX_TEMPLATE`：云手机模版
 
 **重要提示**：`E2B_TEMPLATE` 和 `E2B_DOMAIN` 必须使用上述指定值，这是 01 为当前 demo 提供的专用沙盒环境配置，请勿修改。
 
@@ -166,6 +175,16 @@ Content-Type: application/json
 - 支持用户主动接管控制和登录页面的人工干预
 - 内置错误恢复和重试机制确保任务稳定执行
 
+#### 云手机自动化
+- 基于 AgentBox 的智能移动设备操作和应用自动化
+- 支持 Android 设备的完整 UI 交互和应用管理
+- 智能截屏和可点击元素识别，提供实时视觉上下文
+- 全面的移动端操作能力：点击、滑动、文本输入、按键操作
+- 应用生命周期管理：启动应用、切换应用、获取应用列表
+- 支持复杂移动端任务：购物、社交、搜索、内容浏览等
+- 智能错误处理和任务恢复机制
+- 支持用户接管控制处理验证码、登录等敏感操作
+
 #### 信息检索与处理
 - 网络搜索和内容抓取
 - 多源信息整合和验证
@@ -220,6 +239,17 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   }'
 ```
 
+### 云手机自动化任务
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "启动淘宝应用，搜索iPhone 15 Pro，查看前三个商品的价格并截图保存",
+    "session_id": "shopping_session"
+  }'
+```
+
 ## 项目架构
 
 ```
@@ -233,6 +263,8 @@ src/super_agent/
 ├── config/
 │   ├── config.py           # 配置类定义
 │   └── prompt.py           # 系统提示词
+├── tool/
+│   └── cloud_phone_streaming_tool.py           # 自定义工具
 ├── main.py                 # 直接执行入口点
 └── server.py              # FastAPI 服务器
 ```
