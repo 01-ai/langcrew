@@ -1,0 +1,257 @@
+---
+title: Tools
+description: Understanding tools - the capabilities that empower agents to take actions
+---
+
+Tools are the **action capabilities** that enable agents to interact with the world beyond text generation. They transform agents from conversational entities into practical actors that can read files, search the web, perform calculations, and integrate with external systems.
+
+## What are Tools?
+
+In langcrew, tools are functions or services that agents can invoke to:
+
+- **Gather information** - Search engines, databases, APIs
+- **Process data** - Calculators, parsers, analyzers  
+- **Take actions** - File operations, email sending, API calls
+- **Interact with users** - Input collection, approval workflows
+
+```python
+from langcrew import Agent
+from langcrew_tools import WebSearchTool, FileWriteTool
+
+# Agent with multiple tool capabilities
+agent = Agent(
+    role="Research Assistant",
+    tools=[WebSearchTool(), FileWriteTool()],
+    goal="Research topics and create reports"
+)
+```
+
+## Tool Architecture
+
+### Tool Types
+
+langcrew supports multiple tool ecosystems:
+
+#### 1. **CrewAI Tools** (`crewai_tools`)
+
+Pre-built tools optimized for agent workflows:
+
+```python
+from langcrew.tools import ToolRegistry
+
+# Access CrewAI tools via registry
+search_tool = ToolRegistry.get_tool("crewai:search_the_internet_with_serper")
+file_tool = ToolRegistry.get_tool("crewai:read_a_files_content")
+```
+
+#### 2. **LangChain Tools** (`langchain_community`)
+
+Extensive ecosystem of community tools:
+
+```python
+# LangChain community tools
+calculator = ToolRegistry.get_tool("langchain:calculator")
+wikipedia = ToolRegistry.get_tool("langchain:wikipedia")
+```
+
+#### 3. **Custom Tools**
+
+Application-specific tools you create:
+
+```python
+from langcrew.tools import tool
+
+@tool
+def custom_database_query(query: str) -> str:
+    """Query the company database."""
+    # Your custom logic here
+    return f"Database results for: {query}"
+```
+
+#### 4. **MCP Tools** (Model Context Protocol)
+
+External services via standardized protocol:
+
+```python
+agent = Agent(
+    role="System Admin",
+    mcp_servers={
+        "filesystem": {
+            "transport": "stdio",
+            "command": "python",
+            "args": ["mcp_filesystem.py"]
+        }
+    }
+)
+```
+
+### Tool Discovery
+
+langcrew provides automatic tool discovery:
+
+```python
+from langcrew.tools import ToolRegistry
+
+# List all available tools
+tools = ToolRegistry.list_tools()
+
+# Search for specific tools
+search_tools = ToolRegistry.search_tools("search")
+file_tools = ToolRegistry.search_tools("file")
+```
+
+## Tool Integration Patterns
+
+### 1. **Agent-Level Tools**
+
+Tools assigned to specific agents:
+
+```python
+researcher = Agent(
+    role="Researcher",
+    tools=[WebSearchTool(), WebFetchTool()],
+    goal="Gather comprehensive information"
+)
+```
+
+### 2. **Dynamic Tool Selection**
+
+Agents choose tools based on task requirements:
+
+```python
+multi_tool_agent = Agent(
+    role="General Assistant",
+    tools=ToolRegistry.get_tools_by_category("productivity"),
+    goal="Handle various productivity tasks"
+)
+```
+
+### 3. **Tool Handoffs**
+
+Tools can be passed between agents in a crew:
+
+```python
+# Researcher uses search tools
+researcher = Agent(tools=[search_tools])
+
+# Writer inherits context but uses different tools  
+writer = Agent(tools=[writing_tools])
+```
+
+## Tool Security and Control
+
+### Human-in-the-Loop (HITL)
+
+Control tool execution with human oversight:
+
+```python
+from langcrew.hitl import HITLConfig
+
+agent = Agent(
+    role="File Manager",
+    tools=[FileWriteTool(), FileDeleteTool()],
+    hitl=HITLConfig(
+        interrupt_before_tools=["file_write", "file_delete"]
+    )
+)
+```
+
+### Tool Filtering
+
+Restrict which tools agents can access:
+
+```python
+# Only allow safe tools
+safe_tools = ToolRegistry.get_tools_by_safety_level("safe")
+agent = Agent(tools=safe_tools)
+```
+
+## Tool Performance
+
+### Async Support
+
+Tools support asynchronous execution:
+
+```python
+@tool
+async def async_api_call(endpoint: str) -> str:
+    """Make async API call."""
+    # Async implementation
+    return await make_request(endpoint)
+```
+
+### Caching
+
+Automatic result caching for expensive operations:
+
+```python
+@tool(cache=True, cache_ttl=3600)  # Cache for 1 hour
+def expensive_calculation(data: str) -> str:
+    """Perform expensive calculation."""
+    # Heavy computation
+    return result
+```
+
+## Best Practices
+
+### 1. **Tool Selection**
+
+Choose tools that match agent capabilities:
+
+```python
+# Good: Specialized tools for specialized agents
+data_scientist = Agent(
+    role="Data Scientist", 
+    tools=[pandas_tool, matplotlib_tool, statistics_tool]
+)
+
+# Avoid: Unrelated tools
+# data_scientist = Agent(tools=[email_tool, calendar_tool])  # ❌
+```
+
+### 2. **Error Handling**
+
+Tools should handle errors gracefully:
+
+```python
+@tool
+def robust_file_reader(filepath: str) -> str:
+    """Read file with error handling."""
+    try:
+        with open(filepath, 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return f"Error: File {filepath} not found"
+    except PermissionError:
+        return f"Error: Permission denied for {filepath}"
+```
+
+### 3. **Clear Descriptions**
+
+Provide clear tool descriptions for agent understanding:
+
+```python
+@tool
+def calculate_roi(investment: float, return_amount: float) -> float:
+    """Calculate Return on Investment (ROI) percentage.
+    
+    Args:
+        investment: Initial investment amount in dollars
+        return_amount: Final return amount in dollars
+        
+    Returns:
+        ROI percentage (e.g., 25.5 for 25.5% ROI)
+    """
+    return ((return_amount - investment) / investment) * 100
+```
+
+## Integration with Other Components
+
+Tools integrate seamlessly with all langcrew components:
+
+- **[Agents](/concepts/agents)**: Primary tool users and executors
+- **[Tasks](/concepts/tasks)**: Tasks define which tools are needed
+- **[Crews](/concepts/crews)**: Coordinate tool usage across multiple agents
+- **[Memory](/concepts/memory)**: Remember tool usage patterns and results
+- **[HITL](/concepts/hitl)**: Control tool execution with human oversight
+

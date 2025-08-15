@@ -1,0 +1,445 @@
+---
+title: Web组件通信协议
+description: LangCrew Web组件完整通信协议规范
+---
+
+LangCrew Web组件通信协议定义了Web客户端如何通过Server-Sent Events (SSE)与LangCrew智能体进行实时流式通信。
+
+## 1. 传输协议
+
+### 流式传输（SSE）
+
+- 客户端调用发送消息API
+- 服务器通过该连接发送事件（SSE）流
+
+## 2. 消息定义
+
+### 2.1 消息结构
+
+#### 用户输入
+
+```json
+{
+  "id": "uuid",
+  "role": "user",
+  "type": "text",
+  "content": "用户发的消息",
+  "detail": {
+      "knowledgeIds": [1, 2, 3],
+      "tools": [1, 2, 3],
+      "files": [{
+          "name": "文件1",
+          "type": "pdf",
+          "url": ""
+      }]
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### 起始消息
+
+**起始消息**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "session_init",
+  "content": "",
+  "detail": {
+      "session_id": "xxxxxx",
+      "title": "xxxxx"
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**结束消息**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "finish_reason",
+  "content": "候选人简历分析结果",
+  "detail": {
+      "status": "completed",
+      "reason": ""
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### 资源
+
+**文本（结果交付也用）**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "text",
+  "content": "候选人简历分析结果",
+  "detail": {
+      "streaming": false,
+      "attachments": []
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**图片（暂时没用）**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "image",
+  "content": "图片描述文本",
+  "detail": {
+    "url": "https://example.com/image.jpg",
+    "width": 800,
+    "height": 600
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**音频（暂时没用）**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "audio",
+  "content": "音频描述文本",
+  "detail": {
+    "url": "https://example.com/audio.mp3",
+    "duration": 120
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**视频（暂时没用）**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "video",
+  "content": "视频描述文本",
+  "detail": {
+    "url": "https://example.com/video.mp4",
+    "duration": 180,
+    "thumbnail": "https://example.com/thumbnail.jpg"
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### 计划
+
+**生成**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "plan",
+  "content": "分析计划概述",
+  "detail": {
+    "steps": [{
+        "id": "step1",
+        "title": "步骤1: 搜索信息",
+        "description": "使用搜索工具查找相关资料",
+        "started_at": 1748438204041,
+        "status": "pending"
+      }, {
+        "id": "step2",
+        "title": "步骤2: 分析数据",
+        "description": "分析搜集到的数据",
+        "started_at": null,
+        "status": "pending"
+      }],
+    "created_at": 1748438204041
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**更新**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "plan_update",
+  "content": "计划更新说明",
+  "detail": {
+    "action": "update",
+    "steps": [{
+        "id": "step1",
+        "title": "步骤2: 修改的新步骤",
+        "description": "根据最新情况调整计划",
+        "started_at": 1748438204041,
+        "status": "success"
+      }]
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### 工具调用
+
+**开始调用**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "tool_call",
+  "content": "点击xxx浏览xxx内容",
+  "detail": {
+    "run_id": "xxxxxxxx",
+    "tool": "search",
+    "status": "pending",
+    "action": "正在浏览",
+    "action_content": "/home/user/document.html",
+    "param": {
+      "param1": {},
+      "param2": "xxxxxx"
+    }
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**结束调用**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "tool_result",
+  "content": "",
+  "detail": {
+    "run_id": "xxxxxxxx",
+    "tool": "terminal",
+    "status": "success",
+    "result": {
+      "content": "xxxxxx",
+      "additional_kwargs": {},
+      "response_metadata": "xxxxxx"
+    }
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### HITL
+
+**HITL标准消息**
+
+收到此消息后无下一条finish_reason，需特殊处理为本轮结束、用户为结束状态
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "human_input",
+  "content": "您创建的内容可以部署为静态网站，确认要部署吗？",
+  "detail": {
+      "options": ["同意", "拒绝"],
+      "result": {
+        "question": "您创建的内容可以部署为静态网站，确认要部署吗？"
+      },
+      "session_id": "xxxxxx"
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### 状态消息
+
+**（会在页面上闪烁，新消息来了后当前消息消失）**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "live_status",
+  "content": "正在搜索",
+  "detail": {
+    "expires_in": 5000
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### 错误消息
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "error",
+  "content": "具体的错误消息",
+  "detail": {},
+  "timestamp": 1748438204041
+}
+```
+
+### 2.2 工具类型
+
+**superagent用，持续增加中...**：
+
+- **terminal**: 终端操作
+- **file**: 文件操作
+- **search**: 搜索操作
+- **browser**: 浏览器操作
+- **html**: 网页操作
+
+### 2.3 角色
+
+- **user**: 用户
+- **assistant**: AI助手
+
+## 3. 完整流程
+
+1. **用户发起消息**
+2. **智能体流式返回**：
+   1. 开始消息：title、session_id等关键信息
+   2. Plan消息：包含具体的执行计划（假如有两步，全部pending）
+   3. Plan update消息：step 1 running
+   4. 多条execute消息：多条执行消息（text、tool call、状态消息等）
+   5. Plan update消息：step 1 success
+   6. Plan update消息：step 2 running（和上面step1 success可以一起发）
+   7. 多条execute消息：多条执行消息（text、tool call、状态消息等）
+   8. Plan update消息：step 2 success
+   9. 给用户的结束返回消息：text带attachment
+   10. 结束消息：finish_reason
+   11. 特殊消息：error消息、user_input（hitl）
+
+## 4. 鉴权
+
+无内置身份验证。用户可添加自定义身份验证中间件：
+
+```python
+from langcrew.web import create_server
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPBearer
+
+security = HTTPBearer()
+
+async def verify_token(credentials = Depends(security)):
+    # 在这里添加您的身份验证逻辑
+    if not is_valid_token(credentials.credentials):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return credentials
+
+server = create_server(crew)
+
+@server.app.post("/api/v1/chat")
+async def protected_chat(request: dict, token = Depends(verify_token)):
+    # 您的受保护聊天逻辑
+    pass
+```
+
+## 5. API 参考
+
+#### 发送消息 `/api/v1/chat`
+
+**请求：**
+
+```json
+{
+    "message": "用户发的消息",
+    "session_id": "xxxxx",
+    "interrupt_data": {}
+}
+```
+
+**参数说明：**
+
+- `message`（必需）：用户的消息内容
+- `session_id`（可选）：用于对话连续性的会话标识符。如果不提供或为空，将自动创建新会话，格式为 `session_{16位uuid字符}`
+- `interrupt_data`（可选）：用于恢复中断对话的附加数据
+
+**响应：** 流式返回StreamMessage（见上方消息定义）
+
+#### 停止聊天 `/api/v1/chat/stop`
+
+**请求：**
+
+```json
+{
+    "session_id": "xxxxx"
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "session_id": "xxxx"
+}
+```
+
+## 使用示例
+
+### 基础聊天流程
+
+```python
+import requests
+import json
+
+# 开始新对话（不提供session_id）
+response = requests.post('/api/v1/chat', json={
+    "message": "你好，能帮我分析这个文档吗？"
+})
+
+# 处理流式响应
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"接收到: {message['type']} - {message['content']}")
+        
+        # 从session_init消息中提取session_id
+        if message['type'] == 'session_init':
+            session_id = message['detail']['session_id']
+            print(f"新会话已创建: {session_id}")
+```
+
+### 继续现有对话
+
+```python
+# 使用session_id继续现有对话
+response = requests.post('/api/v1/chat', json={
+    "message": "能提供更多细节吗？",
+    "session_id": "session_abc123def456"  # 使用现有会话
+})
+
+# 处理流式响应
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"接收到: {message['type']} - {message['content']}")
+```
+
+### 处理HITL消息
+
+```python
+# 当接收到human_input消息时
+if message['type'] == 'human_input':
+    user_choice = input(message['content'])
+    
+    # 发送用户响应
+    requests.post('/api/v1/chat', json={
+        "session_id": message['detail']['session_id'],
+        "message": user_choice,
+        "interrupt_data": message['detail']
+    })
+```

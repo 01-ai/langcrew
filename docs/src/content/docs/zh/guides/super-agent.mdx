@@ -1,0 +1,250 @@
+---
+title: Super Agent
+description: 基于 LangCrew 框架构建的强大智能代理系统，集成浏览器自动化、网络搜索、代码执行等功能
+---
+
+Super Agent 是一个基于 LangCrew 框架构建的强大智能代理系统，集成了浏览器自动化、网络搜索、代码执行、文件操作等多种工具，提供完整的 Web API 服务和流式响应支持。
+
+## 准备条件和配置
+
+## 环境变量
+
+在开始使用 Super Agent 之前，您需要配置环境变量。
+
+**重要提示**：请参考项目中的环境变量配置示例文件：
+- **配置示例文件**：[`examples/components/web/super_agent/.env.example`](https://github.com/01-ai/langcrew/blob/main/examples/components/web/super_agent/.env.example)
+
+**请配置以下所有环境变量以确保 Super Agent 正常运行**：
+
+```bash
+# LLM API 密钥
+OPENAI_API_KEY=
+
+# E2B 沙盒环境配置
+E2B_API_KEY=
+E2B_TEMPLATE=e2b-20250806-v1
+E2B_DOMAIN=your-e2b-domain.example.com
+E2B_TIMEOUT=3600
+
+# S3 存储配置
+S3_ENDPOINT=
+S3_AK=
+S3_SK=
+S3_BUCKET=
+S3_GATEWAY=
+S3_REGION=
+
+# WebSearchTool 配置
+LANGCREW_WEB_SEARCH_ENDPOINT=
+LANGCREW_WEB_SEARCH_API_KEY=
+
+# WebFetchTool 配置
+LANGCREW_CRAWL4AI_SERVICE_URL=
+
+# ImageGenerationTool 配置
+LANGCREW_IMAGE_GEN_API_KEY=
+```
+
+### 变量说明
+
+- **LLM API 密钥**：OpenAI API 密钥，用于智能体的核心推理能力
+
+- **E2B 沙盒环境配置**：用于安全的代码执行环境
+  - `E2B_API_KEY`：需要申请 E2B API 密钥
+  - `E2B_TEMPLATE`：**必须使用 `e2b-20250806-v1`**（01 提供的指定沙盒模板）
+  - `E2B_DOMAIN`：您的 E2B 域名（例如：`your-e2b-domain.example.com`）
+  - `E2B_TIMEOUT`：沙盒超时时间，设置为 3600 秒
+
+- **S3 存储配置**：用于文件存储和图像保存，需要配置 S3 兼容的对象存储服务
+
+- **搜索工具配置**：用于网络搜索功能，需要配置搜索服务端点和密钥
+
+- **图像生成配置**：用于 AI 图像生成功能，需要配置图像生成服务密钥
+
+**重要提示**：`E2B_TEMPLATE` 和 `E2B_DOMAIN` 必须使用上述指定值，这是 01 为当前 demo 提供的专用沙盒环境配置，请勿修改。
+
+## 快速启动
+
+### 第一步：进入示例项目目录
+
+```bash
+cd examples/components/web/super_agent
+```
+
+### 第二步：配置环境变量
+
+在当前目录创建 `.env` 文件：
+
+```bash
+# 复制配置示例文件
+cp .env.example .env
+# 编辑 .env 文件，填写必要的配置
+```
+
+### 第三步：启动服务
+
+```bash
+docker-compose -f compose-super-agent.yaml up --build
+```
+
+### 第三步：访问服务
+
+启动完成后，您可以访问：
+- **Super Agent API**：http://localhost:8000
+- **前端 Web UI**：http://localhost:3600
+
+* 注：前端服务启动需要加载5-6分钟。
+
+### Docker Compose 架构说明
+
+示例目录中的 `compose-super-agent.yaml` 文件定义了完整的全栈架构：
+
+**frontend 服务**：
+- 基于 Node.js 18 Alpine 镜像
+- 端口映射：3600:3600
+- 自动安装依赖并启动开发服务器
+- 环境变量：`AGENT_API_HOST=http://super-agent:8000`
+- 挂载 `./web` 目录作为前端代码
+
+**super-agent 服务**：
+- 基于当前目录的 `Dockerfile` 构建
+- 端口映射：8000:8000
+- 从 `.env` 文件加载环境变量
+- 运行模式：full，日志级别：info
+- 网络：langcrew-network（与前端服务通信）
+
+## 重点功能说明
+
+### API 接口
+
+Super Agent 提供以下核心 API 接口：
+
+#### 1. 聊天接口
+```http
+POST /api/v1/chat
+Content-Type: application/json
+
+{
+  "message": "你的任务描述",
+  "session_id": "会话ID（可选，为空时自动生成）"
+}
+```
+
+**功能特性**：
+- 支持多轮对话
+- 实时流式响应（Server-Sent Events）
+- 自动会话管理
+- 工具调用和执行监控
+
+#### 2. 停止执行接口
+```http
+POST /api/v1/chat/stop
+Content-Type: application/json
+
+{
+  "session_id": "要停止的会话ID"
+}
+```
+
+#### 3. 更新任务接口
+```http
+POST /api/v1/update_task
+Content-Type: application/json
+
+{
+  "message": "新的任务指令",
+  "session_id": "会话ID"
+}
+```
+
+### 智能体能力
+
+#### 浏览器自动化
+- 基于 browser-use 的智能网页操作和数据提取
+- 自动处理复杂的多步骤网页任务和工作流
+- 智能识别页面元素并执行交互操作
+- 支持用户主动接管控制和登录页面的人工干预
+- 内置错误恢复和重试机制确保任务稳定执行
+
+#### 信息检索与处理
+- 网络搜索和内容抓取
+- 多源信息整合和验证
+- 结构化数据提取和分析
+- 智能内容总结和报告生成
+
+#### 代码执行与文件操作
+- 沙盒环境中的 Python 代码执行
+- 数学计算、数据分析、图表生成
+- 完整的文件系统操作支持
+- 支持多种文件格式的读写
+
+#### 多媒体生成
+- AI 驱动的图像生成
+- 支持各种艺术风格和描述
+- 自动图像文件保存和管理
+
+#### 系统集成
+- Linux 命令执行支持
+- 环境变量和配置管理
+- 多工具协调和工作流编排
+
+## 使用示例
+
+### 网络搜索和信息提取
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "搜索2024年人工智能发展趋势并总结关键洞察",
+    "session_id": "research_session"
+  }'
+```
+
+### 浏览器自动化任务
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "打开12306官网帮我查询一下后天下午三点以后从北京到上海有哪些高铁有余票",
+    "session_id": "automation_session"
+  }'
+```
+
+### 文件处理和内容生成
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "创建一份关于AI技术发展的研究报告并保存为markdown文件",
+    "session_id": "document_session"
+  }'
+```
+
+## 项目架构
+
+```
+src/super_agent/
+├── agent/
+│   ├── crew.py              # 主要的 SuperAgentCrew 类
+│   └── enhanced_crew.py     # 增强的 Crew 实现
+├── common/
+│   ├── session_state.py     # 会话状态管理
+│   └── sandbox_config.py    # 沙盒配置
+├── config/
+│   ├── config.py           # 配置类定义
+│   └── prompt.py           # 系统提示词
+├── main.py                 # 直接执行入口点
+└── server.py              # FastAPI 服务器
+```
+
+## 与 LangCrew 框架集成
+
+Super Agent 完全基于 LangCrew 框架构建，展示了框架的强大能力：
+
+- **装饰器开发模式**：使用 `@agent`、`@crew` 装饰器
+- **工具生态系统**：集成 LangCrew-Tools 工具集
+- **流式监控**：实时执行状态和结果流
+- **会话管理**：持久化上下文和状态
+- **人机协作**：内置审批和交互机制
+
+Super Agent 是 LangCrew 框架能力的完美展示，为构建生产级智能体系统提供了完整的参考实现。

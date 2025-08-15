@@ -1,0 +1,466 @@
+---
+title: Storage Configuration
+description: Configure different storage backends for Memory
+---
+
+Configure different storage backends for LangCrew Memory to match your deployment needs, from development to production scale.
+
+## Overview
+
+LangCrew Memory supports multiple storage providers:
+
+- **✅ Tested**: `memory`, `sqlite`, `postgresql`
+- **⚠️ Experimental**: `redis`, `mongodb`, `mysql`
+
+## Storage Providers
+
+### In-Memory Storage
+
+Perfect for development and testing:
+
+```python
+from langcrew.memory import MemoryConfig
+
+# In-memory configuration
+memory_config = MemoryConfig(
+    provider="memory",  # No persistence
+    short_term={"enabled": True, "max_history": 20},
+    long_term={"enabled": True},
+    entity={"enabled": True}
+)
+```
+
+**Characteristics:**
+
+- ✅ **Fast**: No disk I/O overhead
+- ✅ **Simple**: No setup required
+- ❌ **Volatile**: Data lost on restart
+- ❌ **Single-process**: No sharing between instances
+
+**Best for:**
+
+- Unit testing
+- Development environments
+- Proof of concepts
+- Temporary sessions
+
+### SQLite Storage
+
+Ideal for single-user applications and development:
+
+```python
+# SQLite configuration
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db",
+    short_term={"enabled": True, "max_history": 30},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
+)
+```
+
+**Connection String Examples:**
+
+```python
+# Relative path
+"sqlite:///memory.db"
+
+# Absolute path
+"sqlite:////path/to/database/memory.db"
+
+# In-memory SQLite (testing)
+"sqlite:///:memory:"
+
+# With options
+"sqlite:///memory.db?check_same_thread=false"
+```
+
+**Characteristics:**
+
+- ✅ **Persistent**: Data survives restarts
+- ✅ **File-based**: Easy backup and migration
+- ✅ **No server**: Embedded database
+- ❌ **Single-writer**: Limited concurrency
+- ❌ **Local only**: No network access
+
+**Best for:**
+
+- Personal applications
+- Local development
+- Small team projects
+- Desktop applications
+
+### PostgreSQL Storage
+
+Production-ready for scalable applications:
+
+```python
+# PostgreSQL configuration
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:password@localhost:5432/memory_db",
+    short_term={"enabled": True, "max_history": 50},
+    long_term={"enabled": True, "min_quality": 0.8},
+    entity={"enabled": True}
+)
+```
+
+**Connection String Examples:**
+
+```python
+# Basic connection
+"postgresql://user:password@localhost:5432/database"
+
+# With host and port
+"postgresql://user:password@db.example.com:5432/memory_db"
+
+# With SSL
+"postgresql://user:password@localhost:5432/memory_db?sslmode=require"
+
+# Connection pooling
+"postgresql://user:password@localhost:5432/memory_db?pool_size=20&max_overflow=30"
+
+# Using environment variables
+import os
+connection_string = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:5432/{os.getenv('DB_NAME')}"
+```
+
+**Characteristics:**
+
+- ✅ **Scalable**: Handles large datasets
+- ✅ **Concurrent**: Multiple readers/writers
+- ✅ **ACID**: Full transaction support
+- ✅ **Network**: Remote access support
+- ❌ **Complex**: Requires server setup
+- ❌ **Resource**: Higher memory/CPU usage
+
+**Best for:**
+
+- Production applications
+- Multi-user systems
+- Large-scale deployments
+- Enterprise environments
+
+## Configuration Examples
+
+### Development Environment
+
+```python
+# Quick development setup
+memory_config = MemoryConfig(
+    provider="memory",  # Fast, no persistence needed
+    short_term={"enabled": True, "max_history": 10},
+    long_term={"enabled": True, "min_quality": 0.5},  # Lower threshold for testing
+    entity={"enabled": True}
+)
+```
+
+### Local Development with Persistence
+
+```python
+# Local development with file persistence
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///dev_memory.db",
+    short_term={"enabled": True, "max_history": 25},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
+)
+```
+
+### Staging Environment
+
+```python
+# Staging with PostgreSQL
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://staging_user:pass@staging-db:5432/memory_staging",
+    short_term={"enabled": True, "max_history": 40},
+    long_term={"enabled": True, "min_quality": 0.8},
+    entity={"enabled": True}
+)
+```
+
+### Production Environment
+
+```python
+# Production configuration with connection pooling
+import os
+
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string=f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:5432/{os.getenv('DB_NAME')}?pool_size=20&max_overflow=30",
+    short_term={"enabled": True, "max_history": 50},
+    long_term={"enabled": True, "min_quality": 0.85},
+    entity={"enabled": True}
+)
+```
+
+## Advanced Configuration
+
+### Connection Pooling
+
+For high-traffic applications:
+
+```python
+# PostgreSQL with connection pooling
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db?pool_size=20&max_overflow=30&pool_timeout=30&pool_recycle=3600"
+)
+```
+
+### SSL Configuration
+
+For secure connections:
+
+```python
+# PostgreSQL with SSL
+memory_config = MemoryConfig(
+    provider="postgresql", 
+    connection_string="postgresql://user:pass@db.example.com:5432/memory_db?sslmode=require&sslcert=/path/to/client.crt&sslkey=/path/to/client.key&sslrootcert=/path/to/ca.crt"
+)
+```
+
+### Environment-based Configuration
+
+```python
+import os
+from langcrew.memory import MemoryConfig
+
+def create_memory_config():
+    """Create memory config based on environment"""
+    env = os.getenv("ENVIRONMENT", "development")
+    
+    if env == "production":
+        return MemoryConfig(
+            provider="postgresql",
+            connection_string=os.getenv("DATABASE_URL"),
+            short_term={"enabled": True, "max_history": 50},
+            long_term={"enabled": True, "min_quality": 0.85},
+            entity={"enabled": True}
+        )
+    elif env == "staging":
+        return MemoryConfig(
+            provider="postgresql",
+            connection_string=os.getenv("STAGING_DATABASE_URL"),
+            short_term={"enabled": True, "max_history": 30},
+            long_term={"enabled": True, "min_quality": 0.75},
+            entity={"enabled": True}
+        )
+    else:  # development
+        return MemoryConfig(
+            provider="sqlite",
+            connection_string="sqlite:///dev_memory.db",
+            short_term={"enabled": True, "max_history": 20},
+            long_term={"enabled": True, "min_quality": 0.6},
+            entity={"enabled": True}
+        )
+
+memory_config = create_memory_config()
+```
+
+## Migration Between Providers
+
+### SQLite to PostgreSQL
+
+```python
+# Export from SQLite
+sqlite_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///old_memory.db"
+)
+
+crew_sqlite = Crew(agents=[agent], memory=sqlite_config)
+
+# Export memories
+short_term_data = crew_sqlite.short_term_memory.export()
+long_term_data = crew_sqlite.long_term_memory.export()
+entity_data = crew_sqlite.entity_memory.export()
+
+# Import to PostgreSQL
+postgres_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/new_memory_db"
+)
+
+crew_postgres = Crew(agents=[agent], memory=postgres_config)
+
+# Import memories
+crew_postgres.short_term_memory.import_memories(short_term_data)
+crew_postgres.long_term_memory.import_memories(long_term_data)
+crew_postgres.entity_memory.import_memories(entity_data)
+```
+
+### Backup and Restore
+
+```python
+import json
+from datetime import datetime
+
+def backup_memory(crew, backup_path):
+    """Backup all memory data"""
+    backup_data = {
+        "timestamp": datetime.now().isoformat(),
+        "short_term": crew.short_term_memory.export(),
+        "long_term": crew.long_term_memory.export(),
+        "entity": crew.entity_memory.export()
+    }
+    
+    with open(backup_path, 'w') as f:
+        json.dump(backup_data, f, indent=2)
+
+def restore_memory(crew, backup_path):
+    """Restore memory data from backup"""
+    with open(backup_path, 'r') as f:
+        backup_data = json.load(f)
+    
+    if "short_term" in backup_data:
+        crew.short_term_memory.import_memories(backup_data["short_term"])
+    if "long_term" in backup_data:
+        crew.long_term_memory.import_memories(backup_data["long_term"])
+    if "entity" in backup_data:
+        crew.entity_memory.import_memories(backup_data["entity"])
+
+# Usage
+backup_memory(crew, f"memory_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+```
+
+## Performance Tuning
+
+### SQLite Optimization
+
+```python
+# SQLite with performance tuning
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&temp_store=MEMORY"
+)
+```
+
+### PostgreSQL Optimization
+
+```python
+# PostgreSQL with optimized settings
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db?pool_size=20&max_overflow=30&pool_pre_ping=true&pool_recycle=3600"
+)
+```
+
+## Monitoring and Maintenance
+
+### Connection Health Check
+
+```python
+def check_memory_health(crew):
+    """Check memory system health"""
+    try:
+        # Test short-term memory
+        crew.short_term_memory.get_context(thread_id="health_check", limit=1)
+        
+        # Test long-term memory
+        crew.long_term_memory.search("health_check", limit=1)
+        
+        # Test entity memory
+        crew.entity_memory.get_entities(limit=1)
+        
+        return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e), "timestamp": datetime.now().isoformat()}
+```
+
+### Memory Usage Monitoring
+
+```python
+def get_memory_stats(crew):
+    """Get memory usage statistics"""
+    stats = {}
+    
+    try:
+        # Short-term memory stats
+        short_term_data = crew.short_term_memory.export()
+        stats["short_term"] = {
+            "total_memories": len(short_term_data),
+            "unique_threads": len(set(m.get("thread_id") for m in short_term_data))
+        }
+        
+        # Long-term memory stats
+        long_term_data = crew.long_term_memory.export()
+        stats["long_term"] = {
+            "total_memories": len(long_term_data),
+            "avg_quality": sum(m.get("quality", 0) for m in long_term_data) / len(long_term_data) if long_term_data else 0
+        }
+        
+        # Entity memory stats
+        entity_data = crew.entity_memory.export()
+        stats["entity"] = {
+            "total_entities": len(entity_data),
+            "entity_types": list(set(e.get("type") for e in entity_data))
+        }
+        
+    except Exception as e:
+        stats["error"] = str(e)
+    
+    return stats
+```
+
+## Troubleshooting
+
+### Connection Issues
+
+```python
+# Test database connection
+def test_connection(connection_string):
+    try:
+        # Test with a simple memory config
+        test_config = MemoryConfig(
+            provider="postgresql",  # or your provider
+            connection_string=connection_string
+        )
+        
+        # Try to create a crew (this will test the connection)
+        from langcrew import Agent, Crew
+        test_agent = Agent(role="Test", goal="Test connection")
+        test_crew = Crew(agents=[test_agent], memory=test_config)
+        
+        return True
+    except Exception as e:
+        print(f"Connection failed: {e}")
+        return False
+```
+
+### Performance Issues
+
+```python
+# Monitor query performance
+import time
+
+def benchmark_memory_operations(crew, iterations=100):
+    """Benchmark memory operations"""
+    
+    # Test short-term memory
+    start_time = time.time()
+    for i in range(iterations):
+        crew.short_term_memory.get_context(f"thread_{i}", limit=10)
+    short_term_time = time.time() - start_time
+    
+    # Test long-term memory
+    start_time = time.time()
+    for i in range(iterations):
+        crew.long_term_memory.search(f"query_{i}", limit=5)
+    long_term_time = time.time() - start_time
+    
+    # Test entity memory
+    start_time = time.time()
+    for i in range(iterations):
+        crew.entity_memory.search(f"entity_{i}", limit=5)
+    entity_time = time.time() - start_time
+    
+    return {
+        "short_term_avg_ms": (short_term_time / iterations) * 1000,
+        "long_term_avg_ms": (long_term_time / iterations) * 1000,
+        "entity_avg_ms": (entity_time / iterations) * 1000
+    }
+```
+

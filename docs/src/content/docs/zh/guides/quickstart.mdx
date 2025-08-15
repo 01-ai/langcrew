@@ -1,0 +1,272 @@
+---
+title: 快速开始
+description: 通过此分步教程在几分钟内构建您的第一个AI智能体团队
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+让我们构建您的第一个 langcrew 应用程序！在本教程中，我们将创建一个简单的内容创作团队，其中两个智能体协同工作。
+
+## 前置要求与安装
+
+### 系统要求
+
+在安装 langcrew 之前，请确保您具备：
+
+- **Python**: 3.11 到 3.12 版本
+- **uv**: 推荐的包管理器
+- **虚拟环境**: 建议用于项目隔离
+
+### 安装方法
+
+> **注意**: langcrew 目前不是开源的，需要访问私有包索引。
+
+使用 uv 和私有索引直接安装 langcrew：
+
+```bash
+uv add langcrew --prerelease=allow
+```
+
+### 验证安装
+
+```python
+import langcrew
+print(langcrew.__version__)
+
+# 测试基本功能
+from langcrew import Agent
+
+agent = Agent(
+    role="测试智能体",
+    goal="验证安装",
+    backstory="一个有用的测试智能体"
+)
+print(f"智能体已创建: {agent.role}")
+```
+
+## 我们要构建什么
+
+一个内容创作系统，其中：
+1. **研究员**智能体收集主题相关信息
+2. **作家**智能体基于研究创建文章
+
+## 步骤1：导入所需组件
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew_tools.search.langchain_tools import WebSearchTool
+from langcrew_tools.fetch.langchain_tools import WebFetchTool
+```
+
+## 步骤2：创建您的智能体
+
+### 研究智能体
+
+```python
+researcher = Agent(
+    role="高级研究分析师",
+    goal="收集给定主题的全面信息",
+    backstory="""您是一位经验丰富的研究员，对可信来源和相关信息有敏锐的眼光。
+    您擅长从多个来源查找和综合数据。""",
+    tools=[WebSearchTool(), WebFetchTool()],
+    verbose=True
+)
+```
+
+### 作家智能体
+
+```python
+writer = Agent(
+    role="内容作家",
+    goal="基于研究创建引人入胜且信息丰富的内容",
+    backstory="""您是一位技能娴熟的作家，能够将研究转化为引人入胜的叙述。
+    您有将复杂主题变得易于读者理解的天赋。""",
+    verbose=True
+)
+```
+
+## 步骤3：定义任务
+
+### 研究任务
+
+```python
+research_task = Task(
+    description="""研究主题：'人工智能对医疗保健的影响'
+    
+    您的研究应包括：
+    - AI在医疗保健中的当前应用
+    - 好处和挑战
+    - 未来的可能性
+    - 真实世界的例子和案例研究
+    
+    提供全面的研究摘要。""",
+    agent=researcher,
+    expected_output="关于AI在医疗保健中的详细研究报告"
+)
+```
+
+### 写作任务
+
+```python
+writing_task = Task(
+    description="""使用提供的研究，写一篇关于'人工智能对医疗保健的影响'的引人入胜的文章。
+    
+    文章应该：
+    - 有一个引人入胜的介绍
+    - 涵盖研究中的关键要点
+    - 包含具体例子
+    - 大约500字
+    - 以发人深省的结论结束""",
+    agent=writer,
+    context=[research_task],  # 此任务依赖于research_task
+    expected_output="一篇关于AI在医疗保健中的精心撰写的文章"
+)
+```
+
+## 步骤4：组建您的团队
+
+```python
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    verbose=True
+)
+```
+
+## 步骤5：执行团队
+
+```python
+# 开始团队工作
+result = crew.kickoff()
+
+# 显示最终结果
+print("=" * 50)
+print("最终文章：")
+print("=" * 50)
+print(result)
+```
+
+## 完整示例
+
+<Tabs>
+<TabItem label="Python">
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew_tools.search.langchain_tools import WebSearchTool
+from langcrew_tools.fetch.langchain_tools import WebFetchTool
+
+# 创建智能体
+researcher = Agent(
+    role="高级研究分析师",
+    goal="收集给定主题的全面信息",
+    backstory="""您是一位经验丰富的研究员，对可信来源和相关信息有敏锐的眼光。""",
+    tools=[WebSearchTool(), WebFetchTool()],
+    verbose=True
+)
+
+writer = Agent(
+    role="内容作家",
+    goal="创建引人入胜且信息丰富的内容",
+    backstory="""您是一位技能娴熟的作家，能够将研究转化为引人入胜的叙述。""",
+    verbose=True
+)
+
+# 定义任务
+research_task = Task(
+    description="研究主题：'人工智能对医疗保健的影响'",
+    agent=researcher,
+    expected_output="详细的研究报告"
+)
+
+writing_task = Task(
+    description="基于研究写一篇引人入胜的文章",
+    agent=writer,
+    context=[research_task],
+    expected_output="一篇精心撰写的文章"
+)
+
+# 创建并运行团队
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    verbose=True
+)
+
+result = crew.kickoff()
+print(result)
+```
+
+</TabItem>
+<TabItem label="命令行">
+
+```bash
+# 创建新项目
+langcrew create my-content-crew
+
+# 进入项目目录
+cd my-content-crew
+
+# 运行团队
+langcrew run
+```
+
+</TabItem>
+</Tabs>
+
+## 理解输出
+
+运行此团队时，您将看到：
+
+
+## 自定义选项
+
+### 添加人工输入
+
+```python
+from langcrew.tools import HumanInputTool
+
+agent = Agent(
+    role="交互式智能体",
+    tools=[HumanInputTool()],
+    # ... 其他参数
+)
+```
+
+### 自定义工具
+
+```python
+from langcrew.tools import tool
+
+@tool
+def custom_calculator(expression: str) -> str:
+    """计算数学表达式。"""
+    try:
+        result = eval(expression)
+        return f"结果是: {result}"
+    except Exception as e:
+        return f"错误: {str(e)}"
+
+agent = Agent(
+    tools=[custom_calculator],
+    # ... 其他参数
+)
+```
+
+## 下一步
+
+恭喜！您已经构建了您的第一个 langcrew 应用程序。接下来可以探索：
+
+- **[智能体深入了解](/zh/concepts/agents)**：了解智能体功能和配置
+- **[任务管理](/zh/concepts/tasks)**：理解任务依赖和执行流程
+- **[工具集成](/zh/concepts/tools)**：探索可用工具并创建自定义工具
+- **[示例](/examples/marketing-strategy)**：查看更复杂的团队实现
+
+## 成功提示
+
+1. **从简单开始**：从2-3个智能体开始，逐渐增加复杂性
+2. **明确角色**：给每个智能体一个特定、明确定义的角色
+3. **任务依赖**：使用上下文在任务之间共享信息
+4. **迭代改进**：根据结果优化智能体提示和任务描述
+5. **监控输出**：在开发过程中使用详细模式了解智能体行为
+

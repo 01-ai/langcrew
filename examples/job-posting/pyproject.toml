@@ -1,0 +1,31 @@
+[project]
+name = "job_posting"
+version = "0.1.0"
+description = "Job posting using LangCrew"
+authors = [
+    { name = "Your Name", email = "you@example.com" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0",
+    "dotenv>=0.9.9",
+    "langcrew>=0.1.0",
+    "langcrew-tools>=0.1.0",
+]
+
+[tool.uv.sources]
+langcrew = { path = "../../libs/langcrew", editable = true }
+langcrew-tools = { path = "../../libs/langcrew-tools", editable = true }
+
+[project.scripts]
+job_posting = "job_posting.main:run"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"

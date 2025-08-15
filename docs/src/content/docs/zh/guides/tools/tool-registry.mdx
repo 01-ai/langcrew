@@ -1,0 +1,213 @@
+---
+title: 使用工具
+description: 学习如何在 LangCrew 智能体中查找和使用工具
+---
+
+## 什么是工具？
+
+**工具**让你的智能体能够采取实际行动——比如计算数字、读取文件、抓取网站或调用 API。LangCrew 的工具系统自动查找并提供来自多个来源的工具访问。
+
+简单示例：
+
+```python
+from langcrew.tools import ToolRegistry
+
+# 获取工具并使用
+calculator = ToolRegistry.get_tool("calculator")
+result = calculator.run("2 + 2")  # "4"
+```
+
+## 获取工具：三种方式
+
+### 1. 安装工具包（推荐）
+
+**适用于**：大多数用户 - 为你提供数百个即用型工具
+
+```bash
+pip install crewai_tools langchain_community
+```
+
+你将获得的热门工具：
+
+```python
+from langcrew.tools import ToolRegistry
+
+# CrewAI 工具（来自 crewai_tools 包）
+file_read = ToolRegistry.get_tool("crewai:read_a_files_content")
+scraper = ToolRegistry.get_tool("crewai:read_website_content")
+search = ToolRegistry.get_tool("crewai:search_the_internet_with_serper")
+# ... 还有更多 CrewAI 工具可用
+
+# LangChain Community 工具（来自 langchain_community 包）
+# 注意：这些需要额外依赖
+wikipedia = ToolRegistry.get_tool("langchain:wikipedia")
+calculator = ToolRegistry.get_tool("langchain:calculator")
+# ... 还有更多 LangChain 工具可用
+```
+
+**重要**：工具名称需要使用 provider 前缀和 snake_case 格式：
+
+- `crewai:` 前缀用于 CrewAI 工具（来自 `crewai_tools`）- 使用 snake_case 格式
+- `langchain:` 前缀用于 LangChain 社区工具（来自 `langchain_community.tools`）- 使用 snake_case 格式
+- `langcrew:` 前缀用于 LangCrew 专用工具（来自 `langcrew_tools`）
+- 自定义工具不需要前缀
+
+**注意**：始终使用 snake_case 格式（小写字母加下划线）的工具名称，即使原始工具使用带空格的描述性名称。
+
+查看所有可用工具：
+
+```bash
+python -c "from langcrew.tools import ToolRegistry; print(ToolRegistry.list_tools())"
+```
+
+**注意**：外部工具采用按需加载（懒加载）- 只有在首次请求时才加载，避免因缺少依赖而导致的导入错误。
+
+### 2. 创建自定义工具
+
+**适用于**：业务特定逻辑或独特工作流
+
+在项目中创建 `tools/` 目录：
+
+```python
+# tools/my_tools.py
+from langchain_core.tools import BaseTool
+
+class SalesReportTool(BaseTool):
+    name = "sales_report"
+    description = "生成销售报告"
+    
+    def _run(self, period: str = "monthly") -> str:
+        # 你的业务逻辑
+        return f"{period}销售额: ¥500,000"
+```
+
+立即使用：
+
+```python
+report_tool = ToolRegistry.get_tool("sales_report")
+result = report_tool.run("quarterly")
+```
+
+### 3. 手动注册
+
+**适用于**：需要覆盖现有工具的高级用户
+
+```python
+from langcrew.tools import ToolRegistry
+
+# 注册你自己的版本
+ToolRegistry.register("calculator", MyEnhancedCalculator())
+
+# 现在使用你的版本
+calc = ToolRegistry.get_tool("calculator")
+```
+
+## 在智能体中使用工具
+
+完整示例展示工具的实际应用：
+
+```python
+from langcrew import Agent, Crew
+from langcrew.tools import ToolRegistry
+
+# 创建带工具的智能体
+researcher = Agent(
+    role="研究分析师",
+    goal="查找任何主题的信息", 
+    backstory="擅长查找可靠信息的专家",
+    tools=[
+        ToolRegistry.get_tool("crewai:search_the_internet_with_serper"),
+        ToolRegistry.get_tool("crewai:read_website_content"),
+        ToolRegistry.get_tool("crewai:read_a_files_content")
+    ]
+)
+
+# 在团队中使用
+crew = Crew(agents=[researcher])
+result = crew.kickoff(inputs={
+    "topic": "可再生能源趋势"
+})
+```
+
+## 常见问题
+
+### "工具未找到"错误
+
+**步骤1**：安装所需的工具包
+
+```bash
+pip install crewai_tools langchain_community
+```
+
+**步骤2**：使用正确的 provider 前缀和 snake_case 格式
+
+```python
+from langcrew.tools import ToolRegistry
+
+# 外部工具需要 provider 前缀（使用 snake_case）
+tool = ToolRegistry.get_tool("crewai:read_a_files_content")  # ✅
+tool = ToolRegistry.get_tool("langchain:wikipedia")  # ✅
+
+# 自定义工具不需要前缀  
+tool = ToolRegistry.get_tool("sales_report")  # ✅
+```
+
+**步骤3**：使用 list_tools() 进行调试
+
+```python
+from langcrew.tools import ToolRegistry
+
+# 查看所有可用工具（触发懒加载）
+available_tools = ToolRegistry.list_tools()
+print("可用工具：")
+for tool in available_tools:
+    print(f'  "{tool}"')
+
+# 尝试访问特定工具查看错误详情
+try:
+    tool = ToolRegistry.get_tool("crewai:read_website_content")
+    print(f"成功: {tool.name}")
+except ValueError as e:
+    print(f"错误: {e}")
+```
+
+### 缺少依赖错误
+
+某些 LangChain 工具需要额外的包：
+
+```bash
+# 用于网页搜索工具
+pip install duckduckgo-search
+
+# 用于 Wikipedia 工具  
+pip install wikipedia
+
+# 用于计算器
+pip install numexpr
+```
+
+### 自定义工具无法工作
+
+确保工具目录结构正确：
+
+```
+your_project/
+├── tools/
+│   ├── __init__.py  # 可以为空
+│   └── my_tools.py  # 你的工具类在这里
+└── main.py
+```
+
+你的工具类必须：
+
+- 继承自 `BaseTool`
+- 有 `name` 属性
+- 实现 `_run` 方法
+
+## 下一步
+
+- **[创建你的第一个智能体](/zh/guides/agents/quickstart)** - 让工具发挥作用
+- **[MCP 集成](/zh/guides/tools/tool-mcp)** - 连接外部 MCP 服务器
+- **[核心概念](/zh/concepts/)** - 理解 LangCrew 系统
+
+**专业提示**：从 `crewai_tools` 开始处理常见任务，然后为特定业务需求创建自定义工具。

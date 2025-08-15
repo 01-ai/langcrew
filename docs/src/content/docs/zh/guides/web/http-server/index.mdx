@@ -1,0 +1,291 @@
+---
+title: HTTP服务器
+description: 基于FastAPI的HTTP服务器，用于将AI智能体暴露为Web服务
+---
+
+LangCrew的HTTP服务器提供基于FastAPI的REST API端点，用于将AI智能体暴露为Web服务，支持实时流式通信。
+
+:::tip[协议参考]
+有关完整的通信协议规范和消息格式，请参阅[通信协议](/zh/guides/web/protocol)文档。
+:::
+
+## HTTP服务器特性
+
+LangCrew HTTP服务器模块 (`langcrew.web.http_server`) 提供：
+
+- **FastAPI集成**：现代、快速的Web框架，具有自动API文档
+- **智能体暴露**：将LangCrew智能体/团队转换为HTTP端点
+- **流式支持**：用于实时通信的Server-Sent Events (SSE)
+- **生产就绪**：内置CORS、错误处理和健康检查
+
+## 基础使用
+
+### LangCrew服务器
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+# 创建您的团队
+agent = Agent(
+    role="Web助手",
+    goal="通过Web界面帮助用户",
+    backstory="您是一个有用的基于Web的AI助手"
+)
+crew = Crew(agents=[agent])
+
+# 创建并运行服务器
+server = create_server(crew)
+server.run(host="0.0.0.0", port=8000)
+```
+
+### 直接LangGraph服务器
+
+```python
+from langcrew.web import create_langgraph_server
+from langgraph.graph import StateGraph
+
+# 如果您有编译好的LangGraph
+compiled_graph = your_compiled_graph  # 您的LangGraph编译结果
+
+# 直接从LangGraph创建服务器
+server = create_langgraph_server(compiled_graph)
+server.run(host="0.0.0.0", port=8000)
+```
+
+## 服务器配置
+
+### 高级服务器设置
+
+```python
+from langcrew.web import AdapterServer, LangGraphAdapter
+
+# 使用自定义配置创建适配器
+adapter = LangGraphAdapter(crew)
+
+# 使用自定义FastAPI应用创建服务器
+server = AdapterServer(adapter)
+
+# 添加自定义中间件或路由
+@server.app.middleware("http")
+async def add_custom_header(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Custom-Header"] = "LangCrew"
+    return response
+
+@server.app.get("/custom")
+async def custom_endpoint():
+    return {"message": "自定义端点"}
+
+server.run()
+```
+
+### CORS配置
+
+```python
+from langcrew.web import create_server
+from fastapi.middleware.cors import CORSMiddleware
+
+# 创建服务器
+server = create_server(crew)
+
+# 覆盖CORS设置
+server.app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://yourdomain.com"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+server.run()
+```
+
+### 身份验证中间件
+
+由于LangCrew没有内置身份验证，您可以添加自己的：
+
+```python
+from langcrew.web import create_server
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """在这里添加您的令牌验证逻辑"""
+    if credentials.credentials != "your-secret-token":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return credentials
+
+# 创建服务器
+server = create_server(crew)
+
+# 为特定路由添加身份验证
+@server.app.post("/api/v1/chat")
+async def protected_chat(request: dict, token: str = Depends(verify_token)):
+    # 您的聊天逻辑
+    pass
+
+server.run()
+```
+
+## API端点
+
+### 可用端点
+
+服务器运行后，以下端点可用：
+
+- **`GET /health`** - 健康检查端点
+- **`POST /api/v1/chat`** - 主要聊天接口，支持流式响应
+- **`POST /api/v1/chat/stop`** - 停止正在进行的聊天执行
+- **`GET /docs`** - 交互式API文档 (Swagger UI)
+- **`GET /redoc`** - 替代API文档 (ReDoc)
+- **`GET /openapi.json`** - OpenAPI规范
+
+### 聊天接口
+
+```bash
+# 发送消息
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "message": "你好，你能帮我什么？",
+       "session_id": "可选的会话ID"
+     }'
+
+# 停止执行
+curl -X POST "http://localhost:8000/api/v1/chat/stop" \
+     -H "Content-Type: application/json" \
+     -d '{"session_id": "your-session-id"}'
+```
+
+## 生产部署
+
+### Uvicorn配置
+
+```python
+from langcrew.web import create_server
+
+server = create_server(crew)
+
+# 生产设置
+server.run(
+    host="0.0.0.0",
+    port=8000,
+    workers=4,                    # 多个工作进程
+    access_log=True,             # 启用访问日志
+    log_level="info",            # 设置日志级别
+    ssl_keyfile="key.pem",       # SSL证书
+    ssl_certfile="cert.pem"
+)
+```
+
+:::tip[完整部署指南]
+有关使用Docker Compose进行包含后端和前端的完整生产部署，请参阅[快速开始](/zh/guides/web/getting-started#生产部署)指南。
+:::
+
+### 环境变量
+
+```bash
+# 服务器配置
+LANGCREW_HOST=0.0.0.0
+LANGCREW_PORT=8000
+LANGCREW_WORKERS=4
+LANGCREW_LOG_LEVEL=info
+
+# CORS设置
+LANGCREW_CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
+```
+
+## 监控和日志
+
+### 健康监控
+
+```python
+import time
+from langcrew.web import create_server
+
+server = create_server(crew)
+
+@server.app.get("/health/detailed")
+async def detailed_health():
+    return {
+        "status": "healthy",
+        "timestamp": int(time.time() * 1000),
+        "version": "1.0.0",
+        "uptime": "在此处计算运行时间"
+    }
+
+server.run()
+```
+
+### 自定义日志
+
+```python
+import logging
+from langcrew.web import create_server
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+server = create_server(crew)
+server.run(access_log=True, log_level="info")
+```
+
+## 性能优化
+
+### 负载测试示例
+
+```python
+import asyncio
+import aiohttp
+import time
+
+async def load_test(concurrent_requests: int, total_requests: int):
+    """简单的负载测试函数"""
+    
+    async def send_request(session, request_id):
+        try:
+            async with session.post(
+                "http://localhost:8000/api/v1/chat",
+                json={"message": f"测试消息 {request_id}"}
+            ) as response:
+                return await response.text()
+        except Exception as e:
+            return f"错误: {e}"
+    
+    start_time = time.time()
+    
+    async with aiohttp.ClientSession() as session:
+        # 创建信号量来限制并发请求
+        semaphore = asyncio.Semaphore(concurrent_requests)
+        
+        async def bounded_request(request_id):
+            async with semaphore:
+                return await send_request(session, request_id)
+        
+        # 执行请求
+        tasks = [bounded_request(i) for i in range(total_requests)]
+        results = await asyncio.gather(*tasks)
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    print(f"在 {duration:.2f}s 内完成了 {total_requests} 个请求")
+    print(f"平均: {total_requests/duration:.2f} 请求/秒")
+    
+    return results
+
+# 运行负载测试
+# asyncio.run(load_test(10, 100))
+```
+
+## 下一步
+
+- **[快速开始](/zh/guides/web/getting-started)** - 基础示例和完整部署设置
+- **[通信协议](/zh/guides/web/protocol)** - 消息规范和API参考
+- **[Web概念](/zh/concepts/web)** - 理解Web架构

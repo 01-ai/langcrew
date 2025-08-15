@@ -1,0 +1,230 @@
+---
+title: Tasks
+description: Understanding tasks - the work units that agents execute in langcrew
+---
+
+Tasks are the fundamental units of work in langcrew. They define what needs to be done, who should do it, how results should be structured, and how work flows between agents in a crew.
+
+## Quick Start - Create a Task
+
+Get your first task running in just 3 lines:
+
+```python
+from langcrew import Agent, Task
+
+agent = Agent(role="Assistant", goal="Help users", backstory="Helpful AI")
+task = Task(agent=agent, description="Analyze data", expected_output="Analysis report")
+result = task.invoke({"messages": []})
+```
+
+:::tip[Complete Guide]
+For detailed examples and workflows, see the [Quick Start](/guides/quickstart) guide.
+:::
+
+## What is a Task?
+
+A Task in langcrew represents a discrete unit of work with:
+
+- **Clear Definition**: Specific description of what needs to be accomplished
+- **Agent Assignment**: The agent responsible for executing the work
+- **Expected Output**: Well-defined expectations for the result
+- **Context Awareness**: Ability to use outputs from previous tasks
+- **Quality Control**: Built-in guardrails and validation
+- **Flow Control**: Handoff capabilities to other tasks or agents
+
+## Core Architecture
+
+Tasks are built on the Runnable interface and integrate seamlessly with LangGraph's execution system:
+
+![Task Architecture](/images/task-architecture.svg)
+
+### Design Philosophy
+
+LangCrew tasks follow three core principles:
+
+**1. Explicit Workflow Design**
+- Clear task descriptions and expected outputs
+- Explicit dependencies between tasks
+- Predictable execution flows
+
+**2. Contextual Intelligence**
+- Tasks can access outputs from previous tasks
+- Automatic context management and passing
+- Smart dependency resolution
+
+**3. Quality Assurance**
+- Built-in input/output validation
+- Structured output schemas
+- Guardrails for safety and compliance
+
+## Task Types
+
+### Basic Tasks
+
+Simple, self-contained work units:
+
+```python
+from langcrew import Agent, Task
+
+task = Task(
+    agent=Agent(role="Analyst", goal="Analyze data", backstory="Expert analyst"),
+    description="Analyze Q3 sales performance and identify trends",
+    expected_output="Sales analysis report with key insights"
+)
+```
+
+### Sequential Tasks
+
+Tasks that depend on previous work:
+
+```python
+# First task
+research_task = Task(
+    agent=researcher,
+    description="Research competitor pricing strategies",
+    expected_output="Competitor pricing analysis",
+    name="research"
+)
+
+# Second task uses first task's output
+strategy_task = Task(
+    agent=strategist,
+    description="Develop pricing strategy based on research",
+    expected_output="Pricing strategy recommendations",
+    context=[research_task]  # Uses research_task output
+)
+```
+
+### Structured Output Tasks
+
+Tasks that enforce specific output formats:
+
+```python
+from pydantic import BaseModel
+from typing import List
+
+class Insight(BaseModel):
+    title: str
+    description: str
+    impact: str
+
+class AnalysisReport(BaseModel):
+    insights: List[Insight]
+    summary: str
+
+task = Task(
+    agent=analyst,
+    description="Analyze customer feedback",
+    expected_output="Structured analysis with insights",
+    output_json=AnalysisReport  # Enforces this schema
+)
+```
+
+## Core Capabilities
+
+### Context Dependencies
+
+Tasks automatically receive and process outputs from previous tasks:
+
+```python
+# Chain of dependent tasks
+tasks = [
+    Task(agent=collector, description="Collect data", name="collect"),
+    Task(agent=processor, description="Process data", context=["collect"], name="process"),
+    Task(agent=reporter, description="Generate report", context=["process"], name="report")
+]
+```
+
+### Quality Control
+
+Built-in validation and guardrails:
+
+```python
+from langcrew.guardrail import input_guard, output_guard
+
+@input_guard
+def validate_input(data):
+    # Validate incoming data
+    return True, "Input valid"
+
+@output_guard  
+def validate_output(data):
+    # Ensure output quality
+    return True, "Output approved"
+
+task = Task(
+    agent=processor,
+    description="Process sensitive data",
+    expected_output="Processed results",
+    input_guards=[validate_input],
+    output_guards=[validate_output]
+)
+```
+
+### Task Handoffs
+
+Tasks can delegate work to specialized agents:
+
+```python
+primary_task = Task(
+    agent=coordinator,
+    description="Coordinate project workflow",
+    expected_output="Coordination results",
+    handoff_to=["specialist_task", "reviewer_task"]  # Can delegate to these
+)
+```
+
+## When to Use Tasks
+
+Tasks are ideal for:
+
+- **Structured Workflows** - Multi-step processes with clear dependencies
+- **Quality-Controlled Work** - Processes requiring validation and compliance
+- **Collaborative Processes** - Work that flows between multiple agents
+- **Data Processing Pipelines** - Sequential data transformation and analysis
+- **Content Creation Workflows** - Research → Analysis → Writing → Review
+- **Complex Problem Solving** - Breaking large problems into manageable steps
+
+## Integration with Crews
+
+Tasks work seamlessly with Crew orchestration to create powerful workflows:
+
+```python
+from langcrew import Agent, Task, Crew
+
+# Create a research and analysis workflow
+research_task = Task(
+    agent=Agent(role="Researcher", goal="Gather information"),
+    description="Research market trends",
+    expected_output="Market research report",
+    name="research"
+)
+
+analysis_task = Task(
+    agent=Agent(role="Analyst", goal="Analyze data"),
+    description="Analyze market opportunities",
+    expected_output="Opportunity analysis",
+    context=[research_task],
+    name="analysis"
+)
+
+# Execute tasks in crew
+crew = Crew(
+    agents=[researcher, analyst],
+    tasks=[research_task, analysis_task]
+)
+
+result = crew.kickoff()
+```
+
+## Common Patterns
+
+### Research → Analysis → Report
+```python
+workflow = [
+    Task(agent=researcher, description="Gather data", name="research"),
+    Task(agent=analyst, description="Analyze findings", context=["research"], name="analyze"),
+    Task(agent=writer, description="Write report", context=["analyze"], name="report")
+]
+```
+

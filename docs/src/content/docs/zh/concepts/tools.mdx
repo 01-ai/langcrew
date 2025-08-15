@@ -1,0 +1,234 @@
+---
+title: 工具 (Tools)
+description: 理解工具 - 赋予智能体采取行动能力的功能
+---
+
+工具是使智能体能够与文本生成之外的世界交互的**行动能力**。它们将智能体从对话实体转变为能够读取文件、搜索网络、执行计算并与外部系统集成的实用执行者。
+
+## 什么是工具？
+
+在langcrew中，工具是智能体可以调用的函数或服务，用于：
+- **收集信息** - 搜索引擎、数据库、API
+- **处理数据** - 计算器、解析器、分析器
+- **执行操作** - 文件操作、发送邮件、API调用
+- **与用户交互** - 输入收集、审批工作流
+
+```python
+from langcrew import Agent
+from langcrew_tools import WebSearchTool, FileWriteTool
+
+# 具有多种工具能力的智能体
+agent = Agent(
+    role="研究助手",
+    tools=[WebSearchTool(), FileWriteTool()],
+    goal="研究主题并创建报告"
+)
+```
+
+## 工具架构
+
+### 工具类型
+
+langcrew支持多种工具生态系统：
+
+#### 1. **CrewAI工具** (`crewai_tools`)
+为智能体工作流优化的预构建工具：
+```python
+from langcrew.tools import ToolRegistry
+
+# 通过注册表访问CrewAI工具
+search_tool = ToolRegistry.get_tool("crewai:search_the_internet_with_serper")
+file_tool = ToolRegistry.get_tool("crewai:read_a_files_content")
+```
+
+#### 2. **LangChain工具** (`langchain_community`)
+广泛的社区工具生态系统：
+```python
+# LangChain社区工具
+calculator = ToolRegistry.get_tool("langchain:calculator")
+wikipedia = ToolRegistry.get_tool("langchain:wikipedia")
+```
+
+#### 3. **自定义工具**
+您创建的应用程序特定工具：
+```python
+from langcrew.tools import tool
+
+@tool
+def custom_database_query(query: str) -> str:
+    """查询公司数据库。"""
+    # 您的自定义逻辑
+    return f"数据库查询结果: {query}"
+```
+
+#### 4. **MCP工具** (模型上下文协议)
+通过标准化协议的外部服务：
+```python
+agent = Agent(
+    role="系统管理员",
+    mcp_servers={
+        "filesystem": {
+            "transport": "stdio",
+            "command": "python",
+            "args": ["mcp_filesystem.py"]
+        }
+    }
+)
+```
+
+### 工具发现
+
+langcrew提供自动工具发现：
+
+```python
+from langcrew.tools import ToolRegistry
+
+# 列出所有可用工具
+tools = ToolRegistry.list_tools()
+
+# 搜索特定工具
+search_tools = ToolRegistry.search_tools("search")
+file_tools = ToolRegistry.search_tools("file")
+```
+
+## 工具集成模式
+
+### 1. **智能体级工具**
+分配给特定智能体的工具：
+```python
+researcher = Agent(
+    role="研究员",
+    tools=[WebSearchTool(), WebFetchTool()],
+    goal="收集全面信息"
+)
+```
+
+### 2. **动态工具选择**
+智能体根据任务需求选择工具：
+```python
+multi_tool_agent = Agent(
+    role="通用助手",
+    tools=ToolRegistry.get_tools_by_category("productivity"),
+    goal="处理各种生产力任务"
+)
+```
+
+### 3. **工具传递**
+工具可以在团队中的智能体之间传递：
+```python
+# 研究员使用搜索工具
+researcher = Agent(tools=[search_tools])
+
+# 作家继承上下文但使用不同工具
+writer = Agent(tools=[writing_tools])
+```
+
+## 工具安全和控制
+
+### 人机协作 (HITL)
+通过人工监督控制工具执行：
+```python
+from langcrew.hitl import HITLConfig
+
+agent = Agent(
+    role="文件管理员",
+    tools=[FileWriteTool(), FileDeleteTool()],
+    hitl=HITLConfig(
+        interrupt_before_tools=["file_write", "file_delete"]
+    )
+)
+```
+
+### 工具过滤
+限制智能体可以访问的工具：
+```python
+# 仅允许安全工具
+safe_tools = ToolRegistry.get_tools_by_safety_level("safe")
+agent = Agent(tools=safe_tools)
+```
+
+## 工具性能
+
+### 异步支持
+工具支持异步执行：
+```python
+@tool
+async def async_api_call(endpoint: str) -> str:
+    """进行异步API调用。"""
+    # 异步实现
+    return await make_request(endpoint)
+```
+
+### 缓存
+对昂贵操作的自动结果缓存：
+```python
+@tool(cache=True, cache_ttl=3600)  # 缓存1小时
+def expensive_calculation(data: str) -> str:
+    """执行昂贵的计算。"""
+    # 重型计算
+    return result
+```
+
+## 最佳实践
+
+### 1. **工具选择**
+选择与智能体能力匹配的工具：
+```python
+# 好的做法：为专业智能体选择专业工具
+data_scientist = Agent(
+    role="数据科学家", 
+    tools=[pandas_tool, matplotlib_tool, statistics_tool]
+)
+
+# 避免：不相关的工具
+# data_scientist = Agent(tools=[email_tool, calendar_tool])  # ❌
+```
+
+### 2. **错误处理**
+工具应该优雅地处理错误：
+```python
+@tool
+def robust_file_reader(filepath: str) -> str:
+    """带错误处理的文件读取。"""
+    try:
+        with open(filepath, 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return f"错误: 文件 {filepath} 未找到"
+    except PermissionError:
+        return f"错误: 对 {filepath} 的访问被拒绝"
+```
+
+### 3. **清晰的描述**
+为智能体理解提供清晰的工具描述：
+```python
+@tool
+def calculate_roi(investment: float, return_amount: float) -> float:
+    """计算投资回报率(ROI)百分比。
+    
+    参数:
+        investment: 初始投资金额（美元）
+        return_amount: 最终回报金额（美元）
+        
+    返回:
+        ROI百分比（例如，25.5表示25.5% ROI）
+    """
+    return ((return_amount - investment) / investment) * 100
+```
+
+## 与其他组件的集成
+
+工具与所有langcrew组件无缝集成：
+
+- **[智能体](/zh/concepts/agents)**：主要工具用户和执行者
+- **[任务](/zh/concepts/tasks)**：任务定义需要哪些工具
+- **[团队](/zh/concepts/crews)**：协调多个智能体之间的工具使用
+- **[记忆](/zh/concepts/memory)**：记住工具使用模式和结果
+- **[HITL](/zh/concepts/hitl)**：通过人工监督控制工具执行
+
+## 下一步
+
+- 了解**[工具注册表](/zh/guides/tools/tool-registry)**以发现和使用现有工具
+- 探索**[工具转换器](/zh/guides/tools/tool-converter)**以实现格式兼容性
+- 理解**[MCP集成](/zh/guides/tools/tool-mcp)**以连接外部服务
+- 查看**[智能体示例](/zh/concepts/agents)**了解工具使用模式

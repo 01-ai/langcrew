@@ -1,0 +1,56 @@
+evaluate_task:
+  description: >
+    You will coordinate the creation of a game using python, these are the instructions:
+
+    Instructions
+    ------------
+    {game}
+    
+    Analyze the requirements and coordinate the development:
+    - Transfer to code_task for any coding work
+    
+    Evaluate what work needs to be done and delegate tasks appropriately.
+  expected_output: >
+    Provide a clear analysis of what work needs to be done and which tasks to transfer to, or confirm that the project is complete and ready for final delivery.
+  # Task handoff configuration
+  handoff_to: ["code_task"]
+
+code_task:
+  description: >
+    You will create a game using python, these are the instructions:
+
+    Follow these steps:
+    1. First, complete the full implementation of the game according to the instructions above.
+    2. After you have completed the code implementation, you MUST transfer this task to review_task 
+       so that your code can be properly reviewed for errors and improvements.
+    
+    Remember: Your job is to write the complete code first, then hand it off for review.
+  expected_output: >
+    Complete the full python code implementation, then transfer this task to review_task for code review.
+  # Hand off to review task after code completion
+  handoff_to: ["review_task"]
+
+review_task:
+  description: >
+    You will create a game using python, these are the instructions:
+
+    Using the code you got, check for errors. Check for logic errors,
+    syntax errors, missing imports, variable declarations, mismatched brackets,
+    and security vulnerabilities.
+  expected_output: >
+    Your Final answer must be the full python code, only the python code and nothing else.
+
+end_task:
+  description: >
+    You are responsible for providing a comprehensive summary of all completed work.
+    
+    Review all the work that has been completed during this project and provide a final summary.
+    Do not perform any additional work - only summarize what has been accomplished.
+    
+    Your summary should include:
+    - Overview of the game that was created
+    - Key features implemented
+    - Code quality and review results
+    - Any important notes or recommendations
+  expected_output: >
+    A comprehensive summary report of all completed work, including the game overview, implemented features, and final project status.

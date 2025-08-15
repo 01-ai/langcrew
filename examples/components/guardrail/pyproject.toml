@@ -1,0 +1,26 @@
+[project]
+name = "guardrail_example"
+version = "0.1.0"
+description = "Minimal Guardrail Example using LangCrew"
+authors = [
+    { name = "LangCrew Team", email = "team@langcrew.ai" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "langcrew>=0.1.0",
+]
+
+[tool.uv.sources]
+langcrew = { path = "../../../libs/langcrew", editable = true }
+
+[project.scripts]
+guardrail_demo = "guardrail_example:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"

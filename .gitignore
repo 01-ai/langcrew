@@ -1,0 +1,41 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.coverage
+agent_history.gif
+
+# Virtual environments
+.venv
+libs/**/uv.lock
+libs/**/.ruff_cache
+
+# Environment variables
+# .env
+.vscode/
+.lingma/
+
+.DS_Store
+.env
+
+.idea/
+CLAUDE.md
+CREDITS.md
+.cursor/rules/my-custom-rule.mdc
+.cursorrules
+checkpoints.db*
+
+# Ignore .venv directories in all task folders under examples directory
+examples/**/.venv/
+examples/**/.venv
+examples/**/uv.lock
+
+# Ignore all libs except langcrew related ones
+libs/*
+!libs/langcrew/
+!libs/langcrew-tools/
+
+web/.pnpm-store

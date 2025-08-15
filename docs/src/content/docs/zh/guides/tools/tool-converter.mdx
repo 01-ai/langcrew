@@ -1,0 +1,100 @@
+---
+title: 工具转换器
+description: LangCrew 工具格式转换系统完整指南
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## 概述
+
+`ToolConverter` 自动检测工具格式并将其转换为统一接口：
+
+```python
+from langcrew.tools import ToolConverter, convert_tools
+
+# 转换任意工具
+converted = ToolConverter.convert_tool(any_tool)
+
+# 批量转换不同格式
+unified = convert_tools([crewai_tool, langchain_tool, my_function])
+```
+
+## 支持的转换
+
+<Tabs>
+<TabItem label="CrewAI 转 LangChain">
+
+将 CrewAI 工具转换为 LangChain 格式：
+
+```python
+from crewai_tools import ScrapeWebsiteTool
+from langcrew.tools import ToolConverter
+
+# 转换 CrewAI 工具
+crewai_tool = ScrapeWebsiteTool()
+langchain_tool = ToolConverter.convert_crewai_tool(crewai_tool)
+
+# 与任何 LangChain 兼容的智能体一起使用
+result = langchain_tool.run("https://example.com")
+```
+
+</TabItem>
+<TabItem label="LangChain 转 CrewAI">
+
+将 LangChain 工具转换为 CrewAI 格式：
+
+```python
+from langchain_core.tools import BaseTool
+from langcrew.tools import convert_langchain_tool
+
+class LangChainCalculator(BaseTool):
+    name = "calculator"
+    description = "Mathematical calculations"
+    
+    def _run(self, expression: str) -> str:
+        return str(eval(expression))
+
+# 转换为 CrewAI
+langchain_tool = LangChainCalculator()
+crewai_tool = convert_langchain_tool(langchain_tool)
+```
+
+</TabItem>
+<TabItem label="函数转工具">
+
+将函数转换为工具格式：
+
+```python
+from langcrew.tools import ToolConverter
+
+def calculate_interest(principal: float, rate: float, time: int) -> float:
+    """计算复利."""
+    return principal * (1 + rate) ** time
+
+# 转换为 LangChain 工具
+tool = ToolConverter.convert_callable_tool(calculate_interest)
+result = tool.run({"principal": 1000, "rate": 0.05, "time": 10})
+```
+
+</TabItem>
+</Tabs>
+
+## 批量转换
+
+一次转换多个不同格式的工具：
+
+```python
+from langcrew.tools import convert_tools
+
+# 混合不同的工具类型
+tools = [crewai_tool, langchain_tool, my_function]
+unified_tools = convert_tools(tools)  # 全部变成 LangChain 工具
+```
+
+## 下一步
+
+- **[工具注册](/zh/guides/tools/tool-registry)** - 了解工具发现和管理
+- **[MCP 集成](/zh/guides/tools/tool-mcp)** - 通过模型上下文协议连接外部工具
+- **[核心概念](/zh/concepts/)** - 理解工具如何与智能体和团队协作
+
+工具转换器提供不同工具格式之间的无缝互操作性，让您能够在 LangCrew 应用程序中使用来自任何源的工具，无需担心兼容性问题。

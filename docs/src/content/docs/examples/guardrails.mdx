@@ -1,0 +1,293 @@
+---
+title: Guardrails Examples
+description: Practical examples of guardrails in action
+---
+
+This page provides practical examples of guardrails in action, from basic usage to advanced patterns.
+
+## Basic Content Generation Guardrails
+
+### Example: Safe Content Generation
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew.guardrail import input_guard, output_guard, GuardrailError
+from langcrew.llm_factory import LLMFactory
+
+# Define guardrails
+@input_guard
+def check_no_sensitive_info(data):
+    """Prevent processing of sensitive information"""
+    content = str(data).lower()
+    sensitive_patterns = ["password:", "api_key:", "secret:", "ssn:"]
+    
+    for pattern in sensitive_patterns:
+        if pattern in content:
+            return False, f"Contains sensitive information: {pattern}"
+    
+    return True, "No sensitive information detected"
+
+@output_guard
+def check_output_quality(data):
+    """Ensure output meets quality standards"""
+    output_str = str(data)
+    
+    if not output_str:
+        return False, "Empty output not allowed"
+    
+    if len(output_str) < 10:
+        return False, "Output too short (minimum 10 characters)"
+    
+    return True, "Output quality check passed"
+
+# Create agent with guardrails
+llm = LLMFactory.create_llm({
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.3
+})
+
+agent = Agent(
+    role="Content Creator",
+    goal="Generate safe content",
+    llm=llm,
+    input_guards=[check_no_sensitive_info],
+    output_guards=[check_output_quality]
+)
+
+# Create and execute task
+task = Task(
+    description="Write an article about artificial intelligence",
+    expected_output="A well-written article about AI",
+    agent=agent
+)
+
+crew = Crew(agents=[agent], tasks=[task])
+
+try:
+    result = crew.kickoff()
+    print("✅ Task completed successfully")
+except GuardrailError as e:
+    print(f"❌ Guardrail blocked: {e}")
+```
+
+### Example: Task-Specific Guardrails
+
+```python
+# Agent with basic protection
+agent = Agent(
+    role="Content Processor",
+    goal="Process content safely",
+    llm=llm,
+    input_guards=[check_no_sensitive_info]  # Global protection
+)
+
+# Task with additional requirements
+task = Task(
+    description="Generate content about cybersecurity",
+    agent=agent,
+    input_guards=[check_input_length],  # Task-specific
+    output_guards=[check_output_quality]  # Task-specific
+)
+
+@input_guard
+def check_input_length(data):
+    """Limit input length to prevent abuse"""
+    content = str(data)
+    max_length = 1000
+    
+    if len(content) > max_length:
+        return False, f"Input too long: {len(content)} > {max_length} characters"
+    
+    return True, f"Input length OK: {len(content)} characters"
+```
+
+## Advanced Guardrail Patterns
+
+### Example: Conditional Guardrails
+
+```python
+@input_guard
+def conditional_sensitive_check(data):
+    """Conditional sensitive data check based on context"""
+    content = str(data).lower()
+    
+    # Check if this is a security-related task
+    security_keywords = ["security", "authentication", "login"]
+    is_security_task = any(keyword in content for keyword in security_keywords)
+    
+    if is_security_task:
+        # For security tasks, be more strict
+        strict_patterns = ["password:", "pwd:", "secret:", "key:"]
+        for pattern in strict_patterns:
+            if pattern in content:
+                return False, f"Security task contains sensitive data: {pattern}"
+    else:
+        # For non-security tasks, be more lenient
+        lenient_patterns = ["password:", "pwd:"]
+        for pattern in lenient_patterns:
+            if pattern in content:
+                return False, f"Contains sensitive data: {pattern}"
+    
+    return True, "Conditional check passed"
+```
+
+### Example: Rate Limiting
+
+```python
+@input_guard
+def check_rate_limiting(data):
+    """Simple rate limiting guardrail"""
+    import time
+    
+    if not hasattr(check_rate_limiting, "_request_count"):
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = time.time()
+    
+    current_time = time.time()
+    
+    # Reset counter every minute
+    if current_time - check_rate_limiting._last_reset > 60:
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = current_time
+    
+    # Allow max 5 requests per minute
+    max_requests = 5
+    check_rate_limiting._request_count += 1
+    
+    if check_rate_limiting._request_count > max_requests:
+        return False, f"Rate limit exceeded: {check_rate_limiting._request_count} > {max_requests}"
+    
+    return True, f"Rate limit OK: {check_rate_limiting._request_count}/{max_requests}"
+```
+
+## Error Handling Examples
+
+### Example: Custom Error Handling
+
+```python
+class CustomGuardrailError(GuardrailError):
+    """Custom guardrail error with additional context"""
+    
+    def __init__(self, message: str, guardrail_name: str | None = None, 
+                 error_code: str | None = None, suggestions: list[str] | None = None):
+        self.error_code = error_code
+        self.suggestions = suggestions or []
+        super().__init__(message, guardrail_name)
+    
+    def __str__(self):
+        base_msg = super().__str__()
+        if self.error_code:
+            base_msg += f" (Code: {self.error_code})"
+        if self.suggestions:
+            base_msg += f"\nSuggestions: {', '.join(self.suggestions)}"
+        return base_msg
+
+@input_guard
+def enhanced_sensitive_check(data):
+    """Enhanced sensitive data check with custom error handling"""
+    content = str(data)
+    
+    # Enhanced pattern detection
+    import re
+    sensitive_patterns = {
+        "credit_card": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
+        "ssn": r"\b\d{3}[\s-]?\d{2}[\s-]?\d{4}\b",
+        "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+    }
+    
+    detected_patterns = []
+    for pattern_type, pattern in sensitive_patterns.items():
+        if re.search(pattern, content, re.IGNORECASE):
+            detected_patterns.append(pattern_type)
+    
+    if detected_patterns:
+        suggestions = [
+            "Remove or redact sensitive information",
+            "Use placeholder text (e.g., [REDACTED])",
+            "Consider using a secure data handling process"
+        ]
+        
+        raise CustomGuardrailError(
+            message=f"Detected sensitive data types: {', '.join(detected_patterns)}",
+            guardrail_name="enhanced_sensitive_check",
+            error_code="SENSITIVE_DATA_DETECTED",
+            suggestions=suggestions
+        )
+    
+    return True, "Enhanced check passed"
+```
+
+### Example: Error Recovery
+
+```python
+def execute_with_guardrails(crew, max_retries=3):
+    """Execute crew with guardrail error recovery"""
+    for attempt in range(max_retries):
+        try:
+            result = crew.kickoff()
+            print(f"✅ Task completed on attempt {attempt + 1}")
+            return result
+        except CustomGuardrailError as e:
+            print(f"❌ Enhanced guardrail error on attempt {attempt + 1}: {e}")
+            if e.suggestions:
+                print("Suggestions for resolution:")
+                for suggestion in e.suggestions:
+                    print(f"  - {suggestion}")
+        except GuardrailError as e:
+            print(f"❌ Standard guardrail error on attempt {attempt + 1}: {e}")
+        except Exception as e:
+            print(f"❌ Unexpected error on attempt {attempt + 1}: {e}")
+    
+    print(f"❌ Failed after {max_retries} attempts")
+    return None
+
+# Usage
+result = execute_with_guardrails(crew)
+```
+
+## Common Use Cases
+
+### Content Quality Validation
+
+```python
+@output_guard
+def validate_content_quality(data):
+    """Validate AI-generated content"""
+    content = str(data)
+    
+    # Check minimum length
+    if len(content) < 50:
+        return False, "Content too short"
+    
+    # Check for proper structure
+    if not content[0].isupper():
+        return False, "Content should start with capital letter"
+    
+    # Check for balanced language
+    if "definitely" in content.lower() or "100%" in content:
+        return False, "Content should use balanced language"
+    
+    return True, "Content quality validated"
+```
+
+### Data Format Validation
+
+```python
+@input_guard
+def validate_data_format(data):
+    """Validate input data format"""
+    if not isinstance(data, dict):
+        return False, "Input must be a dictionary"
+    
+    required_fields = ["task_type", "priority"]
+    for field in required_fields:
+        if field not in data:
+            return False, f"Missing required field: {field}"
+    
+    if data.get("priority") not in ["low", "medium", "high"]:
+        return False, "Priority must be 'low', 'medium', or 'high'"
+    
+    return True, "Data format valid"
+```
+

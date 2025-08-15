@@ -1,0 +1,387 @@
+---
+title: Long-term Memory
+description: Persistent knowledge storage across sessions
+---
+
+Long-term memory provides persistent knowledge storage using LangGraph's Store system. It stores important information across sessions and helps agents accumulate knowledge over time.
+
+## Overview
+
+Long-term memory is ideal for:
+
+- **Knowledge accumulation** across multiple sessions
+- **Learning from experiences** and storing insights
+- **Cross-session continuity** with important facts
+- **Quality-filtered information** storage
+
+## Configuration
+
+### Basic Setup
+
+```python
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///long_term.db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.7,  # Only store high-quality information
+    }
+)
+```
+
+### Configuration Parameters
+
+| Parameter     | Type  | Description                                     | Default |
+| ------------- | ----- | ----------------------------------------------- | ------- |
+| `enabled`     | bool  | Enable long-term memory                         | True    |
+| `min_quality` | float | Minimum quality threshold for storage (0.0-1.0) | 0.7     |
+
+## How It Works
+
+### Quality-Based Storage
+
+Long-term memory only stores information that meets quality thresholds:
+
+```python
+from langcrew import Crew
+from langcrew.memory import MemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///knowledge.db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # High quality threshold
+    }
+)
+
+crew = Crew(agents=[agent], memory=memory_config)
+
+# High-quality information gets stored
+crew.kickoff(
+    inputs={"user_input": "The company's annual revenue is $50M with 25% growth"},
+    thread_id="business_analysis"
+)
+
+# Low-quality information may be filtered out
+crew.kickoff(
+    inputs={"user_input": "Maybe the weather is nice today"},
+    thread_id="casual_chat"
+)
+```
+
+### Knowledge Organization
+
+Long-term memory organizes knowledge by:
+
+- **Agent namespaces**: Each agent has its own knowledge space
+- **Task categories**: Knowledge grouped by task types
+- **Quality scores**: Weighted by importance and accuracy
+- **Timestamps**: Tracked for recency and updates
+
+```python
+# Knowledge is automatically organized
+crew.kickoff(
+    inputs={"user_input": "Our Q1 sales target is $2M for the software division"},
+    thread_id="sales_planning"
+)
+
+# Later retrieval includes relevant context
+crew.kickoff(
+    inputs={"user_input": "How are we tracking against our sales goals?"},
+    thread_id="sales_review"
+)
+```
+
+## Usage Examples
+
+### Knowledge Management System
+
+```python
+from langcrew import Agent, Crew
+from langcrew.memory import MemoryConfig
+
+# Configure for knowledge management
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/knowledge_db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # High quality for knowledge base
+    }
+)
+
+knowledge_agent = Agent(
+    role="Knowledge Manager",
+    goal="Build and maintain organizational knowledge",
+    backstory="You accumulate and organize important information for future reference"
+)
+
+crew = Crew(agents=[knowledge_agent], memory=memory_config)
+
+# Store important company information
+sessions = [
+    ("company_info", "Our company was founded in 2020 and specializes in AI solutions"),
+    ("product_info", "We have three main products: ChatBot Pro, Analytics Suite, and API Gateway"),
+    ("team_info", "The engineering team has 15 developers across frontend, backend, and ML"),
+]
+
+for session_id, info in sessions:
+    crew.kickoff(
+        inputs={"user_input": info},
+        thread_id=session_id
+    )
+
+# Query accumulated knowledge
+result = crew.kickoff(
+    inputs={"user_input": "Tell me about our company and products"},
+    thread_id="knowledge_query"
+)
+```
+
+### Learning Assistant
+
+```python
+# Configure for educational knowledge accumulation
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///learning.db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.75,  # Store learning insights
+    }
+)
+
+tutor_agent = Agent(
+    role="Adaptive Tutor",
+    goal="Teach effectively by building on accumulated knowledge",
+    backstory="You remember what works for each student and build comprehensive understanding"
+)
+
+crew = Crew(agents=[tutor_agent], memory=memory_config)
+
+# Store learning patterns
+learning_sessions = [
+    ("student_123", "Student struggles with algebra but excels at geometry"),
+    ("student_123", "Visual learning methods work best for this student"),
+    ("student_123", "Needs extra practice with quadratic equations"),
+]
+
+for session_id, insight in learning_sessions:
+    crew.kickoff(
+        inputs={"user_input": f"Learning insight: {insight}"},
+        thread_id=session_id
+    )
+
+# Apply accumulated knowledge
+result = crew.kickoff(
+    inputs={"user_input": "Help me learn quadratic equations"},
+    thread_id="student_123"
+)
+```
+
+### Research Assistant
+
+```python
+# Configure for research knowledge accumulation
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///research.db",
+    long_term={
+        "enabled": True,
+        "min_quality": 0.85,  # Very high quality for research
+    }
+)
+
+research_agent = Agent(
+    role="Research Assistant",
+    goal="Accumulate and synthesize research findings",
+    backstory="You build comprehensive knowledge bases from research sources"
+)
+
+crew = Crew(agents=[research_agent], memory=memory_config)
+
+# Store research findings
+research_topics = [
+    ("ai_trends", "Large Language Models showed 40% improvement in reasoning tasks in 2024"),
+    ("ai_trends", "Multimodal AI adoption increased by 60% in enterprise applications"),
+    ("ai_trends", "Edge AI deployment grew 35% due to privacy concerns"),
+]
+
+for topic, finding in research_topics:
+    crew.kickoff(
+        inputs={"user_input": f"Research finding: {finding}"},
+        thread_id=topic
+    )
+
+# Synthesize accumulated research
+result = crew.kickoff(
+    inputs={"user_input": "What are the key AI trends for 2024?"},
+    thread_id="ai_trends_summary"
+)
+```
+
+## Memory Management
+
+### Search Long-term Memory
+
+```python
+# Search within long-term memory
+results = crew.search_memory(
+    query="sales targets",
+    memory_type="long_term",
+    limit=5
+)
+
+for result in results:
+    print(f"Quality: {result['quality']}")
+    print(f"Content: {result['content']}")
+    print(f"Task: {result['task']}")
+    print(f"Agent: {result['agent']}")
+```
+
+### Save Task Results
+
+```python
+# Manually save high-quality results
+crew.long_term_memory.save_task_result(
+    task="market_analysis",
+    result="Q3 market analysis shows 15% growth in our target segment",
+    quality=0.9,
+    learnings=["Market timing is crucial", "Customer feedback drives adoption"],
+    agent="market_analyst"
+)
+```
+
+### Export Knowledge
+
+```python
+# Export all long-term memories
+memories = crew.long_term_memory.export()
+
+for memory in memories:
+    print(f"Task: {memory['task']}")
+    print(f"Content: {memory['content']}")
+    print(f"Quality: {memory['quality']}")
+    print(f"Learnings: {memory['learnings']}")
+    print("---")
+```
+
+### Import Knowledge
+
+```python
+# Import knowledge from external sources
+knowledge_base = [
+    {
+        "content": "Customer retention rate is 85% for premium plans",
+        "task": "customer_analysis",
+        "quality": 0.9,
+        "learnings": ["Premium features drive loyalty"],
+        "agent": "customer_analyst"
+    }
+]
+
+crew.long_term_memory.import_memories(knowledge_base)
+```
+
+## Best Practices
+
+### Quality Threshold Strategy
+
+```python
+# Adjust quality thresholds based on use case
+quality_strategies = {
+    "research": 0.9,        # Very high quality for research
+    "business_intel": 0.8,  # High quality for business decisions
+    "general_knowledge": 0.7, # Standard quality for general use
+    "casual_learning": 0.6,  # Lower threshold for exploratory learning
+}
+
+memory_config = MemoryConfig(
+    long_term={
+        "enabled": True,
+        "min_quality": quality_strategies["business_intel"]
+    }
+)
+```
+
+### Knowledge Organization
+
+```python
+# Use meaningful task categories
+def create_knowledge_session(category, subcategory):
+    return f"{category}_{subcategory}_{uuid.uuid4().hex[:8]}"
+
+# Examples
+sessions = {
+    "company_knowledge": create_knowledge_session("company", "policies"),
+    "product_specs": create_knowledge_session("product", "specifications"),
+    "market_research": create_knowledge_session("market", "analysis"),
+    "customer_insights": create_knowledge_session("customer", "feedback")
+}
+```
+
+### Performance Optimization
+
+```python
+# Optimize for different scales
+storage_configs = {
+    "small_team": {
+        "provider": "sqlite",
+        "connection_string": "sqlite:///team_knowledge.db"
+    },
+    "department": {
+        "provider": "postgresql", 
+        "connection_string": "postgresql://user:pass@localhost:5432/dept_knowledge"
+    },
+    "enterprise": {
+        "provider": "postgresql",
+        "connection_string": "postgresql://user:pass@cluster:5432/enterprise_knowledge"
+    }
+}
+```
+
+## Integration with Other Memory Types
+
+Long-term memory works alongside short-term and entity memory:
+
+```python
+# Comprehensive memory configuration
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://...",
+    short_term={"enabled": True, "max_history": 20},    # Recent context
+    long_term={"enabled": True, "min_quality": 0.8},    # Important knowledge
+    entity={"enabled": True}                            # Entity relationships
+)
+
+# Agent benefits from all memory types
+crew = Crew(agents=[agent], memory=memory_config)
+
+# Short-term provides immediate context
+# Long-term provides accumulated knowledge  
+# Entity memory tracks relationships
+```
+
+## Troubleshooting
+
+### Knowledge Not Being Stored
+
+- Check `min_quality` threshold - may be too high
+- Verify information quality in task results
+- Ensure agent is providing quality metadata
+
+### Poor Knowledge Retrieval
+
+- Lower `min_quality` if too restrictive
+- Use more specific search queries
+- Check if knowledge is properly categorized by task
+
+### Storage Performance Issues
+
+- Use PostgreSQL for large knowledge bases
+- Implement connection pooling
+- Consider archiving old knowledge periodically
+

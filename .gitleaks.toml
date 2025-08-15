@@ -1,0 +1,5 @@
+[allowlist]
+paths = [
+    "web/public/NZsdk.min.2.8.1.js"
+]
+description = "Third-party SDK minified file - false positive"

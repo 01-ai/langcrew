@@ -1,0 +1,289 @@
+---
+title: MCP 集成
+description: 学习如何将模型上下文协议（MCP）服务器与 LangCrew 智能体集成
+---
+
+## 什么是 MCP？
+
+**模型上下文协议（Model Context Protocol，MCP）** 是一个开放标准，用于在大型语言模型和数据源之间建立安全连接。MCP 服务器提供工具和资源，智能体可以使用它们访问外部系统、API 和数据源。
+
+## 为什么在 LangCrew 中使用 MCP？
+
+LangCrew 中的 MCP 集成提供：
+
+- **标准化连接** - 连接到任何兼容 MCP 的服务器
+- **安全访问** - 内置安全和权限控制  
+- **多种传输方式** - 支持 SSE、HTTP 流和 stdio
+- **工具过滤** - 控制智能体可以访问哪些工具
+- **易于扩展** - 无需代码更改即可添加新功能
+
+## 支持的传输类型
+
+LangCrew 支持三种 MCP 传输方法：
+
+### 1. 服务器发送事件（SSE）
+
+最适合实时数据和实时更新：
+
+```python
+server_config = {
+    "url": "https://api.example.com/mcp/sse?key=your_key",
+    "transport": "sse"
+}
+```
+
+### 2. 流式 HTTP
+
+适用于 REST API 集成：
+
+```python
+server_config = {
+    "url": "https://api.example.com/mcp",
+    "transport": "streamable_http"
+}
+```
+
+### 3. 标准输入输出（stdio）
+
+完美适用于本地工具和脚本：
+
+```python
+server_config = {
+    "command": "python3",
+    "args": ["path/to/your/tool.py"],
+    "transport": "stdio"
+}
+```
+
+## 基本用法
+
+### 1. 配置 MCP 服务器
+
+定义您的 MCP 服务器配置：
+
+```python
+from langcrew import Agent
+
+# 配置您的 MCP 服务器
+mcp_server_configs = {
+    "my_server": {
+        "url": "https://api.example.com/mcp",
+        "transport": "streamable_http"
+    }
+}
+```
+
+### 2. 创建带 MCP 的智能体
+
+将 MCP 服务器添加到您的智能体：
+
+```python
+@agent
+def my_agent(self) -> Agent:
+    return Agent(
+        config=self.agents_config["my_agent"],
+        mcp_servers=mcp_server_configs,
+        llm=self._get_default_llm(),
+        verbose=True
+    )
+```
+
+### 3. 可选：过滤可用工具
+
+控制智能体可以访问哪些工具：
+
+```python
+@agent
+def restricted_agent(self) -> Agent:
+    return Agent(
+        config=self.agents_config["my_agent"],
+        mcp_servers=mcp_server_configs,
+        mcp_tool_filter=["search", "calculator"],  # 只有这些工具
+        llm=self._get_default_llm()
+    )
+```
+
+## 完整示例
+
+这是一个使用不同 MCP 传输类型的完整工作示例：
+
+```python
+import os
+from langchain_openai import ChatOpenAI
+from langcrew import Agent, CrewBase, agent, task, crew
+from langcrew.task import Task
+from langcrew.crew import Crew
+
+@CrewBase
+class MyCrew:
+    agents_config = "config/agents.yaml"
+    tasks_config = "config/tasks.yaml"
+
+    def _get_default_llm(self):
+        return ChatOpenAI(
+            model="gpt-4o-mini", 
+            temperature=0.1, 
+            api_key=os.getenv("OPENAI_API_KEY")
+        )
+
+    @agent
+    def web_agent(self) -> Agent:
+        # SSE 传输用于实时数据
+        server_config = {
+            "url": f"https://api.example.com/sse?key={os.getenv('API_KEY')}",
+            "transport": "sse"
+        }
+        return Agent(
+            config=self.agents_config["web_agent"],
+            mcp_servers={"web_server": server_config},
+            llm=self._get_default_llm()
+        )
+
+    @agent  
+    def calculator_agent(self) -> Agent:
+        # stdio 传输用于本地工具
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        calc_script = os.path.join(current_dir, "tools", "calculator.py")
+        
+        server_config = {
+            "command": "python3",
+            "args": [calc_script],
+            "transport": "stdio"
+        }
+        return Agent(
+            config=self.agents_config["calculator"],
+            mcp_servers={"calc_server": server_config},
+            mcp_tool_filter=["add", "multiply"],  # 限制工具
+            llm=self._get_default_llm()
+        )
+
+    @task
+    def web_search_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["web_search"],
+            agent=self.web_agent()
+        )
+
+    @task
+    def calculation_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["calculation"],
+            agent=self.calculator_agent()
+        )
+
+    @crew
+    def crew(self) -> Crew:
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            verbose=True
+        )
+```
+
+## 配置文件
+
+### agents.yaml
+
+```yaml
+web_agent:
+  role: "网络搜索专家"
+  goal: "从网络中找到相关信息"
+  backstory: "擅长搜索和分析网络内容的专家"
+
+calculator:
+  role: "数学专家"  
+  goal: "执行准确的计算"
+  backstory: "专门从事数学计算的专家"
+```
+
+### tasks.yaml
+
+```yaml
+web_search_task:
+  description: "搜索关于 {topic} 的信息"
+  expected_output: "发现的全面总结"
+
+calculation_task:
+  description: "计算表达式 {expression} 的结果"
+  expected_output: "准确的数值结果及解释"
+```
+
+## 最佳实践
+
+### 1. 环境变量
+
+将敏感数据存储在环境变量中：
+
+```bash
+# .env 文件
+API_KEY=your_api_key_here
+OPENAI_API_KEY=your_openai_key_here
+```
+
+### 2. 错误处理
+
+始终优雅地处理 MCP 连接错误：
+
+```python
+try:
+    result = crew.kickoff(inputs={"topic": "AI 趋势"})
+except Exception as e:
+    print(f"MCP 服务器错误: {e}")
+    # 这里添加后备逻辑
+```
+
+### 3. 工具过滤
+
+使用工具过滤提高安全性和性能：
+
+```python
+# 只允许安全的只读操作
+mcp_tool_filter=["search", "read", "analyze"]
+```
+
+### 4. 多个服务器
+
+您可以连接到多个 MCP 服务器：
+
+```python
+mcp_servers = {
+    "search_server": {"url": "...", "transport": "sse"},
+    "data_server": {"url": "...", "transport": "streamable_http"},
+    "local_tools": {"command": "python3", "args": ["tools.py"], "transport": "stdio"}
+}
+```
+
+## 常见用例
+
+- **网络搜索** - 连接到搜索 API
+- **数据分析** - 访问数据库和分析工具
+- **计算** - 数学和统计计算  
+- **文件操作** - 读取、写入和处理文件
+- **API 集成** - 连接到 REST API 和服务
+- **系统工具** - 执行系统命令和脚本
+
+## 故障排除
+
+### 连接问题
+
+- 验证服务器 URL 和身份验证
+- 检查网络连接
+- 验证传输类型兼容性
+
+### 找不到工具
+
+- 确保工具名称与服务器导出匹配
+- 检查工具过滤配置
+- 验证服务器正在运行且可访问
+
+### 性能问题
+
+- 为您的用例使用适当的传输方式
+- 实施工具过滤以减少开销
+- 考虑连接池用于高并发使用
+
+## 下一步
+
+- 探索[智能体配置](/zh/concepts/agents)以进行高级设置
+- 学习[工具开发](/zh/guides/tools)创建自定义 MCP 服务器  
+- 查看[生产部署](/zh/guides/production)以了解扩展考虑事项

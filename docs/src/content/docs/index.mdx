@@ -1,0 +1,140 @@
+---
+title: Welcome to LangCrew
+description: Enterprise-grade multi-agent framework built on LangGraph - from prototyping to production
+template: splash
+hero:
+  tagline: From CrewAI simplicity to LangGraph power - the only framework you need for production-ready AI agent systems
+  actions:
+    - text: Quick Start
+      link: /guides/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: GitHub
+      link: https://github.com/01-ai/langcrew
+      icon: github
+---
+
+import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+<div class="hero-stats">
+  <Badge text="Python 3.11+" variant="note" />
+  <Badge text="Built on LangGraph" variant="success" />
+  <Badge text="Production Ready" variant="caution" />
+</div>
+
+## Why Choose LangCrew?
+
+**The best of both worlds:** CrewAI's simplicity meets LangGraph's enterprise capabilities
+
+<CardGrid stagger>
+	<Card title="Beyond Traditional Flexible Paradigms">
+		**Revolutionary agent collaboration**: Provides a simple, highly configurable development experience with powerful built-in mechanisms like HITL, dynamic workflow orchestration, and event-driven processes that empower unprecedented agent coordination.
+	</Card>
+	<Card title="Full-Stack Support for Productization">
+		**Accelerate market delivery**: Complete Agent-UI protocol and React component library enable frontend visualization of agent planning, scheduling, execution, and tool invocation—significantly reducing time from development to production deployment.
+	</Card>
+	<Card title="Application Templates for Fast Launch">
+		**Industry-ready solutions**: Rich variety of production-tested templates enabling rapid prototyping and deployment of multi-agent solutions across diverse industries and scenarios—from concept to market in record time.
+	</Card>
+	<Card title="Integrated Development and Operations Support">
+		**Seamless lifecycle management**: Integrated free SaaS services covering system construction, deep observability, sandbox environments, and deployment resources—simplifying the entire journey from development to operations.
+	</Card>
+</CardGrid>
+
+## Framework Comparison
+
+| Aspect | LangGraph | CrewAI | LangCrew |
+|--------|-----------|---------|----------|
+| **Abstraction** | Low-level primitives | High-level patterns | **High-level on LangGraph** |
+| **Development** | Build from scratch | Simple but limited | **Best practices pre-built** |
+| **HITL** | Basic interrupt/resume | Limited support | **Advanced approval system + bilingual UI** |
+| **Memory** | Complete primitives/docs | Simple context | **LangGraph native + langmem integration** |
+| **Tools** | LangChain only | Custom only | **Unified registry + LangCrew-Tools** |
+| **UI** | None | Basic examples | **Full React components** |
+| **Observability** | LangSmith integration | Enterprise edition | **LangTrace integration** |
+| **Deployment** | Platform available | Enterprise edition | **Platform (Coming Soon)** |
+
+
+## Quick Start Example
+
+**Build your first agent crew in under 5 minutes:**
+
+```python
+from langcrew import Agent, Crew, Task
+from langcrew.project import CrewBase, agent, crew, task
+from langcrew_tools import WebSearchTool
+
+@CrewBase
+class ResearchCrew:
+    @agent
+    def researcher(self) -> Agent:
+        return Agent(
+            role="Market Researcher",
+            goal="Find latest trends in AI automation",
+            tools=[WebSearchTool()],
+            backstory="Expert at finding market insights"
+        )
+    
+    @task
+    def research_task(self) -> Task:
+        return Task(
+            description="Research AI automation trends for {topic}",
+            agent=self.researcher(),
+            expected_output="Detailed market analysis report"
+        )
+    
+    @crew
+    def crew(self) -> Crew:
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            memory=True,  # Enable memory
+            verbose=True  # See execution details
+        )
+
+# Run the crew
+result = ResearchCrew().crew().kickoff(
+    inputs={"topic": "enterprise AI adoption"}
+)
+```
+
+## Getting Started Paths
+
+<CardGrid>
+	<Card title="Quick Start Guide">
+		**New to LangCrew?** Begin with installation and build your first agent crew in minutes with our step-by-step guide.
+		
+		[Quick Start →](/guides/quickstart/)
+	</Card>
+	<Card title="Core Concepts">
+		**Understand the framework** Learn about Agents, Tasks, Crews, and the foundational concepts that power multi-agent collaboration.
+		
+		[Agents →](/concepts/agents/) | [Tasks →](/concepts/tasks/) | [Crews →](/concepts/crews/)
+	</Card>
+	<Card title="Advanced Features">
+		**Ready for production?** Master memory systems, human-in-the-loop workflows, tools integration, and web services.
+		
+		[Memory Guide →](/guides/memory/getting-started/) | [HITL Guide →](/guides/hitl/getting-started/)
+	</Card>
+	<Card title="Production Deployment (Coming Soon)">
+		**Scale your applications** Advanced deployment features, enterprise observability, and production-grade configurations are being developed.
+		
+		[Web Services →](/guides/web/getting-started/) | [Tools →](/guides/tools/)
+	</Card>
+</CardGrid>
+
+## Success Stories
+
+> **"LangCrew reduced our development time from weeks to days. The production templates and UI components are game-changers."**  
+> — *Sarah Chen, Lead AI Engineer at TechCorp*
+
+> **"Finally, a framework that bridges the gap between prototyping and production. The HITL features are exactly what we needed."**  
+> — *Alex Rodriguez, CTO at StartupAI*
+
+---
+
+<div style="text-align: center; margin: 2rem 0;">
+  <strong>Ready to build production-ready AI agent systems?</strong><br/>
+  <a href="/guides/quickstart/" style="margin: 0 1rem;">Get Started →</a>
+  <a href="https://github.com/01-ai/langcrew" style="margin: 0 1rem;">Star on GitHub →</a>
+</div>

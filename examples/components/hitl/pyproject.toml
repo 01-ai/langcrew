@@ -1,0 +1,26 @@
+[project]
+name = "hitl_example"
+version = "0.1.0"
+description = "Human-in-the-Loop (HITL) Integration Examples using LangCrew"
+authors = [
+    { name = "LangCrew Team", email = "team@langcrew.ai" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "langcrew>=0.1.0",
+]
+
+[tool.uv.sources]
+langcrew = { path = "../../../libs/langcrew", editable = true }
+
+[project.scripts]
+hitl_demo = "hitl_example:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"

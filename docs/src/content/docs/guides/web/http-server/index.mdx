@@ -1,0 +1,286 @@
+---
+title: HTTP Server
+description: FastAPI-based HTTP server for exposing AI agents as web services
+---
+
+LangCrew's HTTP Server provides FastAPI-based REST API endpoints for exposing AI agents as web services with real-time streaming communication.
+
+:::tip[Protocol Reference]
+For complete communication protocol specifications and message formats, see the [Communication Protocol](/guides/web/protocol) documentation.
+:::
+
+## HTTP Server Features
+
+LangCrew HTTP server module (`langcrew.web.http_server`) provides:
+
+- **FastAPI Integration**: Modern, fast web framework with automatic API documentation
+- **Agent Exposure**: Convert LangCrew agents/crews into HTTP endpoints
+- **Streaming Support**: Server-Sent Events (SSE) for real-time communication
+- **Production Ready**: Built-in CORS, error handling, and health checks
+
+## Basic Usage
+
+### LangCrew Server
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+# Create your crew
+agent = Agent(
+    role="Web Assistant",
+    goal="Help users through web interface",
+    backstory="You are a helpful web-based AI assistant"
+)
+crew = Crew(agents=[agent])
+
+# Create and run server
+server = create_server(crew)
+server.run(host="0.0.0.0", port=8000)
+```
+
+### Direct LangGraph Server
+
+```python
+from langcrew.web import create_langgraph_server
+from langgraph.graph import StateGraph
+
+# If you have a compiled LangGraph
+compiled_graph = your_compiled_graph  # Your LangGraph compilation
+
+# Create server directly from LangGraph
+server = create_langgraph_server(compiled_graph)
+server.run(host="0.0.0.0", port=8000)
+```
+
+## Server Configuration
+
+### Advanced Server Setup
+
+```python
+from langcrew.web import AdapterServer, LangGraphAdapter
+
+# Create adapter with custom configuration
+adapter = LangGraphAdapter(crew)
+
+# Create server with custom FastAPI app
+server = AdapterServer(adapter)
+
+# Add custom middleware or routes
+@server.app.middleware("http")
+async def add_custom_header(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Custom-Header"] = "LangCrew"
+    return response
+
+@server.app.get("/custom")
+async def custom_endpoint():
+    return {"message": "Custom endpoint"}
+
+server.run()
+```
+
+### CORS Configuration
+
+```python
+from langcrew.web import create_server
+from fastapi.middleware.cors import CORSMiddleware
+
+# Create server
+server = create_server(crew)
+
+# Override CORS settings
+server.app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://yourdomain.com"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+server.run()
+```
+
+### Authentication Middleware
+
+Since LangCrew provides no built-in authentication, you can add your own:
+
+```python
+from langcrew.web import create_server
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Add your token verification logic here"""
+    if credentials.credentials != "your-secret-token":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return credentials
+
+# Create server
+server = create_server(crew)
+
+# Add authentication to specific routes
+@server.app.post("/api/v1/chat")
+async def protected_chat(request: dict, token: str = Depends(verify_token)):
+    # Your chat logic here
+    pass
+
+server.run()
+```
+
+## API Endpoints
+
+### Available Endpoints
+
+Once your server is running, the following endpoints are available:
+
+- **`GET /health`** - Health check endpoint
+- **`POST /api/v1/chat`** - Main chat interface with streaming response
+- **`POST /api/v1/chat/stop`** - Stop ongoing chat execution
+- **`GET /docs`** - Interactive API documentation (Swagger UI)
+- **`GET /redoc`** - Alternative API documentation (ReDoc)
+- **`GET /openapi.json`** - OpenAPI specification
+
+### Chat Interface
+
+```bash
+# Send a message
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "message": "Hello, how can you help me?",
+       "session_id": "optional-session-id"
+     }'
+
+# Stop execution
+curl -X POST "http://localhost:8000/api/v1/chat/stop" \
+     -H "Content-Type: application/json" \
+     -d '{"session_id": "your-session-id"}'
+```
+
+## Production Deployment
+
+### Uvicorn Configuration
+
+```python
+from langcrew.web import create_server
+
+server = create_server(crew)
+
+# Production settings
+server.run(
+    host="0.0.0.0",
+    port=8000,
+    workers=4,                    # Multiple workers
+    access_log=True,             # Enable access logging
+    log_level="info",            # Set log level
+    ssl_keyfile="key.pem",       # SSL certificate
+    ssl_certfile="cert.pem"
+)
+```
+
+:::tip[Complete Deployment Guide]
+For full production deployment with both backend and frontend using Docker Compose, see the [Getting Started](/guides/web/getting-started#production-deployment) guide.
+:::
+
+### Environment Variables
+
+```bash
+# Server configuration
+LANGCREW_HOST=0.0.0.0
+LANGCREW_PORT=8000
+LANGCREW_WORKERS=4
+LANGCREW_LOG_LEVEL=info
+
+# CORS settings
+LANGCREW_CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
+```
+
+## Monitoring and Logging
+
+### Health Monitoring
+
+```python
+import time
+from langcrew.web import create_server
+
+server = create_server(crew)
+
+@server.app.get("/health/detailed")
+async def detailed_health():
+    return {
+        "status": "healthy",
+        "timestamp": int(time.time() * 1000),
+        "version": "1.0.0",
+        "uptime": "calculate_uptime_here"
+    }
+
+server.run()
+```
+
+### Custom Logging
+
+```python
+import logging
+from langcrew.web import create_server
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+server = create_server(crew)
+server.run(access_log=True, log_level="info")
+```
+
+## Performance Optimization
+
+### Load Testing Example
+
+```python
+import asyncio
+import aiohttp
+import time
+
+async def load_test(concurrent_requests: int, total_requests: int):
+    """Simple load testing function"""
+    
+    async def send_request(session, request_id):
+        try:
+            async with session.post(
+                "http://localhost:8000/api/v1/chat",
+                json={"message": f"Test message {request_id}"}
+            ) as response:
+                return await response.text()
+        except Exception as e:
+            return f"Error: {e}"
+    
+    start_time = time.time()
+    
+    async with aiohttp.ClientSession() as session:
+        # Create semaphore to limit concurrent requests
+        semaphore = asyncio.Semaphore(concurrent_requests)
+        
+        async def bounded_request(request_id):
+            async with semaphore:
+                return await send_request(session, request_id)
+        
+        # Execute requests
+        tasks = [bounded_request(i) for i in range(total_requests)]
+        results = await asyncio.gather(*tasks)
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    print(f"Completed {total_requests} requests in {duration:.2f}s")
+    print(f"Average: {total_requests/duration:.2f} requests/second")
+    
+    return results
+
+# Run load test
+# asyncio.run(load_test(10, 100))
+```
+

@@ -1,0 +1,238 @@
+---
+title: Crews
+description: Understanding crews - orchestrating multiple agents to work together
+---
+
+Crews are the orchestration layer in langcrew that brings agents and tasks together. Built on LangGraph, they manage complex workflows with intelligent routing, memory systems, and dynamic execution patterns.
+
+## Quick Start - Create a Crew
+
+Get your first crew running in just 3 lines:
+
+```python
+from langcrew import Agent, Task, Crew
+
+agents = [Agent(role="Researcher", goal="Gather data"), Agent(role="Writer", goal="Create content")]
+tasks = [Task(agent=agents[0], description="Research AI trends"), Task(agent=agents[1], description="Write report")]
+crew = Crew(agents=agents, tasks=tasks)
+result = crew.kickoff()
+```
+
+:::tip[Complete Guide]
+For detailed workflows and orchestration patterns, see the [Quick Start](/guides/quickstart) guide.
+:::
+
+## What is a Crew?
+
+A Crew in langcrew represents an intelligent orchestration system with:
+
+- **Multi-Agent Coordination**: Multiple agents working together seamlessly
+- **Workflow Management**: Automatic task sequencing and dependency resolution
+- **Context Flow**: Information flows between agents and tasks automatically
+- **Memory Systems**: Persistent memory across conversations and sessions
+- **Dynamic Routing**: Intelligent handoffs between agents and tasks
+- **Human Integration**: Built-in human-in-the-loop capabilities
+
+## Core Architecture
+
+Crews orchestrate the execution of tasks by agents with intelligent coordination:
+
+![Crew Architecture](/images/crew-architecture.svg)
+
+### Design Philosophy
+
+LangCrew crews follow three orchestration principles:
+
+**1. Intelligent Coordination**
+- Automatic task sequencing based on dependencies
+- Dynamic agent selection and routing
+- Context-aware information flow
+
+**2. Stateful Execution** 
+- Memory persistence across sessions
+- Context accumulation and sharing
+- Conversation continuity
+
+**3. Human-AI Collaboration**
+- Seamless human oversight integration
+- Approval workflows and interventions
+- Interactive decision making
+
+## Crew Patterns
+
+### Sequential Workflow
+
+Agents and tasks execute in dependency order:
+
+```python
+from langcrew import Agent, Task, Crew
+
+# Create workflow
+researcher = Agent(role="Researcher", goal="Gather information")
+analyst = Agent(role="Analyst", goal="Analyze data")
+writer = Agent(role="Writer", goal="Create reports")
+
+research_task = Task(agent=researcher, description="Research market trends", name="research")
+analysis_task = Task(agent=analyst, description="Analyze findings", context=[research_task], name="analysis")
+report_task = Task(agent=writer, description="Write final report", context=[analysis_task], name="report")
+
+crew = Crew(
+    agents=[researcher, analyst, writer],
+    tasks=[research_task, analysis_task, report_task]
+)
+```
+
+### Agent-Driven Workflow
+
+When no tasks are specified, agents work sequentially:
+
+```python
+crew = Crew(
+    agents=[researcher, analyst, writer]  # No tasks - agents process input in sequence
+)
+
+# Each agent processes the user input in order
+result = crew.kickoff({"messages": [HumanMessage(content="Analyze market trends")]})
+```
+
+### Dynamic Handoffs
+
+Agents can transfer control to specialists:
+
+```python
+# Configure agent handoffs
+coordinator = Agent(
+    role="Coordinator",
+    goal="Route work to specialists",
+    handoff_to=["specialist", "reviewer"],  # Can transfer to these agents
+    is_entry=True,  # Entry point for workflow
+    name="coordinator"
+)
+
+specialist = Agent(role="Domain Specialist", name="specialist")
+reviewer = Agent(role="Quality Reviewer", name="reviewer")
+
+crew = Crew(agents=[coordinator, specialist, reviewer])
+```
+
+## Core Capabilities
+
+### Memory Systems
+
+Crews maintain persistent memory across conversations:
+
+```python
+# Enable basic memory
+crew = Crew(
+    agents=[assistant],
+    tasks=[support_task],
+    memory=True
+)
+
+# Memory persists across sessions
+result1 = crew.kickoff(thread_id="conversation_1")
+result2 = crew.kickoff(thread_id="conversation_1")  # Remembers previous context
+```
+
+### Human-in-the-Loop
+
+Enable human oversight when needed:
+
+```python
+from langcrew.hitl import HITLConfig
+
+crew = Crew(
+    agents=[decision_agent],
+    tasks=[critical_task],
+    hitl=HITLConfig(enabled=True)  # Human approval required
+)
+```
+
+### Context Management
+
+Automatic context flow between agents and tasks:
+
+```python
+# Context flows automatically through dependencies
+tasks = [
+    Task(agent=collector, description="Collect data", name="collect"),
+    Task(agent=processor, description="Process data", context=["collect"], name="process"),
+    Task(agent=reporter, description="Generate report", context=["process"], name="report")
+]
+
+crew = Crew(agents=[collector, processor, reporter], tasks=tasks)
+```
+
+## When to Use Crews
+
+Crews are ideal for:
+
+- **Multi-Step Workflows** - Complex processes requiring multiple agents
+- **Collaborative Tasks** - Work that benefits from different expertise
+- **Stateful Conversations** - Applications needing memory and context
+- **Quality-Controlled Processes** - Workflows requiring review and approval
+- **Dynamic Routing** - Processes where work flow depends on content
+- **Human-AI Collaboration** - Applications requiring human oversight
+
+## Execution Modes
+
+### Basic Execution
+```python
+# Simple execution
+result = crew.kickoff()
+
+# With inputs
+result = crew.kickoff(inputs={"topic": "AI trends", "deadline": "2024-12-31"})
+```
+
+### Thread Management
+```python
+# Persistent conversations
+result = crew.kickoff(
+    inputs={"query": "Analyze this data"},
+    thread_id="project_123"  # Maintains conversation history
+)
+```
+
+### Streaming Execution
+```python
+# Stream crew execution for real-time monitoring
+for chunk in crew.stream(input={"messages": [HumanMessage(content="Process request")]}):
+    print(f"Step: {chunk}")
+```
+
+## Integration Patterns
+
+### Research Pipeline
+```python
+crew = Crew(
+    agents=[
+        Agent(role="Researcher", goal="Gather data"),
+        Agent(role="Analyst", goal="Analyze findings"), 
+        Agent(role="Writer", goal="Create reports")
+    ],
+    tasks=[
+        Task(agent=researcher, description="Research topic", name="research"),
+        Task(agent=analyst, description="Analyze data", context=["research"], name="analyze"),
+        Task(agent=writer, description="Write report", context=["analyze"], name="report")
+    ]
+)
+```
+
+### Review Workflow
+```python
+crew = Crew(
+    agents=[
+        Agent(role="Author", goal="Create content"),
+        Agent(role="Reviewer", goal="Review quality"),
+        Agent(role="Approver", goal="Final approval")
+    ],
+    tasks=[
+        Task(agent=author, description="Create draft", name="draft"),
+        Task(agent=reviewer, description="Review content", context=["draft"], name="review"),
+        Task(agent=approver, description="Final approval", context=["review"], name="approve")
+    ]
+)
+```
+
+

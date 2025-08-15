@@ -1,0 +1,78 @@
+.agentx-sender {
+  .ant-sender {
+    border-radius: 24px;
+    border-color: #e1e1e1;
+    box-shadow: 0px 4px 20px 0px rgba(0, 0, 0, 0.08);
+
+    .ant-sender-input {
+      font-size: 16px;
+    }
+
+    .ant-sender-content {
+      padding: 20px 24px 16px;
+    }
+
+    .ant-sender-footer {
+      padding: 0 20px 20px;
+    }
+
+    .ant-sender-actions-btn {
+      background: #000;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.7);
+      }
+    }
+
+    .ant-sender-actions-btn-disabled {
+      background: rgba(0, 0, 0, 0.7);
+      color: rgba(255, 255, 255, 0.7);
+
+      &:hover {
+        opacity: 0.4;
+      }
+    }
+
+    .ant-btn-variant-solid {
+      background: #000;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.7);
+      }
+    }
+
+    .ant-btn-color-primary.ant-btn-variant-text {
+      color: #000;
+    }
+
+    .ant-btn-color-primary.ant-btn-variant-text:not(:disabled):not(.ant-btn-disabled):hover {
+      color: rgba(0, 0, 0, 0.7);
+      background: none;
+    }
+
+    &:focus-within {
+      border-color: #d9d9d9;
+      box-shadow: 0px 4px 20px 0px rgba(0, 0, 0, 0.08);
+
+      &:after {
+        border-width: 1px;
+      }
+    }
+  }
+}
+
+.agentx-mcp {
+  .ant-tabs {
+    .ant-tabs-tab {
+      padding: 0;
+    }
+  }
+
+  .ant-tabs-top > .ant-tabs-nav {
+    margin: 0;
+  }
+
+  .ant-tabs-top > .ant-tabs-nav::before {
+    border-bottom: none;
+  }
+}

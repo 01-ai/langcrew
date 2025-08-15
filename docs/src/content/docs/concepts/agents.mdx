@@ -1,0 +1,165 @@
+---
+title: Agents
+description: Understanding agents - the intelligent actors in your langcrew system
+---
+
+Agents are the core building blocks of langcrew. They are autonomous AI-powered entities that can understand tasks, use tools, collaborate with humans, and work within crews to achieve complex goals.
+
+## Quick Start - Create an Agent
+
+Get your first agent running in just 3 lines:
+
+```python
+from langcrew import Agent
+
+agent = Agent(role="Assistant", goal="Help users", backstory="Helpful AI")
+result = agent.invoke({"messages": []})
+```
+
+:::tip[Complete Guide]
+For detailed examples and setup, see the [Quick Start](/guides/quickstart) guide.
+:::
+
+## What is an Agent?
+
+An Agent in langcrew represents a specialized AI entity with:
+
+- **Identity**: Role, goal, and backstory that define its personality and expertise
+- **Capabilities**: Tools and skills it can use to accomplish tasks
+- **Intelligence**: LLM-powered reasoning and decision making
+- **Collaboration**: Ability to work with other agents and humans
+- **Safety**: Built-in guardrails and human oversight capabilities
+
+## Core Architecture
+
+Agents are built around a flexible, modular architecture:
+
+![Agent Architecture](/images/agent-architecture.svg)
+
+### Design Philosophy
+
+LangCrew agents follow three core principles:
+
+**1. CrewAI Compatibility**
+- Drop-in replacement for CrewAI agents
+- Familiar role/goal/backstory pattern
+- Seamless migration path
+
+**2. Native Flexibility** 
+- Custom prompts for specialized behavior
+- Direct LangGraph integration
+- Configurable execution strategies
+
+**3. Production-Ready**
+- Built-in safety with guardrails
+- Human-in-the-loop support
+- Enterprise-grade reliability
+
+## Agent Types
+
+### CrewAI-Style Agents
+
+Perfect for collaborative workflows:
+
+```python
+from langcrew import Agent
+
+researcher = Agent(
+    role="Research Specialist",
+    goal="Find accurate and relevant information",
+    backstory="Expert researcher with academic background",
+    tools=[search_tool, web_scraper]
+)
+```
+
+### Native Agents
+
+For custom behavior and specialized tasks:
+
+```python
+from langchain_core.messages import SystemMessage
+
+code_reviewer = Agent(
+    prompt=SystemMessage(content="You are a senior code reviewer..."),
+    tools=[code_analysis_tool],
+    executor_type="react"
+)
+```
+
+## Core Capabilities
+
+### Tool Integration
+
+Agents can use any LangChain-compatible tool:
+
+```python
+from langcrew_tools.search.langchain_tools import WebSearchTool
+
+agent = Agent(
+    role="Analyst",
+    tools=[WebSearchTool()]
+)
+```
+
+### Memory & Context
+
+Agents maintain conversation history and context:
+
+```python
+agent = Agent(
+    role="Assistant", 
+    memory=True  # Enable conversation memory
+)
+```
+
+### Human Collaboration
+
+Enable human oversight when needed:
+
+```python
+from langcrew.hitl import HITLConfig
+
+agent = Agent(
+    role="Decision Maker",
+    hitl=HITLConfig(enabled=True)
+)
+```
+
+### Agent Handoffs
+
+Agents can delegate tasks to specialists:
+
+```python
+coordinator = Agent(
+    role="Project Coordinator",
+    handoff_to=["developer", "tester", "reviewer"]
+)
+```
+
+## When to Use Agents
+
+Agents are ideal for:
+
+- **Autonomous Task Execution** - Tasks requiring reasoning and tool use
+- **Collaborative Workflows** - Multi-agent crews working together  
+- **Human-AI Collaboration** - Workflows needing human oversight
+- **Specialized Expertise** - Domain-specific knowledge and skills
+- **Complex Reasoning** - Multi-step problem solving
+- **Tool-Rich Environments** - Applications with many available tools
+
+## Integration with Crews
+
+Agents work best when organized into crews for collaborative workflows:
+
+```python
+from langcrew import Agent, Crew
+
+# Create specialized agents
+researcher = Agent(role="Researcher", goal="Gather information")
+writer = Agent(role="Writer", goal="Create content")
+
+# Organize into a crew
+crew = Crew(agents=[researcher, writer])
+result = crew.kickoff(inputs={"task": "Analyze market data"})
+```
+

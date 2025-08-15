@@ -1,0 +1,241 @@
+---
+title: Getting Started
+description: Quick guide to get started with Web services in 5 minutes
+---
+
+Quick guide to get Web services working in your langcrew application.
+
+LangCrew's Web module transforms your AI agents into production-ready web services with real-time streaming communication.
+
+:::tip[Protocol Reference]
+For detailed communication protocol specifications, message formats, and API endpoints, see the [Communication Protocol](/guides/web/protocol) documentation.
+:::
+
+## Quick Start - Just 3 Lines
+
+Get your agent running as a web service in just 3 lines:
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+agent = Agent(role="Assistant", goal="Help users", backstory="Helpful AI")
+server = create_server(Crew(agents=[agent]))
+server.run(port=8000)  # Visit http://localhost:8000/docs
+```
+
+That's it! Your agent is now available as a web service with automatic API documentation.
+
+## Installation
+
+Web services are included in langcrew - no additional installation required:
+
+```bash
+uv add langcrew --prerelease=allow
+```
+
+## Detailed Examples
+
+Here are more detailed examples for different use cases:
+
+### Method 1: Using LangCrew
+
+```python
+from langcrew import Agent, Crew
+from langcrew.web import create_server
+
+# Create agent and crew
+agent = Agent(
+    role="Web Assistant",
+    goal="Help users through web interface",
+    backstory="You are a helpful web-based AI assistant",
+    verbose=True
+)
+
+crew = Crew(agents=[agent])
+
+# Create and start server
+server = create_server(
+    crew=crew,
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["http://localhost:3000"]
+)
+
+# Start server
+if __name__ == "__main__":
+    print("Starting web server at http://localhost:8000")
+    server.run()
+```
+
+### Method 2: Using LangGraph
+
+```python
+from langcrew.web import create_langgraph_server
+from langgraph.graph import StateGraph
+
+# Create your LangGraph workflow
+def create_workflow():
+    workflow = StateGraph()
+    # Add your nodes and edges here
+    return workflow.compile()
+
+# Create server with LangGraph
+compiled_graph = create_workflow()
+server = create_langgraph_server(
+    graph=compiled_graph,
+    host="0.0.0.0",
+    port=8000,
+    cors_origins=["http://localhost:3000"]
+)
+
+# Start server
+if __name__ == "__main__":
+    print("Starting LangGraph web server at http://localhost:8000")
+    server.run()
+```
+
+## Testing Your Server
+
+Once your server is running, you can:
+
+### 1. Use the Built-in Web UI
+
+LangCrew provides a ready-to-use React-based web interface:
+
+```bash
+# Navigate to the web directory
+cd web/
+
+# Install dependencies
+pnpm install
+
+# Start the development server
+pnpm dev
+
+# Open your browser to http://localhost:3000/chat
+```
+
+The web UI includes:
+
+- **Real-time Chat Interface**: Stream responses with typing indicators
+- **Tool Call Visualization**: See agent tool usage in real-time
+- **File Upload Support**: Upload documents for analysis
+- **Session Management**: Maintain conversation history
+- **Modern React Components**: Built with Antd + Tailwind CSS
+
+:::tip[Production Deployment]
+For production, run `pnpm build` and serve the `dist/` directory with your preferred web server.
+:::
+
+### 2. Access API Documentation
+
+Visit `http://localhost:8000/docs` to see the auto-generated API documentation
+
+### 3. Send Test Messages
+
+```bash
+# Start new conversation (no session_id)
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Hello, how can you help me?"}'
+
+# Continue existing conversation
+curl -X POST "http://localhost:8000/api/v1/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "message": "Can you provide more details?",
+       "session_id": "session_abc123def456"
+     }'
+```
+
+### 4. Client Streaming Example
+
+If you need to handle streaming responses on the client side:
+
+```python
+import requests
+import json
+
+# Start new conversation
+response = requests.post('/api/v1/chat', json={
+    "message": "Hello, can you help me analyze this document?"
+    # session_id is optional - omit for new conversation
+}, stream=True)
+
+session_id = None
+
+# Handle streaming response
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"Received: {message['type']} - {message['content']}")
+        
+        # Extract session_id from session_init message
+        if message['type'] == 'session_init':
+            session_id = message['detail']['session_id']
+            print(f"New session created: {session_id}")
+
+# Continue conversation with the same session_id
+if session_id:
+    response = requests.post('/api/v1/chat', json={
+        "message": "Can you provide more details?",
+        "session_id": session_id
+    }, stream=True)
+    
+    for line in response.iter_lines():
+        if line:
+            message = json.loads(line)
+            print(f"Received: {message['type']} - {message['content']}")
+```
+
+## Production Deployment
+
+### Docker Compose (Recommended)
+
+The easiest way to deploy LangCrew with both backend and frontend:
+
+```bash
+# From the repository root
+export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
+
+# Optional configuration
+export LOG_LEVEL=info # debug|info|warning|error
+
+# Start services
+docker compose up --build
+```
+
+**Available endpoints:**
+
+- **Web Chat Interface**: [http://localhost:3600](http://localhost:3600)
+- **Backend API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### Local Development Setup
+
+**Backend Server:**
+
+```bash
+# 1. Configure API Key
+export OPENAI_API_KEY=your-openai-key   # or ANTHROPIC_API_KEY / DASHSCOPE_API_KEY
+
+# 2. Run the Server
+cd examples/components/web/web_chat
+uv run run_server.py
+```
+
+The server will start at **[http://localhost:8000](http://localhost:8000)**
+
+**Frontend Interface:**
+
+```bash
+# 1. Navigate to web directory
+cd web/
+
+# 2. Install dependencies and start development server
+pnpm install
+pnpm dev
+```
+
+Open your browser to **[http://localhost:3000/chat](http://localhost:3000/chat)**
+

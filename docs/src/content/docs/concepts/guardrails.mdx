@@ -1,0 +1,100 @@
+---
+title: Guardrails
+description: Understanding guardrails - the safety and validation system in langcrew
+---
+
+Guardrails are a safety and validation system in langcrew that ensures data quality, security, and compliance. They act as protective barriers that validate inputs before processing and outputs before delivery.
+
+## What are Guardrails?
+
+Guardrails are validation functions that can be applied to:
+
+- **Inputs**: Validate incoming data before processing
+- **Outputs**: Validate generated content before delivery
+- **Agents**: Apply global validation rules to all agent operations
+- **Tasks**: Apply specific validation rules to individual tasks
+
+Think of guardrails as quality control checkpoints that ensure your AI system operates safely and within defined boundaries.
+
+## Core Concepts
+
+### Input vs Output Guardrails
+
+**Input Guardrails** validate data before it reaches your AI agents:
+
+- Detect sensitive information (passwords, API keys, PII)
+- Validate data formats and structures
+- Check user permissions and access rights
+- Implement rate limiting and abuse prevention
+
+**Output Guardrails** validate content after AI processing:
+
+- Ensure content meets quality standards
+- Filter inappropriate or harmful content
+- Validate output format and structure
+- Check for factual accuracy and balanced language
+
+### Multi-Layer Protection
+
+Guardrails can be applied at multiple levels:
+
+- **Agent-Level**: Apply to all tasks executed by an agent
+- **Task-Level**: Apply only to specific tasks
+- **Combined**: Layer multiple guardrail types for comprehensive protection
+
+## Basic Structure
+
+Every guardrail function follows a simple pattern:
+
+```python
+@input_guard  # or @output_guard
+def my_guardrail(data: Any) -> Tuple[bool, str]:
+    """
+    Args:
+        data: The data to validate
+        
+    Returns:
+        Tuple[bool, str]: (is_valid, message)
+    """
+    # Validation logic here
+    if validation_passes:
+        return True, "✅ Validation passed"
+    else:
+        return False, "❌ Validation failed: reason"
+```
+
+## Key Components
+
+### Decorators
+
+- `@input_guard`: Marks functions as input validators
+- `@output_guard`: Marks functions as output validators
+
+### Error Handling
+
+When guardrails fail, they raise `GuardrailError` exceptions with detailed information about what went wrong.
+
+### Integration Points
+
+Guardrails integrate seamlessly with:
+
+- **Agents**: Apply via `input_guards` and `output_guards` parameters
+- **Tasks**: Apply specific guardrails to individual tasks
+- **Crews**: Inherit guardrails from their agents and tasks
+
+## Benefits
+
+- **Safety**: Prevent processing of sensitive or harmful data
+- **Quality**: Ensure outputs meet your standards
+- **Compliance**: Enforce business rules and regulations
+- **Reliability**: Catch errors early in the processing pipeline
+- **Flexibility**: Mix and match guardrails for different use cases
+
+## Use Cases
+
+- **Content Generation**: Validate AI-generated content quality
+- **Data Processing**: Ensure input data meets requirements
+- **Security**: Prevent exposure of sensitive information
+- **Compliance**: Enforce industry-specific regulations
+- **Quality Control**: Maintain consistent output standards
+

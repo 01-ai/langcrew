@@ -1,0 +1,45 @@
+services:
+  # Frontend React application
+  frontend:
+    image: node:18-alpine
+    ports:
+      - "3600:3600"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.pnpm-store
+    working_dir: /app
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - AGENT_API_HOST=http://super-agent:8000
+    command: >
+      sh -c "
+        npm install -g pnpm &&
+        pnpm install &&
+        pnpm dev
+      "
+    networks:
+      - langcrew-network
+    depends_on:
+      - super-agent
+
+  # Super Agent API service
+  super-agent:
+    build:
+      context: .
+      dockerfile: examples/components/web/super_agent/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - MODE=full
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - langcrew-network
+
+networks:
+  langcrew-network:
+    driver: bridge

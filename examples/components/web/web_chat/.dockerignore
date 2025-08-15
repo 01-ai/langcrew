@@ -1,0 +1,44 @@
+# Virtual environments - MUST exclude
+**/.venv/
+**/venv/
+**/ENV/
+**/env/
+
+# Exclude all examples except current one
+/examples/*
+!/examples/components/web/web_chat/
+
+# Exclude documentation and non-essential files
+/docs/
+/web/
+*.md
+!README.md
+.git/
+.gitignore
+.github/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+ENV/
+env/
+.env
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store

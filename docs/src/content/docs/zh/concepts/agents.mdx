@@ -1,0 +1,145 @@
+---
+title: 智能体 (Agents)  
+description: 理解智能体 - 具有特定角色、目标和能力的AI实体
+---
+
+智能体是 langcrew 的核心构建模块。它们是由AI驱动的自主实体，能够理解任务、使用工具、与人类协作，并在团队中协作以实现复杂目标。
+
+## 快速开始 - 创建智能体
+
+用3行代码创建并运行您的第一个智能体：
+
+```python
+from langcrew import Agent
+
+agent = Agent(role="助手", goal="帮助用户", backstory="有用的AI助手")
+result = agent.invoke({"messages": []})
+```
+
+:::tip[完整指南]
+详细的智能体配置和高级功能请参考 [快速开始](/guides/quickstart) 指南。
+:::
+
+## 什么是智能体？
+
+langcrew 中的智能体代表一个AI驱动的实体，具有：
+
+- **明确角色**: 特定的职责和专业领域
+- **目标导向**: 明确的目标和成功标准  
+- **工具集成**: 访问执行任务所需的工具
+- **协作能力**: 与其他智能体和人类协作
+- **记忆系统**: 跨对话的上下文记忆
+- **人机协作支持**: 内置的人工监督机制
+- **企业级可靠性**: 生产环境的稳定性
+
+## 智能体类型
+
+### CrewAI风格智能体
+
+非常适合协作工作流：
+
+```python
+from langcrew import Agent
+
+researcher = Agent(
+    role="研究专员",
+    goal="找到准确和相关的信息",
+    backstory="具有学术背景的专业研究员",
+    tools=[search_tool, web_scraper]
+)
+```
+
+### 原生智能体
+
+用于自定义行为和专业化任务：
+
+```python
+from langchain_core.messages import SystemMessage
+
+code_reviewer = Agent(
+    prompt=SystemMessage(content="您是一名高级代码审查员..."),
+    tools=[code_analysis_tool],
+    executor_type="react"
+)
+```
+
+## 核心能力
+
+### 工具集成
+
+智能体可以使用任何兼容LangChain的工具：
+
+```python
+from langcrew_tools.search.langchain_tools import WebSearchTool
+
+agent = Agent(
+    role="分析师",
+    tools=[WebSearchTool()]
+)
+```
+
+### 记忆系统
+
+为对话维护上下文：
+
+```python
+agent = Agent(
+    role="助手", 
+    memory=True  # 启用对话记忆
+)
+```
+
+### 人机协作
+
+在需要时启用人工监督：
+
+```python
+from langcrew.hitl import HITLConfig
+
+agent = Agent(
+    role="决策者",
+    hitl=HITLConfig(enabled=True)
+)
+```
+
+### 智能体移交
+
+智能体可以将任务委托给专家：
+
+```python
+coordinator = Agent(
+    role="项目协调员",
+    handoff_to=["开发者", "测试员", "审查员"]
+)
+```
+
+## 何时使用智能体
+
+智能体非常适合：
+
+- **专业任务** - 需要特定专业知识的工作
+- **工具密集型工作** - 需要多种工具协调的任务
+- **协作工作流** - 需要与其他智能体协作的流程
+- **人工监督场景** - 需要人类监督和干预的工作
+- **状态化对话** - 需要记住上下文的应用
+- **复杂决策制定** - 需要多步推理的任务
+
+## 与其他组件的集成
+
+智能体无缝集成所有 langcrew 组件：
+
+```python
+from langcrew import Agent, Task, Crew
+
+# 创建专业智能体
+researcher = Agent(role="研究员", goal="收集数据")
+writer = Agent(role="写手", goal="创建内容")
+
+# 组织成一个团队
+crew = Crew(agents=[researcher, writer])
+result = crew.kickoff(inputs={"task": "分析市场数据"})
+```
+
+## 下一步
+
+继续学习 [任务](/concepts/tasks) - 理解智能体执行的工作单元。

@@ -1,0 +1,250 @@
+---
+title: Super Agent
+description: A powerful intelligent agent system built on the LangCrew framework, integrating browser automation, web search, code execution, and more
+---
+
+Super Agent is a powerful intelligent agent system built on the LangCrew framework, integrating browser automation, web search, code execution, file operations, and various other tools. It provides complete Web API services with streaming response support.
+
+## Prerequisites and Configuration
+
+## Environment Variables
+
+Before using Super Agent, you need to configure environment variables.
+
+**Important Note**: Please refer to the environment variable configuration example file in the project:
+- **Configuration Example File**: [`examples/components/web/super_agent/.env.example`](https://github.com/01-ai/langcrew/blob/main/examples/components/web/super_agent/.env.example)
+
+**Please configure all the following environment variables to ensure Super Agent runs properly**:
+
+```bash
+# LLM API Key
+OPENAI_API_KEY=
+
+# E2B Sandbox Environment Configuration
+E2B_API_KEY=
+E2B_TEMPLATE=e2b-20250806-v1
+E2B_DOMAIN=your-e2b-domain.example.com
+E2B_TIMEOUT=3600
+
+# S3 Storage Configuration
+S3_ENDPOINT=
+S3_AK=
+S3_SK=
+S3_BUCKET=
+S3_GATEWAY=
+S3_REGION=
+
+# WebSearchTool Configuration
+LANGCREW_WEB_SEARCH_ENDPOINT=
+LANGCREW_WEB_SEARCH_API_KEY=
+
+# WebFetchTool Configuration
+LANGCREW_CRAWL4AI_SERVICE_URL=
+
+# ImageGenerationTool Configuration
+LANGCREW_IMAGE_GEN_API_KEY=
+```
+
+### Variable Descriptions
+
+- **LLM API Key**: OpenAI API key for the agent's core reasoning capabilities
+
+- **E2B Sandbox Environment Configuration**: Used for secure code execution environment
+  - `E2B_API_KEY`: Requires applying for E2B API key
+  - `E2B_TEMPLATE`: **Must use `e2b-20250806-v1`** (designated sandbox template provided by 01)
+  - `E2B_DOMAIN`: Your E2B domain (e.g., `your-e2b-domain.example.com`)
+  - `E2B_TIMEOUT`: Sandbox timeout, set to 3600 seconds
+
+- **S3 Storage Configuration**: For file storage and image saving, requires configuring S3-compatible object storage service
+
+- **Search Tool Configuration**: For web search functionality, requires configuring search service endpoint and key
+
+- **Image Generation Configuration**: For AI image generation functionality, requires configuring image generation service key
+
+**Important Note**: `E2B_TEMPLATE` and `E2B_DOMAIN` must use the specified values above. These are dedicated sandbox environment configurations provided by 01 for the current demo. Please do not modify them.
+
+## Quick Start
+
+### Step 1: Navigate to the Example Project Directory
+
+```bash
+cd examples/components/web/super_agent
+```
+
+### Step 2: Configure Environment Variables
+
+Create a `.env` file in the current directory:
+
+```bash
+# Copy configuration example file
+cp .env.example .env
+# Edit the .env file to fill in necessary configurations
+```
+
+### Step 3: Start Services
+
+```bash
+docker-compose -f compose-super-agent.yaml up --build
+```
+
+### Step 3: Access Services
+
+After startup is complete, you can access:
+- **Super Agent API**: http://localhost:8000
+- **Frontend Web UI**: http://localhost:3600
+
+* Note: The front-end service requires 5-6 minutes to start up.
+
+### Docker Compose Architecture Overview
+
+The `compose-super-agent.yaml` file in the example directory defines the complete full-stack architecture:
+
+**frontend service**:
+- Based on Node.js 18 Alpine image
+- Port mapping: 3600:3600
+- Automatically installs dependencies and starts development server
+- Environment variable: `AGENT_API_HOST=http://super-agent:8000`
+- Mounts `./web` directory as frontend code
+
+**super-agent service**:
+- Built based on the `Dockerfile` in the current directory
+- Port mapping: 8000:8000
+- Loads environment variables from `.env` file
+- Run mode: full, log level: info
+- Network: langcrew-network (for communication with frontend service)
+
+## Key Features
+
+### API Interfaces
+
+Super Agent provides the following core API interfaces:
+
+#### 1. Chat Interface
+```http
+POST /api/v1/chat
+Content-Type: application/json
+
+{
+  "message": "Your task description",
+  "session_id": "Session ID (optional, automatically generated if empty)"
+}
+```
+
+**Features**:
+- Multi-turn conversation support
+- Real-time streaming response (Server-Sent Events)
+- Automatic session management
+- Tool invocation and execution monitoring
+
+#### 2. Stop Execution Interface
+```http
+POST /api/v1/chat/stop
+Content-Type: application/json
+
+{
+  "session_id": "Session ID to stop"
+}
+```
+
+#### 3. Update Task Interface
+```http
+POST /api/v1/update_task
+Content-Type: application/json
+
+{
+  "message": "New task instruction",
+  "session_id": "Session ID"
+}
+```
+
+### Agent Capabilities
+
+#### Browser Automation
+- Intelligent web page operation and data extraction based on browser-use
+- Automatic handling of complex multi-step web tasks and workflows
+- Intelligent page element recognition and interactive operations
+- Support for user takeover control and manual intervention for login pages
+- Built-in error recovery and retry mechanisms to ensure stable task execution
+
+#### Information Retrieval and Processing
+- Web search and content scraping
+- Multi-source information integration and verification
+- Structured data extraction and analysis
+- Intelligent content summarization and report generation
+
+#### Code Execution and File Operations
+- Python code execution in sandbox environment
+- Mathematical calculations, data analysis, chart generation
+- Complete file system operation support
+- Support for reading and writing various file formats
+
+#### Multimedia Generation
+- AI-driven image generation
+- Support for various artistic styles and descriptions
+- Automatic image file saving and management
+
+#### System Integration
+- Linux command execution support
+- Environment variable and configuration management
+- Multi-tool coordination and workflow orchestration
+
+## Usage Examples
+
+### Web Search and Information Extraction
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Search for 2024 artificial intelligence development trends and summarize key insights",
+    "session_id": "research_session"
+  }'
+```
+
+### Browser Automation Tasks
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Open the 12306 official website and help me check which high-speed trains from Beijing to Shanghai have available tickets after 3 PM the day after tomorrow",
+    "session_id": "automation_session"
+  }'
+```
+
+### File Processing and Content Generation
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Create a research report on AI technology development and save it as a markdown file",
+    "session_id": "document_session"
+  }'
+```
+
+## Project Architecture
+
+```
+src/super_agent/
+├── agent/
+│   ├── crew.py              # Main SuperAgentCrew class
+│   └── enhanced_crew.py     # Enhanced Crew implementation
+├── common/
+│   ├── session_state.py     # Session state management
+│   └── sandbox_config.py    # Sandbox configuration
+├── config/
+│   ├── config.py           # Configuration class definitions
+│   └── prompt.py           # System prompts
+├── main.py                 # Direct execution entry point
+└── server.py              # FastAPI server
+```
+
+## Integration with LangCrew Framework
+
+Super Agent is built entirely on the LangCrew framework, showcasing the framework's powerful capabilities:
+
+- **Decorator Development Pattern**: Uses `@agent`, `@crew` decorators
+- **Tool Ecosystem**: Integrates LangCrew-Tools toolset
+- **Streaming Monitoring**: Real-time execution status and result streams
+- **Session Management**: Persistent context and state
+- **Human-AI Collaboration**: Built-in approval and interaction mechanisms
+
+Super Agent is a perfect demonstration of the LangCrew framework's capabilities, providing a complete reference implementation for building production-grade intelligent agent systems.

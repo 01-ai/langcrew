@@ -1,0 +1,240 @@
+---
+title: 团队
+description: 理解团队 - 协调多个智能体协同工作
+---
+
+团队是 langcrew 中的编排层，将智能体和任务结合在一起。基于 LangGraph 构建，它们管理具有智能路由、记忆系统和动态执行模式的复杂工作流。
+
+## 快速开始 - 创建团队
+
+用3行代码创建并运行您的第一个团队：
+
+```python
+from langcrew import Agent, Task, Crew
+
+agents = [Agent(role="研究员", goal="收集数据"), Agent(role="写手", goal="创建内容")]
+tasks = [Task(agent=agents[0], description="研究AI趋势"), Task(agent=agents[1], description="撰写报告")]
+crew = Crew(agents=agents, tasks=tasks)
+result = crew.kickoff()
+```
+
+:::tip[完整指南]
+详细的工作流和编排模式请参考 [快速开始](/guides/quickstart) 指南。
+:::
+
+## 什么是团队？
+
+langcrew 中的团队代表一个智能编排系统，具有：
+
+- **多智能体协调**: 多个智能体无缝协作
+- **工作流管理**: 自动任务排序和依赖解析
+- **上下文流转**: 信息在智能体和任务间自动流转
+- **记忆系统**: 跨对话和会话的持久记忆
+- **动态路由**: 智能体和任务间的智能移交
+- **人机集成**: 内置的人机协作能力
+
+## 核心架构
+
+团队通过智能协调来编排智能体执行任务：
+
+![团队架构](/images/crew-architecture.svg)
+
+### 设计理念
+
+LangCrew 团队遵循三个编排原则：
+
+**1. 智能协调**
+- 基于依赖关系的自动任务排序
+- 动态智能体选择和路由
+- 上下文感知的信息流
+
+**2. 有状态执行** 
+- 跨会话的记忆持久化
+- 上下文积累和共享
+- 对话连续性
+
+**3. 人机协作**
+- 无缝的人工监督集成
+- 审批工作流和干预
+- 交互式决策制定
+
+## 团队模式
+
+### 顺序工作流
+
+智能体和任务按依赖顺序执行：
+
+```python
+from langcrew import Agent, Task, Crew
+
+# 创建工作流
+researcher = Agent(role="研究员", goal="收集信息")
+analyst = Agent(role="分析师", goal="分析数据")
+writer = Agent(role="写手", goal="创建报告")
+
+research_task = Task(agent=researcher, description="研究市场趋势", name="research")
+analysis_task = Task(agent=analyst, description="分析发现", context=[research_task], name="analysis")
+report_task = Task(agent=writer, description="写最终报告", context=[analysis_task], name="report")
+
+crew = Crew(
+    agents=[researcher, analyst, writer],
+    tasks=[research_task, analysis_task, report_task]
+)
+```
+
+### 智能体驱动工作流
+
+当未指定任务时，智能体按顺序工作：
+
+```python
+crew = Crew(
+    agents=[researcher, analyst, writer]  # 无任务 - 智能体按顺序处理输入
+)
+
+# 每个智能体按顺序处理用户输入
+result = crew.kickoff({"messages": [HumanMessage(content="分析市场趋势")]})
+```
+
+### 动态移交
+
+智能体可以将控制权转移给专家：
+
+```python
+# 配置智能体移交
+coordinator = Agent(
+    role="协调员",
+    goal="将工作路由给专家",
+    handoff_to=["specialist", "reviewer"],  # 可以转移到这些智能体
+    is_entry=True,  # 工作流的入口点
+    name="coordinator"
+)
+
+specialist = Agent(role="领域专家", name="specialist")
+reviewer = Agent(role="质量审核员", name="reviewer")
+
+crew = Crew(agents=[coordinator, specialist, reviewer])
+```
+
+## 核心能力
+
+### 记忆系统
+
+团队在对话间维护持久记忆：
+
+```python
+# 启用基础记忆
+crew = Crew(
+    agents=[assistant],
+    tasks=[support_task],
+    memory=True
+)
+
+# 记忆在会话间持久化
+result1 = crew.kickoff(thread_id="conversation_1")
+result2 = crew.kickoff(thread_id="conversation_1")  # 记住之前的上下文
+```
+
+### 人机协作
+
+在需要时启用人工监督：
+
+```python
+from langcrew.hitl import HITLConfig
+
+crew = Crew(
+    agents=[decision_agent],
+    tasks=[critical_task],
+    hitl=HITLConfig(enabled=True)  # 需要人工批准
+)
+```
+
+### 上下文管理
+
+智能体和任务间的自动上下文流转：
+
+```python
+# 上下文通过依赖关系自动流转
+tasks = [
+    Task(agent=collector, description="收集数据", name="collect"),
+    Task(agent=processor, description="处理数据", context=["collect"], name="process"),
+    Task(agent=reporter, description="生成报告", context=["process"], name="report")
+]
+
+crew = Crew(agents=[collector, processor, reporter], tasks=tasks)
+```
+
+## 何时使用团队
+
+团队非常适合：
+
+- **多步骤工作流** - 需要多个智能体的复杂流程
+- **协作任务** - 受益于不同专业知识的工作
+- **有状态对话** - 需要记忆和上下文的应用
+- **质量控制流程** - 需要审核和批准的工作流
+- **动态路由** - 工作流程取决于内容的流程
+- **人机协作** - 需要人工监督的应用
+
+## 执行模式
+
+### 基础执行
+```python
+# 简单执行
+result = crew.kickoff()
+
+# 带输入
+result = crew.kickoff(inputs={"topic": "AI趋势", "deadline": "2024-12-31"})
+```
+
+### 线程管理
+```python
+# 持久对话
+result = crew.kickoff(
+    inputs={"query": "分析这些数据"},
+    thread_id="project_123"  # 维护对话历史
+)
+```
+
+### 流式执行
+```python
+# 流式团队执行以进行实时监控
+for chunk in crew.stream(input={"messages": [HumanMessage(content="处理请求")]}):
+    print(f"步骤：{chunk}")
+```
+
+## 集成模式
+
+### 研究管道
+```python
+crew = Crew(
+    agents=[
+        Agent(role="研究员", goal="收集数据"),
+        Agent(role="分析师", goal="分析发现"), 
+        Agent(role="写手", goal="创建报告")
+    ],
+    tasks=[
+        Task(agent=researcher, description="研究主题", name="research"),
+        Task(agent=analyst, description="分析数据", context=["research"], name="analyze"),
+        Task(agent=writer, description="写报告", context=["analyze"], name="report")
+    ]
+)
+```
+
+### 审核工作流
+```python
+crew = Crew(
+    agents=[
+        Agent(role="作者", goal="创建内容"),
+        Agent(role="审核员", goal="审核质量"),
+        Agent(role="批准者", goal="最终批准")
+    ],
+    tasks=[
+        Task(agent=author, description="创建草稿", name="draft"),
+        Task(agent=reviewer, description="审核内容", context=["draft"], name="review"),
+        Task(agent=approver, description="最终批准", context=["review"], name="approve")
+    ]
+)
+```
+
+## 下一步
+
+继续学习 [内存管理](/concepts/memory) - 理解有状态工作流的持久记忆系统。

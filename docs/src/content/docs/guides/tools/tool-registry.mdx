@@ -1,0 +1,207 @@
+---
+title: Using Tools
+description: Learn how to find and use tools in your LangCrew agents
+---
+
+## What are Tools?
+
+**Tools** give your agents the ability to take real actions - like calculating numbers, reading files, scraping websites, or calling APIs. LangCrew's tool system automatically finds and provides access to tools from multiple sources.
+
+Quick example:
+
+```python
+from langcrew.tools import ToolRegistry
+
+# Get a tool and use it
+calculator = ToolRegistry.get_tool("calculator")
+result = calculator.run("2 + 2")  # "4"
+```
+
+## Getting Tools: Three Ways
+
+### 1. Install Tool Packages (Recommended)
+
+**Best for**: Most users - gets you hundreds of ready-to-use tools
+
+```bash
+pip install crewai_tools langchain_community
+```
+
+Popular tools you'll get:
+
+```python
+from langcrew.tools import ToolRegistry
+
+# CrewAI tools (from crewai_tools package)
+file_read = ToolRegistry.get_tool("crewai:read_a_files_content")
+scraper = ToolRegistry.get_tool("crewai:read_website_content")
+search = ToolRegistry.get_tool("crewai:search_the_internet_with_serper")
+# ... many more CrewAI tools available
+
+# LangChain Community tools (from langchain_community package)
+# Note: These require additional dependencies
+wikipedia = ToolRegistry.get_tool("langchain:wikipedia")
+calculator = ToolRegistry.get_tool("langchain:calculator")
+# ... many more LangChain tools available
+```
+
+**Important**: Tool names use provider prefixes and snake_case format:
+
+- `crewai:` prefix for CrewAI tools (from `crewai_tools`) - use snake_case format
+- `langchain:` prefix for LangChain community tools (from `langchain_community.tools`) - use snake_case format
+- `langcrew:` prefix for LangCrew-specific tools (from `langcrew_tools`)
+- No prefix for custom tools in your project
+
+**Note**: Always use snake_case format (lowercase with underscores) for tool names, even if the original tool uses descriptive names with spaces.
+
+To see all available tools:
+
+```bash
+python -c "from langcrew.tools import ToolRegistry; print(ToolRegistry.list_tools())"
+```
+
+**Note**: External tools are loaded on-demand (lazy loading) - they only load when first requested to avoid import errors from missing dependencies.
+
+### 2. Create Custom Tools
+
+**Best for**: Business-specific logic or unique workflows
+
+Create a `tools/` directory in your project:
+
+```python
+# tools/my_tools.py
+from langchain_core.tools import BaseTool
+
+class SalesReportTool(BaseTool):
+    name = "sales_report"
+    description = "Generate sales reports"
+    
+    def _run(self, period: str = "monthly") -> str:
+        # Your business logic here
+        return f"Sales for {period}: $50,000"
+```
+
+Use it immediately:
+
+```python
+report_tool = ToolRegistry.get_tool("sales_report")
+result = report_tool.run("quarterly")
+```
+
+### 3. Manual Registration
+
+**Best for**: Advanced users who need to override existing tools
+
+```python
+from langcrew.tools import ToolRegistry
+
+# Register your own version
+ToolRegistry.register("calculator", MyEnhancedCalculator())
+
+# Now your version is used
+calc = ToolRegistry.get_tool("calculator")
+```
+
+## Using Tools with Agents
+
+Here's a complete example showing tools in action:
+
+```python
+from langcrew import Agent, Crew
+from langcrew.tools import ToolRegistry
+
+# Create an agent with tools
+researcher = Agent(
+    role="Research Analyst", 
+    goal="Find information on any topic",
+    backstory="Expert at finding reliable information",
+    tools=[
+        ToolRegistry.get_tool("crewai:search_the_internet_with_serper"),
+        ToolRegistry.get_tool("crewai:read_website_content"),
+        ToolRegistry.get_tool("crewai:read_a_files_content")
+    ]
+)
+
+# Use in a crew
+crew = Crew(agents=[researcher])
+result = crew.kickoff(inputs={
+    "topic": "renewable energy trends"
+})
+```
+
+## Common Issues
+
+### "Tool not found" Error
+
+**Step 1**: Install the required tool packages
+
+```bash
+pip install crewai_tools langchain_community
+```
+
+**Step 2**: Use the correct provider prefix
+
+```python
+from langcrew.tools import ToolRegistry
+
+# External tools need provider prefixes (use snake_case)
+tool = ToolRegistry.get_tool("crewai:read_a_files_content")  # ✅
+tool = ToolRegistry.get_tool("langchain:wikipedia")  # ✅
+
+# Custom tools don't need prefixes  
+tool = ToolRegistry.get_tool("sales_report")  # ✅
+```
+
+**Step 3**: Debug with list_tools() if needed
+
+```python
+from langcrew.tools import ToolRegistry
+
+# See all available tools (triggers lazy loading)
+available_tools = ToolRegistry.list_tools()
+print("Available tools:")
+for tool in available_tools:
+    print(f'  "{tool}"')
+
+# Try accessing a specific tool to see error details
+try:
+    tool = ToolRegistry.get_tool("crewai:read_website_content")
+    print(f"Success: {tool.name}")
+except ValueError as e:
+    print(f"Error: {e}")
+```
+
+### Missing Dependencies Error
+
+Some LangChain tools need additional packages:
+
+```bash
+# For web search tools
+pip install duckduckgo-search
+
+# For Wikipedia tool  
+pip install wikipedia
+
+# For calculator
+pip install numexpr
+```
+
+### Creating Custom Tools Not Working
+
+Make sure your tools directory structure is correct:
+
+```text
+your_project/
+├── tools/
+│   ├── __init__.py  # Can be empty
+│   └── my_tools.py  # Your tool classes here
+└── main.py
+```
+
+Your tool class must:
+
+- Inherit from `BaseTool`
+- Have a `name` attribute
+- Implement the `_run` method
+
+**Pro tip**: Start with `crewai_tools` for common tasks, then create custom tools for your specific business needs.

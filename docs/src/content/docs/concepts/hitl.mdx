@@ -1,0 +1,173 @@
+---
+title: Human-in-the-Loop (HITL)
+description: Understanding HITL - adding human oversight to AI workflows
+---
+
+Human-in-the-Loop (HITL) is LangCrew's **high-level human oversight component** built on top of [LangGraph's native interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/). It provides an easy-to-use interface for adding human approval workflows to AI agent executions.
+
+## What is HITL?
+
+HITL is a high-level abstraction that wraps [LangGraph's interrupt mechanisms](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) to provide strategic control points where humans can:
+
+- **Approve or deny** tool executions before they run
+- **Modify parameters** before tool execution  
+- **Review and edit** tool results after execution
+- **Implement safety policies** for production environments
+- **Multi-language support** with Chinese and English UI elements
+
+## Core Architecture
+
+HITL provides a high-level wrapper around [LangGraph's interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) with enhanced approval workflows:
+
+```python
+from langcrew.hitl import HITLConfig
+
+# Basic configuration
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write", "database_query"],
+    interrupt_after_tools=["data_analysis"],
+    interrupt_tool_mode="specified"
+)
+```
+
+## Key Components
+
+### HITLConfig
+
+Unified configuration for all interrupt and approval settings.
+
+#### Configuration Parameters
+
+| Parameter                | Type      | Description                               | Default     |
+| ------------------------ | --------- | ----------------------------------------- | ----------- |
+| `enabled`                | bool      | Enable/disable HITL functionality         | True        |
+| `interrupt_before_tools` | List[str] | Tools requiring approval before execution | []          |
+| `interrupt_after_tools`  | List[str] | Tools requiring review after execution    | []          |
+| `interrupt_tool_mode`    | str       | Interrupt mode: "specified", "all"        | "specified" |
+| `excluded_tools`         | List[str] | Tools excluded from "all" mode            | []          |
+| `interrupt_before_nodes` | List[str] | Nodes to interrupt before                 | []          |
+| `interrupt_after_nodes`  | List[str] | Nodes to interrupt after                  | []          |
+
+### Tool-Level Interrupts
+
+Control tool execution with human approval workflows.
+
+```python
+# Interrupt before/after specific tools
+hitl_config = HITLConfig(
+    interrupt_before_tools=["file_write", "web_search"],
+    interrupt_after_tools=["data_analysis"]
+)
+```
+
+- **Before interrupts**: Parameter approval and modification
+- **After interrupts**: Result review and editing
+
+:::caution[Session-Level Limitation]
+**`interrupt_after_tools` only works within a single execution session.** The interrupt occurs during tool node execution, before the next checkpoint is saved. After workflow restarts, the system cannot resume from the interrupt point and must restart from the last checkpoint, potentially causing duplicate tool executions.
+
+For tools that need post-execution review across restarts, consider:
+
+- Using `interrupt_before_tools` for critical operations
+- Implementing re-entrant tools that can handle multiple review cycles
+- Using node-level interrupts for workflow-level control points
+
+:::
+
+### Node-Level Interrupts  
+
+Integration with [LangGraph's native interrupt system](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/) for workflow control.
+
+```python
+# Interrupt before/after specific workflow nodes
+hitl_config = HITLConfig(
+    interrupt_before_nodes=["decision_node"],
+    interrupt_after_nodes=["validation_node"]
+)
+```
+
+Node-level interrupts provide granular control over workflow execution, allowing human intervention at specific decision points or validation steps in your agent workflows.
+
+### UserInputTool
+
+Dynamic user interaction tool for agent-initiated input requests.
+
+```python
+from langcrew.tools.hitl import UserInputTool
+
+# Agent can request user input during execution
+user_input_tool = UserInputTool()
+agent = Agent(tools=[user_input_tool, ...])
+```
+
+Enables agents to dynamically collect information from users during workflow execution.
+
+## Integration with langcrew
+
+HITL integrates seamlessly with all langcrew components:
+
+- **[Agents](/concepts/agents)**: Add approval workflows to agent tools
+- **[Tasks](/concepts/tasks)**: Tasks inherit HITL settings from their assigned agents
+- **[Crews](/concepts/crews)**: Apply unified HITL policies across teams
+
+```python
+# HITL is configured at the Agent level
+agent = Agent(
+    role="Data Analyst", 
+    tools=[web_search, file_write],
+    hitl=HITLConfig(interrupt_before_tools=["file_write"])
+)
+
+# Tasks automatically inherit HITL settings from their agent
+task = Task(
+    agent=agent,
+    description="Analyze data and save report"
+)
+
+# Crew can also apply HITL policies to all agents
+crew = Crew(
+    agents=[agent], 
+    tasks=[task],
+    hitl=HITLConfig(interrupt_before_tools=["web_search"])
+)
+```
+
+## Interrupt Types
+
+### Before Interrupt
+
+```python
+# User approves/modifies parameters before execution
+hitl_config = HITLConfig(
+    interrupt_before_tools=["web_search", "file_write"]
+)
+```
+
+### After Interrupt
+
+```python
+# User reviews/edits results after execution
+hitl_config = HITLConfig(
+    interrupt_after_tools=["data_analysis", "report_generator"]
+)
+```
+
+## When to Use HITL
+
+- **Production environments** requiring human oversight
+- **Sensitive operations** like file modifications or API calls
+- **Quality assurance** workflows needing human validation
+- **Compliance scenarios** requiring audit trails
+
+## Multi-language Support
+
+HITL provides built-in multi-language interface support:
+
+```python
+# Automatic language detection
+# Currently supported languages:
+# English: "approve", "deny", "yes", "no"
+# Chinese: "批准", "拒绝", "同意", "不同意"
+# More languages can be added in the future
+```
+

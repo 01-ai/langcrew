@@ -1,0 +1,259 @@
+---
+title: Getting Started
+description: Get started with Memory in 5 minutes
+---
+
+Get up and running with LangCrew Memory in just a few minutes. This guide covers basic setup and common usage patterns.
+
+## Installation
+
+Install LangCrew with memory support:
+
+```bash
+# Install LangCrew
+uv add langcrew
+```
+
+## Basic Usage
+
+### 1. Simple Memory Setup
+
+```python
+from langcrew import Agent, Crew
+
+# Create memory configuration - just enable it!
+memory_config = True  # Uses default settings with all memory types enabled
+
+# Create agent with memory
+agent = Agent(
+    role="Memory Assistant",
+    goal="Remember and use information from our conversations",
+    backstory="You are an AI assistant with excellent memory capabilities"
+)
+
+# Create crew with shared memory
+crew = Crew(
+    agents=[agent],
+    memory=memory_config
+)
+```
+
+### 2. Run Your First Memory-Enabled Conversation
+
+```python
+# First conversation
+result1 = crew.kickoff(
+    inputs={"user_input": "My name is Alice and I love pizza"},
+    thread_id="conversation_1"
+)
+
+# Later conversation - agent remembers Alice
+result2 = crew.kickoff(
+    inputs={"user_input": "What food do I like?"},
+    thread_id="conversation_1"  # Same thread ID
+)
+
+print(result2)  # Agent will remember Alice likes pizza
+```
+
+### 3. Persistent Memory with SQLite
+
+```python
+from langcrew.memory import MemoryConfig
+
+# Persistent memory configuration
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///my_memory.db",
+    short_term={"enabled": True, "max_history": 20},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
+)
+
+crew = Crew(agents=[agent], memory=memory_config)
+
+# Memory persists across program restarts
+result = crew.kickoff(
+    inputs={"user_input": "Remember that I work at TechCorp"},
+    thread_id="user_alice"
+)
+```
+
+## Memory Types in Action
+
+### Short-term Memory
+
+Remembers recent conversation history within a session:
+
+```python
+# Configure short-term memory
+memory_config = MemoryConfig(
+    short_term={
+        "enabled": True,
+        "max_history": 15,  # Keep last 15 conversation turns
+    }
+)
+
+# Agent will remember context from recent messages
+crew = Crew(agents=[agent], memory=memory_config)
+```
+
+### Long-term Memory
+
+Stores important knowledge across sessions:
+
+```python
+# Configure long-term memory
+memory_config = MemoryConfig(
+    long_term={
+        "enabled": True,
+        "min_quality": 0.8,  # Only store high-quality information
+    }
+)
+
+# Agent learns and remembers important facts
+crew = Crew(agents=[agent], memory=memory_config)
+```
+
+### Entity Memory
+
+Tracks people, organizations, and concepts:
+
+```python
+# Configure entity memory
+memory_config = MemoryConfig(
+    entity={"enabled": True}
+)
+
+# Agent remembers entities and their relationships
+crew = Crew(agents=[agent], memory=memory_config)
+
+# Example: Agent will remember "Alice works at TechCorp"
+result = crew.kickoff(
+    inputs={"user_input": "Alice is the CEO of TechCorp"},
+    thread_id="business_context"
+)
+```
+
+## Memory Search
+
+Search across all memory types:
+
+```python
+# Search memory
+results = crew.search_memory(
+    query="Alice",
+    memory_type="all",  # Search all memory types
+    limit=5
+)
+
+for result in results:
+    print(f"Memory type: {result['memory_type']}")
+    print(f"Content: {result['content']}")
+```
+
+## Configuration Examples
+
+### Development Setup (In-Memory)
+
+```python
+memory_config = MemoryConfig(
+    provider="memory",  # Fast, no persistence
+    short_term={"enabled": True, "max_history": 10},
+    long_term={"enabled": True},
+    entity={"enabled": True}
+)
+```
+
+### Production Setup (PostgreSQL)
+
+```python
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db",
+    short_term={"enabled": True, "max_history": 50},
+    long_term={"enabled": True, "min_quality": 0.8},
+    entity={"enabled": True}
+)
+```
+
+### Local Development (SQLite)
+
+```python
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///development.db",
+    short_term={"enabled": True, "max_history": 30},
+    long_term={"enabled": True, "min_quality": 0.7},
+    entity={"enabled": True}
+)
+```
+
+## Common Patterns
+
+### Customer Service Agent
+
+```python
+# Memory-enabled customer service
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///customer_service.db",
+    short_term={"enabled": True, "max_history": 20},
+    entity={"enabled": True}  # Remember customer details
+)
+
+service_agent = Agent(
+    role="Customer Service Representative",
+    goal="Provide personalized customer support",
+    backstory="You remember customer history and preferences"
+)
+
+crew = Crew(agents=[service_agent], memory=memory_config)
+
+# Each customer gets their own thread
+result = crew.kickoff(
+    inputs={"user_input": "I need help with my order"},
+    thread_id=f"customer_{customer_id}"
+)
+```
+
+### Learning Assistant
+
+```python
+# Memory-enabled learning assistant
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///learning.db",
+    long_term={"enabled": True, "min_quality": 0.8},  # Store learnings
+    entity={"enabled": True}  # Track concepts and topics
+)
+
+tutor = Agent(
+    role="Personal Tutor",
+    goal="Adapt teaching based on student progress",
+    backstory="You remember what students have learned and their difficulties"
+)
+
+crew = Crew(agents=[tutor], memory=memory_config)
+```
+
+
+## Troubleshooting
+
+### Memory Not Persisting
+
+- Check your `connection_string` format
+- Ensure database permissions are correct
+- Verify the database file/connection is accessible
+
+### High Memory Usage
+
+- Reduce `max_history` in short-term memory
+- Increase `min_quality` threshold in long-term memory
+- Consider using SQLite/PostgreSQL instead of in-memory
+
+### Slow Performance
+
+- Use PostgreSQL for production workloads
+- Enable connection pooling for database providers
+- Consider memory provider for development/testing

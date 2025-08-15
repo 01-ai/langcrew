@@ -1,0 +1,173 @@
+@import 'tailwindcss';
+@config '../tailwind.config.js';
+
+/* @font-face {
+  font-family: HarmonyOS Sans;
+  src: url('./assets/fonts/HarmonyOS_Sans.ttf');
+} */
+
+body {
+  margin: 0px !important;
+  overflow: auto;
+  background: #000;
+  color: #fff;
+}
+
+div,
+span,
+p,
+a,
+ul,
+li,
+label,
+textarea,
+input,
+button,
+th,
+td,
+h1,
+h2,
+h3,
+h4 {
+  border: 0;
+  background: transparent;
+}
+
+.planner {
+  .ant-thought-chain-item-header::before {
+    width: 0px !important;
+    background-color: #fff !important;
+    border-left: 1px;
+    border-color: #d1d5db;
+    border-style: dashed;
+  }
+
+  .ant-thought-chain .ant-thought-chain-item-pending-pending .ant-thought-chain-item-icon {
+    background-color: #fff !important;
+  }
+
+  .planner-item .ant-thought-chain-item .ant-thought-chain-item-header::before {
+    display: none !important;
+  }
+
+  .ant-thought-chain.ant-thought-chain-middle
+    .ant-thought-chain-item
+    .ant-thought-chain-item-content
+    .ant-thought-chain-item-content-box {
+    max-width: 100%;
+  }
+
+  .ant-thought-chain.ant-thought-chain-middle {
+    .ant-thought-chain-item {
+      .ant-thought-chain-item-header {
+        .ant-thought-chain-item-header-box {
+          .ant-thought-chain-item-title {
+            font-size: 16px;
+          }
+          .ant-thought-chain-item-desc {
+            font-size: 16px;
+          }
+        }
+      }
+    }
+  }
+
+  .ant-thought-chain-item-icon {
+    height: 20px !important;
+    width: 20px !important;
+    margin-top: 5px;
+    margin-left: 3px;
+  }
+}
+
+.ant-attachment-list-card {
+  background-color: #fff;
+  border: 1px solid #ededed;
+}
+
+.active {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.26) 25%,
+    rgba(255, 255, 255, 0.85) 37%,
+    rgba(255, 255, 255, 0.26) 63%
+  );
+  background-size: 400% 100%;
+  animation-name: active;
+  animation-duration: 1.4s;
+  animation-timing-function: ease;
+  animation-iteration-count: infinite;
+}
+
+@keyframes active {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* 聊天区域滚动条样式 */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent; /* 默认透明 */
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
+}
+
+.chat-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1); /* 悬停时显示 */
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.follow-btn-none {
+  display: none;
+}
+
+/* 附件列表卡片样式 */
+.ant-attachment-list-card {
+  padding: 12px 46px 12px 12px;
+  border-radius: 12px;
+  border-color: #ededed;
+}
+.ant-attachment-list-card.ant-attachment-list-card-type-preview {
+  padding-right: 12px;
+}
+.ant-attachment-list-card:hover {
+  background-color: #0000000a;
+}
+.ant-attachment-list-card-type-overview .ant-attachment-list-card-icon {
+  font-size: 36px;
+  padding-top: 0;
+}
+.ant-attachment-list-card .ant-attachment-list-card-name {
+  line-height: 20px;
+  font-size: 14px;
+}
+.ant-attachment-list-card-type-overview .ant-attachment-list-card-desc {
+  line-height: 14px;
+  font-size: 10px;
+}
+
+/* @js-preview/docx样式 */
+.docx-wrapper {
+  padding: 12px !important;
+  background: none !important;
+
+  .docx {
+    width: 100% !important;
+    min-height: 87vh !important;
+    padding: 24px !important;
+  }
+}

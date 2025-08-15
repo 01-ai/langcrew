@@ -1,0 +1,445 @@
+---
+title: Web Component Communication Protocol
+description: Complete communication protocol specification for LangCrew Web components
+---
+
+The LangCrew Web Component Communication Protocol defines how web clients communicate with LangCrew agents using Server-Sent Events (SSE) for real-time streaming communication.
+
+## 1. Transport Protocol
+
+### Streaming Transport (SSE)
+
+- Client calls the send message API
+- Server sends event streams through SSE (Server-Sent Events) connection
+
+## 2. Message Definition
+
+### 2.1 Message Structure
+
+#### User Input
+
+```json
+{
+  "id": "uuid",
+  "role": "user",
+  "type": "text",
+  "content": "User message content",
+  "detail": {
+      "knowledgeIds": [1, 2, 3],
+      "tools": [1, 2, 3],
+      "files": [{
+          "name": "file1.pdf",
+          "type": "pdf",
+          "url": ""
+      }]
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### Session Messages
+
+**Session Init**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "session_init",
+  "content": "",
+  "detail": {
+      "session_id": "xxxxxx",
+      "title": "xxxxx"
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**Finish Reason**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "finish_reason",
+  "content": "Task completion message",
+  "detail": {
+      "status": "completed",
+      "reason": ""
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### Resource Messages
+
+**Text (also used for result delivery)**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "text",
+  "content": "Analysis results",
+  "detail": {
+      "streaming": false,
+      "attachments": []
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**Image (currently unused)**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "image",
+  "content": "Image description text",
+  "detail": {
+    "url": "https://example.com/image.jpg",
+    "width": 800,
+    "height": 600
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**Audio (currently unused)**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "audio",
+  "content": "Audio description text",
+  "detail": {
+    "url": "https://example.com/audio.mp3",
+    "duration": 120
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**Video (currently unused)**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "video",
+  "content": "Video description text",
+  "detail": {
+    "url": "https://example.com/video.mp4",
+    "duration": 180,
+    "thumbnail": "https://example.com/thumbnail.jpg"
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### Plan Messages
+
+**Plan Generation**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "plan",
+  "content": "Analysis plan overview",
+  "detail": {
+    "steps": [{
+        "id": "step1",
+        "title": "Step 1: Search Information",
+        "description": "Use search tools to find relevant materials",
+        "started_at": 1748438204041,
+        "status": "pending"
+      }, {
+        "id": "step2",
+        "title": "Step 2: Analyze Data",
+        "description": "Analyze collected data",
+        "started_at": null,
+        "status": "pending"
+      }],
+    "created_at": 1748438204041
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**Plan Update**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "plan_update",
+  "content": "Plan update description",
+  "detail": {
+    "action": "update",
+    "steps": [{
+        "id": "step1",
+        "title": "Step 2: Modified new step",
+        "description": "Adjust plan based on latest situation",
+        "started_at": 1748438204041,
+        "status": "success"
+      }]
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### Tool Call Messages
+
+**Tool Call Start**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "tool_call",
+  "content": "Click xxx to browse xxx content",
+  "detail": {
+    "run_id": "xxxxxxxx",
+    "tool": "search",
+    "status": "pending",
+    "action": "Browsing",
+    "action_content": "/home/user/document.html",
+    "param": {
+      "param1": {},
+      "param2": "xxxxxx"
+    }
+  },
+  "timestamp": 1748438204041
+}
+```
+
+**Tool Call End**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "tool_result",
+  "content": "",
+  "detail": {
+    "run_id": "xxxxxxxx",
+    "tool": "terminal",
+    "status": "success",
+    "result": {
+      "content": "xxxxxx",
+      "additional_kwargs": {},
+      "response_metadata": "xxxxxx"
+    }
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### HITL Messages
+
+**HITL Standard Message**
+
+When this message is received, there is no subsequent finish_reason, requiring special handling as end of round with user in finished state
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "human_input",
+  "content": "Your created content can be deployed as a static website, confirm deployment?",
+  "detail": {
+      "options": ["Agree", "Reject"],
+      "result": {
+        "question": "Your created content can be deployed as a static website, confirm deployment?"
+      },
+      "session_id": "xxxxxx"
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### Status Messages
+
+**(Will flash on page, current message disappears when new message arrives)**
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "live_status",
+  "content": "Searching",
+  "detail": {
+    "expires_in": 5000
+  },
+  "timestamp": 1748438204041
+}
+```
+
+#### Error Messages
+
+```json
+{
+  "id": "uuid",
+  "role": "assistant",
+  "type": "error",
+  "content": "Specific error message",
+  "detail": {},
+  "timestamp": 1748438204041
+}
+```
+
+### 2.2 Tool Types
+
+**For superagent use, continuously expanding...**:
+
+- **terminal**: Terminal operations
+- **file**: File operations
+- **search**: Search operations
+- **browser**: Browser operations
+- **html**: Web page operations
+
+### 2.3 Roles
+
+- **user**: User
+- **assistant**: AI assistant
+
+## 3. Complete Flow
+
+1. **User initiates message**
+2. **Agent streaming response**：
+   1. Start message: title, session_id and other key information
+   2. Plan message: Contains specific execution plan (if there are two steps, all pending)
+   3. Plan update message: step 1 running
+   4. Multiple execute messages: Multiple execution messages (text, tool call, status messages, etc.)
+   5. Plan update message: step 1 success
+   6. Plan update message: step 2 running (can be sent together with step1 success above)
+   7. Multiple execute messages: Multiple execution messages (text, tool call, status messages, etc.)
+   8. Plan update message: step 2 success
+   9. Final return message to user: text with attachment
+   10. End message: finish_reason
+   11. Special messages: error messages, user_input (hitl)
+
+## 4. Authentication
+
+No built-in authentication. Users can add custom authentication middleware:
+
+```python
+from langcrew.web import create_server
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPBearer
+
+security = HTTPBearer()
+
+async def verify_token(credentials = Depends(security)):
+    # Add your authentication logic here
+    if not is_valid_token(credentials.credentials):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return credentials
+
+server = create_server(crew)
+
+@server.app.post("/api/v1/chat")
+async def protected_chat(request: dict, token = Depends(verify_token)):
+    # Your protected chat logic
+    pass
+```
+
+## 5. API Reference
+
+#### Send Message `/api/v1/chat`
+
+**Request:**
+
+```json
+{
+    "message": "User message",
+    "session_id": "xxxxx",
+    "interrupt_data": {}
+}
+```
+
+**Parameters:**
+
+- `message` (required): User's message content
+- `session_id` (optional): Session identifier for conversation continuity. If not provided or empty, a new session will be automatically created with format `session_{16-character-uuid}`
+- `interrupt_data` (optional): Additional data for resuming interrupted conversations
+
+**Response:** Streaming return of StreamMessage (see message definitions above)
+
+#### Stop Chat `/api/v1/chat/stop`
+
+**Request:**
+
+```json
+{
+    "session_id": "xxxxx"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "session_id": "xxxx"
+}
+```
+
+## Usage Examples
+
+### Basic Chat Flow
+
+```python
+import requests
+import json
+
+# Start new conversation (no session_id provided)
+response = requests.post('/api/v1/chat', json={
+    "message": "Hello, can you help me analyze this document?"
+})
+
+# Handle streaming response
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"Received: {message['type']} - {message['content']}")
+        
+        # Extract session_id from session_init message
+        if message['type'] == 'session_init':
+            session_id = message['detail']['session_id']
+            print(f"New session created: {session_id}")
+```
+
+### Continue Existing Conversation
+
+```python
+# Continue existing conversation with session_id
+response = requests.post('/api/v1/chat', json={
+    "message": "Can you provide more details?",
+    "session_id": "session_abc123def456"  # Use existing session
+})
+
+# Handle streaming response
+for line in response.iter_lines():
+    if line:
+        message = json.loads(line)
+        print(f"Received: {message['type']} - {message['content']}")
+```
+
+### Handle HITL Messages
+
+```python
+# When receiving human_input message
+if message['type'] == 'human_input':
+    user_choice = input(message['content'])
+    
+    # Send user response
+    requests.post('/api/v1/chat', json={
+        "session_id": message['detail']['session_id'],
+        "message": user_choice,
+        "interrupt_data": message['detail']
+    })
+```

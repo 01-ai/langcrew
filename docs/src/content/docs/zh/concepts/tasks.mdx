@@ -1,0 +1,233 @@
+---
+title: 任务
+description: 理解任务 - 智能体在 langcrew 中执行的工作单元
+---
+
+任务是 langcrew 中的基本工作单元。它们定义了需要完成什么、谁应该完成、如何构造结果，以及工作如何在团队中的智能体之间流转。
+
+## 快速开始 - 创建任务
+
+用3行代码创建并运行您的第一个任务：
+
+```python
+from langcrew import Agent, Task
+
+agent = Agent(role="助手", goal="帮助用户", backstory="有用的AI")
+task = Task(agent=agent, description="分析数据", expected_output="分析报告")
+result = task.invoke({"messages": []})
+```
+
+:::tip[完整指南]
+详细示例和工作流程请参考 [快速开始](/guides/quickstart) 指南。
+:::
+
+## 什么是任务？
+
+langcrew 中的任务代表一个离散的工作单元，具有：
+
+- **明确定义**: 需要完成的具体描述
+- **智能体分配**: 负责执行工作的智能体
+- **预期输出**: 对结果的明确期望
+- **上下文感知**: 能够使用前置任务的输出
+- **质量控制**: 内置的防护栏和验证
+- **流程控制**: 向其他任务或智能体移交的能力
+
+## 核心架构
+
+任务基于 Runnable 接口构建，与 LangGraph 的执行系统无缝集成：
+
+![任务架构](/images/task-architecture.svg)
+
+### 设计理念
+
+LangCrew 任务遵循三个核心原则：
+
+**1. 显式工作流设计**
+- 明确的任务描述和预期输出
+- 任务之间的显式依赖关系
+- 可预测的执行流程
+
+**2. 上下文智能**
+- 任务可以访问前置任务的输出
+- 自动的上下文管理和传递
+- 智能的依赖解析
+
+**3. 质量保证**
+- 内置的输入/输出验证
+- 结构化输出模式
+- 安全性和合规性防护栏
+
+## 任务类型
+
+### 基础任务
+
+简单、自包含的工作单元：
+
+```python
+from langcrew import Agent, Task
+
+task = Task(
+    agent=Agent(role="分析师", goal="分析数据", backstory="专业分析师"),
+    description="分析Q3销售表现并识别趋势",
+    expected_output="包含关键洞察的销售分析报告"
+)
+```
+
+### 序列任务
+
+依赖前置工作的任务：
+
+```python
+# 第一个任务
+research_task = Task(
+    agent=researcher,
+    description="研究竞争对手定价策略",
+    expected_output="竞争对手定价分析",
+    name="research"
+)
+
+# 第二个任务使用第一个任务的输出
+strategy_task = Task(
+    agent=strategist,
+    description="基于研究制定定价策略",
+    expected_output="定价策略建议",
+    context=[research_task]  # 使用 research_task 输出
+)
+```
+
+### 结构化输出任务
+
+强制特定输出格式的任务：
+
+```python
+from pydantic import BaseModel
+from typing import List
+
+class Insight(BaseModel):
+    title: str
+    description: str
+    impact: str
+
+class AnalysisReport(BaseModel):
+    insights: List[Insight]
+    summary: str
+
+task = Task(
+    agent=analyst,
+    description="分析客户反馈",
+    expected_output="包含洞察的结构化分析",
+    output_json=AnalysisReport  # 强制使用此模式
+)
+```
+
+## 核心能力
+
+### 上下文依赖
+
+任务自动接收和处理前置任务的输出：
+
+```python
+# 依赖任务链
+tasks = [
+    Task(agent=collector, description="收集数据", name="collect"),
+    Task(agent=processor, description="处理数据", context=["collect"], name="process"),
+    Task(agent=reporter, description="生成报告", context=["process"], name="report")
+]
+```
+
+### 质量控制
+
+内置验证和防护栏：
+
+```python
+from langcrew.guardrail import input_guard, output_guard
+
+@input_guard
+def validate_input(data):
+    # 验证输入数据
+    return True, "输入有效"
+
+@output_guard  
+def validate_output(data):
+    # 确保输出质量
+    return True, "输出通过"
+
+task = Task(
+    agent=processor,
+    description="处理敏感数据",
+    expected_output="处理结果",
+    input_guards=[validate_input],
+    output_guards=[validate_output]
+)
+```
+
+### 任务移交
+
+任务可以将工作委托给专业智能体：
+
+```python
+primary_task = Task(
+    agent=coordinator,
+    description="协调项目工作流",
+    expected_output="协调结果",
+    handoff_to=["specialist_task", "reviewer_task"]  # 可以委托给这些任务
+)
+```
+
+## 何时使用任务
+
+任务非常适合：
+
+- **结构化工作流** - 具有明确依赖关系的多步骤流程
+- **质量控制工作** - 需要验证和合规的流程
+- **协作流程** - 在多个智能体之间流转的工作
+- **数据处理管道** - 顺序的数据转换和分析
+- **内容创作工作流** - 研究 → 分析 → 写作 → 审核
+- **复杂问题解决** - 将大问题分解为可管理的步骤
+
+## 与团队集成
+
+任务与团队编排无缝协作，创建强大的工作流：
+
+```python
+from langcrew import Agent, Task, Crew
+
+# 创建研究和分析工作流
+research_task = Task(
+    agent=Agent(role="研究员", goal="收集信息"),
+    description="研究市场趋势",
+    expected_output="市场研究报告",
+    name="research"
+)
+
+analysis_task = Task(
+    agent=Agent(role="分析师", goal="分析数据"),
+    description="分析市场机会",
+    expected_output="机会分析",
+    context=[research_task],
+    name="analysis"
+)
+
+# 在团队中执行任务
+crew = Crew(
+    agents=[researcher, analyst],
+    tasks=[research_task, analysis_task]
+)
+
+result = crew.kickoff()
+```
+
+## 常见模式
+
+### 研究 → 分析 → 报告
+```python
+workflow = [
+    Task(agent=researcher, description="收集数据", name="research"),
+    Task(agent=analyst, description="分析发现", context=["research"], name="analyze"),
+    Task(agent=writer, description="撰写报告", context=["analyze"], name="report")
+]
+```
+
+## 下一步
+
+继续学习 [团队](/concepts/crews) - 理解团队如何协调智能体和任务。
