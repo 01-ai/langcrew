@@ -62,7 +62,6 @@ class LangGraphAdapter:
 
         self.crew = crew
         self.compiled_graph = compiled_graph
-        self._display_language: str = "en"  # Default to English
 
     @classmethod
     def _get_session_state(cls, session_id: str) -> dict[str, Any]:
@@ -82,6 +81,41 @@ class LangGraphAdapter:
     def _get_session_value(cls, session_id: str, key: str, default: Any = None) -> Any:
         """Get a value from session state."""
         return cls._get_session_state(session_id).get(key, default)
+
+    @classmethod
+    def _get_session_display_language(
+        cls, session_id: str, user_input: str = None, explicit_language: str = None
+    ) -> str:
+        """Get session-level display language.
+
+        Priority: explicit_language > cached_language > detected_language > default
+
+        Args:
+            session_id: Session identifier
+            user_input: User input text for language detection (optional)
+            explicit_language: Explicitly specified language (optional)
+
+        Returns:
+            Language code ('zh' or 'en')
+        """
+        # Priority 1: Explicit language specification
+        if explicit_language:
+            cls._set_session_state(session_id, "display_language", explicit_language)
+            return explicit_language
+
+        # Priority 2: Cached session language
+        cached_language = cls._get_session_value(session_id, "display_language")
+        if cached_language:
+            return cached_language
+
+        # Priority 3: Detect from user input and cache
+        if user_input:
+            detected_language = detect_language(user_input)
+        else:
+            detected_language = "en"  # Default to English
+
+        cls._set_session_state(session_id, "display_language", detected_language)
+        return detected_language
 
     @classmethod
     async def set_stop_flag(
@@ -164,13 +198,12 @@ class LangGraphAdapter:
         """Unified execution method for both new conversations and resume scenarios."""
         config = self._build_config(execution_input.session_id, **config_kwargs)
 
-        # Detect display language
-        if execution_input.language:
-            self._display_language = execution_input.language
-        elif execution_input.user_input:
-            self._display_language = detect_language(execution_input.user_input)
-        else:
-            self._display_language = "en"
+        # Initialize session-level display language (cached for this session)
+        self._get_session_display_language(
+            execution_input.session_id,
+            execution_input.user_input,
+            execution_input.language,
+        )
 
         try:
             input_data = self._prepare_input(execution_input)
@@ -364,9 +397,10 @@ class LangGraphAdapter:
             tool_input = data.get("input", {})
             brief = tool_input.get("brief", "")
 
-            # Generate display fields with current task language
+            # Generate display fields with session language
+            session_language = self._get_session_display_language(session_id)
             display_fields = ToolDisplayManager.get_display(
-                tool_name, tool_input, self._display_language
+                tool_name, tool_input, session_language
             )
 
             return StreamMessage(
@@ -777,8 +811,9 @@ class LangGraphAdapter:
                 approval_data = data
                 tool_info = approval_data.get("tool", {})
 
-                # Use current task language for content
-                is_chinese = self._display_language == "zh"
+                # Use session language for content
+                session_language = self._get_session_display_language(session_id)
+                is_chinese = session_language == "zh"
                 if is_chinese:
                     content = f"工具执行前中断: {tool_info.get('name', 'unknown')}"
                 else:
@@ -812,8 +847,9 @@ class LangGraphAdapter:
                 review_data = data
                 tool_info = review_data.get("tool", {})
 
-                # Use current task language for content
-                is_chinese = self._display_language == "zh"
+                # Use session language for content
+                session_language = self._get_session_display_language(session_id)
+                is_chinese = session_language == "zh"
                 if is_chinese:
                     content = f"工具执行后审查: {tool_info.get('name', 'unknown')}"
                 else:
@@ -907,8 +943,9 @@ class LangGraphAdapter:
                     f"Invalid phases type: {type(phases)}, expected list, got {phases}"
                 )
                 return None
-            # Use current task language instead of detecting from goal
-            is_chinese = self._display_language == "zh"
+            # Use session language instead of detecting from goal
+            session_language = self._get_session_display_language(session_id)
+            is_chinese = session_language == "zh"
             if is_chinese:
                 goal_lines = ["我将按照下列计划进行工作：\n"]
             else:
