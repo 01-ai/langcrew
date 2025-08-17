@@ -11,10 +11,12 @@ import requests
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
+
 logger = logging.getLogger(__name__)
 
 
-class WebSearchInput(BaseModel):
+class WebSearchInput(BaseToolInput):
     """Input for WebSearchTool."""
 
     query: str = Field(..., description="Search keywords")
@@ -94,6 +96,7 @@ class WebSearchTool(BaseTool):
         self,
         query: str,
         query_num: int = 10,
+        **kwargs,
     ) -> list[dict[str, Any]]:
         """Perform web search synchronously."""
         logger.info(f"Starting web search. Query: {query}, Language: {self.language}")
@@ -151,8 +154,9 @@ class WebSearchTool(BaseTool):
         self,
         query: str,
         query_num: int = 10,
+        **kwargs,
     ) -> list[dict[str, Any]]:
         """Perform web search asynchronously."""
         # For now, just call the sync version
         # In a real implementation, you'd use aiohttp or similar
-        return asyncio.run(self._arun(query=query, query_num=query_num))
+        return asyncio.run(self._arun(query=query, query_num=query_num, **kwargs))

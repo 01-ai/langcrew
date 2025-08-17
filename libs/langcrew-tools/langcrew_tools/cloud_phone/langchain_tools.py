@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
 from .actions import (
     clear_text,
     complete,
@@ -23,11 +24,10 @@ from .base import CloudPhoneBaseTool
 logger = logging.getLogger(__name__)
 
 
-class TapToolInput(BaseModel):
+class TapToolInput(BaseToolInput):
     """Input for TapTool."""
 
     index: int = Field(..., description="Index of the element to tap")
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -42,7 +42,7 @@ class TapTool(CloudPhoneBaseTool):
         "index: index of the element to tap, from Clickable elements list(eg.'index': 10)"
     )
 
-    async def _arun(self, index: int, brief: str = "", thinking: str = "") -> dict:
+    async def _arun(self, index: int, thinking: str = "", **kwargs) -> dict:
         """
         Asynchronously tap on a UI element by its index.
         """
@@ -57,7 +57,7 @@ class TapTool(CloudPhoneBaseTool):
         raise NotImplementedError("TapTool only supports async execution.")
 
 
-class SwipeToolInput(BaseModel):
+class SwipeToolInput(BaseToolInput):
     """Input for SwipeTool."""
 
     start_x: int = Field(..., description="Starting X coordinate")
@@ -65,7 +65,6 @@ class SwipeToolInput(BaseModel):
     end_x: int = Field(..., description="Ending X coordinate")
     end_y: int = Field(..., description="Ending Y coordinate")
     duration_ms: int = Field(300, description="Duration of swipe in milliseconds")
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -87,8 +86,8 @@ class SwipeTool(CloudPhoneBaseTool):
         end_x: int,
         end_y: int,
         duration_ms: int = 300,
-        brief: str = "",
         thinking: str = "",
+        **kwargs,
     ) -> dict:
         phone = await self._get_cloud_phone()
         swipe_result = await swipe(phone, start_x, start_y, end_x, end_y, duration_ms)
@@ -102,13 +101,12 @@ class SwipeTool(CloudPhoneBaseTool):
         raise NotImplementedError("SwipeTool only supports async execution.")
 
 
-class InputTextToolInput(BaseModel):
+class InputTextToolInput(BaseToolInput):
     """Input for InputTextTool."""
 
     text: str = Field(
         ..., description="Text to input. Can contain spaces and special characters."
     )
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -122,7 +120,7 @@ class InputTextTool(CloudPhoneBaseTool):
         "Input text on the device. Args: text (str): Text to input."
     )
 
-    async def _arun(self, text: str, brief: str = "", thinking: str = "") -> dict:
+    async def _arun(self, text: str, thinking: str = "", **kwargs) -> dict:
         input_result = await input_text(await self._get_cloud_phone(), text)
         current_state = await self._get_current_state()
         return {
@@ -134,14 +132,13 @@ class InputTextTool(CloudPhoneBaseTool):
         raise NotImplementedError("InputTextTool only supports async execution.")
 
 
-class PressKeyToolInput(BaseModel):
+class PressKeyToolInput(BaseToolInput):
     """Input for PressKeyTool."""
 
     keycode: int = Field(
         ...,
         description="Android keycode to press. Common: 3=HOME, 4=BACK, 24=VOLUME UP, 25=VOLUME DOWN, 26=POWER, 82=MENU.",
     )
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -157,7 +154,7 @@ class PressKeyTool(CloudPhoneBaseTool):
         "Common keycodes: 3=HOME, 4=BACK, 24=VOLUME UP, 25=VOLUME DOWN, 26=POWER, 82=MENU."
     )
 
-    async def _arun(self, keycode: int, brief: str = "", thinking: str = "") -> dict:
+    async def _arun(self, keycode: int, thinking: str = "", **kwargs) -> dict:
         press_result = await press_key(await self._get_cloud_phone(), keycode)
         current_state = await self._get_current_state()
         return {
@@ -169,12 +166,11 @@ class PressKeyTool(CloudPhoneBaseTool):
         raise NotImplementedError("PressKeyTool only supports async execution.")
 
 
-class StartAppToolInput(BaseModel):
+class StartAppToolInput(BaseToolInput):
     """Input for StartAppTool."""
 
     package: str = Field(..., description="Package name (e.g., 'com.android.settings')")
     activity: str = Field("", description="Optional activity name")
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -190,7 +186,7 @@ class StartAppTool(CloudPhoneBaseTool):
     )
 
     async def _arun(
-        self, package: str, activity: str = "", brief: str = "", thinking: str = ""
+        self, package: str, activity: str = "", thinking: str = "", **kwargs
     ) -> dict:
         start_result = await start_app(await self._get_cloud_phone(), package, activity)
         current_state = await self._get_current_state()
@@ -203,13 +199,12 @@ class StartAppTool(CloudPhoneBaseTool):
         raise NotImplementedError("StartAppTool only supports async execution.")
 
 
-class ListPackagesToolInput(BaseModel):
+class ListPackagesToolInput(BaseToolInput):
     """Input for ListPackagesTool."""
 
     include_system_apps: bool = Field(
         False, description="Whether to include system apps (default: False)"
     )
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class ListPackagesTool(CloudPhoneBaseTool):
@@ -221,7 +216,7 @@ class ListPackagesTool(CloudPhoneBaseTool):
         "Returns: Dictionary with 'packages', 'count', and 'type'."
     )
 
-    async def _arun(self, include_system_apps: bool = False, brief: str = "") -> dict:
+    async def _arun(self, include_system_apps: bool = False, **kwargs) -> dict:
         ret = await list_packages(await self._get_cloud_phone(), include_system_apps)
         current_state = await self._get_current_state()
         return {
@@ -233,12 +228,11 @@ class ListPackagesTool(CloudPhoneBaseTool):
         raise NotImplementedError("ListPackagesTool only supports async execution.")
 
 
-class CompleteTaskToolInput(BaseModel):
+class CompleteTaskToolInput(BaseToolInput):
     """Input for CompleteTaskTool."""
 
     success: bool = Field(..., description="Indicates if the task was successful.")
     result: str = Field(..., description="Reason for failure/success.")
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class CompleteTaskTool(CloudPhoneBaseTool):
@@ -250,7 +244,7 @@ class CompleteTaskTool(CloudPhoneBaseTool):
     )
     return_direct: bool = True
 
-    async def _arun(self, success: bool, result: str, brief: str = "") -> dict:
+    async def _arun(self, success: bool, result: str, **kwargs) -> dict:
         complete_result = await complete(success, result)
         return {"result": complete_result}
 
@@ -258,10 +252,9 @@ class CompleteTaskTool(CloudPhoneBaseTool):
         raise NotImplementedError("CompleteTaskTool only supports async execution.")
 
 
-class EnterToolInput(BaseModel):
+class EnterToolInput(BaseToolInput):
     """Input for EnterTool."""
 
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -273,7 +266,7 @@ class EnterTool(CloudPhoneBaseTool):
     args_schema: ClassVar[type[BaseModel]] = EnterToolInput
     description: ClassVar[str] = "Press the ENTER key on the device."
 
-    async def _arun(self, brief: str = "", thinking: str = "") -> dict:
+    async def _arun(self, thinking: str = "", **kwargs) -> dict:
         enter_result = await press_key(await self._get_cloud_phone(), 66)
         current_state = await self._get_current_state()
         return {
@@ -285,10 +278,8 @@ class EnterTool(CloudPhoneBaseTool):
         raise NotImplementedError("EnterTool only supports async execution.")
 
 
-class SwitchAppToolInput(BaseModel):
+class SwitchAppToolInput(BaseToolInput):
     """Input for SwitchAppTool."""
-
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class SwitchAppTool(CloudPhoneBaseTool):
@@ -296,7 +287,7 @@ class SwitchAppTool(CloudPhoneBaseTool):
     args_schema: ClassVar[type[BaseModel]] = SwitchAppToolInput
     description: ClassVar[str] = "Switch to the previous app on the device."
 
-    async def _arun(self, brief: str = "") -> dict:
+    async def _arun(self, **kwargs) -> dict:
         switch_result = await switch_app(await self._get_cloud_phone())
         current_state = await self._get_current_state()
         return {
@@ -308,10 +299,9 @@ class SwitchAppTool(CloudPhoneBaseTool):
         raise NotImplementedError("SwitchAppTool only supports async execution.")
 
 
-class BackToolInput(BaseModel):
+class BackToolInput(BaseToolInput):
     """Input for BackTool."""
 
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -323,7 +313,7 @@ class BackTool(CloudPhoneBaseTool):
     args_schema: ClassVar[type[BaseModel]] = BackToolInput
     description: ClassVar[str] = "Press the BACK key on the device."
 
-    async def _arun(self, brief: str = "", thinking: str = "") -> dict:
+    async def _arun(self, thinking: str = "", **kwargs) -> dict:
         back_result = await press_key(await self._get_cloud_phone(), 4)
         current_state = await self._get_current_state()
         return {
@@ -335,10 +325,8 @@ class BackTool(CloudPhoneBaseTool):
         raise NotImplementedError("BackTool only supports async execution.")
 
 
-class HomeToolInput(BaseModel):
+class HomeToolInput(BaseToolInput):
     """Input for HomeTool."""
-
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class HomeTool(CloudPhoneBaseTool):
@@ -346,7 +334,7 @@ class HomeTool(CloudPhoneBaseTool):
     args_schema: ClassVar[type[BaseModel]] = HomeToolInput
     description: ClassVar[str] = "Press the HOME key on the device."
 
-    async def _arun(self, brief: str = "") -> dict:
+    async def _arun(self, **kwargs) -> dict:
         home_result = await press_key(await self._get_cloud_phone(), 3)
         current_state = await self._get_current_state()
         return {
@@ -358,11 +346,10 @@ class HomeTool(CloudPhoneBaseTool):
         raise NotImplementedError("HomeTool only supports async execution.")
 
 
-class WaitToolInput(BaseModel):
+class WaitToolInput(BaseToolInput):
     """Input for WaitTool."""
 
     duration: int = Field(5, description="Duration to wait in seconds (default: 5)")
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class WaitTool(CloudPhoneBaseTool):
@@ -372,7 +359,7 @@ class WaitTool(CloudPhoneBaseTool):
         "Wait for specified duration. Args: duration (int): Duration in seconds (default: 5)."
     )
 
-    async def _arun(self, duration: int = 5, brief: str = "") -> dict:
+    async def _arun(self, duration: int = 5, **kwargs) -> dict:
         await asyncio.sleep(duration)
         await self._get_cloud_phone()
         current_state = await self._get_current_state()
@@ -385,10 +372,8 @@ class WaitTool(CloudPhoneBaseTool):
         raise NotImplementedError("WaitTool only supports async execution.")
 
 
-class UserTakeOverToolInput(BaseModel):
+class UserTakeOverToolInput(BaseToolInput):
     """Input for UserTakeOverTool."""
-
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class UserTakeOverTool(CloudPhoneBaseTool):
@@ -402,7 +387,7 @@ class UserTakeOverTool(CloudPhoneBaseTool):
         "such as entering verification codes, solving CAPTCHAs, or providing login credentials. "
     )
 
-    async def _arun(self, brief: str = "") -> dict:
+    async def _arun(self, **kwargs) -> dict:
         await self._get_cloud_phone()
         await user_takeover()
         current_state = await self._get_current_state()
@@ -415,13 +400,12 @@ class UserTakeOverTool(CloudPhoneBaseTool):
         raise NotImplementedError("UserTakeOverTool only supports async execution.")
 
 
-class TapInputAndEnterToolInput(BaseModel):
+class TapInputAndEnterToolInput(BaseToolInput):
     """Input for TapInputAndEnterTool."""
 
     x: int = Field(..., description="X coordinate to tap")
     y: int = Field(..., description="Y coordinate to tap")
     text: str = Field(..., description="Text to input after tap")
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class TapInputAndEnterTool(CloudPhoneBaseTool):
@@ -431,7 +415,7 @@ class TapInputAndEnterTool(CloudPhoneBaseTool):
         "Tap at coordinates, input text, and press enter. Args: x, y (int): Coordinates. text (str): Text to input."
     )
 
-    async def _arun(self, x: int, y: int, text: str, brief: str = "") -> dict:
+    async def _arun(self, x: int, y: int, text: str, **kwargs) -> dict:
         phone = await self._get_cloud_phone()
         tap_input_result = await tap_input_and_enter(x, y, text, phone)
         current_state = await self._get_current_state()
@@ -444,12 +428,11 @@ class TapInputAndEnterTool(CloudPhoneBaseTool):
         raise NotImplementedError("TapInputAndEnterTool only supports async execution.")
 
 
-class TapByCoordinatesToolInput(BaseModel):
+class TapByCoordinatesToolInput(BaseToolInput):
     """Input for TapByCoordinatesTool."""
 
     x: int = Field(..., description="X coordinate to tap (screen size 720*1280)")
     y: int = Field(..., description="Y coordinate to tap (screen size 720*1280)")
-    brief: str = Field(..., description="One brief sentence to explain this action")
     thinking: str = Field(
         default="",
         description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
@@ -465,7 +448,7 @@ class TapByCoordinatesTool(CloudPhoneBaseTool):
         "If no clickable elements are available, analyze coordinates through visual analysis of screenshots."
     )
 
-    async def _arun(self, x: int, y: int, brief: str = "", thinking: str = "") -> dict:
+    async def _arun(self, x: int, y: int, thinking: str = "", **kwargs) -> dict:
         """
         Asynchronously tap on the device screen at specific coordinates.
         """
@@ -481,7 +464,7 @@ class TapByCoordinatesTool(CloudPhoneBaseTool):
         raise NotImplementedError("TapByCoordinatesTool only supports async execution.")
 
 
-class ClearTextToolInput(BaseModel):
+class ClearTextToolInput(BaseToolInput):
     """Input for ClearTextTool."""
 
     x: int = Field(
@@ -493,7 +476,6 @@ class ClearTextToolInput(BaseModel):
     num_chars: int = Field(
         ..., description="Number of characters to delete. Can exceed text length."
     )
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class ClearTextTool(CloudPhoneBaseTool):
@@ -504,7 +486,7 @@ class ClearTextTool(CloudPhoneBaseTool):
         "Args: x,y (int): Coordinates of text field. num_chars (int): Number of characters to delete."
     )
 
-    async def _arun(self, x: int, y: int, num_chars: int = 20, brief: str = "") -> dict:
+    async def _arun(self, x: int, y: int, num_chars: int = 20, **kwargs) -> dict:
         """
         Asynchronously clear text from an input field.
         First taps the field, then sends delete key events.
@@ -521,10 +503,8 @@ class ClearTextTool(CloudPhoneBaseTool):
         raise NotImplementedError("ClearTextTool only supports async execution.")
 
 
-class TaskScreenShotToolInput(BaseModel):
+class TaskScreenShotToolInput(BaseToolInput):
     """Input for TaskScreenShotTool."""
-
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class TaskScreenShotTool(CloudPhoneBaseTool):
@@ -534,7 +514,7 @@ class TaskScreenShotTool(CloudPhoneBaseTool):
         "Take a screenshot of the current screen. No arguments. Returns base64 encoded image."
     )
 
-    async def _arun(self, brief: str = "") -> dict:
+    async def _arun(self, **kwargs) -> dict:
         await self._get_cloud_phone()
         current_state = await self._get_current_state()
         return {
@@ -546,10 +526,8 @@ class TaskScreenShotTool(CloudPhoneBaseTool):
         raise NotImplementedError("TaskScreenShotTool only supports async execution.")
 
 
-class GetClickablesToolInput(BaseModel):
+class GetClickablesToolInput(BaseToolInput):
     """Input for GetClickablesTool."""
-
-    brief: str = Field(..., description="One brief sentence to explain this action")
 
 
 class GetClickablesTool(CloudPhoneBaseTool):
@@ -559,7 +537,7 @@ class GetClickablesTool(CloudPhoneBaseTool):
         "Get clickable elements on the current screen. No arguments. Returns clickable elements."
     )
 
-    async def _arun(self, brief: str = "") -> dict:
+    async def _arun(self, **kwargs) -> dict:
         await self._get_cloud_phone()
         current_state = await self._get_current_state()
         return {
@@ -595,6 +573,7 @@ def get_cloudphone_tools(
     session_id: str, sandbox_id: str | None = None
 ) -> list[CloudPhoneBaseTool]:
     """Initialize CloudPhone specific tools.
+
     Returns:
         List of initialized tools for the agent
     """

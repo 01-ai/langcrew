@@ -11,10 +11,12 @@ import aiohttp
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
+
 logger = logging.getLogger(__name__)
 
 
-class WebFetchInput(BaseModel):
+class WebFetchInput(BaseToolInput):
     """Input for WebFetchInput."""
 
     url: str = Field(..., description="Target webpage URL to crawl")
@@ -128,6 +130,7 @@ class WebFetchTool(BaseTool):
         self,
         url: str,
         filter_type: Literal["llm", "pruning"] | None = None,
+        **kwargs,
     ) -> dict[str, Any]:
         """Crawl web page asynchronously using crawl4ai HTTP service."""
         logger.info(f"Starting web crawl via HTTP service. URL: {url}")
@@ -289,11 +292,13 @@ class WebFetchTool(BaseTool):
         self,
         url: str,
         filter_type: Literal["llm", "pruning"] | None = None,
+        **kwargs,
     ) -> dict[str, Any]:
         """Crawl web page synchronously."""
         return asyncio.run(
             self._arun(
                 url=url,
                 filter_type=filter_type,
+                **kwargs,
             )
         )

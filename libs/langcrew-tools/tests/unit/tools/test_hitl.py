@@ -1,9 +1,10 @@
 from unittest.mock import patch
 
 import pytest
-from langcrew.hitl import UserInputTool
-from langcrew.hitl.langchain_tools import UserInputRequest
 from pydantic import ValidationError
+
+from langcrew_tools.hitl import UserInputTool
+from langcrew_tools.hitl.langchain_tools import UserInputRequest
 
 
 class TestUserInputRequest:
@@ -69,9 +70,11 @@ class TestUserInputTool:
         mock_user_response = "My response"
 
         with (
-            patch("langcrew.hitl.langchain_tools.adispatch_custom_event") as mock_event,
             patch(
-                "langcrew.hitl.langchain_tools.interrupt",
+                "langcrew_tools.hitl.langchain_tools.adispatch_custom_event"
+            ) as mock_event,
+            patch(
+                "langcrew_tools.hitl.langchain_tools.interrupt",
                 return_value=mock_user_response,
             ) as mock_interrupt,
         ):
@@ -110,9 +113,11 @@ class TestUserInputTool:
         mock_user_response = "Yes"
 
         with (
-            patch("langcrew.hitl.langchain_tools.adispatch_custom_event") as mock_event,
             patch(
-                "langcrew.hitl.langchain_tools.interrupt",
+                "langcrew_tools.hitl.langchain_tools.adispatch_custom_event"
+            ) as mock_event,
+            patch(
+                "langcrew_tools.hitl.langchain_tools.interrupt",
                 return_value=mock_user_response,
             ) as mock_interrupt,
         ):
@@ -140,11 +145,11 @@ class TestUserInputTool:
 
         with (
             patch(
-                "langcrew.hitl.langchain_tools.adispatch_custom_event",
+                "langcrew_tools.hitl.langchain_tools.adispatch_custom_event",
                 side_effect=Exception("Event dispatch failed"),
             ) as mock_event,
             patch(
-                "langcrew.hitl.langchain_tools.interrupt",
+                "langcrew_tools.hitl.langchain_tools.interrupt",
                 return_value=mock_user_response,
             ) as mock_interrupt,
         ):
@@ -173,9 +178,9 @@ class TestUserInputTool:
 
         for mock_response in test_cases:
             with (
-                patch("langcrew.hitl.langchain_tools.adispatch_custom_event"),
+                patch("langcrew_tools.hitl.langchain_tools.adispatch_custom_event"),
                 patch(
-                    "langcrew.hitl.langchain_tools.interrupt",
+                    "langcrew_tools.hitl.langchain_tools.interrupt",
                     return_value=mock_response,
                 ),
             ):
@@ -217,9 +222,11 @@ class TestUserInputTool:
         mock_user_response = "Response"
 
         with (
-            patch("langcrew.hitl.langchain_tools.adispatch_custom_event") as mock_event,
             patch(
-                "langcrew.hitl.langchain_tools.interrupt",
+                "langcrew_tools.hitl.langchain_tools.adispatch_custom_event"
+            ) as mock_event,
+            patch(
+                "langcrew_tools.hitl.langchain_tools.interrupt",
                 return_value=mock_user_response,
             ) as mock_interrupt,
         ):
@@ -241,11 +248,40 @@ class TestUserInputTool:
         tool = UserInputTool()
 
         with (
-            patch("langcrew.hitl.langchain_tools.adispatch_custom_event"),
-            patch("langcrew.hitl.langchain_tools.interrupt", return_value=None),
+            patch("langcrew_tools.hitl.langchain_tools.adispatch_custom_event"),
+            patch("langcrew_tools.hitl.langchain_tools.interrupt", return_value=None),
         ):
             result = await tool._arun(question="Question?")
 
             # None should be converted to "None" string
             assert result == "None"
             assert isinstance(result, str)
+
+    @pytest.mark.asyncio
+    async def test_arun_with_brief_parameter(self):
+        """Test that _arun method accepts brief parameter through kwargs."""
+        tool = UserInputTool()
+
+        with (
+            patch("langcrew_tools.hitl.langchain_tools.adispatch_custom_event"),
+            patch(
+                "langcrew_tools.hitl.langchain_tools.interrupt",
+                return_value="test response",
+            ),
+        ):
+            # Test that _arun accepts brief parameter without raising exception
+            result = await tool._arun(question="Test question?", brief="获取用户输入")
+            # If no exception is raised, the **kwargs mechanism works correctly
+            assert result == "test response"
+
+    def test_input_model_has_brief_field(self):
+        """Test that UserInputRequest has inherited brief field from BaseToolInput."""
+        input_model = UserInputRequest(question="Test question?")
+
+        # Should have brief field with default value
+        assert hasattr(input_model, "brief")
+        assert input_model.brief == ""
+
+        # Should be able to set brief field
+        input_with_brief = UserInputRequest(question="Test question?", brief="询问用户")
+        assert input_with_brief.brief == "询问用户"

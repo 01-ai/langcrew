@@ -8,12 +8,13 @@ from typing import ClassVar
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
 from ..utils.sandbox.base_sandbox import SandboxMixin
 
 logger = logging.getLogger(__name__)
 
 
-class CodeInterpreterInput(BaseModel):
+class CodeInterpreterInput(BaseToolInput):
     """Input schema for the code interpreter tool."""
 
     code: str = Field(..., description="Python code to execute")
@@ -54,11 +55,11 @@ class CodeInterpreterTool(BaseTool, SandboxMixin):
         encoded = base64.b64encode(code.encode()).decode()
         return f"python3 -c \"import base64; exec(base64.b64decode('{encoded}').decode())\""
 
-    def _run(self, code: str, timeout: int = 30, brief: str = "") -> str:
+    def _run(self, code: str, timeout: int = 30, **kwargs) -> str:
         """Execute the provided Python code."""
-        return asyncio.run(self._arun(code, timeout, brief))
+        return asyncio.run(self._arun(code, timeout, **kwargs))
 
-    async def _arun(self, code: str, timeout: int = 30, brief: str = "") -> str:
+    async def _arun(self, code: str, timeout: int = 30, **kwargs) -> str:
         """Asynchronously execute the provided Python code."""
         try:
             sandbox = await self.get_sandbox()

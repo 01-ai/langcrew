@@ -589,3 +589,48 @@ class TestWebFetchTool:
         # Should use the specific crawl4ai key, not the OPENAI_API_KEY
         assert tool.filter_type == "llm"
         assert tool.crawl4ai_llm_api_key == "crawl4ai-specific-key"
+
+    @pytest.mark.asyncio
+    async def test_arun_with_brief_parameter(self):
+        """Test that _arun method accepts brief parameter through kwargs."""
+        tool = WebFetchTool(crawl4ai_service_url="https://api.example.com")
+
+        mock_response_data = {
+            "success": True,
+            "results": [{"markdown": {"raw_markdown": "test content"}}],
+        }
+
+        with patch("aiohttp.ClientSession") as mock_session:
+            # Setup mock response
+            mock_response = Mock()
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value=mock_response_data)
+
+            mock_post = AsyncMock()
+            mock_post.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_post.__aexit__ = AsyncMock(return_value=None)
+
+            mock_session_instance = AsyncMock()
+            mock_session_instance.post = Mock(return_value=mock_post)
+
+            mock_session.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session_instance
+            )
+            mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            # Test that _arun accepts brief parameter without raising exception
+            result = await tool._arun(url="https://example.com", brief="测试抓取功能")
+            # If no exception is raised, the **kwargs mechanism works correctly
+            assert isinstance(result, str)
+
+    def test_input_model_has_brief_field(self):
+        """Test that WebFetchInput has inherited brief field from BaseToolInput."""
+        input_model = WebFetchInput(url="https://example.com")
+
+        # Should have brief field with default value
+        assert hasattr(input_model, "brief")
+        assert input_model.brief == ""
+
+        # Should be able to set brief field
+        input_with_brief = WebFetchInput(url="https://example.com", brief="抓取测试")
+        assert input_with_brief.brief == "抓取测试"

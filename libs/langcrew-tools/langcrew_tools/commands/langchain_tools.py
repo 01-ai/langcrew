@@ -5,13 +5,14 @@ from typing import ClassVar
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
 from ..utils.sandbox import SandboxMixin
 from .terminal_formatter import TerminalFormatter
 
 logger = logging.getLogger(__name__)
 
 
-class RunCommandInput(BaseModel):
+class RunCommandInput(BaseToolInput):
     """Input for RunCommandTool."""
 
     command: str = Field(..., description="Command to execute in the terminal")
@@ -19,13 +20,12 @@ class RunCommandInput(BaseModel):
         ...,
         description="User to execute the command, default is 'user', you can use 'root' to execute the command as root if necessary",
     )
-    brief: str = Field(..., description="One brief sentence to explain this action")
     background: bool = Field(
         default=True, description="Whether to run the command in the background"
     )
 
 
-class KillCommandInput(BaseModel):
+class KillCommandInput(BaseToolInput):
     """Input for KillCommandTool."""
 
     process_id: str = Field(
@@ -48,7 +48,7 @@ class RunCommandTool(BaseTool, SandboxMixin):
         command: str,
         user: str = "user",
         background: bool = False,
-        brief: str = "",
+        **kwargs,
     ) -> str:
         """Run command synchronously."""
         try:
@@ -121,10 +121,10 @@ class RunCommandTool(BaseTool, SandboxMixin):
         command: str,
         user: str = "user",
         background: bool = False,
-        brief: str = "",
+        **kwargs,
     ) -> str:
         """Perform document parsing synchronously."""
-        return asyncio.run(self._arun(command, user, background, brief))
+        return asyncio.run(self._arun(command, user, background, **kwargs))
 
 
 class KillCommandTool(BaseTool, SandboxMixin):
@@ -137,7 +137,7 @@ class KillCommandTool(BaseTool, SandboxMixin):
         "Provide the process ID or handle returned from a background command."
     )
 
-    async def _arun(self, process_id: str) -> str:
+    async def _arun(self, process_id: str, **kwargs) -> str:
         """Kill command synchronously."""
         try:
             # Note: This is a simplified implementation
@@ -147,6 +147,6 @@ class KillCommandTool(BaseTool, SandboxMixin):
         except Exception as e:
             return f"Failed to kill process '{process_id}': {str(e)}"
 
-    def _run(self, process_id: str) -> str:
+    def _run(self, process_id: str, **kwargs) -> str:
         """Perform document parsing synchronously."""
-        return asyncio.run(self._arun(process_id))
+        return asyncio.run(self._arun(process_id, **kwargs))
