@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import ClassVar
 
@@ -124,7 +123,7 @@ class RunCommandTool(BaseTool, SandboxMixin):
         **kwargs,
     ) -> str:
         """Perform document parsing synchronously."""
-        return asyncio.run(self._arun(command, user, background, **kwargs))
+        raise NotImplementedError("run_command only supports async execution.")
 
 
 class KillCommandTool(BaseTool, SandboxMixin):
@@ -149,4 +148,4 @@ class KillCommandTool(BaseTool, SandboxMixin):
 
     def _run(self, process_id: str, **kwargs) -> str:
         """Perform document parsing synchronously."""
-        return asyncio.run(self._arun(process_id, **kwargs))
+        raise NotImplementedError("kill_command only supports async execution.")

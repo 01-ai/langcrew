@@ -1,7 +1,6 @@
 # Knowledge Base LangChain Tools
 # Provides knowledge base retrieval functionality using unified pgvector toolkit
 
-import asyncio
 import logging
 import traceback
 from typing import ClassVar
@@ -69,7 +68,7 @@ class PgVectorSearchTool(BaseTool):
     ) -> str:
         """Perform knowledge search synchronously."""
 
-        return asyncio.run(self._arun(query, knowledge_ids, top_k, **kwargs))
+        raise NotImplementedError("pgvector_search only supports async execution.")
 
     async def _arun(
         self,

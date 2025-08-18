@@ -1,6 +1,5 @@
 """Code interpreter tool for executing Python code safely."""
 
-import asyncio
 import base64
 import logging
 from typing import ClassVar
@@ -57,7 +56,7 @@ class CodeInterpreterTool(BaseTool, SandboxMixin):
 
     def _run(self, code: str, timeout: int = 30, **kwargs) -> str:
         """Execute the provided Python code."""
-        return asyncio.run(self._arun(code, timeout, **kwargs))
+        raise NotImplementedError("python_executor only supports async execution.")
 
     async def _arun(self, code: str, timeout: int = 30, **kwargs) -> str:
         """Asynchronously execute the provided Python code."""

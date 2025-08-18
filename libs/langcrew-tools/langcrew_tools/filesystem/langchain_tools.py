@@ -1,4 +1,3 @@
-import asyncio
 from typing import ClassVar
 
 from langchain_core.tools import BaseTool
@@ -127,7 +126,7 @@ class WriteFileTool(BaseTool, SandboxMixin):
             return {"error": f"Failed to write to file: {str(e)}"}
 
     def _run(self, path: str, content: str, **kwargs) -> dict:
-        return asyncio.run(self._arun(path, content, **kwargs))
+        raise NotImplementedError("write_file only supports async execution.")
 
 
 class ReadFileTool(BaseTool, SandboxMixin):
@@ -157,7 +156,7 @@ class ReadFileTool(BaseTool, SandboxMixin):
             return {"error": f"Failed to read file: {str(e)}"}
 
     def _run(self, path: str, **kwargs) -> dict:
-        return asyncio.run(self._arun(path, **kwargs))
+        raise NotImplementedError("write_file only supports async execution.")
 
 
 class ListFilesTool(BaseTool, SandboxMixin):
@@ -181,7 +180,7 @@ class ListFilesTool(BaseTool, SandboxMixin):
             return f"Failed to list files: {str(e)}"
 
     def _run(self, path: str, depth: int = 1, **kwargs) -> str:
-        return asyncio.run(self._arun(path, depth, **kwargs))
+        raise NotImplementedError("write_file only supports async execution.")
 
 
 class DeleteFileTool(BaseTool, SandboxMixin):
@@ -204,7 +203,7 @@ class DeleteFileTool(BaseTool, SandboxMixin):
             return f"Failed to delete file: {str(e)}"
 
     def _run(self, path: str, **kwargs) -> str:
-        return asyncio.run(self._arun(path, **kwargs))
+        raise NotImplementedError("delete_file only supports async execution.")
 
 
 class FileReplaceTextTool(BaseTool, SandboxMixin):
@@ -240,7 +239,7 @@ class FileReplaceTextTool(BaseTool, SandboxMixin):
             return {"error": f"Failed to replace text in file '{path}': {str(e)}"}
 
     def _run(self, path: str, old_str: str, new_str: str, **kwargs) -> dict:
-        return asyncio.run(self._arun(path, old_str, new_str, **kwargs))
+        raise NotImplementedError("file_replace_text only supports async execution.")
 
 
 class FileAppendTextTool(BaseTool, SandboxMixin):
@@ -288,7 +287,7 @@ class FileAppendTextTool(BaseTool, SandboxMixin):
         self, path: str, content: str, append_newline: bool = True, **kwargs
     ) -> dict:
         """Append text to file synchronously."""
-        return asyncio.run(self._arun(path, content, append_newline, **kwargs))
+        raise NotImplementedError("file_append_text only supports async execution.")
 
 
 class CreateDirectoryTool(BaseTool, SandboxMixin):
@@ -311,7 +310,7 @@ class CreateDirectoryTool(BaseTool, SandboxMixin):
             return f"Failed to create directory: {str(e)}"
 
     def _run(self, path: str, **kwargs) -> str:
-        return asyncio.run(self._arun(path, **kwargs))
+        raise NotImplementedError("create_directory only supports async execution.")
 
 
 class FileExistsTool(BaseTool, SandboxMixin):
@@ -333,7 +332,7 @@ class FileExistsTool(BaseTool, SandboxMixin):
             return f"Failed to check path: {str(e)}"
 
     def _run(self, path: str, **kwargs) -> str:
-        return asyncio.run(self._arun(path, **kwargs))
+        raise NotImplementedError("file_exists only supports async execution.")
 
 
 class RenameFileTool(BaseTool, SandboxMixin):
@@ -356,4 +355,4 @@ class RenameFileTool(BaseTool, SandboxMixin):
             return f"Failed to rename: {str(e)}"
 
     def _run(self, old_path: str, new_path: str, **kwargs) -> str:
-        return asyncio.run(self._arun(old_path, new_path, **kwargs))
+        raise NotImplementedError("rename_file only supports async execution.")
