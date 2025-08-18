@@ -47,7 +47,7 @@ class Crew:
         async_checkpointer: BaseCheckpointSaver | None = None,
         async_store: BaseStore | None = None,
         # HITL configuration
-        hitl: bool | HITLConfig | None = None,
+        hitl: HITLConfig | None = None,
     ):
         self.agents = agents or []
         self.tasks = tasks or []
@@ -97,16 +97,14 @@ class Crew:
 
         # HITL configuration
         if hitl is None:
-            self.hitl_config = HITLConfig(enabled=False)
-        elif isinstance(hitl, bool):
-            self.hitl_config = HITLConfig(enabled=hitl)
+            self.hitl_config = None
         elif isinstance(hitl, HITLConfig):
             self.hitl_config = hitl
         else:
-            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}")
+            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance.")
 
-        # Setup HITL if enabled
-        if self.hitl_config.enabled:
+        # Setup HITL if configured
+        if self.hitl_config is not None:
             self._setup_hitl()
 
         # Setup memory if enabled (check final config, not original parameter)
@@ -1354,15 +1352,12 @@ class Crew:
 
     def _setup_hitl(self):
         """Setup HITL (Human-in-the-Loop) for all agents"""
-        if not self.hitl_config.enabled:
-            return
-
         if self.verbose:
             logger.info("Setting up HITL tool approval for crew")
 
         # Apply crew-level HITL configuration to agents that don't have their own config
         for agent in self.agents:
-            if not hasattr(agent, "hitl_config") or not agent.hitl_config.enabled:
+            if not hasattr(agent, "hitl_config") or agent.hitl_config is None:
                 agent.hitl_config = self.hitl_config
                 agent._setup_hitl()
 

@@ -50,7 +50,7 @@ class Agent:
         # Post-model hook
         post_model_hook: RunnableLike | None = None,
         # HITL support
-        hitl: bool | HITLConfig | None = None,
+        hitl: HITLConfig | None = None,
         # Handoff configuration
         handoff_to: list[str] | None = None,
         # Entry agent flag
@@ -178,16 +178,15 @@ class Agent:
 
         # HITL configuration
         if hitl is None:
-            self.hitl_config = HITLConfig(enabled=False)
-        elif isinstance(hitl, bool):
-            self.hitl_config = HITLConfig(enabled=hitl)
+            self.hitl_config = None
         elif isinstance(hitl, HITLConfig):
             self.hitl_config = hitl
         else:
-            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}")
+            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance.")
 
         # Setup HITL configuration
-        self._setup_hitl()
+        if self.hitl_config is not None:
+            self._setup_hitl()
 
     def __repr__(self):
         role_str = self.role if self.role else "N/A"
@@ -284,9 +283,6 @@ class Agent:
 
     def _setup_hitl(self):
         """Setup HITL tool wrapping for the agent"""
-        if not self.hitl_config.enabled:
-            return
-
         from langcrew.hitl import HITLToolWrapper
 
         wrapper = HITLToolWrapper(self.hitl_config)
