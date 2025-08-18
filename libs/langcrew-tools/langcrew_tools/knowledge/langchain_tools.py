@@ -69,7 +69,7 @@ class PgVectorSearchTool(BaseTool):
     ) -> str:
         """Perform knowledge search synchronously."""
 
-        return asyncio.run(self._arun(query, knowledge_ids, top_k, **kwargs))
+        raise NotImplementedError("pgvector_search only supports async execution.")
 
     async def _arun(
         self,

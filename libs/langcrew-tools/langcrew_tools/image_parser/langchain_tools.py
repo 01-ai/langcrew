@@ -106,7 +106,7 @@ class ImageParserTool(BaseTool):
         **kwargs,
     ) -> str:
         """Perform image analysis synchronously."""
-        return asyncio.run(self._arun(image_url, question, **kwargs))
+        raise NotImplementedError("image_parser only supports async execution.")
 
     async def _arun(
         self,

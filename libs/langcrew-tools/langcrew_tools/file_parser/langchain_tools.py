@@ -96,7 +96,7 @@ class DocumentParserTool(BaseTool):
 
     def _run(self, file_md5: str, file_type: str, **kwargs) -> str:
         """Perform document parsing synchronously."""
-        return asyncio.run(self._arun(file_md5, file_type, **kwargs))
+        raise NotImplementedError("file_parser only supports async execution.")
 
     async def _arun(self, file_md5: str, file_type: str, **kwargs) -> str:
         """Perform document parsing asynchronously."""
@@ -740,7 +740,7 @@ class ChunkRetrievalTool(BaseTool):
 
     def _run(self, query: str, file_md5s: list[str], top_k: int = 5, **kwargs) -> str:
         """Perform chunk retrieval synchronously."""
-        return asyncio.run(self._arun(query, file_md5s, top_k, **kwargs))
+        raise NotImplementedError("chunk_retrieval only supports async execution.")
 
     async def _arun(
         self, query: str, file_md5s: list[str], top_k: int = 5, **kwargs
