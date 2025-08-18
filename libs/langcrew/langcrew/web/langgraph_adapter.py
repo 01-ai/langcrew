@@ -429,14 +429,17 @@ class LangGraphAdapter:
                 id=message_id,
                 type=MessageType.TOOL_CALL,
                 content=brief,
-                detail={
-                    "run_id": run_id,  # Use run_id instead of call_id
-                    "tool": tool_name,
-                    "status": ToolResult.PENDING,
-                    "param": tool_input,
-                    "action": display_fields["action"],
-                    "action_content": display_fields["action_content"],
-                },
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "run_id": run_id,  # Use run_id instead of call_id
+                        "tool": tool_name,
+                        "status": ToolResult.PENDING,
+                        "param": tool_input,
+                        "action": display_fields["action"],
+                        "action_content": display_fields["action_content"],
+                    },
+                ),
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
@@ -459,12 +462,15 @@ class LangGraphAdapter:
                 id=message_id,
                 type=MessageType.TOOL_RESULT,
                 content=brief,
-                detail={
-                    "tool": tool_name,
-                    "run_id": run_id,  # Use run_id for correlation
-                    "result": output,
-                    "status": ToolResult.SUCCESS,
-                },
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "tool": tool_name,
+                        "run_id": run_id,  # Use run_id for correlation
+                        "result": output,
+                        "status": ToolResult.SUCCESS,
+                    },
+                ),
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
@@ -544,11 +550,18 @@ class LangGraphAdapter:
                 if metadata.get("langgraph_node") == "pre_model_hook":
                     logger.info(f"pre_model_hook, ignore content: {content}")
                     return None
+
                 return StreamMessage(
                     id=message_id,
                     type=MessageType.TEXT,
                     content=content,
-                    detail={"streaming": False, "final": True},
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "streaming": False,
+                            "final": True,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -680,9 +693,12 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN,
                     content=plan_data.get("goal", "Planning execution"),
-                    detail={
-                        "steps": steps,
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -716,10 +732,13 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN_UPDATE,
                     content=f"开始执行步骤 {step_id}: {step_data.get('step_description', '')}",
-                    detail={
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "action": PlanAction.UPDATE,
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -737,10 +756,13 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN_UPDATE,
                     content=f"步骤 {step_data.get('step_id', '')} 完成",
-                    detail={
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "action": PlanAction.UPDATE,
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -758,7 +780,13 @@ class LangGraphAdapter:
                         id=message_id,
                         type=MessageType.TEXT,
                         content=direct_response,
-                        detail={"streaming": False, "final": True},
+                        detail=self._enhance_detail_with_metadata(
+                            event,
+                            {
+                                "streaming": False,
+                                "final": True,
+                            },
+                        ),
                         role="assistant",
                         timestamp=int(time.time() * 1000),
                         session_id=session_id,
@@ -782,7 +810,12 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN,
                     content=plan_data.get("task_type", "Planning execution"),
-                    detail={"steps": steps},
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -795,11 +828,14 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.CONFIG,
                     content="update_session",
-                    detail={
-                        "session_id": sandbox_data.get("session_id"),
-                        "sandbox_id": sandbox_data.get("sandbox_id"),
-                        "sandbox_url": sandbox_data.get("sandbox_url"),
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "session_id": sandbox_data.get("session_id"),
+                            "sandbox_id": sandbox_data.get("sandbox_id"),
+                            "sandbox_url": sandbox_data.get("sandbox_url"),
+                        },
+                    ),
                     role="inner_message",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -818,6 +854,9 @@ class LangGraphAdapter:
                 # Add options if they exist
                 if "options" in input_data and input_data["options"]:
                     detail["options"] = input_data["options"]
+
+                # Enhance detail with langcrew metadata
+                detail = self._enhance_detail_with_metadata(event, detail)
 
                 return StreamMessage(
                     id=message_id,
@@ -847,19 +886,22 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.USER_INPUT,
                     content=content,
-                    detail={
-                        "interaction_type": "tool_approval",
-                        "approval_type": "before_execution",
-                        "tool_name": tool_info.get("name"),
-                        "tool_args": tool_info.get("args", {}),
-                        "tool_description": tool_info.get("description", ""),
-                        "interrupt_data": approval_data,
-                        "supports_modification": True,
-                        "modification_hint": "You can approve/deny or provide modified parameters",
-                        "options": ["批准", "拒绝"]
-                        if is_chinese
-                        else ["Approve", "Deny"],
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "interaction_type": "tool_approval",
+                            "approval_type": "before_execution",
+                            "tool_name": tool_info.get("name"),
+                            "tool_args": tool_info.get("args", {}),
+                            "tool_description": tool_info.get("description", ""),
+                            "interrupt_data": approval_data,
+                            "supports_modification": True,
+                            "modification_hint": "You can approve/deny or provide modified parameters",
+                            "options": ["批准", "拒绝"]
+                            if is_chinese
+                            else ["Approve", "Deny"],
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -883,20 +925,23 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.USER_INPUT,
                     content=content,
-                    detail={
-                        "interaction_type": "tool_approval",
-                        "approval_type": "after_execution",
-                        "tool_name": tool_info.get("name"),
-                        "tool_args": tool_info.get("args", {}),
-                        "tool_result": tool_info.get("result"),
-                        "tool_description": tool_info.get("description", ""),
-                        "interrupt_data": review_data,
-                        "supports_modification": True,
-                        "modification_hint": "You can approve/deny or provide modified result",
-                        "options": ["确认", "拒绝"]
-                        if is_chinese
-                        else ["Confirm", "Deny"],
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "interaction_type": "tool_approval",
+                            "approval_type": "after_execution",
+                            "tool_name": tool_info.get("name"),
+                            "tool_args": tool_info.get("args", {}),
+                            "tool_result": tool_info.get("result"),
+                            "tool_description": tool_info.get("description", ""),
+                            "interrupt_data": review_data,
+                            "supports_modification": True,
+                            "modification_hint": "You can approve/deny or provide modified result",
+                            "options": ["确认", "拒绝"]
+                            if is_chinese
+                            else ["Confirm", "Deny"],
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -909,11 +954,12 @@ class LangGraphAdapter:
                 return None  # Do not send to frontend, just log
             elif event_name == "on_langcrew_new_message":
                 new_message = data.get("new_message", "")
+
                 return StreamMessage(
                     id=message_id,
                     type=MessageType.TEXT,
                     content=new_message,
-                    detail={},
+                    detail=self._enhance_detail_with_metadata(event, {}),
                     role="user",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -1158,6 +1204,29 @@ class LangGraphAdapter:
         )
         # Clear the stop flag
         self.clear_stop_flag(session_id)
+
+    def _enhance_detail_with_metadata(
+        self, event: dict[str, Any], detail: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Enhance detail dictionary with langcrew metadata.
+
+        Args:
+            event: LangGraph event dictionary
+            detail: Original detail dictionary
+
+        Returns:
+            Enhanced detail dictionary with langcrew metadata
+        """
+        metadata = event.get("metadata", {})
+        langcrew_info = {}
+
+        if metadata.get("langcrew_agent"):
+            langcrew_info["langcrew_agent"] = metadata["langcrew_agent"]
+
+        if metadata.get("langcrew_task"):
+            langcrew_info["langcrew_task"] = metadata["langcrew_task"]
+
+        return {**detail, **langcrew_info}
 
     @staticmethod
     def create_sse_handler(crew):

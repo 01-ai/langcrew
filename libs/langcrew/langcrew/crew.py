@@ -98,7 +98,9 @@ class Crew:
         elif isinstance(hitl, HITLConfig):
             self.hitl_config = hitl
         else:
-            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance.")
+            raise ValueError(
+                f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance."
+            )
 
         # Setup HITL if configured
         if self.hitl_config is not None:
@@ -174,19 +176,23 @@ class Crew:
 
         return interrupt_before, interrupt_after
 
-    def _compile_graph_with_interrupts(self, builder: StateGraph, checkpointer=None) -> CompiledStateGraph:
+    def _compile_graph_with_interrupts(
+        self, builder: StateGraph, checkpointer=None
+    ) -> CompiledStateGraph:
         """Compile graph with interrupt configuration applied"""
         interrupt_before, interrupt_after = self._collect_interrupt_config()
-        
+
         compiled = builder.compile(
             checkpointer=checkpointer or self.checkpointer,
             interrupt_before=interrupt_before,
             interrupt_after=interrupt_after,
         )
-        
+
         if self.verbose and (interrupt_before or interrupt_after):
-            logger.info(f"Applied interrupts - Before: {interrupt_before}, After: {interrupt_after}")
-        
+            logger.info(
+                f"Applied interrupts - Before: {interrupt_before}, After: {interrupt_after}"
+            )
+
         return compiled
 
     def _create_generic_node_factory(
@@ -257,7 +263,15 @@ class Crew:
             # Basic validation - task must have an agent
             if not hasattr(task, "agent") or task.agent is None:
                 raise ValueError("Task must have an agent to create executor")
-            return (state,)  # Tasks only need state
+
+            # Create config with langcrew metadata
+            config = RunnableConfig(
+                metadata={
+                    "langcrew_agent": task.agent.name,
+                    "langcrew_task": task.name or f"task_{self.tasks.index(task)}",
+                }
+            )
+            return (state, config)
 
         return self._create_generic_node_factory(
             is_async=is_async,
@@ -289,18 +303,17 @@ class Crew:
             prev_node = node_name
 
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_interrupts(builder, checkpointer)  # Use interrupt-aware compilation
+        return self._compile_graph_with_interrupts(
+            builder, checkpointer
+        )  # Use interrupt-aware compilation
 
     def _create_agent_node_factory(self, is_async: bool = False):
         """Factory for creating agent node functions"""
 
         def get_agent_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for agent"""
-            config = (
-                self._async_compiled_graph.config
-                if is_async
-                else self._compiled_graph.config
-            )
+            # Create config with langcrew metadata
+            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
             return (state, config)
 
         return self._create_generic_node_factory(
@@ -350,7 +363,9 @@ class Crew:
 
         # Last agent connects to END
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_interrupts(builder, checkpointer)  # Use interrupt-aware compilation
+        return self._compile_graph_with_interrupts(
+            builder, checkpointer
+        )  # Use interrupt-aware compilation
 
     def _compile_graph_with_checkpointer(
         self, builder: StateGraph, checkpointer=None
@@ -452,7 +467,7 @@ class Crew:
         # Create mapping of agent names to agent objects and their indices
         agent_map = {}
         agent_node_map = {}  # Maps agent name to node name
-        
+
         for i, agent in enumerate(self.agents):
             if agent.name:
                 agent_map[agent.name] = agent
@@ -472,7 +487,9 @@ class Crew:
                     continue
 
                 target_agent = agent_map[target_name]
-                target_node_name = agent_node_map[target_name]  # Use node name for routing
+                target_node_name = agent_node_map[
+                    target_name
+                ]  # Use node name for routing
 
                 # Create description using target agent's role, goal and backstory
                 description_parts = []
@@ -498,7 +515,9 @@ class Crew:
                 agent.tools.append(handoff_tool)
 
                 if self.verbose:
-                    logger.info(f"Created handoff tool: {agent.name} -> {target_name} (node: {target_node_name})")
+                    logger.info(
+                        f"Created handoff tool: {agent.name} -> {target_name} (node: {target_node_name})"
+                    )
 
     def _setup_task_handoff_tools(self):
         """Create handoff tools for tasks based on their handoff_to configuration"""
@@ -524,7 +543,9 @@ class Crew:
             for target_name in task.handoff_to:
                 target_task = self.get_task_by_name(target_name)
                 # Find the target task's node name
-                target_node_name = self._get_task_node_name(target_task, self.tasks.index(target_task))
+                target_node_name = self._get_task_node_name(
+                    target_task, self.tasks.index(target_task)
+                )
 
                 # Create and add handoff tool with node name for correct routing
                 handoff_tool = create_handoff_tool(
@@ -553,7 +574,9 @@ class Crew:
 
         def get_handoff_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for handoff agent"""
-            return (state,)  # Handoff agents only need state
+            # Create config with langcrew metadata
+            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
+            return (state, config)
 
         return self._create_generic_node_factory(
             is_async=is_async,
@@ -577,7 +600,7 @@ class Crew:
         for i, agent in enumerate(self.agents):
             # Prepare tools with state manager for each agent
             agent.tools = self._prepare_tools(agent.tools)
-            
+
             node_name = self._get_agent_node_name(agent, i)
             builder.add_node(
                 node_name, self._create_handoff_aware_agent_node(agent, is_async)
@@ -592,18 +615,20 @@ class Crew:
                 "No entry agent found. Please mark an agent with is_entry=True or ensure at least one agent has handoff_to configured. "
                 f"Available agents: {available_agents}"
             )
-        
+
         # Find the node name for the entry agent
         entry_node_name = None
         for i, agent in enumerate(self.agents):
             if agent.name == entry_agent_name:
                 entry_node_name = self._get_agent_node_name(agent, i)
                 break
-        
+
         if entry_node_name:
             builder.add_edge(START, entry_node_name)
         else:
-            raise ValueError(f"Entry agent '{entry_agent_name}' not found in agents list")
+            raise ValueError(
+                f"Entry agent '{entry_agent_name}' not found in agents list"
+            )
 
         # No conditional edges needed - LangGraph's Command mechanism handles routing
         # The handoff tools return Command(goto=agent_name) which LangGraph processes automatically
@@ -1226,8 +1251,6 @@ class Crew:
         # Use provided thread_id or generate new one
         self._thread_id = thread_id or str(uuid.uuid4())
 
-
-
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})
 
@@ -1265,8 +1288,6 @@ class Crew:
         # Ensure async components are set up
         if self.memory_config:
             await self._setup_async_components()
-
-
 
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})
