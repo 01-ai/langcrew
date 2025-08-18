@@ -18,6 +18,7 @@ class HITLConfig:
 
     # Tool-level interrupt configuration
     interrupt_before_tools: list[str] | None = None
+    # Note: Only works within single execution session, not across restarts
     interrupt_after_tools: list[str] | None = None
 
     # Node-level interrupt configuration (LangGraph native)
