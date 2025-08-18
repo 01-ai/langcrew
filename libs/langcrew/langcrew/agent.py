@@ -50,7 +50,7 @@ class Agent:
         # Post-model hook
         post_model_hook: RunnableLike | None = None,
         # HITL support
-        hitl: bool | HITLConfig | None = None,
+        hitl: HITLConfig | None = None,
         # Handoff configuration
         handoff_to: list[str] | None = None,
         # Entry agent flag
@@ -151,20 +151,15 @@ class Agent:
 
         # Memory configuration
         if memory is None:
-            self.memory_config = MemoryConfig(enabled=False)
-            self.memory = False
+            self.memory_config = None
         elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig(enabled=memory)
-            self.memory = memory
+            self.memory_config = MemoryConfig() if memory else None
         elif isinstance(memory, MemoryConfig):
             self.memory_config = memory
-            self.memory = memory.enabled
         else:
             raise ValueError(f"Invalid memory parameter type: {type(memory)}")
-        self._memory = None  # Will store ShortTermMemory instance from crew
-        self._memory_context = None  # For storing injected context
-        self._thread_id = None  # For thread management
-        self.use_memory = False  # Will be set by crew if memory enabled
+        
+        self.memory = self.memory_config is not None
 
         # Hooks
         self.pre_model_hook = pre_model_hook
@@ -178,16 +173,15 @@ class Agent:
 
         # HITL configuration
         if hitl is None:
-            self.hitl_config = HITLConfig(enabled=False)
-        elif isinstance(hitl, bool):
-            self.hitl_config = HITLConfig(enabled=hitl)
+            self.hitl_config = None
         elif isinstance(hitl, HITLConfig):
             self.hitl_config = hitl
         else:
-            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}")
+            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance.")
 
         # Setup HITL configuration
-        self._setup_hitl()
+        if self.hitl_config is not None:
+            self._setup_hitl()
 
     def __repr__(self):
         role_str = self.role if self.role else "N/A"
@@ -261,15 +255,6 @@ class Agent:
 
         self._setup_and_process_mcp_tools(tools)
 
-    def _setup_with_memory(self, memory, thread_id):
-        """Setup agent with memory context (called by Crew)"""
-        self._memory = memory  # ShortTermMemory instance
-        self._thread_id = thread_id
-        self.use_memory = True
-
-        if self.verbose:
-            logger.info(f"Agent '{self.role}' configured with memory support")
-
     def _create_default_store(self):
         """Create default store based on config"""
         from langcrew.memory.storage import get_storage
@@ -284,9 +269,6 @@ class Agent:
 
     def _setup_hitl(self):
         """Setup HITL tool wrapping for the agent"""
-        if not self.hitl_config.enabled:
-            return
-
         from langcrew.hitl import HITLToolWrapper
 
         wrapper = HITLToolWrapper(self.hitl_config)
@@ -381,12 +363,12 @@ class Agent:
         # Get interrupt configuration from HITL config
         interrupt_before = (
             self.hitl_config.get_interrupt_before_nodes()
-            if self.hitl_config.enabled
+            if self.hitl_config is not None
             else []
         )
         interrupt_after = (
             self.hitl_config.get_interrupt_after_nodes()
-            if self.hitl_config.enabled
+            if self.hitl_config is not None
             else []
         )
 

@@ -204,3 +204,33 @@ class TestWebSearchTool:
         assert tool.endpoint == "https://constructor.example.com"
         assert tool.api_key == "constructor-key"
         assert tool.language == "en"
+
+    @pytest.mark.asyncio
+    async def test_arun_with_brief_parameter(self):
+        """Test that _arun method accepts brief parameter through kwargs."""
+        tool = WebSearchTool(
+            endpoint="https://api.example.com/search",
+            api_key="test-api-key",
+        )
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"search_info": []}}
+
+        with patch("requests.post", return_value=mock_response):
+            # Test that _arun accepts brief parameter without raising exception
+            result = await tool._arun(query="test query", brief="测试搜索功能")
+            # If no exception is raised, the **kwargs mechanism works correctly
+            assert isinstance(result, list)
+
+    def test_input_model_has_brief_field(self):
+        """Test that WebSearchInput has inherited brief field from BaseToolInput."""
+        input_model = WebSearchInput(query="test query")
+
+        # Should have brief field with default value
+        assert hasattr(input_model, "brief")
+        assert input_model.brief == ""
+
+        # Should be able to set brief field
+        input_with_brief = WebSearchInput(query="test query", brief="搜索测试")
+        assert input_with_brief.brief == "搜索测试"

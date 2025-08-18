@@ -615,16 +615,10 @@ def create_crewai_tool_from_function(
         def _run(self, **kwargs) -> str:
             try:
                 if asyncio.iscoroutinefunction(func):
-                    # If it's an async function, run in sync context
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        result = loop.run_until_complete(func(**kwargs))
-                    finally:
-                        loop.close()
-                else:
-                    result = func(**kwargs)
-                return str(result)
+                    raise RuntimeError(
+                        "In an sync context async tasks cannot be called"
+                    )
+                return str(func(**kwargs))
             except Exception as e:
                 return f"Error executing function tool: {str(e)}"
 

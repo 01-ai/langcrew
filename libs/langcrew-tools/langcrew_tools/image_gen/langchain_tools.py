@@ -11,6 +11,7 @@ import httpx
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
 from ..utils.s3.client import AsyncS3Client
 from ..utils.sandbox.base_sandbox import SandboxMixin
 from ..utils.sandbox.s3_integration import SandboxS3Toolkit
@@ -18,7 +19,7 @@ from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 logger = logging.getLogger(__name__)
 
 
-class ImageGenerationInput(BaseModel):
+class ImageGenerationInput(BaseToolInput):
     """Input for ImageGenerationTool."""
 
     prompt: str = Field(
@@ -123,6 +124,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
         self,
         prompt: str,
         path: str | None = None,
+        **kwargs,
     ) -> str:
         """Synchronous wrapper for async _arun method.
 
@@ -133,12 +135,13 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
         Returns:
             JSON string containing image URLs and any warnings
         """
-        return asyncio.run(self._arun(prompt, path))
+        return asyncio.run(self._arun(prompt, path, **kwargs))
 
     async def _arun(
         self,
         prompt: str,
         path: str | None = None,
+        **kwargs,
     ) -> str:
         """Use the tool asynchronously.
 

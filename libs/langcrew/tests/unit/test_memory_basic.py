@@ -22,27 +22,24 @@ class TestMemoryConfig:
 
     def test_basic_config(self):
         """Test basic memory configuration"""
-        config = MemoryConfig(enabled=True, provider="memory")
+        config = MemoryConfig(provider="memory")
 
-        assert config.enabled
         assert config.provider == "memory"
-        assert config.short_term["enabled"]
-        assert config.long_term["enabled"]
-        assert config.entity["enabled"]
+        assert not config.short_term_enabled  # Default disabled
+        assert not config.long_term_enabled   # Default disabled
+        assert not config.entity_enabled      # Default disabled
 
     def test_config_from_dict(self):
         """Test creating config from dictionary"""
         config_dict = {
-            "enabled": True,
             "provider": "sqlite",
-            "path": "./test.db",
+            "connection_string": "./test.db",
             "short_term": {"max_history": 50},
         }
 
         config = MemoryConfig.from_dict(config_dict)
-        assert config.enabled
         assert config.provider == "sqlite"
-        assert config.path == "./test.db"
+        assert config.connection_string == "./test.db"
         assert config.short_term["max_history"] == 50
 
 
@@ -328,16 +325,15 @@ class TestCrewMemoryIntegration:
         crew = Crew(
             agents=[agent1, agent2],
             tasks=[task],
-            memory=True,
-            memory_config={
-                "provider": "memory",
-                "short_term": {"enabled": True},
-                "long_term": {"enabled": True},
-            },
+            memory=MemoryConfig(
+                provider="memory",
+                short_term_enabled=True,
+                long_term_enabled=True,
+            ),
         )
 
         # Verify memory setup
-        assert crew._memory
+        assert crew.memory_config is not None
         assert crew.short_term_memory is not None
         assert crew.long_term_memory is not None
         assert crew.entity_memory is not None

@@ -8,8 +8,10 @@ from langchain_core.tools import BaseTool
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
 
-class UserInputRequest(BaseModel):
+
+class UserInputRequest(BaseToolInput):
     """Input for UserInputTool."""
 
     question: str = Field(..., description="The question to ask the user")
@@ -44,6 +46,7 @@ class UserInputTool(BaseTool):
         self,
         question: str,
         options: list[str] | None = None,
+        **kwargs,
     ) -> str:
         """Request user input asynchronously using LangGraph interrupt."""
 
@@ -87,6 +90,7 @@ class UserInputTool(BaseTool):
         self,
         question: str,
         options: list[str] | None = None,
+        **kwargs,
     ) -> str:
         """Request user input synchronously.
 
@@ -99,5 +103,6 @@ class UserInputTool(BaseTool):
             self._arun(
                 question=question,
                 options=options,
+                **kwargs,
             )
         )

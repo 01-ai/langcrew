@@ -118,7 +118,7 @@ class AdapterServer:
                     execution_input = ExecutionInput(
                         session_id=session_id,
                         user_input=request.message,
-                        is_resume=request.interrupt_data is not None,
+                        interrupt_data=request.interrupt_data,
                     )
 
                     # Stream execution results

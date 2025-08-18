@@ -1,0 +1,137 @@
+---
+title: 链路追踪 (Tracing)
+description: 了解如何使用 Langtrace 来追踪您的 LangCrew 执行过程，以实现更好的可观测性和调试。
+sidebar:
+  label: 链路追踪 (Tracing)
+  order: 7
+---
+
+在任何复杂的人工智能代理系统中，深入了解其内部运作对于调试、优化和确保可靠性至关重要。链路追踪（Tracing）为您的代理执行路径提供了详细的可视化日志，包括工具使用、代理交互和性能指标。LangCrew 与 [Langtrace](https://langtrace.ai/) 集成，提供开箱即用的强大可观测性。
+
+## 快速入门：5 步追踪一个 Crew
+
+在几分钟内启动并运行您的第一个被追踪的 Crew。
+
+### 1. 安装 Langtrace SDK
+
+首先，使用 `uv` 将 `langtrace-python-sdk` 添加到您的项目中：
+
+```bash
+uv add langtrace-python-sdk
+```
+
+### 2. 获取您的 Langtrace API 密钥
+
+要将追踪数据发送到平台，您需要一个 API 密钥。
+
+1.  访问 [Langtrace](https://langtrace.ai/) 官方网站。
+2.  注册一个免费账户。
+3.  在您的账户设置中，创建一个新项目并生成一个 API 密钥。
+
+### 3. 配置 SDK
+
+将您的 API 密钥设置为环境变量。如果您还没有 `.env` 文件，请在项目根目录中创建一个：
+
+```env
+# .env
+LANGTRACE_API_KEY="your-langtrace-api-key-goes-here"
+```
+
+### 4. 在您的应用中初始化 Langtrace
+
+在您的主应用程序文件中，运行您的 Crew 之前，请先初始化 Langtrace。只需两行代码即可完成。
+
+```python
+import os
+from dotenv import load_dotenv
+from langtrace_python_sdk import langtrace
+
+# 加载环境变量
+load_dotenv()
+
+# 初始化 Langtrace
+langtrace.init(api_key=os.getenv("LANGTRACE_API_KEY"))
+
+# ... 您的其他 crew 设置和执行代码
+```
+
+### 5. 运行您的 Crew
+
+现在，像往常一样运行您的 Crew 即可。Langtrace 使用字节码插桩技术自动捕获并发送来自您的 LangCrew 代理和任务的追踪数据。
+
+```python
+# 初始化后运行 crew 的示例
+from my_crew import MyAwesomeCrew
+
+def main():
+    # crew 的执行过程被自动追踪
+    result = MyAwesomeCrew().crew().kickoff()
+    print(result)
+
+if __name__ == "__main__":
+    main()
+```
+
+## 查看您的追踪数据
+
+脚本执行完毕后，您的追踪数据就会出现在 Langtrace 平台上。
+
+1.  **登录**到您的 [Langtrace](https://langtrace.ai/) 账户。
+2.  **导航到您的项目**。
+3.  您将看到一个包含最近追踪列表的仪表盘。点击任何一个追踪，即可看到详细的瀑布流视图，其中包含您的 crew 流程中每个步骤的计时、输入、输出和工具调用等信息。
+
+## 高级用法：自定义 Span
+
+为了实现更精细的控制，您可以使用 `@with_langtrace_root_span` 装饰器为应用程序的特定部分添加自定义的 Span。这对于将一组操作归类到一个根追踪下非常有用。
+
+```python
+from langtrace_python_sdk import with_langtrace_root_span
+from my_crew import MyAwesomeCrew
+
+@with_langtrace_root_span("my_custom_crew_run")
+def run_my_crew_with_custom_span():
+    inputs = {"topic": "AI advancements"}
+    result = MyAwesomeCrew().crew().kickoff(inputs=inputs)
+    print(result)
+
+# 此函数内的所有操作都将嵌套在 "my_custom_crew_run" 这个 span 下
+run_my_crew_with_custom_span()
+```
+
+通过集成 Langtrace，您可以获得对 LangCrew 性能和行为的强大洞察力，从而更容易地构建、调试和扩展您的 AI 代理系统。
+
+## 问题排查 (Troubleshooting)
+
+如果您在查看追踪数据时遇到问题，这里有一些常见问题及其解决方法。
+
+### 问题：执行后没有上传任何追踪数据
+
+如果您的代码成功运行，但 Langtrace 仪表盘中没有任何显示，那么 SDK 可能没有捕获到任何数据。
+
+**解决方案：**
+1.  通过在 `init` 函数中添加 `write_spans_to_console=True` 来启用 Span 的控制台输出。
+
+    ```python
+    langtrace.init(
+        api_key=os.getenv("LANGTRACE_API_KEY"),
+        write_spans_to_console=True
+    )
+    ```
+
+2.  再次运行您的脚本并检查控制台。如果您在控制台中**没有**看到任何 Span 数据输出，这几乎总是意味着 `langtrace.init()` 调用得太晚了。
+
+3.  **解决方法：** Langtrace SDK 通过字节码增强（bytecode instrumentation）工作。这意味着它必须在任何 LLM 库（如 `langchain`、`openai` 等）或您的 crew 代码被导入*之前*进行初始化。请确保 `langtrace.init()` 是您应用程序入口点最先运行的代码之一。
+
+### 问题：控制台有 Span 输出，但平台上看不到
+
+如果您在控制台中看到了追踪数据，但它们从未出现在您的 Langtrace 仪表盘中，问题很可能出在您的凭据或端点配置上。
+
+**请检查以下几点：**
+*   **API 密钥：** 仔细检查您的 `LANGTRACE_API_KEY` 是否正确，没有拼写错误或多余的字符。
+*   **自托管端点：** 如果您是自托管 Langtrace，则必须在初始化时指定正确的 API 端点。请确保 `api_host` 参数指向您的实例地址。
+  ```python
+  langtrace.init(
+      api_key=os.getenv("LANGTRACE_API_KEY"),
+      api_host="http://your-self-hosted-langtrace-instance:3000" # 示例
+  )
+  ```

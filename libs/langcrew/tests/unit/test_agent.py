@@ -73,7 +73,7 @@ class TestAgent:
         )
 
         assert agent.memory is True
-        assert agent.memory_config.enabled is True
+        assert agent.memory_config is not None
 
     def test_agent_initialization_with_mcp(self, mock_llm):
         """Test agent initialization with MCP configuration."""
@@ -160,12 +160,8 @@ class TestAgent:
             memory=True,
         )
 
-        # Test memory setup
-        agent._setup_with_memory(mock_memory, "test_thread_id")
-
-        assert agent._memory == mock_memory
-        assert agent._thread_id == "test_thread_id"
-        assert agent.use_memory is True
+        # Memory is configured at agent level via MemoryConfig
+        # No additional setup needed
 
     def test_agent_executor_kwargs(self, mock_llm):
         """Test agent executor kwargs configuration."""

@@ -62,7 +62,6 @@ class LangGraphAdapter:
 
         self.crew = crew
         self.compiled_graph = compiled_graph
-        self._display_language: str = "en"  # Default to English
 
     @classmethod
     def _get_session_state(cls, session_id: str) -> dict[str, Any]:
@@ -82,6 +81,41 @@ class LangGraphAdapter:
     def _get_session_value(cls, session_id: str, key: str, default: Any = None) -> Any:
         """Get a value from session state."""
         return cls._get_session_state(session_id).get(key, default)
+
+    @classmethod
+    def _get_session_display_language(
+        cls, session_id: str, user_input: str = None, explicit_language: str = None
+    ) -> str:
+        """Get session-level display language.
+
+        Priority: explicit_language > cached_language > detected_language > default
+
+        Args:
+            session_id: Session identifier
+            user_input: User input text for language detection (optional)
+            explicit_language: Explicitly specified language (optional)
+
+        Returns:
+            Language code ('zh' or 'en')
+        """
+        # Priority 1: Explicit language specification
+        if explicit_language:
+            cls._set_session_state(session_id, "display_language", explicit_language)
+            return explicit_language
+
+        # Priority 2: Cached session language
+        cached_language = cls._get_session_value(session_id, "display_language")
+        if cached_language:
+            return cached_language
+
+        # Priority 3: Detect from user input and cache
+        if user_input:
+            detected_language = detect_language(user_input)
+        else:
+            detected_language = "en"  # Default to English
+
+        cls._set_session_state(session_id, "display_language", detected_language)
+        return detected_language
 
     @classmethod
     async def set_stop_flag(
@@ -147,7 +181,26 @@ class LangGraphAdapter:
     def _prepare_input(self, execution_input: ExecutionInput):
         """Prepare input data for execution based on execution mode."""
         if execution_input.is_resume:
-            return Command(resume=execution_input.user_input)
+            # Use enhanced modification processing method
+            processed_modifications = self._process_user_modifications(
+                execution_input.user_input, 
+                execution_input.interrupt_data
+            )
+            
+            action = processed_modifications.get("action")
+            modifications = processed_modifications.get("modifications", {})
+            
+            if action == "continue":
+                return Command(resume="continue")
+            elif action == "abort":
+                return Command(resume="abort")
+            elif action in ["modify", "modify_and_continue"]:
+                return Command(resume={
+                    "action": "continue",
+                    "modifications": modifications
+                })
+            else:
+                return Command(resume=execution_input.user_input)
         else:
             messages = []
             if execution_input.user_input:
@@ -164,20 +217,24 @@ class LangGraphAdapter:
         """Unified execution method for both new conversations and resume scenarios."""
         config = self._build_config(execution_input.session_id, **config_kwargs)
 
-        # Detect display language
-        if execution_input.language:
-            self._display_language = execution_input.language
-        elif execution_input.user_input:
-            self._display_language = detect_language(execution_input.user_input)
-        else:
-            self._display_language = "en"
+        # Initialize session-level display language (cached for this session)
+        self._get_session_display_language(
+            execution_input.session_id,
+            execution_input.user_input,
+            execution_input.language,
+        )
 
         try:
             input_data = self._prepare_input(execution_input)
 
             # Control whether to send messages to client
-            # Non-resume: send all, Resume: wait for completed event
-            should_send_messages = not execution_input.is_resume
+            # Different logic for Node vs Tool interrupts
+            if execution_input.is_resume:
+                interrupt_type = execution_input.interrupt_data.get("type", "") if execution_input.interrupt_data else ""
+                # Node interrupts (Task/Agent) can send messages immediately after resume
+                should_send_messages = interrupt_type.startswith(("task_interrupt", "agent_interrupt"))
+            else:
+                should_send_messages = True
 
             # Execution state tracking
             task_ended = False
@@ -189,15 +246,13 @@ class LangGraphAdapter:
                 event_type = event.get("event")
                 event_data = event.get("data", {})
 
-                # TODO: Handle LangGraph native node interrupts
+                # Handle LangGraph native node interrupts
                 # Check for node-level interrupts that don't have custom events
                 if "__interrupt__" in event_data:
-                    # TODO: Implement node-level interrupt handling
-                    # - Parse interrupt_obj.value to determine interrupt type
-                    # - Skip tool-level and user_input interrupts (already handled by custom events)
-                    # - Handle pure node-level interrupts from interrupt_before_nodes/interrupt_after_nodes
-                    # - Generate appropriate StreamMessage for frontend using MessageType.USER_INPUT
-                    pass
+                    interrupt_message = self._handle_node_interrupt(event_data, event)
+                    if interrupt_message:
+                        yield await self._format_sse_message(interrupt_message)
+                        continue
 
                 # Resume mode: check for completed events
                 if execution_input.is_resume and event_type == "on_custom_event":
@@ -364,23 +419,27 @@ class LangGraphAdapter:
             tool_input = data.get("input", {})
             brief = tool_input.get("brief", "")
 
-            # Generate display fields with current task language
+            # Generate display fields with session language
+            session_language = self._get_session_display_language(session_id)
             display_fields = ToolDisplayManager.get_display(
-                tool_name, tool_input, self._display_language
+                tool_name, tool_input, session_language
             )
 
             return StreamMessage(
                 id=message_id,
                 type=MessageType.TOOL_CALL,
                 content=brief,
-                detail={
-                    "run_id": run_id,  # Use run_id instead of call_id
-                    "tool": tool_name,
-                    "status": ToolResult.PENDING,
-                    "param": tool_input,
-                    "action": display_fields["action"],
-                    "action_content": display_fields["action_content"],
-                },
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "run_id": run_id,  # Use run_id instead of call_id
+                        "tool": tool_name,
+                        "status": ToolResult.PENDING,
+                        "param": tool_input,
+                        "action": display_fields["action"],
+                        "action_content": display_fields["action_content"],
+                    },
+                ),
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
@@ -403,12 +462,15 @@ class LangGraphAdapter:
                 id=message_id,
                 type=MessageType.TOOL_RESULT,
                 content=brief,
-                detail={
-                    "tool": tool_name,
-                    "run_id": run_id,  # Use run_id for correlation
-                    "result": output,
-                    "status": ToolResult.SUCCESS,
-                },
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "tool": tool_name,
+                        "run_id": run_id,  # Use run_id for correlation
+                        "result": output,
+                        "status": ToolResult.SUCCESS,
+                    },
+                ),
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
@@ -488,11 +550,18 @@ class LangGraphAdapter:
                 if metadata.get("langgraph_node") == "pre_model_hook":
                     logger.info(f"pre_model_hook, ignore content: {content}")
                     return None
+
                 return StreamMessage(
                     id=message_id,
                     type=MessageType.TEXT,
                     content=content,
-                    detail={"streaming": False, "final": True},
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "streaming": False,
+                            "final": True,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -624,9 +693,12 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN,
                     content=plan_data.get("goal", "Planning execution"),
-                    detail={
-                        "steps": steps,
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -660,10 +732,13 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN_UPDATE,
                     content=f"开始执行步骤 {step_id}: {step_data.get('step_description', '')}",
-                    detail={
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "action": PlanAction.UPDATE,
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -681,10 +756,13 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN_UPDATE,
                     content=f"步骤 {step_data.get('step_id', '')} 完成",
-                    detail={
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "action": PlanAction.UPDATE,
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -702,7 +780,13 @@ class LangGraphAdapter:
                         id=message_id,
                         type=MessageType.TEXT,
                         content=direct_response,
-                        detail={"streaming": False, "final": True},
+                        detail=self._enhance_detail_with_metadata(
+                            event,
+                            {
+                                "streaming": False,
+                                "final": True,
+                            },
+                        ),
                         role="assistant",
                         timestamp=int(time.time() * 1000),
                         session_id=session_id,
@@ -726,7 +810,12 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.PLAN,
                     content=plan_data.get("task_type", "Planning execution"),
-                    detail={"steps": steps},
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "steps": steps,
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -739,11 +828,14 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.CONFIG,
                     content="update_session",
-                    detail={
-                        "session_id": sandbox_data.get("session_id"),
-                        "sandbox_id": sandbox_data.get("sandbox_id"),
-                        "sandbox_url": sandbox_data.get("sandbox_url"),
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "session_id": sandbox_data.get("session_id"),
+                            "sandbox_id": sandbox_data.get("sandbox_id"),
+                            "sandbox_url": sandbox_data.get("sandbox_url"),
+                        },
+                    ),
                     role="inner_message",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -763,6 +855,9 @@ class LangGraphAdapter:
                 if "options" in input_data and input_data["options"]:
                     detail["options"] = input_data["options"]
 
+                # Enhance detail with langcrew metadata
+                detail = self._enhance_detail_with_metadata(event, detail)
+
                 return StreamMessage(
                     id=message_id,
                     type=MessageType.USER_INPUT,
@@ -777,8 +872,9 @@ class LangGraphAdapter:
                 approval_data = data
                 tool_info = approval_data.get("tool", {})
 
-                # Use current task language for content
-                is_chinese = self._display_language == "zh"
+                # Use session language for content
+                session_language = self._get_session_display_language(session_id)
+                is_chinese = session_language == "zh"
                 if is_chinese:
                     content = f"工具执行前中断: {tool_info.get('name', 'unknown')}"
                 else:
@@ -790,19 +886,22 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.USER_INPUT,
                     content=content,
-                    detail={
-                        "interaction_type": "tool_approval",
-                        "approval_type": "before_execution",
-                        "tool_name": tool_info.get("name"),
-                        "tool_args": tool_info.get("args", {}),
-                        "tool_description": tool_info.get("description", ""),
-                        "interrupt_data": approval_data,
-                        "supports_modification": True,
-                        "modification_hint": "You can approve/deny or provide modified parameters",
-                        "options": ["批准", "拒绝"]
-                        if is_chinese
-                        else ["Approve", "Deny"],
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "interaction_type": "tool_approval",
+                            "approval_type": "before_execution",
+                            "tool_name": tool_info.get("name"),
+                            "tool_args": tool_info.get("args", {}),
+                            "tool_description": tool_info.get("description", ""),
+                            "interrupt_data": approval_data,
+                            "supports_modification": True,
+                            "modification_hint": "You can approve/deny or provide modified parameters",
+                            "options": ["批准", "拒绝"]
+                            if is_chinese
+                            else ["Approve", "Deny"],
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -812,8 +911,9 @@ class LangGraphAdapter:
                 review_data = data
                 tool_info = review_data.get("tool", {})
 
-                # Use current task language for content
-                is_chinese = self._display_language == "zh"
+                # Use session language for content
+                session_language = self._get_session_display_language(session_id)
+                is_chinese = session_language == "zh"
                 if is_chinese:
                     content = f"工具执行后审查: {tool_info.get('name', 'unknown')}"
                 else:
@@ -825,20 +925,23 @@ class LangGraphAdapter:
                     id=message_id,
                     type=MessageType.USER_INPUT,
                     content=content,
-                    detail={
-                        "interaction_type": "tool_approval",
-                        "approval_type": "after_execution",
-                        "tool_name": tool_info.get("name"),
-                        "tool_args": tool_info.get("args", {}),
-                        "tool_result": tool_info.get("result"),
-                        "tool_description": tool_info.get("description", ""),
-                        "interrupt_data": review_data,
-                        "supports_modification": True,
-                        "modification_hint": "You can approve/deny or provide modified result",
-                        "options": ["确认", "拒绝"]
-                        if is_chinese
-                        else ["Confirm", "Deny"],
-                    },
+                    detail=self._enhance_detail_with_metadata(
+                        event,
+                        {
+                            "interaction_type": "tool_approval",
+                            "approval_type": "after_execution",
+                            "tool_name": tool_info.get("name"),
+                            "tool_args": tool_info.get("args", {}),
+                            "tool_result": tool_info.get("result"),
+                            "tool_description": tool_info.get("description", ""),
+                            "interrupt_data": review_data,
+                            "supports_modification": True,
+                            "modification_hint": "You can approve/deny or provide modified result",
+                            "options": ["确认", "拒绝"]
+                            if is_chinese
+                            else ["Confirm", "Deny"],
+                        },
+                    ),
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -851,11 +954,12 @@ class LangGraphAdapter:
                 return None  # Do not send to frontend, just log
             elif event_name == "on_langcrew_new_message":
                 new_message = data.get("new_message", "")
+
                 return StreamMessage(
                     id=message_id,
                     type=MessageType.TEXT,
                     content=new_message,
-                    detail={},
+                    detail=self._enhance_detail_with_metadata(event, {}),
                     role="user",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
@@ -907,8 +1011,9 @@ class LangGraphAdapter:
                     f"Invalid phases type: {type(phases)}, expected list, got {phases}"
                 )
                 return None
-            # Use current task language instead of detecting from goal
-            is_chinese = self._display_language == "zh"
+            # Use session language instead of detecting from goal
+            session_language = self._get_session_display_language(session_id)
+            is_chinese = session_language == "zh"
             if is_chinese:
                 goal_lines = ["我将按照下列计划进行工作：\n"]
             else:
@@ -1100,6 +1205,29 @@ class LangGraphAdapter:
         # Clear the stop flag
         self.clear_stop_flag(session_id)
 
+    def _enhance_detail_with_metadata(
+        self, event: dict[str, Any], detail: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Enhance detail dictionary with langcrew metadata.
+
+        Args:
+            event: LangGraph event dictionary
+            detail: Original detail dictionary
+
+        Returns:
+            Enhanced detail dictionary with langcrew metadata
+        """
+        metadata = event.get("metadata", {})
+        langcrew_info = {}
+
+        if metadata.get("langcrew_agent"):
+            langcrew_info["langcrew_agent"] = metadata["langcrew_agent"]
+
+        if metadata.get("langcrew_task"):
+            langcrew_info["langcrew_task"] = metadata["langcrew_task"]
+
+        return {**detail, **langcrew_info}
+
     @staticmethod
     def create_sse_handler(crew):
         """
@@ -1166,3 +1294,212 @@ class LangGraphAdapter:
                     yield StreamMessage(**message_data)
 
         return generate_messages
+
+    def _handle_node_interrupt(self, event_data: dict, event: dict) -> StreamMessage | None:
+        """Handle Node-level interrupts (Task/Agent)"""
+        interrupt_obj = event_data.get("__interrupt__")
+        node_name = event.get("name", "")
+        
+        # Only handle Task/Agent node interrupts, skip Tool and User input
+        if not (node_name.startswith(("task__", "agent__")) and interrupt_obj):
+            return None
+            
+        # Check it's not a tool or user_input interrupt type
+        interrupt_value = getattr(interrupt_obj, 'value', {}) if hasattr(interrupt_obj, 'value') else {}
+        interrupt_type = interrupt_value.get('type', '')
+        
+        if interrupt_type in ['tool_interrupt_before', 'tool_interrupt_after', 'user_input']:
+            return None  # Skip, these have their own handling mechanisms
+        
+        return self._create_node_interrupt_message(event, node_name, interrupt_obj)
+
+    def _create_node_interrupt_message(self, event: dict, node_name: str, interrupt_obj) -> StreamMessage:
+        """Create Node interrupt message"""
+        message_id = generate_message_id()
+        session_id = self._extract_session_id(event)
+        session_language = self._get_session_display_language(session_id)
+        is_chinese = session_language == "zh"
+        
+        # Parse interrupt details
+        interrupt_details = self._parse_interrupt_details(interrupt_obj)
+        is_before = interrupt_details.get('timing') == 'before'
+        
+        if node_name.startswith("task__"):
+            task_name = node_name[6:]  # Remove "task__" prefix
+            
+            if is_before:
+                content = f"任务执行前中断: {task_name}" if is_chinese else f"Task before interrupt: {task_name}"
+                interaction_type = "task_interrupt_before"
+            else:
+                content = f"任务执行后中断: {task_name}" if is_chinese else f"Task after interrupt: {task_name}"
+                interaction_type = "task_interrupt_after"
+            
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.USER_INPUT,
+                content=content,
+                detail={
+                    "interaction_type": interaction_type,
+                    "task_name": task_name,
+                    "interrupt_data": {
+                        "type": interaction_type,
+                        "task_name": task_name,
+                        "node_name": node_name,
+                        "timing": "before" if is_before else "after",
+                        "original_state": interrupt_details.get('state', {}),
+                        "editable_fields": {
+                            "messages": interrupt_details.get('input_messages' if is_before else 'output_messages', []),
+                            "context": interrupt_details.get('context', ''),
+                        }
+                    },
+                    "supports_modification": True,
+                    "modification_hint": "You can modify the content before continuing",
+                    "options": ["继续", "修改后继续", "终止"] if is_chinese else ["Continue", "Modify & Continue", "Abort"],
+                },
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
+            
+        elif node_name.startswith("agent__"):
+            agent_name = node_name[7:]  # Remove "agent__" prefix
+            
+            if is_before:
+                content = f"智能体执行前中断: {agent_name}" if is_chinese else f"Agent before interrupt: {agent_name}"
+                interaction_type = "agent_interrupt_before"
+            else:
+                content = f"智能体执行后中断: {agent_name}" if is_chinese else f"Agent after interrupt: {agent_name}"
+                interaction_type = "agent_interrupt_after"
+            
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.USER_INPUT,
+                content=content,
+                detail={
+                    "interaction_type": interaction_type,
+                    "agent_name": agent_name,
+                    "interrupt_data": {
+                        "type": interaction_type,
+                        "agent_name": agent_name,
+                        "node_name": node_name,
+                        "timing": "before" if is_before else "after",
+                        "original_state": interrupt_details.get('state', {}),
+                        "editable_fields": {
+                            "messages": interrupt_details.get('input_messages' if is_before else 'output_messages', []),
+                            "context": interrupt_details.get('context', ''),
+                        }
+                    },
+                    "supports_modification": True,
+                    "modification_hint": "You can modify the content before continuing",
+                    "options": ["继续", "修改后继续", "终止"] if is_chinese else ["Continue", "Modify & Continue", "Abort"],
+                },
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
+        
+        return None
+
+    def _parse_interrupt_details(self, interrupt_obj) -> dict:
+        """Parse interrupt object to get detailed information"""
+        if hasattr(interrupt_obj, 'value'):
+            interrupt_value = interrupt_obj.value
+            return {
+                'timing': interrupt_value.get('timing', 'before'),  # before/after
+                'state': interrupt_value.get('state', {}),
+                'input_messages': interrupt_value.get('input', []),
+                'output_messages': interrupt_value.get('output', []),
+                'context': interrupt_value.get('context', ''),
+            }
+        return {}
+
+    def _process_user_modifications(self, user_input: str, interrupt_data: dict) -> dict:
+        """Handle user modifications, supporting multiple input formats"""
+        
+        # 1. Try to parse JSON format structured modifications
+        if user_input.strip().startswith('{'):
+            try:
+                parsed_input = json.loads(user_input)
+                if isinstance(parsed_input, dict) and self._validate_json_modifications(parsed_input):
+                    return {"action": "modify", "modifications": parsed_input}
+            except json.JSONDecodeError:
+                logger.warning(f"Invalid JSON format in user input: {user_input}")
+        
+        # 2. Handle simple commands
+        normalized_input = user_input.strip().lower()
+        simple_commands = {
+            # Continue commands
+            **dict.fromkeys(["approve", "continue", "继续", "同意"], {"action": "continue"}),
+            # Abort commands  
+            **dict.fromkeys(["reject", "abort", "cancel", "终止", "取消", "拒绝"], {"action": "abort"}),
+        }
+        
+        if normalized_input in simple_commands:
+            return simple_commands[normalized_input]
+        
+        # 3. Handle natural language modification instructions
+        interrupt_type = interrupt_data.get("type", "") if interrupt_data else ""
+        
+        if interrupt_type.endswith("_before"):
+            # Before interrupt: user may want to modify input
+            return {
+                "action": "modify_and_continue",
+                "modifications": {
+                    "type": "natural_language_instruction",
+                    "instruction": user_input,
+                    "target": "input_modification",
+                    "timestamp": int(time.time())
+                }
+            }
+        elif interrupt_type.endswith("_after"):
+            # After interrupt: user may want to modify output
+            return {
+                "action": "modify_and_continue", 
+                "modifications": {
+                    "type": "natural_language_instruction",
+                    "instruction": user_input,
+                    "target": "output_modification",
+                    "timestamp": int(time.time())
+                }
+            }
+        else:
+            # Default handling
+            return {
+                "action": "modify_and_continue",
+                "modifications": {
+                    "type": "natural_language_instruction",
+                    "instruction": user_input,
+                    "timestamp": int(time.time())
+                }
+            }
+
+    def _validate_json_modifications(self, modifications: dict) -> bool:
+        """Validate that JSON modifications have legal structure"""
+        # Check for dangerous operations
+        dangerous_keys = ["__", "eval", "exec", "import", "class", "def"]
+        
+        def check_dangerous_content(obj, path=""):
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    if any(dangerous in str(key).lower() for dangerous in dangerous_keys):
+                        logger.warning(f"Dangerous key detected: {path}.{key}")
+                        return False
+                    if not check_dangerous_content(value, f"{path}.{key}"):
+                        return False
+            elif isinstance(obj, list):
+                for i, item in enumerate(obj):
+                    if not check_dangerous_content(item, f"{path}[{i}]"):
+                        return False
+            elif isinstance(obj, str):
+                if any(dangerous in obj.lower() for dangerous in dangerous_keys):
+                    logger.warning(f"Dangerous content detected: {path}")
+                    return False
+            
+            return True
+        
+        return check_dangerous_content(modifications)
+
+    def _extract_session_id(self, event: dict) -> str:
+        """Extract session_id from event"""
+        # Try to get session_id from event metadata or use a default
+        return event.get('metadata', {}).get('session_id', 'unknown_session')

@@ -15,12 +15,13 @@ from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
 from .config import ImageParserConfig, default_config
 
 logger = logging.getLogger(__name__)
 
 
-class ImageParserInput(BaseModel):
+class ImageParserInput(BaseToolInput):
     """Input for ImageParserTool."""
 
     image_url: str = Field(..., description="URL of the image to analyze")
@@ -102,14 +103,16 @@ class ImageParserTool(BaseTool):
         self,
         image_url: str,
         question: str,
+        **kwargs,
     ) -> str:
         """Perform image analysis synchronously."""
-        return asyncio.run(self._arun(image_url, question))
+        raise NotImplementedError("image_parser only supports async execution.")
 
     async def _arun(
         self,
         image_url: str,
         question: str,
+        **kwargs,
     ) -> str:
         """Perform image analysis asynchronously."""
         logger.info(f"Starting image analysis for URL: {image_url}")

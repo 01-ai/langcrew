@@ -47,7 +47,7 @@ class Crew:
         async_checkpointer: BaseCheckpointSaver | None = None,
         async_store: BaseStore | None = None,
         # HITL configuration
-        hitl: bool | HITLConfig | None = None,
+        hitl: HITLConfig | None = None,
     ):
         self.agents = agents or []
         self.tasks = tasks or []
@@ -56,14 +56,11 @@ class Crew:
 
         # Memory configuration
         if memory is None:
-            self.memory_config = MemoryConfig(enabled=False)
-            self._memory = False
+            self.memory_config = None
         elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig(enabled=memory)
-            self._memory = memory
+            self.memory_config = MemoryConfig() if memory else None
         elif isinstance(memory, MemoryConfig):
             self.memory_config = memory
-            self._memory = memory.enabled
         else:
             raise ValueError(f"Invalid memory parameter type: {type(memory)}")
         self.embedder = embedder
@@ -97,20 +94,20 @@ class Crew:
 
         # HITL configuration
         if hitl is None:
-            self.hitl_config = HITLConfig(enabled=False)
-        elif isinstance(hitl, bool):
-            self.hitl_config = HITLConfig(enabled=hitl)
+            self.hitl_config = None
         elif isinstance(hitl, HITLConfig):
             self.hitl_config = hitl
         else:
-            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}")
+            raise ValueError(
+                f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance."
+            )
 
-        # Setup HITL if enabled
-        if self.hitl_config.enabled:
+        # Setup HITL if configured
+        if self.hitl_config is not None:
             self._setup_hitl()
 
         # Setup memory if enabled (check final config, not original parameter)
-        if self.memory_config.enabled:
+        if self.memory_config is not None:
             self._setup_crew_memory()
 
         if self.graph is None and not self.tasks and not self.agents:
@@ -130,11 +127,73 @@ class Crew:
         # Create agent to task mapping for handoff mode
         self._agent_task_map: dict[str, Task] = {}
         for task in self.tasks:
-            self._agent_task_map[task.agent.name] = task
+            if task.agent.name:  # Check if agent has a name
+                self._agent_task_map[task.agent.name] = task
 
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
         """Inject ToolStateManager into E2BBaseToolV2 and HITLBaseTool instances."""
         return tools
+
+    def _get_task_node_name(self, task: Task, index: int) -> str:
+        """Unified task node naming rule with namespace isolation"""
+        base_name = task.name if task.name else f"task_{index}"
+        return f"task__{base_name}"
+
+    def _get_agent_node_name(self, agent: Agent, index: int) -> str:
+        """Unified agent node naming rule with namespace isolation"""
+        base_name = agent.name if agent.name else f"agent_{index}"
+        return f"agent__{base_name}"
+
+    def _collect_interrupt_config(self) -> tuple[list[str], list[str]]:
+        """Collect all interrupt configurations and convert to node-level interrupts"""
+        interrupt_before = []
+        interrupt_after = []
+
+        if not self.hitl_config:
+            return interrupt_before, interrupt_after
+
+        # Task-level interrupts -> Node-level interrupts
+        for i, task in enumerate(self.tasks):
+            node_name = self._get_task_node_name(task, i)
+            if task.name:
+                if self.hitl_config.should_interrupt_before_task(task.name):
+                    interrupt_before.append(node_name)
+                if self.hitl_config.should_interrupt_after_task(task.name):
+                    interrupt_after.append(node_name)
+
+        # Agent-level interrupts -> Node-level interrupts
+        for i, agent in enumerate(self.agents):
+            node_name = self._get_agent_node_name(agent, i)
+            if agent.name:
+                if self.hitl_config.should_interrupt_before_agent(agent.name):
+                    interrupt_before.append(node_name)
+                if self.hitl_config.should_interrupt_after_agent(agent.name):
+                    interrupt_after.append(node_name)
+
+        # Add user-specified node-level interrupts
+        interrupt_before.extend(self.hitl_config.get_interrupt_before_nodes())
+        interrupt_after.extend(self.hitl_config.get_interrupt_after_nodes())
+
+        return interrupt_before, interrupt_after
+
+    def _compile_graph_with_interrupts(
+        self, builder: StateGraph, checkpointer=None
+    ) -> CompiledStateGraph:
+        """Compile graph with interrupt configuration applied"""
+        interrupt_before, interrupt_after = self._collect_interrupt_config()
+
+        compiled = builder.compile(
+            checkpointer=checkpointer or self.checkpointer,
+            interrupt_before=interrupt_before,
+            interrupt_after=interrupt_after,
+        )
+
+        if self.verbose and (interrupt_before or interrupt_after):
+            logger.info(
+                f"Applied interrupts - Before: {interrupt_before}, After: {interrupt_after}"
+            )
+
+        return compiled
 
     def _create_generic_node_factory(
         self,
@@ -204,7 +263,15 @@ class Crew:
             # Basic validation - task must have an agent
             if not hasattr(task, "agent") or task.agent is None:
                 raise ValueError("Task must have an agent to create executor")
-            return (state,)  # Tasks only need state
+
+            # Create config with langcrew metadata
+            config = RunnableConfig(
+                metadata={
+                    "langcrew_agent": task.agent.name,
+                    "langcrew_task": task.name or f"task_{self.tasks.index(task)}",
+                }
+            )
+            return (state, config)
 
         return self._create_generic_node_factory(
             is_async=is_async,
@@ -216,7 +283,7 @@ class Crew:
     def _build_task_sequential_graph(
         self, checkpointer=None, is_async=False
     ) -> CompiledStateGraph:
-        """Build a sequential graph from tasks
+        """Build a sequential graph from tasks with native interrupt support
 
         Args:
             checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
@@ -227,27 +294,26 @@ class Crew:
         create_task_node = self._create_task_node_factory(is_async=is_async)
 
         for i, task in enumerate(self.tasks):
-            name = f"node_{i}"
+            node_name = self._get_task_node_name(task, i)  # Use unified naming
             # Prepare tools with state manager
             if hasattr(task, "agent") and hasattr(task.agent, "tools"):
                 task.agent.tools = self._prepare_tools(task.agent.tools)
-            builder.add_node(name, create_task_node(task))
-            builder.add_edge(prev_node, name)
-            prev_node = name
+            builder.add_node(node_name, create_task_node(task))
+            builder.add_edge(prev_node, node_name)
+            prev_node = node_name
 
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_checkpointer(builder, checkpointer)
+        return self._compile_graph_with_interrupts(
+            builder, checkpointer
+        )  # Use interrupt-aware compilation
 
     def _create_agent_node_factory(self, is_async: bool = False):
         """Factory for creating agent node functions"""
 
         def get_agent_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for agent"""
-            config = (
-                self._async_compiled_graph.config
-                if is_async
-                else self._compiled_graph.config
-            )
+            # Create config with langcrew metadata
+            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
             return (state, config)
 
         return self._create_generic_node_factory(
@@ -260,7 +326,7 @@ class Crew:
     def _build_agent_sequential_graph(
         self, checkpointer=None, is_async=False
     ) -> CompiledStateGraph:
-        """Build a sequential graph from agents without explicit tasks
+        """Build a sequential graph from agents with native interrupt support
 
         Args:
             checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
@@ -273,7 +339,7 @@ class Crew:
         prev_node = START
 
         for i, agent in enumerate(self.agents):
-            node_name = f"agent_{i}"
+            node_name = self._get_agent_node_name(agent, i)  # Use unified naming
             # Prepare tools with state manager
             agent.tools = self._prepare_tools(agent.tools)
 
@@ -297,20 +363,15 @@ class Crew:
 
         # Last agent connects to END
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_checkpointer(builder, checkpointer)
+        return self._compile_graph_with_interrupts(
+            builder, checkpointer
+        )  # Use interrupt-aware compilation
 
     def _compile_graph_with_checkpointer(
         self, builder: StateGraph, checkpointer=None
     ) -> CompiledStateGraph:
-        """Common logic for compiling graphs with checkpointer handling"""
-        checkpointer_to_use = (
-            checkpointer if checkpointer is not None else self.checkpointer
-        )
-
-        if checkpointer_to_use:
-            return builder.compile(checkpointer=checkpointer_to_use)
-        else:
-            return builder.compile()
+        """Legacy method - redirect to new interrupt-aware compilation"""
+        return self._compile_graph_with_interrupts(builder, checkpointer)
 
     def _has_agent_handoffs(self) -> bool:
         """Check if any agents are configured for handoff and validate configuration
@@ -403,8 +464,14 @@ class Crew:
 
     def _setup_agent_handoff_tools(self):
         """Create handoff tools for agents based on their handoff_to configuration"""
-        # Create mapping of agent names to agent objects
-        agent_map = {agent.name: agent for agent in self.agents if agent.name}
+        # Create mapping of agent names to agent objects and their indices
+        agent_map = {}
+        agent_node_map = {}  # Maps agent name to node name
+
+        for i, agent in enumerate(self.agents):
+            if agent.name:
+                agent_map[agent.name] = agent
+                agent_node_map[agent.name] = self._get_agent_node_name(agent, i)
 
         for agent in self.agents:
             if not agent.handoff_to:
@@ -420,6 +487,9 @@ class Crew:
                     continue
 
                 target_agent = agent_map[target_name]
+                target_node_name = agent_node_map[
+                    target_name
+                ]  # Use node name for routing
 
                 # Create description using target agent's role, goal and backstory
                 description_parts = []
@@ -436,16 +506,18 @@ class Crew:
                     else f"Transfer to {target_name}"
                 )
 
-                # Create handoff tool
+                # Create handoff tool with node name for correct routing
                 handoff_tool = create_handoff_tool(
-                    agent_name=target_name, description=description
+                    agent_name=target_node_name, description=description
                 )
 
                 # Add tool to agent
                 agent.tools.append(handoff_tool)
 
                 if self.verbose:
-                    logger.info(f"Created handoff tool: {agent.name} -> {target_name}")
+                    logger.info(
+                        f"Created handoff tool: {agent.name} -> {target_name} (node: {target_node_name})"
+                    )
 
     def _setup_task_handoff_tools(self):
         """Create handoff tools for tasks based on their handoff_to configuration"""
@@ -470,10 +542,14 @@ class Crew:
 
             for target_name in task.handoff_to:
                 target_task = self.get_task_by_name(target_name)
+                # Find the target task's node name
+                target_node_name = self._get_task_node_name(
+                    target_task, self.tasks.index(target_task)
+                )
 
-                # Create and add handoff tool
+                # Create and add handoff tool with node name for correct routing
                 handoff_tool = create_handoff_tool(
-                    agent_name=target_name,
+                    agent_name=target_node_name,  # Use node name for routing
                     description=create_handoff_tool_description(target_task),
                 )
 
@@ -498,7 +574,9 @@ class Crew:
 
         def get_handoff_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for handoff agent"""
-            return (state,)  # Handoff agents only need state
+            # Create config with langcrew metadata
+            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
+            return (state, config)
 
         return self._create_generic_node_factory(
             is_async=is_async,
@@ -518,13 +596,14 @@ class Crew:
         """
         builder = StateGraph(CrewState)
 
-        # Add all agent nodes
-        for agent in self.agents:
+        # Add all agent nodes using unified naming
+        for i, agent in enumerate(self.agents):
             # Prepare tools with state manager for each agent
             agent.tools = self._prepare_tools(agent.tools)
 
+            node_name = self._get_agent_node_name(agent, i)
             builder.add_node(
-                agent.name, self._create_handoff_aware_agent_node(agent, is_async)
+                node_name, self._create_handoff_aware_agent_node(agent, is_async)
             )
 
         # Set entry point using inferred entry agent
@@ -536,7 +615,20 @@ class Crew:
                 "No entry agent found. Please mark an agent with is_entry=True or ensure at least one agent has handoff_to configured. "
                 f"Available agents: {available_agents}"
             )
-        builder.add_edge(START, entry_agent_name)
+
+        # Find the node name for the entry agent
+        entry_node_name = None
+        for i, agent in enumerate(self.agents):
+            if agent.name == entry_agent_name:
+                entry_node_name = self._get_agent_node_name(agent, i)
+                break
+
+        if entry_node_name:
+            builder.add_edge(START, entry_node_name)
+        else:
+            raise ValueError(
+                f"Entry agent '{entry_agent_name}' not found in agents list"
+            )
 
         # No conditional edges needed - LangGraph's Command mechanism handles routing
         # The handoff tools return Command(goto=agent_name) which LangGraph processes automatically
@@ -560,10 +652,10 @@ class Crew:
         builder = StateGraph(CrewState)
         create_task_node = self._create_task_node_factory(is_async=is_async)
 
-        # Internal helper functions
+        # Use unified task naming
         def get_task_identifier(task):
-            """Get consistent task identifier - matches get_task_by_name logic"""
-            return task.name if task.name else f"task_{self.tasks.index(task)}"
+            """Get consistent task identifier using unified naming"""
+            return self._get_task_node_name(task, self.tasks.index(task))
 
         # Identify all handoff targets for validation
         handoff_target_names = set()
@@ -582,7 +674,8 @@ class Crew:
 
         for task in self.tasks:
             task_name = get_task_identifier(task)
-            if task_name in handoff_target_names:
+            # Check if task's original name (not node name) is a handoff target
+            if task.name and task.name in handoff_target_names:
                 # This task is a handoff target → goes to handoff subgraph
                 handoff_subgraph_tasks.append(task)
             else:
@@ -760,17 +853,17 @@ class Crew:
             )
 
         # Initialize memory instances
-        if self.memory_config.short_term.get("enabled", True):
+        if self.memory_config.short_term_enabled:
             self._short_term_memory = ShortTermMemory(
                 checkpointer=self.checkpointer, config=self.memory_config
             )
 
-        if self.memory_config.long_term.get("enabled", True):
+        if self.memory_config.long_term_enabled:
             self._long_term_memory = LongTermMemory(
                 store=self.store, config=self.memory_config
             )
 
-        if self.memory_config.entity.get("enabled", True):
+        if self.memory_config.entity_enabled:
             self._entity_memory = EntityMemory(
                 store=self.store, config=self.memory_config
             )
@@ -785,7 +878,7 @@ class Crew:
 
     async def _setup_async_components(self):
         """Setup async components for async methods"""
-        if not self.memory_config.enabled:
+        if self.memory_config is None:
             return
 
         # Skip if already initialized
@@ -851,26 +944,17 @@ class Crew:
                     self._async_store.setup()
 
         # Create async memory instances using async components (only if not already created)
-        if (
-            self.memory_config.short_term.get("enabled", True)
-            and not self._async_short_term_memory
-        ):
+        if self.memory_config.short_term_enabled and not self._async_short_term_memory:
             self._async_short_term_memory = ShortTermMemory(
                 checkpointer=self._async_checkpointer, config=self.memory_config
             )
 
-        if (
-            self.memory_config.long_term.get("enabled", True)
-            and not self._async_long_term_memory
-        ):
+        if self.memory_config.long_term_enabled and not self._async_long_term_memory:
             self._async_long_term_memory = LongTermMemory(
                 store=self._async_store, config=self.memory_config
             )
 
-        if (
-            self.memory_config.entity.get("enabled", True)
-            and not self._async_entity_memory
-        ):
+        if self.memory_config.entity_enabled and not self._async_entity_memory:
             self._async_entity_memory = EntityMemory(
                 store=self._async_store, config=self.memory_config
             )
@@ -909,7 +993,7 @@ class Crew:
         """
 
         # Enhance config with crew-level settings if needed
-        if config is None and (self.memory_config.enabled or self.checkpointer):
+        if config is None and (self.memory_config or self.checkpointer):
             config = RunnableConfig()
 
         # Get compiled graph and execute
@@ -950,7 +1034,7 @@ class Crew:
         """
 
         # Enhance config as needed
-        if config is None and (self.memory_config.enabled or self.checkpointer):
+        if config is None and (self.memory_config or self.checkpointer):
             config = RunnableConfig()
 
         # Get compiled graph and execute asynchronously
@@ -1167,11 +1251,6 @@ class Crew:
         # Use provided thread_id or generate new one
         self._thread_id = thread_id or str(uuid.uuid4())
 
-        # Setup agents with memory if enabled
-        if self.memory_config.enabled and self._short_term_memory:
-            for agent in self.agents:
-                agent._setup_with_memory(self._short_term_memory, self._thread_id)
-
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})
 
@@ -1207,13 +1286,8 @@ class Crew:
         self._thread_id = thread_id or str(uuid.uuid4())
 
         # Ensure async components are set up
-        if self.memory_config.enabled:
+        if self.memory_config:
             await self._setup_async_components()
-
-        # Setup agents with async memory if enabled
-        if self.memory_config.enabled and self._async_short_term_memory:
-            for agent in self.agents:
-                agent._setup_with_memory(self._async_short_term_memory, self._thread_id)
 
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})
@@ -1346,7 +1420,7 @@ class Crew:
             List of memory items
         """
         # Ensure async components are set up
-        if self.memory_config.enabled:
+        if self.memory_config:
             await self._setup_async_components()
 
         # Use the unified search_memory with async flag
@@ -1354,15 +1428,12 @@ class Crew:
 
     def _setup_hitl(self):
         """Setup HITL (Human-in-the-Loop) for all agents"""
-        if not self.hitl_config.enabled:
-            return
-
         if self.verbose:
             logger.info("Setting up HITL tool approval for crew")
 
         # Apply crew-level HITL configuration to agents that don't have their own config
         for agent in self.agents:
-            if not hasattr(agent, "hitl_config") or not agent.hitl_config.enabled:
+            if not hasattr(agent, "hitl_config") or agent.hitl_config is None:
                 agent.hitl_config = self.hitl_config
                 agent._setup_hitl()
 
@@ -1370,7 +1441,7 @@ class Crew:
     @property
     def memory(self):
         """Access memory configuration status"""
-        return self.memory_config.enabled
+        return self.memory_config is not None
 
     @property
     def short_term_memory(self):
@@ -1446,32 +1517,22 @@ class Crew:
             if agent.name == name:
                 return agent
 
-        raise ValueError(f"Agent '{name}' not found.")
+        raise ValueError(f"Agent with name '{name}' not found")
 
     def get_task_by_name(self, name: str) -> Task:
-        """Get a task by name or index identifier
+        """Get a task by name
 
         Args:
-            name: The name of the task or index identifier (e.g., 'task_0', 'task_1')
+            name: The name of the task
 
         Returns:
             Task instance
 
         Raises:
-            ValueError: When the task with the specified name or identifier is not found
+            ValueError: When the task with the specified name is not found
         """
-        # First try exact name match
         for task in self.tasks:
             if task.name == name:
                 return task
 
-        # Try index identifier match (e.g., 'task_0', 'task_1')
-        if name.startswith("task_"):
-            try:
-                index = int(name[5:])  # Extract number after 'task_'
-                if 0 <= index < len(self.tasks):
-                    return self.tasks[index]
-            except ValueError:
-                pass  # Not a valid index format
-
-        raise ValueError(f"Task '{name}' not found.")
+        raise ValueError(f"Task with name '{name}' not found")

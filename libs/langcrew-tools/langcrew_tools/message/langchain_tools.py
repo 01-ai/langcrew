@@ -11,12 +11,13 @@ from pydantic import BaseModel, Field
 from langcrew_tools.utils.s3.client import AsyncS3Client
 from langcrew_tools.utils.sandbox.base_sandbox import SandboxMixin
 
+from ..base import BaseToolInput
 from .config import MessageConfig, default_config
 
 logger = logging.getLogger(__name__)
 
 
-class MessageToUserInput(BaseModel):
+class MessageToUserInput(BaseToolInput):
     """Input for MessageToUserTool."""
 
     text: str = Field(..., description="The message text to send to the user")
@@ -75,6 +76,7 @@ class MessageToUserTool(SandboxMixin):
         text: str,
         attachments: list[str] | str | None = None,
         intent_type: str | None = "general",
+        **kwargs,
     ) -> dict[str, Any]:
         """Send notification to user synchronously."""
         logger.info(f"Notifying user: {text[:50]}... (intent: {intent_type})")

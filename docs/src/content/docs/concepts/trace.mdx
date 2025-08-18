@@ -1,0 +1,138 @@
+---
+title: Tracing
+description: Understanding trace - Learn how to trace your LangCrew executions for better observability and debugging using Langtrace.
+sidebar:
+  label: Tracing
+  order: 7
+---
+
+In any complex AI agent system, understanding what's happening under the hood is crucial for debugging, optimization, and ensuring reliability. Tracing provides a detailed, visual log of your agents' execution paths, including tool usage, agent interactions, and performance metrics. LangCrew integrates with [Langtrace](https://langtrace.ai/) to offer robust observability out of the box.
+
+## Quick Start: Tracing a Crew in 5 Steps
+
+Get your first traced crew running in minutes.
+
+### 1. Install the Langtrace SDK
+
+First, add the Langtrace Python SDK to your project using `uv`:
+
+```bash
+uv add langtrace-python-sdk
+```
+
+### 2. Get Your Langtrace API Key
+
+To send traces to the platform, you'll need an API key.
+
+1.  Navigate to the [Langtrace](https://langtrace.ai/) website.
+2.  Sign up for a free account.
+3.  In your account settings, create a new project and generate an API key.
+
+### 3. Configure the SDK
+
+Set your API key as an environment variable. Create a `.env` file in your project root if you don't have one:
+
+```env
+# .env
+LANGTRACE_API_KEY="your-langtrace-api-key-goes-here"
+```
+
+### 4. Initialize Langtrace in Your App
+
+In your main application file, before you run your crew, initialize Langtrace. It only takes two lines of code.
+
+```python
+import os
+from dotenv import load_dotenv
+from langtrace_python_sdk import langtrace
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Langtrace
+langtrace.init(api_key=os.getenv("LANGTRACE_API_KEY"))
+
+# ... rest of your crew setup and execution
+```
+
+### 5. Run Your Crew
+
+Now, simply run your crew as you normally would. Langtrace uses instrumentation to automatically capture and send trace data from your LangCrew agents and tasks.
+
+```python
+# Example of running a crew after initialization
+from my_crew import MyAwesomeCrew
+
+def main():
+    # The crew execution is automatically traced
+    result = MyAwesomeCrew().crew().kickoff()
+    print(result)
+
+if __name__ == "__main__":
+    main()
+```
+
+## Viewing Your Traces
+
+Once your script has been executed, your traces are available on the Langtrace platform.
+
+1.  **Log in** to your [Langtrace](https://langtrace.ai/) account.
+2.  **Navigate to your project**.
+3.  You will see a dashboard with a list of recent traces. Click on any trace to see a detailed waterfall view of the execution, including timings, inputs, outputs, and tool calls for each step in your crew's process.
+
+
+## Advanced Usage: Custom Spans
+
+For more granular control, you can add custom spans to trace specific parts of your application using the `@with_langtrace_root_span` decorator. This is useful for grouping a set of operations under a single root trace.
+
+```python
+from langtrace_python_sdk import with_langtrace_root_span
+from my_crew import MyAwesomeCrew
+
+@with_langtrace_root_span("my_custom_crew_run")
+def run_my_crew_with_custom_span():
+    inputs = {"topic": "AI advancements"}
+    result = MyAwesomeCrew().crew().kickoff(inputs=inputs)
+    print(result)
+
+# All operations inside this function will be nested under the "my_custom_crew_run" span
+run_my_crew_with_custom_span()
+```
+
+By integrating Langtrace, you gain powerful insights into your LangCrew's performance and behavior, making it easier to build, debug, and scale your AI agent systems.
+
+## Troubleshooting
+
+If you're having trouble seeing your traces, here are a couple of common issues and how to solve them.
+
+### Problem: No traces are uploaded after execution
+
+If your code runs but nothing appears in the Langtrace dashboard, the SDK might not be capturing any data.
+
+**Solution:**
+1.  Enable console output for spans by adding `write_spans_to_console=True` to the `init` function.
+
+    ```python
+    langtrace.init(
+        api_key=os.getenv("LANGTRACE_API_KEY"),
+        write_spans_to_console=True
+    )
+    ```
+
+2.  Run your script again and check the console. If you **do not** see span data printed in your console, it almost always means the `langtrace.init()` call is happening too late.
+
+3.  **The Fix:** The Langtrace SDK works using bytecode instrumentation. This means it must be initialized *before* any LLM libraries (like `langchain`, `openai`, etc.) or your crew code is imported. Ensure `langtrace.init()` is one of the very first things that runs in your application's entry point.
+
+### Problem: Spans appear in the console, but not on the platform
+
+If you see trace data in your console but it never appears in your Langtrace dashboard, the issue is likely with your credentials or endpoint configuration.
+
+**Check the following:**
+*   **API Key:** Double-check that your `LANGTRACE_API_KEY` is correct and doesn't have any typos or extra characters.
+*   **Self-Hosted Endpoint:** If you are self-hosting Langtrace, you must specify the correct API endpoint during initialization. Make sure the `api_host` parameter is pointing to your instance.
+  ```python
+  langtrace.init(
+      api_key=os.getenv("LANGTRACE_API_KEY"),
+      api_host="http://your-self-hosted-langtrace-instance:3000" # Example
+  )
+  ```

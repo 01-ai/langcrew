@@ -1,7 +1,6 @@
 # File Parser LangChain Tools
 # Provides file parsing functionality using Marker (PDF) and Unstructured (other formats)
 
-import asyncio
 import io
 import logging
 import re
@@ -18,13 +17,14 @@ from langchain_core.tools import BaseTool
 from langchain_text_splitters import TokenTextSplitter
 from pydantic import BaseModel, Field
 
+from ..base import BaseToolInput
 from ..utils.s3 import AsyncS3Client, ClientFactory
 from .config import ParserConfig, default_config
 
 logger = logging.getLogger(__name__)
 
 
-class DocumentParserInput(BaseModel):
+class DocumentParserInput(BaseToolInput):
     """Input for DocumentParserTool."""
 
     file_md5: str = Field(
@@ -35,7 +35,7 @@ class DocumentParserInput(BaseModel):
     )
 
 
-class ChunkRetrievalInput(BaseModel):
+class ChunkRetrievalInput(BaseToolInput):
     """Input for chunk retrieval from vector database."""
 
     query: str = Field(
@@ -93,11 +93,11 @@ class DocumentParserTool(BaseTool):
             # Default S3 configuration - should be provided via environment or config
             self.s3_client = ClientFactory.create_s3_client()
 
-    def _run(self, file_md5: str, file_type: str) -> str:
+    def _run(self, file_md5: str, file_type: str, **kwargs) -> str:
         """Perform document parsing synchronously."""
-        return asyncio.run(self._arun(file_md5, file_type))
+        raise NotImplementedError("file_parser only supports async execution.")
 
-    async def _arun(self, file_md5: str, file_type: str) -> str:
+    async def _arun(self, file_md5: str, file_type: str, **kwargs) -> str:
         """Perform document parsing asynchronously."""
         logger.info(
             f"Starting document parsing for file MD5: {file_md5}, type: {file_type}"
@@ -737,11 +737,13 @@ class ChunkRetrievalTool(BaseTool):
         """Initialize ChunkRetrievalTool."""
         super().__init__(**kwargs)
 
-    def _run(self, query: str, file_md5s: list[str], top_k: int = 5) -> str:
+    def _run(self, query: str, file_md5s: list[str], top_k: int = 5, **kwargs) -> str:
         """Perform chunk retrieval synchronously."""
-        return asyncio.run(self._arun(query, file_md5s, top_k))
+        raise NotImplementedError("chunk_retrieval only supports async execution.")
 
-    async def _arun(self, query: str, file_md5s: list[str], top_k: int = 5) -> str:
+    async def _arun(
+        self, query: str, file_md5s: list[str], top_k: int = 5, **kwargs
+    ) -> str:
         """Perform chunk retrieval asynchronously."""
         logger.info(
             f"Starting chunk retrieval for files: {file_md5s}, query: {query[:50]}..."
