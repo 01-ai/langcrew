@@ -151,20 +151,15 @@ class Agent:
 
         # Memory configuration
         if memory is None:
-            self.memory_config = MemoryConfig(enabled=False)
-            self.memory = False
+            self.memory_config = None
         elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig(enabled=memory)
-            self.memory = memory
+            self.memory_config = MemoryConfig() if memory else None
         elif isinstance(memory, MemoryConfig):
             self.memory_config = memory
-            self.memory = memory.enabled
         else:
             raise ValueError(f"Invalid memory parameter type: {type(memory)}")
-        self._memory = None  # Will store ShortTermMemory instance from crew
-        self._memory_context = None  # For storing injected context
-        self._thread_id = None  # For thread management
-        self.use_memory = False  # Will be set by crew if memory enabled
+        
+        self.memory = self.memory_config is not None
 
         # Hooks
         self.pre_model_hook = pre_model_hook
@@ -259,15 +254,6 @@ class Agent:
         )
 
         self._setup_and_process_mcp_tools(tools)
-
-    def _setup_with_memory(self, memory, thread_id):
-        """Setup agent with memory context (called by Crew)"""
-        self._memory = memory  # ShortTermMemory instance
-        self._thread_id = thread_id
-        self.use_memory = True
-
-        if self.verbose:
-            logger.info(f"Agent '{self.role}' configured with memory support")
 
     def _create_default_store(self):
         """Create default store based on config"""

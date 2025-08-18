@@ -13,8 +13,6 @@ class HITLConfig:
     interrupt_after_tools: list[str] | None = (
         None  # Note: Only works within single execution session, not across restarts
     )
-    interrupt_tool_mode: Literal["all", "specified"] = "specified"
-    excluded_tools: list[str] | None = field(default_factory=lambda: ["user_input"])
 
     # Node-level interrupt configuration (LangGraph native)
     interrupt_before_nodes: list[str] | None = None
@@ -22,13 +20,6 @@ class HITLConfig:
 
     def should_interrupt_before_tool(self, tool_name: str) -> bool:
         """Check if tool requires interrupt before execution"""
-        # Check exclusion list first
-        if self.excluded_tools and tool_name in self.excluded_tools:
-            return False
-
-        if self.interrupt_tool_mode == "all":
-            return True
-
         return self.interrupt_before_tools and tool_name in self.interrupt_before_tools
 
     def should_interrupt_after_tool(self, tool_name: str) -> bool:
@@ -39,21 +30,7 @@ class HITLConfig:
         already cached and won't trigger after-interrupts again. This is by design
         to prevent duplicate user interactions for the same tool execution.
         """
-        # Check exclusion list first
-        if self.excluded_tools and tool_name in self.excluded_tools:
-            return False
-
-        if self.interrupt_tool_mode == "all":
-            return True
-
         return self.interrupt_after_tools and tool_name in self.interrupt_after_tools
-
-    def add_excluded_tool(self, tool_name: str):
-        """Dynamically add tool to exclusion list"""
-        if self.excluded_tools is None:
-            self.excluded_tools = []
-        if tool_name not in self.excluded_tools:
-            self.excluded_tools.append(tool_name)
 
     def get_interrupt_before_nodes(self) -> list[str]:
         """Get list of nodes to interrupt before execution (LangGraph native)"""

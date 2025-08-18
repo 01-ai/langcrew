@@ -61,7 +61,7 @@ class ShortTermMemory:
 
         # Add new memory and maintain size limit
         memories.append(memory_item)
-        max_history = self.config.short_term.get("max_history", 20)
+        max_history = self.config.short_term_max_history
         if len(memories) > max_history:
             memories = memories[-max_history:]
 

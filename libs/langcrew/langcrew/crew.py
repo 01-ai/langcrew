@@ -56,14 +56,11 @@ class Crew:
 
         # Memory configuration
         if memory is None:
-            self.memory_config = MemoryConfig(enabled=False)
-            self._memory = False
+            self.memory_config = None
         elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig(enabled=memory)
-            self._memory = memory
+            self.memory_config = MemoryConfig() if memory else None
         elif isinstance(memory, MemoryConfig):
             self.memory_config = memory
-            self._memory = memory.enabled
         else:
             raise ValueError(f"Invalid memory parameter type: {type(memory)}")
         self.embedder = embedder
@@ -108,7 +105,7 @@ class Crew:
             self._setup_hitl()
 
         # Setup memory if enabled (check final config, not original parameter)
-        if self.memory_config.enabled:
+        if self.memory_config is not None:
             self._setup_crew_memory()
 
         if self.graph is None and not self.tasks and not self.agents:
@@ -758,17 +755,17 @@ class Crew:
             )
 
         # Initialize memory instances
-        if self.memory_config.short_term.get("enabled", True):
+        if self.memory_config.short_term_enabled:
             self._short_term_memory = ShortTermMemory(
                 checkpointer=self.checkpointer, config=self.memory_config
             )
 
-        if self.memory_config.long_term.get("enabled", True):
+        if self.memory_config.long_term_enabled:
             self._long_term_memory = LongTermMemory(
                 store=self.store, config=self.memory_config
             )
 
-        if self.memory_config.entity.get("enabled", True):
+        if self.memory_config.entity_enabled:
             self._entity_memory = EntityMemory(
                 store=self.store, config=self.memory_config
             )
@@ -783,7 +780,7 @@ class Crew:
 
     async def _setup_async_components(self):
         """Setup async components for async methods"""
-        if not self.memory_config.enabled:
+        if self.memory_config is None:
             return
 
         # Skip if already initialized
@@ -849,26 +846,17 @@ class Crew:
                     self._async_store.setup()
 
         # Create async memory instances using async components (only if not already created)
-        if (
-            self.memory_config.short_term.get("enabled", True)
-            and not self._async_short_term_memory
-        ):
+        if self.memory_config.short_term_enabled and not self._async_short_term_memory:
             self._async_short_term_memory = ShortTermMemory(
                 checkpointer=self._async_checkpointer, config=self.memory_config
             )
 
-        if (
-            self.memory_config.long_term.get("enabled", True)
-            and not self._async_long_term_memory
-        ):
+        if self.memory_config.long_term_enabled and not self._async_long_term_memory:
             self._async_long_term_memory = LongTermMemory(
                 store=self._async_store, config=self.memory_config
             )
 
-        if (
-            self.memory_config.entity.get("enabled", True)
-            and not self._async_entity_memory
-        ):
+        if self.memory_config.entity_enabled and not self._async_entity_memory:
             self._async_entity_memory = EntityMemory(
                 store=self._async_store, config=self.memory_config
             )
@@ -907,7 +895,7 @@ class Crew:
         """
 
         # Enhance config with crew-level settings if needed
-        if config is None and (self.memory_config.enabled or self.checkpointer):
+        if config is None and (self.memory_config or self.checkpointer):
             config = RunnableConfig()
 
         # Get compiled graph and execute
@@ -948,7 +936,7 @@ class Crew:
         """
 
         # Enhance config as needed
-        if config is None and (self.memory_config.enabled or self.checkpointer):
+        if config is None and (self.memory_config or self.checkpointer):
             config = RunnableConfig()
 
         # Get compiled graph and execute asynchronously
@@ -1165,10 +1153,7 @@ class Crew:
         # Use provided thread_id or generate new one
         self._thread_id = thread_id or str(uuid.uuid4())
 
-        # Setup agents with memory if enabled
-        if self.memory_config.enabled and self._short_term_memory:
-            for agent in self.agents:
-                agent._setup_with_memory(self._short_term_memory, self._thread_id)
+
 
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})
@@ -1205,13 +1190,10 @@ class Crew:
         self._thread_id = thread_id or str(uuid.uuid4())
 
         # Ensure async components are set up
-        if self.memory_config.enabled:
+        if self.memory_config:
             await self._setup_async_components()
 
-        # Setup agents with async memory if enabled
-        if self.memory_config.enabled and self._async_short_term_memory:
-            for agent in self.agents:
-                agent._setup_with_memory(self._async_short_term_memory, self._thread_id)
+
 
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})
@@ -1344,7 +1326,7 @@ class Crew:
             List of memory items
         """
         # Ensure async components are set up
-        if self.memory_config.enabled:
+        if self.memory_config:
             await self._setup_async_components()
 
         # Use the unified search_memory with async flag
@@ -1365,7 +1347,7 @@ class Crew:
     @property
     def memory(self):
         """Access memory configuration status"""
-        return self.memory_config.enabled
+        return self.memory_config is not None
 
     @property
     def short_term_memory(self):
