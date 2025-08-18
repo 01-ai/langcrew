@@ -363,12 +363,12 @@ class Agent:
         # Get interrupt configuration from HITL config
         interrupt_before = (
             self.hitl_config.get_interrupt_before_nodes()
-            if self.hitl_config.enabled
+            if self.hitl_config is not None
             else []
         )
         interrupt_after = (
             self.hitl_config.get_interrupt_after_nodes()
-            if self.hitl_config.enabled
+            if self.hitl_config is not None
             else []
         )
 
