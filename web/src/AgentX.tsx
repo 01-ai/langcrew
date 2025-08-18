@@ -3,7 +3,6 @@ import Agent from '@/components/Agent';
 import Home from '@/components/Home';
 import { useAgentStore } from '@/store';
 import { KnowledgeBaseItem, MCPToolItem, AgentMode } from '@/types';
-import { EmployeeType } from '@/components/Home/mock';
 import { changeLanguage } from '@/hooks/useTranslation';
 import '@/registry/builtin';
 import './index.css';
@@ -35,7 +34,6 @@ interface AgentProps {
 }
 
 const AgentX = (props: AgentProps) => {
-  const [currentAgent, setCurrentAgent] = useState<EmployeeType | null>(null);
   const {
     agentId,
     sessionId,
