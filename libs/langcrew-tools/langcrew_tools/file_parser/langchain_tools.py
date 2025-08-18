@@ -1,7 +1,6 @@
 # File Parser LangChain Tools
 # Provides file parsing functionality using Marker (PDF) and Unstructured (other formats)
 
-import asyncio
 import io
 import logging
 import re

@@ -1,6 +1,5 @@
 """Code interpreter tool for executing Python code safely."""
 
-import asyncio
 import base64
 import logging
 from typing import ClassVar

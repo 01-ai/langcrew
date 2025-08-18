@@ -1,7 +1,6 @@
 # Knowledge Base LangChain Tools
 # Provides knowledge base retrieval functionality using unified pgvector toolkit
 
-import asyncio
 import logging
 import traceback
 from typing import ClassVar
