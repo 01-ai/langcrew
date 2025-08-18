@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Slider } from 'antd';
-import { CaretRightOutlined } from '@ant-design/icons';
+
 
 import { CustomIcon } from '@/components/Agent/Chatbot/Sender/components';
 import { useAgentStore } from '@/store';

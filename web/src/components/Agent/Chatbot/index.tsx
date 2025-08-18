@@ -1,7 +1,7 @@
 import React, { Fragment, useEffect, useRef } from 'react';
 import { Button, Flex, Layout, Card, Typography, ConfigProvider, theme, message as antdMessage } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CopyOutlined, RedoOutlined, FireOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { CopyOutlined } from '@ant-design/icons';
 import { Bubble, Actions, Prompts } from '@ant-design/x';
 import { useAgentStore } from '@/store';
 import Sender from '@/components/Agent/Chatbot/Sender';
@@ -37,53 +37,6 @@ const Chatbot = ({ shareButtonNode }: { shareButtonNode?: React.ReactNode }) => 
     setPipelineTargetMessage,
     workspaceMessages,
   } = useAgentStore();
-
-  const sessionStatus = sessionInfo?.status;
-
-  const actionItems = [
-    {
-      key: 'retry',
-      icon: <RedoOutlined />,
-      label: 'Retry',
-    },
-    {
-      key: 'copy',
-      icon: <CopyOutlined />,
-      label: 'Copy',
-    },
-    {
-      key: 'share',
-      icon: <ShareAltOutlined />,
-      label: 'Share',
-    },
-  ];
-
-  const suggestionItems = [
-    {
-      key: 'a',
-      label: (
-        <Flex>
-          <FireOutlined style={{ color: '#FF4D4F' }} />
-          <Text>{'Hot Topics'}</Text>
-        </Flex>
-      ),
-      description: 'What are you interested in?',
-      children: [
-        {
-          key: 'a-a',
-          description: `First Question?`,
-        },
-        {
-          key: 'a-b',
-          description: `Second Question?`,
-        },
-        {
-          key: 'a-c',
-          description: `Third Question?`,
-        },
-      ],
-    },
-  ];
 
   const handleWorkspaceOpen = () => {
     setWorkspaceVisible(true);
@@ -236,41 +189,6 @@ const Chatbot = ({ shareButtonNode }: { shareButtonNode?: React.ReactNode }) => 
                         );
                       })}
                     </Flex>
-                  }
-                  footer={
-                    taskStage === TaskStage.Success ? (
-                      <>
-                        <Actions items={actionItems} />
-                        <ConfigProvider
-                          theme={{
-                            algorithm: theme.defaultAlgorithm,
-                          }}
-                        >
-                          <Card style={{ borderRadius: 0, border: 0 }} className="w-full">
-                            <Prompts
-                              title="You might also want to ask"
-                              items={suggestionItems}
-                              wrap
-                              styles={{
-                                item: {
-                                  flex: 'none',
-                                  width: 'calc(30% - 6px)',
-                                  backgroundImage: `linear-gradient(137deg, #e5f4ff 0%, #efe7ff 100%)`,
-                                  border: 0,
-                                },
-                                subItem: {
-                                  background: 'rgba(255,255,255,0.45)',
-                                  border: '1px solid #FFF',
-                                },
-                              }}
-                              onItemClick={(info) => {
-                                console.info(`You have clicked the suggestion: ${info.data.key}`);
-                              }}
-                            />
-                          </Card>
-                        </ConfigProvider>
-                      </>
-                    ) : null
                   }
                 />
               );

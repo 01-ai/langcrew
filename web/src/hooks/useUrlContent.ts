@@ -260,7 +260,7 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
   // 自动获取内容
   useEffect(() => {
     if (url) {
-      fetchContent(url);
+      fetchContent(encodeURI(url));
     }
   }, [url, fetchContent]);
 

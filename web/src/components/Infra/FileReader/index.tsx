@@ -119,8 +119,8 @@ const FileReader: FC<FileReaderProps> = ({ url, contentType, filename }) => {
     return <FileContentRender key={url} fileContent={data || error || ''} fileExtension={ext} isDiff={false} />;
   }
 
-  // 附件office文件预览（预览链接不带后缀名，需要通过contentType来判断文件类型）
-  if (['docx', 'xlsx', 'pptx'].includes(fileType)) {
+  // 预览链接不带后缀名，需要通过contentType来判断文件类型
+  if (!ext && ['docx', 'xlsx', 'pptx'].includes(fileType)) {
     return <OfficeFilePreview url={url} fileType={fileType} />;
   }
 

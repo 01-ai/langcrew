@@ -1,7 +1,7 @@
 import React, { Fragment, useEffect, useState, useRef } from 'react';
 import { ThoughtChain } from '@ant-design/x';
-import { Card, Typography, Spin } from 'antd';
-import { CheckOutlined, LoadingOutlined, WarningOutlined } from '@ant-design/icons';
+import { Card, Typography } from 'antd';
+import { CheckOutlined, WarningOutlined } from '@ant-design/icons';
 import { useAgentStore } from '@/store';
 import { MessageToolChunk, TaskStatus } from '@/types';
 import registry from '@/registry';

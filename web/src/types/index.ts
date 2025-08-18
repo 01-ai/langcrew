@@ -280,6 +280,14 @@ export interface EventErrorChunk {
   message?: string;
 }
 
+export interface SessionInitChunk extends MessageChunk {
+  type: 'session_init';
+  detail: {
+    session_id: string;
+    title: string;
+  };
+}
+
 export interface AntdUploadFile {
   uid: string;
   name: string;
