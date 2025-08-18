@@ -5,7 +5,7 @@ services:
     ports:
       - "3600:3600"
     volumes:
-      - ./web:/app
+      - ../../../../web:/app
       - /app/node_modules
       - /app/.pnpm-store
     working_dir: /app
@@ -27,7 +27,7 @@ services:
   # Super Agent API service
   super-agent:
     build:
-      context: .
+      context: ../../../../
       dockerfile: examples/components/web/super_agent/Dockerfile
     ports:
       - "8000:8000"
