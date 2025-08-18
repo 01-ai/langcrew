@@ -3,6 +3,7 @@ __all__ = [
     "Agent",
     "Task",
     "Crew",
+    "HITLConfig",
     "LLMFactory",
     "PromptBuilder",
     # CrewAI-style decorators
@@ -15,6 +16,7 @@ __all__ = [
 try:
     from .agent import Agent
     from .crew import Crew
+    from .hitl import HITLConfig
     from .llm_factory import LLMFactory
     from .project import CrewBase, agent, crew, task
     from .prompt_builder import PromptBuilder
