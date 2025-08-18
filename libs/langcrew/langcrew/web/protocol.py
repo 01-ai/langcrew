@@ -97,9 +97,12 @@ class ExecutionInput(BaseModel):
     session_id: str  # Required for multi-turn conversations and context continuity
     user_input: str
     language: str | None = None  # Language field for tool display
+    interrupt_data: dict[str, Any] | None = None  # Interrupt data for resume scenarios
 
-    # Resume-related fields
-    is_resume: bool = False  # Whether this is resuming an interrupted execution
+    @property
+    def is_resume(self) -> bool:
+        """Whether this is resuming an interrupted execution"""
+        return self.interrupt_data is not None
 
     def __init__(self, **data):
         # Ensure session_id is provided

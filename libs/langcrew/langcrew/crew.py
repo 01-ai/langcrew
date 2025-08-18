@@ -125,7 +125,8 @@ class Crew:
         # Create agent to task mapping for handoff mode
         self._agent_task_map: dict[str, Task] = {}
         for task in self.tasks:
-            self._agent_task_map[task.agent.name] = task
+            if task.agent.name:  # Check if agent has a name
+                self._agent_task_map[task.agent.name] = task
 
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
         """Inject ToolStateManager into E2BBaseToolV2 and HITLBaseTool instances."""
