@@ -13,7 +13,6 @@ from langchain_core.language_models.fake import FakeListLLM
 from langcrew.agent import Agent
 from langcrew.guardrail import input_guard, output_guard
 from langcrew.hitl import HITLConfig
-from langcrew.mcp import MCPConfig
 from langcrew.memory import MemoryConfig
 
 
@@ -77,7 +76,6 @@ class TestAgent:
 
     def test_agent_initialization_with_mcp(self, mock_llm):
         """Test agent initialization with MCP configuration."""
-        mcp_config = MCPConfig()
         mcp_servers = {"test_server": {"command": "test"}}
 
         with patch.object(Agent, "_load_mcp_tools"):
@@ -86,11 +84,9 @@ class TestAgent:
                 goal="Use MCP tools",
                 backstory="Expert in MCP integration",
                 llm=mock_llm,
-                mcp_config=mcp_config,
                 mcp_servers=mcp_servers,
             )
 
-        assert agent.mcp_config == mcp_config
         assert agent.mcp_servers == mcp_servers
 
     def test_agent_str_representation(self, mock_llm):
