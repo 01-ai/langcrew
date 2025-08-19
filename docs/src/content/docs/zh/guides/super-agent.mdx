@@ -56,7 +56,7 @@ AGENTBOX_TIMEOUT=1800
 
 - **E2B 沙盒环境配置**：用于安全的代码执行环境
   - `E2B_API_KEY`：需要申请 E2B API 密钥
-  - `E2B_TEMPLATE`：**必须使用 `e2b-20250806-v1`**（01 提供的指定沙盒模板）
+  - `E2B_TEMPLATE`：您可以参考官方文档 https://e2b.dev/docs/sandbox-template 来构建自己的模版。我们在 `langcrew/libs/langcrew-tools/e2b-template` 目录下提供了我们的定制模版以及构建模版所需的文件。您可以参考官方文档进行模版的构建，构建之后将 `E2B_TEMPLATE` 变量替换为您自己的模版ID即可。
   - `E2B_DOMAIN`：您的 E2B 域名（例如：`your-e2b-domain.example.com`）
   - `E2B_TIMEOUT`：沙盒超时时间，设置为 3600 秒
 
