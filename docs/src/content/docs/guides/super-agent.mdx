@@ -56,7 +56,7 @@ AGENTBOX_TIMEOUT=1800
 
 - **E2B Sandbox Environment Configuration**: Used for secure code execution environment
   - `E2B_API_KEY`: Requires applying for E2B API key
-  - `E2B_TEMPLATE`: **Must use `e2b-20250806-v1`** (designated sandbox template provided by 01)
+  - `E2B_TEMPLATE`: To build a custom sandbox, refer to the official E2B documentation at https://e2b.dev/docs/sandbox-template. We provide a pre-configured template in `langcrew/libs/langcrew-tools/e2b-template`. After building your own, replace the `E2B_TEMPLATE` variable with your template ID.
   - `E2B_DOMAIN`: Your E2B domain (e.g., `your-e2b-domain.example.com`)
   - `E2B_TIMEOUT`: Sandbox timeout, set to 3600 seconds
 
