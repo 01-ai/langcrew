@@ -284,20 +284,20 @@ class LangGraphAdapter:
         self, execution_input: ExecutionInput, **config_kwargs
     ) -> AsyncGenerator[str, None]:
         """Unified execution method for both new conversations and resume scenarios."""
-        config = self._build_config(execution_input.session_id, **config_kwargs)
-
-        # Initialize session-level display language (cached for this session)
-        self._get_session_display_language(
-            execution_input.session_id,
-            execution_input.user_input,
-            execution_input.language,
-        )
 
         try:
-            input_data = self._prepare_input(execution_input)
+            # Initialize session-level display language (cached for this session)
+            self._get_session_display_language(
+                execution_input.session_id,
+                execution_input.user_input,
+                execution_input.language,
+            )
+
+            # Execution state tracking
+            task_ended = False
+            need_user_input = False
 
             # Control whether to send messages to client
-            # Different logic for different types of interrupts
             if execution_input.is_resume:
                 interrupt_type = (
                     execution_input.interrupt_data.get("type", "")
@@ -310,18 +310,16 @@ class LangGraphAdapter:
             else:
                 should_send_messages = True
 
-            # Execution state tracking
-            task_ended = False
-            need_user_input = False
+            input_data = self._prepare_input(execution_input)
+            config = self._build_config(execution_input.session_id, **config_kwargs)
 
             async for event in self.executor.astream_events(
-                input=input_data, config=config, version="v2"
+                input=input_data, config=config
             ):
                 event_type = event.get("event")
                 event_data = event.get("data", {})
 
                 # Handle LangGraph native node interrupts
-                # Check for node-level interrupts that don't have custom events
                 if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
                     interrupt_message = self._handle_node_interrupt(
                         event_data, event, execution_input.session_id
