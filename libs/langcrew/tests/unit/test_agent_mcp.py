@@ -13,7 +13,7 @@ from langchain_core.language_models.fake import FakeListLLM
 from langchain_core.tools import BaseTool
 
 from langcrew.agent import Agent
-from langcrew.mcp import MCPConfig, MCPToolAdapter
+from langcrew.tools.mcp import MCPToolAdapter
 
 
 class MockMCPTool(BaseTool):
@@ -37,7 +37,7 @@ class TestAgentMCP:
     @pytest.fixture
     def mock_mcp_config(self):
         """Create mock MCP config for testing."""
-        return MCPConfig()
+        return None  # MCPConfig doesn't exist, use None
 
     @pytest.fixture
     def mock_mcp_servers(self):
@@ -59,12 +59,10 @@ class TestAgentMCP:
                 goal="Test MCP functionality",
                 backstory="An agent for testing MCP integration",
                 llm=mock_llm,
-                mcp_config=mock_mcp_config,
                 mcp_servers=mock_mcp_servers,
                 mcp_tool_filter=["test_tool"],
             )
 
-            assert agent.mcp_config == mock_mcp_config
             assert agent.mcp_servers == mock_mcp_servers
             assert agent.mcp_tool_filter == ["test_tool"]
             assert agent._mcp_adapter is None
@@ -80,7 +78,6 @@ class TestAgentMCP:
             llm=mock_llm,
         )
 
-        assert agent.mcp_config is None
         assert agent.mcp_servers is None
         assert agent.mcp_tool_filter is None
         assert agent._mcp_adapter is None
@@ -222,7 +219,7 @@ class TestAgentMCP:
         await agent._aload_mcp_tools()
 
         # Verify adapter was created and used
-        mock_adapter_class.assert_called_once_with(config=None)
+        mock_adapter_class.assert_called_once_with()
         mock_adapter.from_servers.assert_called_once_with(
             servers=None, tool_filter=None
         )
@@ -266,19 +263,17 @@ class TestAgentMCP:
     def test_mcp_adapter_creation_with_config(
         self, mock_llm, mock_mcp_config, mock_mcp_servers
     ):
-        """Test that MCP config is properly stored and used."""
+        """Test that MCP servers config is properly stored and used."""
         with patch.object(Agent, "_load_mcp_tools"):
             agent = Agent(
                 role="Config MCP Agent",
                 goal="Test MCP config",
                 backstory="Agent with MCP config",
                 llm=mock_llm,
-                mcp_config=mock_mcp_config,
                 mcp_servers=mock_mcp_servers,
             )
 
         # Verify the config was stored correctly
-        assert agent.mcp_config == mock_mcp_config
         assert agent.mcp_servers == mock_mcp_servers
         assert (
             agent._mcp_adapter is None
