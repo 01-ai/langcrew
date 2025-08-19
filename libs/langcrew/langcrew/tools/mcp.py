@@ -45,9 +45,6 @@ class MCPToolAdapter:
         all_tools = []
 
         for server_name in servers:
-            if self.config.debug:
-                logger.debug(f"Loading tools from server: {server_name}")
-
             try:
                 # Get tools from specific server
                 server_tools = await self._client.get_tools(server_name=server_name)
