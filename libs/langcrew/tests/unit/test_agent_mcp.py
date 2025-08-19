@@ -35,11 +35,6 @@ class TestAgentMCP:
         return FakeListLLM(responses=["Test response"])
 
     @pytest.fixture
-    def mock_mcp_config(self):
-        """Create mock MCP config for testing."""
-        return None  # MCPConfig doesn't exist, use None
-
-    @pytest.fixture
     def mock_mcp_servers(self):
         """Create mock MCP servers config for testing."""
         return {"test_server": {"command": "test", "args": ["--test"]}}
@@ -50,7 +45,7 @@ class TestAgentMCP:
         return [MockMCPTool()]
 
     def test_agent_mcp_initialization_basic(
-        self, mock_llm, mock_mcp_config, mock_mcp_servers
+        self, mock_llm, mock_mcp_servers
     ):
         """Test basic MCP initialization in Agent."""
         with patch.object(Agent, "_load_mcp_tools") as mock_load:
@@ -261,7 +256,7 @@ class TestAgentMCP:
         )
 
     def test_mcp_adapter_creation_with_config(
-        self, mock_llm, mock_mcp_config, mock_mcp_servers
+        self, mock_llm, mock_mcp_servers
     ):
         """Test that MCP servers config is properly stored and used."""
         with patch.object(Agent, "_load_mcp_tools"):
