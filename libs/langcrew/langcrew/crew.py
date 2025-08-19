@@ -1415,15 +1415,43 @@ class Crew:
         return self.search_memory(query, memory_type, limit, is_async=True)
 
     def _setup_hitl(self):
-        """Setup HITL (Human-in-the-Loop) for all agents"""
+        """Setup HITL (Human-in-the-Loop) for all agents with configuration validation"""
         if self.verbose:
             logger.info("Setting up HITL tool approval for crew")
+
+        # Determine execution mode and validate HITL configuration
+        execution_mode = self._get_execution_mode()
+
+        # Validate HITL configuration against execution mode
+        if self.hitl_config:
+            self.hitl_config.validate_config(execution_mode)
+
+            if self.verbose:
+                logger.info("HITL Configuration:")
+                print(self.hitl_config.get_configuration_summary())
 
         # Apply crew-level HITL configuration to agents that don't have their own config
         for agent in self.agents:
             if not hasattr(agent, "hitl_config") or agent.hitl_config is None:
                 agent.hitl_config = self.hitl_config
                 agent._setup_hitl()
+
+    def _get_execution_mode(self) -> str:
+        """Determine the execution mode based on crew configuration
+
+        Returns:
+            "task_mode" if crew has tasks (regardless of agents or handoff)
+            "agent_mode" if crew has only agents without tasks
+        """
+        if self.tasks:
+            # Task mode takes priority when tasks are present (regardless of handoff)
+            return "task_mode"
+        elif self.agents:
+            return "agent_mode"
+        else:
+            raise ValueError(
+                "Cannot determine execution mode: no tasks or agents provided"
+            )
 
     # Memory access properties (CrewAI compatibility)
     @property
