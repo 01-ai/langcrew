@@ -124,12 +124,6 @@ class Crew:
         # msgID -> MsgSource
         # self._msg_source: dict[str, MsgSource] = {}
 
-        # Create agent to task mapping for handoff mode
-        self._agent_task_map: dict[str, Task] = {}
-        for task in self.tasks:
-            if task.agent.name:  # Check if agent has a name
-                self._agent_task_map[task.agent.name] = task
-
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
         """Inject ToolStateManager into E2BBaseToolV2 and HITLBaseTool instances."""
         return tools
@@ -176,10 +170,10 @@ class Crew:
 
         return interrupt_before, interrupt_after
 
-    def _compile_graph_with_interrupts(
+    def _compile_graph_with_checkpointer(
         self, builder: StateGraph, checkpointer=None
     ) -> CompiledStateGraph:
-        """Compile graph with interrupt configuration applied"""
+        """Compile graph with checkpointer and interrupt configuration applied"""
         interrupt_before, interrupt_after = self._collect_interrupt_config()
 
         compiled = builder.compile(
@@ -303,7 +297,7 @@ class Crew:
             prev_node = node_name
 
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_interrupts(
+        return self._compile_graph_with_checkpointer(
             builder, checkpointer
         )  # Use interrupt-aware compilation
 
@@ -363,15 +357,9 @@ class Crew:
 
         # Last agent connects to END
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_interrupts(
+        return self._compile_graph_with_checkpointer(
             builder, checkpointer
         )  # Use interrupt-aware compilation
-
-    def _compile_graph_with_checkpointer(
-        self, builder: StateGraph, checkpointer=None
-    ) -> CompiledStateGraph:
-        """Legacy method - redirect to new interrupt-aware compilation"""
-        return self._compile_graph_with_interrupts(builder, checkpointer)
 
     def _has_agent_handoffs(self) -> bool:
         """Check if any agents are configured for handoff and validate configuration
