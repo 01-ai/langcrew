@@ -286,6 +286,7 @@ class LangGraphAdapter:
         """Unified execution method for both new conversations and resume scenarios."""
 
         try:
+            # ============ 1. INITIALIZATION ============
             # Initialize session-level display language (cached for this session)
             self._get_session_display_language(
                 execution_input.session_id,
@@ -293,11 +294,12 @@ class LangGraphAdapter:
                 execution_input.language,
             )
 
-            # Execution state tracking
+            # Initialize execution state
             task_ended = False
             need_user_input = False
+            should_send_messages = True
 
-            # Control whether to send messages to client
+            # Configure message sending behavior for resume mode
             if execution_input.is_resume:
                 interrupt_type = (
                     execution_input.interrupt_data.get("type", "")
@@ -307,17 +309,19 @@ class LangGraphAdapter:
                 # Only generic interrupts can send messages immediately
                 # Tool and user_input interrupts need to wait for completion events to avoid duplicate messages
                 should_send_messages = interrupt_type == "generic_interrupt"
-            else:
-                should_send_messages = True
 
+            # Prepare input data and configuration
             input_data = self._prepare_input(execution_input)
             config = self._build_config(execution_input.session_id, **config_kwargs)
 
+            # ============ 2. EVENT PROCESSING LOOP ============
             async for event in self.executor.astream_events(
                 input=input_data, config=config
             ):
                 event_type = event.get("event")
                 event_data = event.get("data", {})
+
+                # -------- 2.1 High Priority: Interrupts & State Updates --------
 
                 # Handle LangGraph native node interrupts
                 if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
@@ -325,7 +329,6 @@ class LangGraphAdapter:
                         event_data, event, execution_input.session_id
                     )
                     yield await self._format_sse_message(interrupt_message)
-                    continue
 
                 # Resume mode: enable messages after tool completion events
                 if execution_input.is_resume and event_type == "on_custom_event":
@@ -340,27 +343,28 @@ class LangGraphAdapter:
                             f"Resuming execution with response: {event.get('data', {})}"
                         )
                         should_send_messages = True
-                        continue
 
-                # Check task end conditions
+                # -------- 2.2 Termination Conditions --------
+
+                # Check task end conditions - ROOT EVENTS ONLY
                 is_root_event = len(event.get("parent_ids", [])) == 0
                 if is_root_event:
                     if event_type == "on_chain_end":
                         task_ended = True
-                        if need_user_input:
-                            async for finish_message in self._handle_finish_signal(
-                                execution_input.session_id,
-                                "Waiting for user input",
-                                TaskExecutionStatus.USER_INPUT,
-                            ):
-                                yield finish_message
-                        else:
-                            async for finish_message in self._handle_finish_signal(
-                                execution_input.session_id,
-                                "Task completed",
-                                TaskExecutionStatus.COMPLETED,
-                            ):
-                                yield finish_message
+                        status = (
+                            TaskExecutionStatus.USER_INPUT
+                            if need_user_input
+                            else TaskExecutionStatus.COMPLETED
+                        )
+                        reason = (
+                            "Waiting for user input"
+                            if need_user_input
+                            else "Task completed"
+                        )
+                        async for finish_message in self._handle_finish_signal(
+                            execution_input.session_id, reason, status
+                        ):
+                            yield finish_message
                         break
                     elif event_type == "on_chain_error":
                         task_ended = True
@@ -373,14 +377,32 @@ class LangGraphAdapter:
                             yield finish_message
                         break
 
+                # Check stop signal - USER REQUESTED TERMINATION
+                if event_type in [
+                    "on_tool_end",
+                    "on_chat_model_end",
+                    "on_custom_event",
+                ]:
+                    control_data = await self._check_stop_signal(
+                        execution_input.session_id
+                    )
+                    if control_data:
+                        task_ended = True
+                        async for stop_message in self._handle_stop_signal(
+                            control_data, execution_input.session_id
+                        ):
+                            yield stop_message
+                        break
+
+                # -------- 2.3 Regular Event Processing --------
+
                 # Process tracked event types - only send if enabled
                 if event_type in self.TRACKED_EVENTS and should_send_messages:
                     message = await self._convert_langgraph_event(
                         event, execution_input.session_id
                     )
-
                     if message:
-                        # Check if user input is needed
+                        # Update user input requirement flags
                         if message.type == MessageType.USER_INPUT:
                             need_user_input = True
                             logger.debug("User input needed due to USER_INPUT message")
@@ -399,26 +421,10 @@ class LangGraphAdapter:
                         message = await self._handle_special_tool_events(
                             event, execution_input.session_id, message
                         )
-
                         if message:
                             yield await self._format_sse_message(message)
 
-                # Check stop signal - expanded to check on more event types
-                if event_type in [
-                    "on_tool_end",
-                    "on_chat_model_end",
-                    "on_custom_event",
-                ]:
-                    control_data = await self._check_stop_signal(
-                        execution_input.session_id
-                    )
-                    if control_data:
-                        task_ended = True
-                        async for stop_message in self._handle_stop_signal(
-                            control_data, execution_input.session_id
-                        ):
-                            yield stop_message
-                        break
+            # ============ 3. COMPLETION HANDLING ============
 
             # Handle abnormal completion
             if not task_ended:
@@ -438,11 +444,10 @@ class LangGraphAdapter:
                     yield finish_message
 
         except Exception as e:
+            # ============ 4. ERROR HANDLING ============
             logger.error(f"Execution failed: {e}")
             async for finish_message in self._handle_finish_signal(
-                execution_input.session_id,
-                str(e),
-                TaskExecutionStatus.FAILED,
+                execution_input.session_id, str(e), TaskExecutionStatus.FAILED
             ):
                 yield finish_message
 
