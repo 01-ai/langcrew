@@ -516,21 +516,19 @@ class LangGraphAdapter:
     def _handle_model_end(
         self, event: dict[str, Any], session_id: str
     ) -> StreamMessage | None:
-        """Handle model completion - provide complete information without judgment."""
+        """Handle model completion - provide metadata only, empty content to avoid duplication."""
         output = event.get("data", {}).get("output")
         run_id = event.get("run_id")
 
         # Initialize default values
-        content = ""
         has_tool_calls = False
         tool_calls_count = 0
         usage_metadata = {}
         response_metadata = {}
 
-        # Extract information if output exists
+        # Extract metadata information if output exists
         if output:
             message: AIMessage = output
-            content = self._extract_content(message)
             has_tool_calls = bool(getattr(message, "tool_calls", []))
             tool_calls_count = len(getattr(message, "tool_calls", []))
 
@@ -557,11 +555,12 @@ class LangGraphAdapter:
 
         detail = self._enhance_detail_with_metadata(event, detail)
 
-        # Always return message, even with empty content
+        # Return metadata-only message with empty content to avoid duplication
+        # Content is already provided by on_chat_model_stream events
         return StreamMessage(
             id=generate_message_id(),
             type=MessageType.TEXT,
-            content=content,  # May be empty string
+            content="",  # Empty - content comes from streaming events
             detail=detail,
             role="assistant",
             timestamp=int(time.time() * 1000),
