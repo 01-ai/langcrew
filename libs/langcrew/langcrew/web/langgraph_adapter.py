@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 from langchain_core.messages import AIMessage
 from langchain_core.messages.human import HumanMessage
-from langchain_core.messages.tool import ToolMessage
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
@@ -42,9 +41,13 @@ class LangGraphAdapter:
 
     # Define tracked events as class constant
     TRACKED_EVENTS = {
+        "on_chat_model_stream",
+        "on_chat_model_end",
+        "on_chat_model_error",
+        "on_llm_error",
         "on_tool_start",
         "on_tool_end",
-        "on_chat_model_end",
+        "on_tool_error",
         "on_custom_event",
     }
 
@@ -454,189 +457,366 @@ class LangGraphAdapter:
     async def _convert_langgraph_event(
         self, event: dict[str, Any], session_id: str
     ) -> StreamMessage | None:
-        """Convert LangGraph v2 event format to StreamMessage."""
+        """Convert LangGraph event to StreamMessage.
+
+        Standard conversion without content filtering or subjective judgment.
+        Provides complete information for frontend decision-making.
+        """
         event_type = event.get("event")
-        data = event.get("data", {})
 
-        # Extract common fields
-        message_id = generate_message_id()
+        if event_type == "on_chat_model_stream":
+            return self._handle_model_stream(event, session_id)
 
-        # Convert based on event type
-        if event_type == "on_chain_start":
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.LIVE_STATUS,
-                content=f"Starting: {event.get('name', 'chain')}",
-                detail={"event": "chain_start", "name": event.get("name")},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
+        elif event_type == "on_chat_model_end":
+            return self._handle_model_end(event, session_id)
 
-        elif event_type == "on_chain_end":
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.LIVE_STATUS,
-                content=f"Completed: {event.get('name', 'chain')}",
-                detail={"event": "chain_end", "name": event.get("name")},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
+        elif event_type in ["on_chat_model_error", "on_llm_error"]:
+            return self._handle_model_error(event, session_id)
 
         elif event_type == "on_tool_start":
-            run_id = event.get("run_id")  # Use run_id as correlation ID
-            tool_name = event.get("name", None)
-
-            # Skip sending tool_start message for message_to_user tool
-            # We'll only send the final result with MessageType.MESSAGE_TO_USER
-            if tool_name == "message_to_user":
-                return None
-
-            # Skip sending tool_start message for user_input tool
-            # This prevents the tool_call message from being sent to frontend
-            if tool_name == "user_input":
-                return None
-
-            tool_input = data.get("input", {})
-            brief = tool_input.get("brief", "")
-
-            # Generate display fields with session language
-            session_language = self._get_session_display_language(session_id)
-            display_fields = ToolDisplayManager.get_display(
-                tool_name, tool_input, session_language
-            )
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.TOOL_CALL,
-                content=brief,
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "run_id": run_id,  # Use run_id instead of call_id
-                        "tool": tool_name,
-                        "status": ToolResult.PENDING,
-                        "param": tool_input,
-                        "action": display_fields["action"],
-                        "action_content": display_fields["action_content"],
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
+            return self._handle_tool_start(event, session_id)
         elif event_type == "on_tool_end":
-            run_id = event.get("run_id")  # Use run_id as correlation ID
-            tool_name = event.get("name", None)
-            output = data.get("output", "")
-            # BUG: content may be an empty list, which needs special handling
-            content = str(getattr(output, "content", str(output)))
-            tool_input = data.get("input", {}) or {}
-            brief = tool_input.get("brief", "")
-
-            # Skip sending tool_result message for user_input tool
-            # This prevents the tool_result message from being sent to frontend
-            if tool_name == "user_input":
-                return None
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.TOOL_RESULT,
-                content=brief,
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "tool": tool_name,
-                        "run_id": run_id,  # Use run_id for correlation
-                        "result": output,
-                        "status": ToolResult.SUCCESS,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
+            return self._handle_tool_end(event, session_id)
 
         elif event_type == "on_tool_error":
-            run_id = event.get("run_id")  # Use run_id as correlation ID
-            tool_name = event.get("name", None)
-            error = data.get("error", "Unknown tool error")
+            return self._handle_tool_error(event, session_id)
+        elif event_type == "on_custom_event":
+            return self._handle_custom_event(event, session_id)
 
-            # Extract error message
-            if hasattr(error, "message"):
-                error_message = error.message
-            elif hasattr(error, "args") and error.args:
-                error_message = str(error.args[0])
-            else:
-                error_message = str(error)
+        return None
+
+    def _handle_model_stream(
+        self, event: dict[str, Any], session_id: str
+    ) -> StreamMessage | None:
+        """Handle streaming model output - no content filtering."""
+        chunk = event.get("data", {}).get("chunk")
+        if not chunk:
+            return None
+
+        content = self._extract_content_from_chunk(chunk)
+        if not content:
+            return None
+
+        detail = {
+            "streaming": True,
+            "run_id": event.get("run_id"),
+        }
+        detail = self._enhance_detail_with_metadata(event, detail)
+
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.TEXT,
+            content=content,
+            detail=detail,
+            role="assistant",
+            timestamp=int(time.time() * 1000),
+            session_id=session_id,
+        )
+
+    def _handle_model_end(
+        self, event: dict[str, Any], session_id: str
+    ) -> StreamMessage | None:
+        """Handle model completion - provide complete information without judgment."""
+        output = event.get("data", {}).get("output")
+        run_id = event.get("run_id")
+
+        # Initialize default values
+        content = ""
+        has_tool_calls = False
+        tool_calls_count = 0
+        usage_metadata = {}
+        response_metadata = {}
+
+        # Extract information if output exists
+        if output:
+            message: AIMessage = output
+            content = self._extract_content(message)
+            has_tool_calls = bool(getattr(message, "tool_calls", []))
+            tool_calls_count = len(getattr(message, "tool_calls", []))
+
+            if hasattr(message, "usage_metadata") and message.usage_metadata:
+                usage_metadata = message.usage_metadata
+
+            if hasattr(message, "response_metadata") and message.response_metadata:
+                response_metadata = message.response_metadata
+
+        # Build detail with completion signal
+        detail = {
+            "streaming": False,
+            "final": True,  # Stream completion signal
+            "run_id": run_id,
+            "has_tool_calls": has_tool_calls,
+            "tool_calls_count": tool_calls_count,
+        }
+
+        if usage_metadata:
+            detail["usage"] = usage_metadata
+
+        if response_metadata:
+            detail["response_metadata"] = response_metadata
+
+        detail = self._enhance_detail_with_metadata(event, detail)
+
+        # Always return message, even with empty content
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.TEXT,
+            content=content,  # May be empty string
+            detail=detail,
+            role="assistant",
+            timestamp=int(time.time() * 1000),
+            session_id=session_id,
+        )
+
+    def _handle_model_error(
+        self, event: dict[str, Any], session_id: str
+    ) -> StreamMessage | None:
+        """Handle model errors."""
+        error = event.get("data", {}).get("error", "Unknown model error")
+        error_message = self._extract_error_message(error)
+
+        detail = {
+            "run_id": event.get("run_id"),
+            "error": str(error),
+            "error_type": type(error).__name__
+            if hasattr(error, "__class__")
+            else "Unknown",
+        }
+        detail = self._enhance_detail_with_metadata(event, detail)
+
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.ERROR,
+            content=f"Model Error: {error_message}",
+            detail=detail,
+            role="assistant",
+            timestamp=int(time.time() * 1000),
+            session_id=session_id,
+        )
+
+    def _handle_tool_start(
+        self, event: dict[str, Any], session_id: str
+    ) -> StreamMessage | None:
+        """Handle tool start events."""
+        tool_name = event.get("name")
+        if not tool_name:
+            return None
+
+        # Skip special tools (business logic, not content judgment)
+        if tool_name in ["message_to_user", "user_input"]:
+            return None
+
+        tool_input = event.get("data", {}).get("input", {})
+
+        # Get display information
+        session_language = self._get_session_display_language(session_id)
+        display_fields = ToolDisplayManager.get_display(
+            tool_name, tool_input, session_language
+        )
+
+        detail = {
+            "run_id": event.get("run_id"),
+            "tool": tool_name,
+            "status": ToolResult.PENDING,
+            "param": tool_input,
+            "action": display_fields["action"],
+            "action_content": display_fields["action_content"],
+        }
+        detail = self._enhance_detail_with_metadata(event, detail)
+
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.TOOL_CALL,
+            content=tool_input.get("brief", ""),
+            detail=detail,
+            role="assistant",
+            timestamp=int(time.time() * 1000),
+            session_id=session_id,
+        )
+
+    def _handle_tool_end(
+        self, event: dict[str, Any], session_id: str
+    ) -> StreamMessage | None:
+        """Handle tool completion events."""
+        tool_name = event.get("name")
+        if not tool_name or tool_name in ["user_input"]:
+            return None
+
+        tool_input = event.get("data", {}).get("input", {}) or {}
+        output = event.get("data", {}).get("output", "")
+
+        detail = {
+            "run_id": event.get("run_id"),
+            "tool": tool_name,
+            "result": output,
+            "status": ToolResult.SUCCESS,
+        }
+        detail = self._enhance_detail_with_metadata(event, detail)
+
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.TOOL_RESULT,
+            content=tool_input.get("brief", ""),
+            detail=detail,
+            role="assistant",
+            timestamp=int(time.time() * 1000),
+            session_id=session_id,
+        )
+
+    def _handle_tool_error(
+        self, event: dict[str, Any], session_id: str
+    ) -> StreamMessage | None:
+        """Handle tool error events."""
+        tool_name = event.get("name")
+        error = event.get("data", {}).get("error", "Unknown tool error")
+        error_message = self._extract_error_message(error)
+
+        detail = {
+            "run_id": event.get("run_id"),
+            "tool": tool_name,
+            "status": ToolResult.FAILED,
+            "output": error_message,
+            "error": error_message,
+            "error_type": type(error).__name__
+            if hasattr(error, "__class__")
+            else "Unknown",
+        }
+        detail = self._enhance_detail_with_metadata(event, detail)
+
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.TOOL_RESULT,
+            content=error_message,
+            detail=detail,
+            role="assistant",
+            timestamp=int(time.time() * 1000),
+            session_id=session_id,
+        )
+
+    def _handle_custom_event(
+        self, event: dict[str, Any], session_id: str
+    ) -> StreamMessage | None:
+        """Handle custom events from LangCrew."""
+        data = event.get("data", {})
+        event_name = event.get("name")
+        message_id = generate_message_id()
+
+        if event_name == "on_langcrew_plan_start":
+            # Plan creation event from Plan-and-Execute executor
+            plan_data = data
+            # Convert phases to steps format for frontend compatibility
+            steps = []
+            current_phase_id = plan_data.get("current_phase_id", 1)
+
+            for phase in plan_data.get("phases", []):
+                phase_id = phase.get("id")
+
+                # Determine status based on phase_id and current_phase_id
+                status = StepStatus.PENDING
+                if phase_id == current_phase_id:
+                    status = StepStatus.RUNNING
+                elif phase_id < current_phase_id:
+                    status = StepStatus.SUCCESS
+
+                steps.append({
+                    "id": str(phase_id),
+                    "title": phase["title"],
+                    "description": phase.get("expected_output", ""),
+                    "status": status,
+                    "started_at": int(time.time() * 1000),
+                })
 
             return StreamMessage(
                 id=message_id,
-                type=MessageType.TOOL_RESULT,
-                content=error_message,
-                detail={
-                    "run_id": run_id,  # Use run_id for correlation
-                    "tool": tool_name,
-                    "status": ToolResult.FAILED,
-                    "output": error_message,
-                    "error": error_message,
-                    "error_type": type(error).__name__
-                    if hasattr(error, "__class__")
-                    else "Unknown",
-                },
+                type=MessageType.PLAN,
+                content=plan_data.get("goal", "Planning execution"),
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "steps": steps,
+                    },
+                ),
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
             )
-        elif event_type == "on_chat_model_end":
-            output = event["data"].get("output")
-            if output:
-                message: AIMessage = output
-                content: str = ""
-                if isinstance(message.content, list):
-                    for c in message.content:
-                        if isinstance(c, str):
-                            content += c
-                        elif isinstance(c, dict):
-                            if c.get("type") == "text":
-                                content += c.get("text", "")
-                else:
-                    content = message.content
 
-                if len(message.tool_calls) > 0:
-                    # If tool calls exist, don't output content. Claude has content, most models don't.
-                    # Sometimes Claude's output content is like thinking, which is not user-friendly
-                    logger.info(
-                        f"tool_calls exists, content ignored content: {content}"
-                    )
-                    return None
+        elif event_name == "on_langcrew_step_start":
+            # Step start event from Plan-and-Execute executor
+            step_data = data
+            step_id = step_data.get("step_id", "")
 
-                if len(message.tool_calls) == 0:
-                    input = event["data"].get("input")
-                    if input:
-                        input_messages = input.get("messages")
-                        if (
-                            len(input_messages) >= 1
-                            and isinstance(input_messages[0][-1], ToolMessage)
-                            and input_messages[0][-1].name == "message_to_user"
-                        ):
-                            return None
+            # Create steps array with current step marked as running
+            # and previous step (if any) marked as success
+            steps = []
 
-                # Default processing for regular messages
-                # If content is empty string, return None
-                if not content:
-                    return None
-                # ignore summary message
-                metadata = event.get("metadata", {})
-                if metadata.get("langgraph_node") == "pre_model_hook":
-                    logger.info(f"pre_model_hook, ignore content: {content}")
-                    return None
+            # If this isn't the first step, add the previous step as completed
+            if step_id > 1:
+                steps.append({
+                    "id": f"{step_id - 1}",
+                    "status": StepStatus.SUCCESS,
+                    "started_at": int(time.time() * 1000),
+                })
 
+            # Add current step as running
+            steps.append({
+                "id": f"{step_id}",
+                "status": StepStatus.RUNNING,
+                "started_at": int(time.time() * 1000),
+            })
+
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.PLAN_UPDATE,
+                content=f"开始执行步骤 {step_id}: {step_data.get('step_description', '')}",
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "action": PlanAction.UPDATE,
+                        "steps": steps,
+                    },
+                ),
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
+        elif event_name == "on_langcrew_step_end":
+            # Step end event from Plan-and-Execute executor
+            step_data = data
+            steps = []
+            steps.append({
+                "id": f"{step_data.get('step_id', '')}",
+                "status": StepStatus.SUCCESS,
+                "started_at": int(time.time() * 1000),
+            })
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.PLAN_UPDATE,
+                content=f"步骤 {step_data.get('step_id', '')} 完成",
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "action": PlanAction.UPDATE,
+                        "steps": steps,
+                    },
+                ),
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
+
+        elif event_name == "on_langcrew_plan_created":
+            # Plan creation event from Plan-and-Execute executor
+            plan_data = data
+            task_type = plan_data.get("task_type", "")
+
+            # For simple tasks, return a text message with the direct response
+            if task_type == "simple":
+                direct_response = plan_data.get("direct_response", "")
                 return StreamMessage(
                     id=message_id,
                     type=MessageType.TEXT,
-                    content=content,
+                    content=direct_response,
                     detail=self._enhance_detail_with_metadata(
                         event,
                         {
@@ -649,419 +829,177 @@ class LangGraphAdapter:
                     session_id=session_id,
                 )
 
-        elif event_type == "on_chat_model_stream":
-            # Handle streaming LLM output
-            chunk = data.get("chunk")
-            if chunk:
-                # Handle AIMessageChunk objects
-                if hasattr(chunk, "content"):
-                    content = chunk.content
-                    # Handle Claude's content structure which can be [{"text": "xx"}]
-                    if isinstance(content, list):
-                        extracted_content = ""
-                        for item in content:
-                            if isinstance(item, dict) and "text" in item:
-                                extracted_content += item.get("text", "")
-                            elif isinstance(item, str):
-                                extracted_content += item
-                        content = extracted_content
-                elif isinstance(chunk, dict):
-                    content = chunk.get("content", "")
-                else:
-                    content = str(chunk)
+            steps = []
+            if "plan" in plan_data:
+                plan = plan_data.get("plan", {})
+                steps_data = plan.get("steps", [])
+                for i, step in enumerate(steps_data):
+                    steps.append({
+                        "id": str(i + 1),
+                        "title": step.get("description", "Step"),
+                        "status": StepStatus.PENDING if i > 0 else StepStatus.RUNNING,
+                        "started_at": int(time.time() * 1000),
+                    })
 
-                if content:
-                    return StreamMessage(
-                        id=message_id,
-                        type=MessageType.TEXT,
-                        content=content,
-                        detail={"streaming": True},
-                        role="assistant",
-                        timestamp=int(time.time() * 1000),
-                        session_id=session_id,
-                    )
-
-        elif event_type == "on_llm_error":
-            error = data.get("error", "Unknown error")
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.ERROR,
-                content=f"LLM Error: {error}",
-                detail={"error": str(error)},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-
-        elif event_type == "on_agent_action":
-            # Agent planning or action
-            action = data.get("action", "")
             return StreamMessage(
                 id=message_id,
                 type=MessageType.PLAN,
-                content=action,
-                detail=data,
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-
-        elif event_type == "on_llm_start":
-            # LLM thinking/processing
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.LIVE_STATUS,
-                content="Thinking...",
-                detail={"event": "llm_start", "model": event.get("name")},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-
-        elif event_type == "on_retriever_start":
-            # Retriever/search started
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.LIVE_STATUS,
-                content=f"Searching: {event.get('name', 'information')}",
-                detail={"event": "retriever_start"},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-
-        elif event_type == "on_parser_start":
-            # Parser started
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.LIVE_STATUS,
-                content="Processing response...",
-                detail={"event": "parser_start"},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-
-        elif event_type == "on_custom_event":
-            # Handle custom events from LangCrew
-            event_name = event.get("name")
-
-            if event_name == "on_langcrew_plan_start":
-                # Plan creation event from Plan-and-Execute executor
-                plan_data = data
-                # Convert phases to steps format for frontend compatibility
-                steps = []
-                current_phase_id = plan_data.get("current_phase_id", 1)
-
-                for phase in plan_data.get("phases", []):
-                    phase_id = phase.get("id")
-
-                    # Determine status based on phase_id and current_phase_id
-                    status = StepStatus.PENDING
-                    if phase_id == current_phase_id:
-                        status = StepStatus.RUNNING
-                    elif phase_id < current_phase_id:
-                        status = StepStatus.SUCCESS
-
-                    steps.append(
-                        {
-                            "id": str(phase_id),
-                            "title": phase["title"],
-                            "description": phase.get("expected_output", ""),
-                            "status": status,
-                            "started_at": int(time.time() * 1000),
-                        }
-                    )
-
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.PLAN,
-                    content=plan_data.get("goal", "Planning execution"),
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "steps": steps,
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
-
-            elif event_name == "on_langcrew_step_start":
-                # Step start event from Plan-and-Execute executor
-                step_data = data
-                step_id = step_data.get("step_id", "")
-
-                # Create steps array with current step marked as running
-                # and previous step (if any) marked as success
-                steps = []
-
-                # If this isn't the first step, add the previous step as completed
-                if step_id > 1:
-                    steps.append(
-                        {
-                            "id": f"{step_id - 1}",
-                            "status": StepStatus.SUCCESS,
-                            "started_at": int(time.time() * 1000),
-                        }
-                    )
-
-                # Add current step as running
-                steps.append(
+                content=plan_data.get("task_type", "Planning execution"),
+                detail=self._enhance_detail_with_metadata(
+                    event,
                     {
-                        "id": f"{step_id}",
-                        "status": StepStatus.RUNNING,
-                        "started_at": int(time.time() * 1000),
-                    }
-                )
+                        "steps": steps,
+                    },
+                ),
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
 
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.PLAN_UPDATE,
-                    content=f"开始执行步骤 {step_id}: {step_data.get('step_description', '')}",
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "action": PlanAction.UPDATE,
-                            "steps": steps,
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
-            elif event_name == "on_langcrew_step_end":
-                # Step end event from Plan-and-Execute executor
-                step_data = data
-                steps = []
-                steps.append(
+        elif event_name == "on_langcrew_sandbox_created":
+            # Sandbox creation event from E2B tools
+            sandbox_data = data
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.CONFIG,
+                content="update_session",
+                detail=self._enhance_detail_with_metadata(
+                    event,
                     {
-                        "id": f"{step_data.get('step_id', '')}",
-                        "status": StepStatus.SUCCESS,
-                        "started_at": int(time.time() * 1000),
-                    }
-                )
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.PLAN_UPDATE,
-                    content=f"步骤 {step_data.get('step_id', '')} 完成",
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "action": PlanAction.UPDATE,
-                            "steps": steps,
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
+                        "session_id": sandbox_data.get("session_id"),
+                        "sandbox_id": sandbox_data.get("sandbox_id"),
+                        "sandbox_url": sandbox_data.get("sandbox_url"),
+                    },
+                ),
+                role="inner_message",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
 
-            elif event_name == "on_langcrew_plan_created":
-                # Plan creation event from Plan-and-Execute executor
-                plan_data = data
-                task_type = plan_data.get("task_type", "")
+        elif event_name == "on_langcrew_user_input_required":
+            # User input required event from HITL tools
+            input_data = data
 
-                # For simple tasks, return a text message with the direct response
-                if task_type == "simple":
-                    direct_response = plan_data.get("direct_response", "")
-                    return StreamMessage(
-                        id=message_id,
-                        type=MessageType.TEXT,
-                        content=direct_response,
-                        detail=self._enhance_detail_with_metadata(
-                            event,
-                            {
-                                "streaming": False,
-                                "final": True,
-                            },
-                        ),
-                        role="assistant",
-                        timestamp=int(time.time() * 1000),
-                        session_id=session_id,
-                    )
+            # Build detail with options if available
+            detail = {
+                "interrupt_data": input_data,
+                "session_id": session_id,
+            }
 
-                steps = []
-                if "plan" in plan_data:
-                    plan = plan_data.get("plan", {})
-                    steps_data = plan.get("steps", [])
-                    for i, step in enumerate(steps_data):
-                        steps.append(
-                            {
-                                "id": str(i + 1),
-                                "title": step.get("description", "Step"),
-                                "status": StepStatus.PENDING
-                                if i > 0
-                                else StepStatus.RUNNING,
-                                "started_at": int(time.time() * 1000),
-                            }
-                        )
+            # Add options if they exist
+            if "options" in input_data and input_data["options"]:
+                detail["options"] = input_data["options"]
 
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.PLAN,
-                    content=plan_data.get("task_type", "Planning execution"),
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "steps": steps,
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
+            # Enhance detail with langcrew metadata
+            detail = self._enhance_detail_with_metadata(event, detail)
 
-            elif event_name == "on_langcrew_sandbox_created":
-                # Sandbox creation event from E2B tools
-                sandbox_data = data
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.CONFIG,
-                    content="update_session",
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "session_id": sandbox_data.get("session_id"),
-                            "sandbox_id": sandbox_data.get("sandbox_id"),
-                            "sandbox_url": sandbox_data.get("sandbox_url"),
-                        },
-                    ),
-                    role="inner_message",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.USER_INPUT,
+                content=input_data.get("question", "Please provide input"),
+                detail=detail,
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
+        elif event_name == "on_langcrew_tool_interrupt_before":
+            # Tool before interrupt event from HITL tools
+            approval_data = data
+            tool_info = approval_data.get("tool", {})
 
-            elif event_name == "on_langcrew_user_input_required":
-                # User input required event from HITL tools
-                input_data = data
+            # Use session language for content
+            session_language = self._get_session_display_language(session_id)
+            is_chinese = session_language == "zh"
+            if is_chinese:
+                content = f"工具执行前中断: {tool_info.get('name', 'unknown')}"
+            else:
+                content = f"Tool before interrupt: {tool_info.get('name', 'unknown')}"
 
-                # Build detail with options if available
-                detail = {
-                    "interrupt_data": input_data,
-                    "session_id": session_id,
-                }
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.USER_INPUT,
+                content=content,
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "interaction_type": "tool_approval",
+                        "approval_type": "before_execution",
+                        "tool_name": tool_info.get("name"),
+                        "tool_args": tool_info.get("args", {}),
+                        "tool_description": tool_info.get("description", ""),
+                        "interrupt_data": approval_data,
+                        "supports_modification": True,
+                        "modification_hint": "You can approve/deny or provide modified parameters",
+                        "options": ["批准", "拒绝"]
+                        if is_chinese
+                        else ["Approve", "Deny"],
+                    },
+                ),
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
+        elif event_name == "on_langcrew_tool_interrupt_after":
+            # Tool after interrupt event from HITL tools
+            review_data = data
+            tool_info = review_data.get("tool", {})
 
-                # Add options if they exist
-                if "options" in input_data and input_data["options"]:
-                    detail["options"] = input_data["options"]
+            # Use session language for content
+            session_language = self._get_session_display_language(session_id)
+            is_chinese = session_language == "zh"
+            if is_chinese:
+                content = f"工具执行后审查: {tool_info.get('name', 'unknown')}"
+            else:
+                content = f"Tool after interrupt: {tool_info.get('name', 'unknown')}"
 
-                # Enhance detail with langcrew metadata
-                detail = self._enhance_detail_with_metadata(event, detail)
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.USER_INPUT,
+                content=content,
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "interaction_type": "tool_approval",
+                        "approval_type": "after_execution",
+                        "tool_name": tool_info.get("name"),
+                        "tool_args": tool_info.get("args", {}),
+                        "tool_result": tool_info.get("result"),
+                        "tool_description": tool_info.get("description", ""),
+                        "interrupt_data": review_data,
+                        "supports_modification": True,
+                        "modification_hint": "You can approve/deny or provide modified result",
+                        "options": ["确认", "拒绝"]
+                        if is_chinese
+                        else ["Confirm", "Deny"],
+                    },
+                ),
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
+        elif event_name == "on_langcrew_tool_interrupt_before_completed":
+            logger.info(f"Tool before interrupt completed: {data.get('tool_name')}")
+            return None  # Do not send to frontend, just log
+        elif event_name == "on_langcrew_tool_interrupt_after_completed":
+            logger.info(f"Tool after interrupt completed: {data.get('tool_name')}")
+            return None  # Do not send to frontend, just log
+        elif event_name == "on_langcrew_new_message":
+            new_message = data.get("new_message", "")
 
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.USER_INPUT,
-                    content=input_data.get("question", "Please provide input"),
-                    detail=detail,
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
-            elif event_name == "on_langcrew_tool_interrupt_before":
-                # Tool before interrupt event from HITL tools
-                approval_data = data
-                tool_info = approval_data.get("tool", {})
-
-                # Use session language for content
-                session_language = self._get_session_display_language(session_id)
-                is_chinese = session_language == "zh"
-                if is_chinese:
-                    content = f"工具执行前中断: {tool_info.get('name', 'unknown')}"
-                else:
-                    content = (
-                        f"Tool before interrupt: {tool_info.get('name', 'unknown')}"
-                    )
-
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.USER_INPUT,
-                    content=content,
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "interaction_type": "tool_approval",
-                            "approval_type": "before_execution",
-                            "tool_name": tool_info.get("name"),
-                            "tool_args": tool_info.get("args", {}),
-                            "tool_description": tool_info.get("description", ""),
-                            "interrupt_data": approval_data,
-                            "supports_modification": True,
-                            "modification_hint": "You can approve/deny or provide modified parameters",
-                            "options": ["批准", "拒绝"]
-                            if is_chinese
-                            else ["Approve", "Deny"],
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
-            elif event_name == "on_langcrew_tool_interrupt_after":
-                # Tool after interrupt event from HITL tools
-                review_data = data
-                tool_info = review_data.get("tool", {})
-
-                # Use session language for content
-                session_language = self._get_session_display_language(session_id)
-                is_chinese = session_language == "zh"
-                if is_chinese:
-                    content = f"工具执行后审查: {tool_info.get('name', 'unknown')}"
-                else:
-                    content = (
-                        f"Tool after interrupt: {tool_info.get('name', 'unknown')}"
-                    )
-
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.USER_INPUT,
-                    content=content,
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "interaction_type": "tool_approval",
-                            "approval_type": "after_execution",
-                            "tool_name": tool_info.get("name"),
-                            "tool_args": tool_info.get("args", {}),
-                            "tool_result": tool_info.get("result"),
-                            "tool_description": tool_info.get("description", ""),
-                            "interrupt_data": review_data,
-                            "supports_modification": True,
-                            "modification_hint": "You can approve/deny or provide modified result",
-                            "options": ["确认", "拒绝"]
-                            if is_chinese
-                            else ["Confirm", "Deny"],
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
-            elif event_name == "on_langcrew_tool_interrupt_before_completed":
-                logger.info(f"Tool before interrupt completed: {data.get('tool_name')}")
-                return None  # Do not send to frontend, just log
-            elif event_name == "on_langcrew_tool_interrupt_after_completed":
-                logger.info(f"Tool after interrupt completed: {data.get('tool_name')}")
-                return None  # Do not send to frontend, just log
-            elif event_name == "on_langcrew_new_message":
-                new_message = data.get("new_message", "")
-
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.TEXT,
-                    content=new_message,
-                    detail=self._enhance_detail_with_metadata(event, {}),
-                    role="user",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                )
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.TEXT,
+                content=new_message,
+                detail=self._enhance_detail_with_metadata(event, {}),
+                role="user",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+            )
 
         # Log unknown events for debugging (but don't send to frontend)
-        if event_type and not event_type.startswith("on_chain"):
-            logger.debug(f"Unhandled event type: {event_type}")
+        if event_name:
+            logger.debug(f"Unhandled custom event: {event_name}")
 
-        # Filter out events we don't need to send to frontend
         return None
 
     async def _handle_special_tool_events(
@@ -1137,54 +1075,6 @@ class LangGraphAdapter:
                 type=MessageType.MESSAGE_TO_USER,
                 content=content,
                 detail={},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-        # Special handling for agent_update_plan tool
-        if tool_name == "agent_update_plan":
-            tool_input = event.get("data", {}).get("input", {})
-            goal = tool_input.get("goal", "AI 的规划")
-            phases = tool_input.get("phases", [])
-            current_phase_id = tool_input.get("current_phase_id", 1)
-
-            steps = []
-            for phase in phases:
-                phase_id = (
-                    phase.get("id")
-                    if isinstance(phase, dict)
-                    else getattr(phase, "id", None)
-                )
-                phase_title = (
-                    phase.get("title")
-                    if isinstance(phase, dict)
-                    else getattr(phase, "title", "")
-                )
-
-                status = (
-                    StepStatus.RUNNING
-                    if phase_id == current_phase_id
-                    else StepStatus.PENDING
-                )
-                if phase_id < current_phase_id:
-                    status = StepStatus.SUCCESS
-
-                steps.append(
-                    {
-                        "id": f"{phase_id}",
-                        "title": phase_title,
-                        "status": status,
-                        "started_at": int(time.time() * 1000),
-                    }
-                )
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN,
-                content=goal,
-                detail={
-                    "steps": steps,
-                },
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
@@ -1322,6 +1212,50 @@ class LangGraphAdapter:
             langcrew_info["langcrew_task"] = metadata["langcrew_task"]
 
         return {**detail, **langcrew_info}
+
+    def _extract_content(self, message: AIMessage) -> str:
+        """Extract content from AIMessage - handle different model formats."""
+        if not message or not message.content:
+            return ""
+
+        # Handle Claude's list format and GPT's string format
+        if isinstance(message.content, list):
+            content = ""
+            for item in message.content:
+                if isinstance(item, str):
+                    content += item
+                elif isinstance(item, dict) and item.get("type") == "text":
+                    content += item.get("text", "")
+            return content.strip()
+
+        return str(message.content).strip()
+
+    def _extract_content_from_chunk(self, chunk) -> str:
+        """Extract content from streaming chunk."""
+        if hasattr(chunk, "content"):
+            content = chunk.content
+            if isinstance(content, list):
+                extracted = ""
+                for item in content:
+                    if isinstance(item, dict) and "text" in item:
+                        extracted += item.get("text", "")
+                    elif isinstance(item, str):
+                        extracted += item
+                return extracted
+            return str(content) if content else ""
+        elif isinstance(chunk, dict):
+            return chunk.get("content", "")
+
+        return str(chunk) if chunk else ""
+
+    def _extract_error_message(self, error) -> str:
+        """Extract error message from different error types."""
+        if hasattr(error, "message"):
+            return error.message
+        elif hasattr(error, "args") and error.args:
+            return str(error.args[0])
+        else:
+            return str(error)
 
     def _handle_node_interrupt(
         self, event_data: dict, event: dict, session_id: str
