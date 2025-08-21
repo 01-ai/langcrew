@@ -135,3 +135,66 @@ run_my_crew_with_custom_span()
       api_host="http://your-self-hosted-langtrace-instance:3000" # 示例
   )
   ```
+
+## 与 LangSmith 集成
+
+LangCrew 也可以将追踪数据发送到 LangSmith（LangChain 的可观测性平台）。如果你的团队已经在使用 LangSmith 的仪表盘与评估功能，可以选择这个集成方式。
+
+### 1. 安装 SDK
+
+```bash
+uv add langsmith
+# 或者
+pip install -U langsmith
+```
+
+### 2. 配置环境变量
+
+创建或更新你的 `.env` 以启用并完成鉴权：
+
+```env
+# .env
+LANGCHAIN_TRACING_V2="true"
+LANGCHAIN_API_KEY="your-langsmith-api-key"
+# 可选
+LANGCHAIN_PROJECT="my-langcrew-project"
+# 如果使用自托管实例或非默认区域
+# LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
+```
+
+在应用启动之前加载这些变量（例如通过 `dotenv.load_dotenv()`），或在 shell 中提前导出。
+
+### 3. 为代码添加注解或包装（可选）
+
+当设置了 `LANGCHAIN_TRACING_V2=true` 时，LangSmith 会自动对许多 LangChain 集成进行插桩。对于非 LangChain 的执行路径，或为了在你的 crew 执行周围创建清晰的运行边界，可以使用装饰器或上下文管理器：
+
+```python
+from dotenv import load_dotenv
+load_dotenv()
+
+from langsmith import traceable
+
+@traceable(name="run_langcrew_crew")
+def run_crew():
+    from my_crew import MyAwesomeCrew
+    return MyAwesomeCrew().crew().kickoff()
+
+result = run_crew()
+print(result)
+```
+
+或者使用上下文管理器以手动控制输入/输出：
+
+```python
+import langsmith as ls
+
+with ls.trace("langcrew_run", "chain") as run:
+    from my_crew import MyAwesomeCrew
+    out = MyAwesomeCrew().crew().kickoff()
+    run.end(outputs={"result": str(out)})
+```
+
+### 4. 查看你的追踪
+
+打开你的 LangSmith 项目仪表盘，确认运行记录已出现，并包含输入、输出与计时信息。更多内容参见官方文档：
+[LangSmith Documentation](https://docs.smith.langchain.com/).
