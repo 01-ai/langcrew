@@ -29,7 +29,7 @@ LangCrew is a high-level multi-agent development framework built on LangGraph, c
 | **Memory** | Complete primitives/docs | Simple context | **LangGraph native + langmem integration** |
 | **Tools** | LangChain only | Custom only | **Unified registry + LangCrew-Tools** |
 | **UI** | None | Basic examples | **Full React components** |
-| **Observability** | LangSmith integration | Enterprise edition | **LangTrace integration** |
+| **Observability** | LangSmith integration | Enterprise edition | **LangSmith + LangTrace integration** |
 | **Deployment** | Platform available | Enterprise edition | **Platform (Coming Soon)** |
 
 ### Key Differentiators

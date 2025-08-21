@@ -136,3 +136,65 @@ If you see trace data in your console but it never appears in your Langtrace das
       api_host="http://your-self-hosted-langtrace-instance:3000" # Example
   )
   ```
+
+## Integrate with LangSmith
+
+LangCrew can also emit traces to LangSmith, LangChain’s observability platform. Use this if your team already relies on LangSmith for dashboards and evaluations.
+
+### 1. Install the SDK
+
+```bash
+uv add langsmith
+# or
+pip install -U langsmith
+```
+
+### 2. Configure environment variables
+
+Create or update your `.env` so tracing is enabled and authenticated:
+
+```env
+# .env
+LANGCHAIN_TRACING_V2="true"
+LANGCHAIN_API_KEY="your-langsmith-api-key"
+# Optional
+LANGCHAIN_PROJECT="my-langcrew-project"
+# If using a self-hosted instance or a non-default region
+# LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
+```
+
+Load these before your app starts (for example, via `dotenv.load_dotenv()`), or export them in your shell.
+
+### 3. Annotate or wrap your code (optional)
+
+LangSmith auto-instruments many LangChain integrations when `LANGCHAIN_TRACING_V2=true`. For non-LangChain code paths, or to create clear run boundaries around your crew execution, use the decorator or context manager:
+
+```python
+from dotenv import load_dotenv
+load_dotenv()
+
+from langsmith import traceable
+
+@traceable(name="run_langcrew_crew")
+def run_crew():
+    from my_crew import MyAwesomeCrew
+    return MyAwesomeCrew().crew().kickoff()
+
+result = run_crew()
+print(result)
+```
+
+Or with a context manager for manual control over inputs/outputs:
+
+```python
+import langsmith as ls
+
+with ls.trace("langcrew_run", "chain") as run:
+    from my_crew import MyAwesomeCrew
+    out = MyAwesomeCrew().crew().kickoff()
+    run.end(outputs={"result": str(out)})
+```
+
+### 4. View your traces
+
+Open your LangSmith project dashboard to verify runs are appearing with inputs, outputs, and timing. For more, see the official LangSmith docs: [LangSmith Documentation](https://docs.smith.langchain.com/).
