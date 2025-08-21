@@ -92,7 +92,7 @@ crew = Crew(
 )
 
 # 每个智能体按顺序处理用户输入
-result = crew.kickoff({"messages": [HumanMessage(content="分析市场趋势")]})
+result = crew.invoke({"messages": [HumanMessage(content="分析市场趋势")]})
 ```
 
 ### 动态移交

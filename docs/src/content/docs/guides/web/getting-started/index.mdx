@@ -55,17 +55,12 @@ agent = Agent(
 crew = Crew(agents=[agent])
 
 # Create and start server
-server = create_server(
-    crew=crew,
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["http://localhost:3000"]
-)
+server = create_server(crew)
 
 # Start server
 if __name__ == "__main__":
-    print("Starting web server at http://localhost:8000")
-    server.run()
+    print("Starting web server at http://0.0.0.0:8000")
+    server.run(host="0.0.0.0", port=8000)
 ```
 
 ### Method 2: Using LangGraph
@@ -82,17 +77,12 @@ def create_workflow():
 
 # Create server with LangGraph
 compiled_graph = create_workflow()
-server = create_langgraph_server(
-    graph=compiled_graph,
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["http://localhost:3000"]
-)
+server = create_langgraph_server(compiled_graph)
 
 # Start server
 if __name__ == "__main__":
-    print("Starting LangGraph web server at http://localhost:8000")
-    server.run()
+    print("Starting LangGraph web server at http://0.0.0.0:8000")
+    server.run(host="0.0.0.0", port=8000)
 ```
 
 ## Testing Your Server
@@ -113,7 +103,7 @@ pnpm install
 # Start the development server
 pnpm dev
 
-# Open your browser to http://localhost:3000/chat
+# Open your browser to http://localhost:3600/chat
 ```
 
 The web UI includes:
@@ -237,5 +227,5 @@ pnpm install
 pnpm dev
 ```
 
-Open your browser to **[http://localhost:3000/chat](http://localhost:3000/chat)**
+Open your browser to **[http://localhost:3600/chat](http://localhost:3600/chat)**
 

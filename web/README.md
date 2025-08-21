@@ -52,7 +52,7 @@ pnpm install
 pnpm dev
 
 # Open Browser
-http://localhost:3000/chat
+http://localhost:3600/chat
 ```
 
 ---
