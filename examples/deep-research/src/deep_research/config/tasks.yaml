@@ -1,0 +1,37 @@
+planning_task:
+  description: >
+    Create a structured research plan for the topic: {topic}. Consider the time horizon: {time_horizon}.
+    Identify 4-6 key sub-questions based on the user's focus areas: {focus_areas}. Order them by priority,
+    and propose likely sources to consult (e.g., documentation, research blogs, benchmarks, reputable media).
+  expected_output: >
+    A plan with numbered steps, each including: sub-question, rationale, and suggested sources.
+
+gather_evidence_task:
+  description: >
+    Use web search and webpage fetching to gather evidence for the topic: {topic}. Focus on the areas: {focus_areas}.
+    Prefer reputable, recent sources within the time horizon: {time_horizon}. For each major claim, collect at least
+    two independent sources. Include the final list of source URLs used.
+  expected_output: >
+    A bulleted list of claims with supporting evidence and citations. Include a consolidated sources list at the end.
+
+analyze_and_summarize_task:
+  description: >
+    Analyze the collected evidence and summarize key findings. Highlight consensus, disagreements, and notable trends.
+    Note any gaps in evidence that require further research.
+  expected_output: >
+    A concise analysis section with 5-10 key findings and any open questions.
+
+fact_check_task:
+  description: >
+    Verify the most important claims. Cross-check multiple sources and cite URLs. Flag weak or contradictory evidence,
+    and suggest replacements.
+  expected_output: >
+    A fact-check log listing each checked claim with verdict (confirmed/contested/uncertain), rationale, and citations.
+
+write_report_task:
+  description: >
+    Write a final report in {language}. Ensure correctness based on the fact-check log.
+  expected_output: >
+    A report based on the collected evidence and analyzed findings.
+
+
