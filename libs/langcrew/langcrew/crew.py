@@ -267,11 +267,18 @@ class Crew:
             )
             return (state, config)
 
+        def process_result_fn(state: CrewState, result: dict[str, Any], task: Task):
+            # Ensure task_outputs persisted into graph state by returning it with updates
+            return {
+                **result,
+                "task_outputs": state.get("task_outputs", []),
+            }
+
         return self._create_generic_node_factory(
             is_async=is_async,
             item_type="task",
             get_invoke_args_fn=get_task_invoke_args,
-            process_result_fn=None,  # Tasks don't need result processing
+            process_result_fn=process_result_fn,
         )
 
     def _build_task_sequential_graph(

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from langchain_core.messages import (
+    AIMessage,
     SystemMessage,
 )
 from langchain_core.runnables import Runnable
@@ -145,7 +146,9 @@ class ReactExecutor(BaseExecutor):
 
         # Return structured response if available and requested
         if self.response_format and "structured_response" in result:
-            return result["structured_response"]
+            result["messages"][-1] = AIMessage(
+                content=str(result["structured_response"])
+            )
 
         return result
 
@@ -184,6 +187,8 @@ class ReactExecutor(BaseExecutor):
 
         # Return structured response if available and requested
         if self.response_format and "structured_response" in result:
-            return result["structured_response"]
+            result["messages"][-1] = AIMessage(
+                content=str(result["structured_response"])
+            )
 
         return result
