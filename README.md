@@ -103,7 +103,7 @@ pnpm install
 pnpm dev
 ```
 
-Open your browser to **http://localhost:3000/chat**
+Open your browser to **http://localhost:3600/chat**
 
 ### Docker Compose
 

@@ -216,7 +216,7 @@ pnpm install
 pnpm dev
 ```
 
-Visit http://localhost:3000/chat for graphical interaction.
+Visit http://localhost:3600/chat for graphical interaction.
 
 ## Agent Capabilities
 
