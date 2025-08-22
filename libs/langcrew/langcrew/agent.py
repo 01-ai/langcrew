@@ -135,6 +135,9 @@ class Agent:
         self.prompt = prompt
         self.executor_kwargs = executor_kwargs or {}
 
+        # Per-task executor cache to support reusing an agent across multiple tasks
+        self._executors: dict[str, BaseExecutor] = {}
+
         # Guardrail configuration
         self.input_guards = input_guards or []
         self.output_guards = output_guards or []
@@ -158,7 +161,7 @@ class Agent:
             self.memory_config = memory
         else:
             raise ValueError(f"Invalid memory parameter type: {type(memory)}")
-        
+
         self.memory = self.memory_config is not None
 
         # Hooks
@@ -177,7 +180,9 @@ class Agent:
         elif isinstance(hitl, HITLConfig):
             self.hitl_config = hitl
         else:
-            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance.")
+            raise ValueError(
+                f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance."
+            )
 
         # Setup HITL configuration
         if self.hitl_config is not None:
@@ -315,6 +320,19 @@ class Agent:
             expected_output="Complete and accurate response to the user's request",
         )
 
+    def _get_executor_cache_key(self, task=None) -> str:
+        """Compute a stable cache key for the executor based on the task.
+
+        - Prefer task name when available to keep keys readable and stable
+        - Fallback to the object's id to differentiate unnamed tasks
+        - Use "default" when no task is provided (agent-only mode)
+        """
+        if task is None:
+            return "default"
+        if getattr(task, "name", None):
+            return f"task_name::{task.name}"
+        return f"task_id::{id(task)}"
+
     def _create_executor(
         self, state: dict[str, Any], task=None, response_format=None
     ) -> BaseExecutor:
@@ -328,7 +346,10 @@ class Agent:
         Returns:
             Configured BaseExecutor instance
         """
-        if self.executor is not None:
+        # Check per-task executor cache first
+        key = self._get_executor_cache_key(task)
+        if key in self._executors:
+            self.executor = self._executors[key]
             return self.executor
 
         # Use task's spec if available, otherwise create default
@@ -389,13 +410,17 @@ class Agent:
             **self.executor_kwargs,
         )
 
+        # Store in cache and return
+        self._executors[key] = self.executor
+        return self.executor
+
     def _prepare_executor_input(
         self, input: dict[str, Any] | None, task=None
     ) -> dict[str, Any] | None:
         """Prepare executor input by building and handling user messages.
 
         Logic flow:
-        1. Get task_spec from executor or create default
+        1. Get task_spec from task or executor
         2. Ensure input is a dictionary (create empty dict if None)
         3. Based on prompt mode:
            - Native prompt: Create minimal HumanMessage with task details
@@ -411,10 +436,12 @@ class Agent:
         Raises:
             ValueError: If task_spec is not found in executor
         """
-        # Get task_spec from executor or task
-        task_spec = getattr(self.executor, "task_spec", None)
-        if task_spec is None and task and hasattr(task, "_spec"):
+        # Prefer provided task's spec; fallback to executor's
+        task_spec = None
+        if task and hasattr(task, "_spec"):
             task_spec = task._spec
+        if task_spec is None:
+            task_spec = getattr(self.executor, "task_spec", None)
         if task_spec is None:
             logger.error("task_spec is required but not found in executor or task")
             raise ValueError("task_spec is required but not found in executor or task")
