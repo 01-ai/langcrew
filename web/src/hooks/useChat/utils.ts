@@ -72,7 +72,9 @@ function hideFutureSteps(message: MessageItem) {
 function hideEmptySteps(message: MessageItem) {
   message.messages.forEach((msg) => {
     if (isPlanChunk(msg)) {
-      (msg as MessagePlanChunk).children = (msg as MessagePlanChunk).children.filter((step: PlanStep) => step.children.length > 0);
+      (msg as MessagePlanChunk).children = (msg as MessagePlanChunk).children.filter(
+        (step: PlanStep) => step.children.length > 0,
+      );
     }
   });
   return message;
@@ -245,6 +247,20 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       const step = plan.children.find((step: PlanStep) => step.status === 'running');
       if (step) {
         step.children.push(chunk);
+        continue;
+      }
+    }
+
+    if (chunk.type !== 'tool_call' && chunk.type !== 'tool_result' && !!chunk.detail?.run_id) {
+      // the first item with same run_id
+      const firstRunIndex = chunksCopy.findIndex((c) => c.detail?.run_id === chunk.detail?.run_id);
+      // if this is the first item with same run_id
+      if (firstRunIndex === i) {
+        // find all items with same run_id
+        const items = chunksCopy.filter((c) => c.detail?.run_id === chunk.detail?.run_id);
+        chunk.content = items.map((c) => c.content).join('');
+      } else {
+        // skip items not the first
         continue;
       }
     }
