@@ -516,21 +516,21 @@ class LangGraphAdapter:
     def _handle_model_end(
         self, event: dict[str, Any], session_id: str
     ) -> StreamMessage | None:
-        """Handle model completion - provide metadata only, empty content to avoid duplication."""
+        """Handle model completion - provide complete information with empty content to avoid duplication."""
         output = event.get("data", {}).get("output")
         run_id = event.get("run_id")
 
         # Initialize default values
-        has_tool_calls = False
-        tool_calls_count = 0
+        full_content = ""
+        tool_calls = []
         usage_metadata = {}
         response_metadata = {}
 
-        # Extract metadata information if output exists
+        # Extract complete information if output exists
         if output:
             message: AIMessage = output
-            has_tool_calls = bool(getattr(message, "tool_calls", []))
-            tool_calls_count = len(getattr(message, "tool_calls", []))
+            full_content = self._extract_content(message)
+            tool_calls = getattr(message, "tool_calls", [])
 
             if hasattr(message, "usage_metadata") and message.usage_metadata:
                 usage_metadata = message.usage_metadata
@@ -538,14 +538,15 @@ class LangGraphAdapter:
             if hasattr(message, "response_metadata") and message.response_metadata:
                 response_metadata = message.response_metadata
 
-        # Build detail with completion signal
+        # Build detail with essential information
         detail = {
-            "streaming": False,
-            "final": True,  # Stream completion signal
             "run_id": run_id,
-            "has_tool_calls": has_tool_calls,
-            "tool_calls_count": tool_calls_count,
+            "full_content": full_content,  # Complete content as backup
         }
+
+        # Include tool_calls if they exist
+        if tool_calls:
+            detail["tool_calls"] = tool_calls
 
         if usage_metadata:
             detail["usage"] = usage_metadata
@@ -555,12 +556,10 @@ class LangGraphAdapter:
 
         detail = self._enhance_detail_with_metadata(event, detail)
 
-        # Return metadata-only message with empty content to avoid duplication
-        # Content is already provided by on_chat_model_stream events
         return StreamMessage(
             id=generate_message_id(),
             type=MessageType.TEXT,
-            content="",  # Empty - content comes from streaming events
+            content="",  # Empty content to avoid duplication, full content in detail.full_content
             detail=detail,
             role="assistant",
             timestamp=int(time.time() * 1000),
