@@ -1,11 +1,18 @@
-"""LangCrew Web module for HTTP server and adapters."""
+"""LangCrew Web module for HTTP server and adapters.
+
+This module provides a clean API for web integration with LangCrew.
+The main entry points are the factory functions that create properly
+configured adapters and handlers.
+"""
 
 from ..utils.message_utils import generate_message_id
+from .adapter import LangGraphAdapter
+from .factory import create_message_generator, create_sse_handler
 from .http_server import AdapterServer, create_langgraph_server, create_server
-from .langgraph_adapter import LangGraphAdapter
 from .protocol import (
     ChatRequest,
     ExecutionInput,
+    MessageType,
     PlanAction,
     StepStatus,
     StopRequest,
@@ -16,17 +23,21 @@ from .protocol import (
 from .tool_display import ToolDisplayManager
 
 __all__ = [
+    # Factory functions (recommended API)
+    "create_sse_handler",
+    "create_message_generator",
     # HTTP Server
     "AdapterServer",
     "create_server",
     "create_langgraph_server",
-    # LangGraph Adapter
+    # LangGraph Adapter (for advanced usage)
     "LangGraphAdapter",
     # Protocol types
     "ChatRequest",
     "StopRequest",
     "ExecutionInput",
     "StreamMessage",
+    "MessageType",
     "TaskExecutionStatus",
     "StepStatus",
     "PlanAction",

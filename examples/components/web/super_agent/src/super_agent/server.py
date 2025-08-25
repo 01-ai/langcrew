@@ -26,7 +26,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from super_agent.agent.crew import SuperAgentCrew
-from langcrew.web.langgraph_adapter import LangGraphAdapter
+from langcrew.web import LangGraphAdapter
 from langcrew.web.protocol import (
     ChatRequest,
     StreamMessage,

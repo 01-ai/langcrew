@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from ..utils.message_utils import generate_message_id
-from .langgraph_adapter import LangGraphAdapter
+from .adapter import LangGraphAdapter
 from .protocol import (
     ChatRequest,
     ExecutionInput,
