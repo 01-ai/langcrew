@@ -185,6 +185,22 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       continue;
     }
 
+    if (chunk.type !== 'tool_call' && chunk.type !== 'tool_result' && !!chunk.detail?.run_id) {
+      // the first item with same run_id
+      const firstRunIndex = chunksCopy.findIndex((c) => c.detail?.run_id === chunk.detail?.run_id);
+      // find all items with same run_id
+      const items = chunksCopy.filter((c) => c.detail?.run_id === chunk.detail?.run_id);
+      // if this is the first item with same run_id
+      if (items.length > 1) {
+        if (firstRunIndex === i) {
+          chunk.content = items.map((c) => c.content).join('');
+        } else {
+          // skip items not the first
+          continue;
+        }
+      }
+    }
+
     // tool_call处理 - 检查下一条是否为tool_result
     if (chunk.type === 'tool_call') {
       // 指定chunk是MessageToolChunk
@@ -227,20 +243,6 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       currentAIMessage = filterLiveStatus(currentAIMessage);
       currentAIMessage.messages.push(chunk);
       continue;
-    }
-
-    if (chunk.type !== 'tool_call' && chunk.type !== 'tool_result' && !!chunk.detail?.run_id) {
-      // the first item with same run_id
-      const firstRunIndex = chunksCopy.findIndex((c) => c.detail?.run_id === chunk.detail?.run_id);
-      // if this is the first item with same run_id
-      if (firstRunIndex === i) {
-        // find all items with same run_id
-        const items = chunksCopy.filter((c) => c.detail?.run_id === chunk.detail?.run_id);
-        chunk.content = items.map((c) => c.content).join('');
-      } else {
-        // skip items not the first
-        continue;
-      }
     }
 
     const plan = currentAIMessage.messages.find(isPlanChunk) as MessagePlanChunk;
