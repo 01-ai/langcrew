@@ -229,6 +229,20 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       continue;
     }
 
+    if (chunk.type !== 'tool_call' && chunk.type !== 'tool_result' && !!chunk.detail?.run_id) {
+      // the first item with same run_id
+      const firstRunIndex = chunksCopy.findIndex((c) => c.detail?.run_id === chunk.detail?.run_id);
+      // if this is the first item with same run_id
+      if (firstRunIndex === i) {
+        // find all items with same run_id
+        const items = chunksCopy.filter((c) => c.detail?.run_id === chunk.detail?.run_id);
+        chunk.content = items.map((c) => c.content).join('');
+      } else {
+        // skip items not the first
+        continue;
+      }
+    }
+
     const plan = currentAIMessage.messages.find(isPlanChunk) as MessagePlanChunk;
     // 处理普通的，如果有step_id，则添加到step中，不然加到messages中
     if (chunk.step_id) {
@@ -247,20 +261,6 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       const step = plan.children.find((step: PlanStep) => step.status === 'running');
       if (step) {
         step.children.push(chunk);
-        continue;
-      }
-    }
-
-    if (chunk.type !== 'tool_call' && chunk.type !== 'tool_result' && !!chunk.detail?.run_id) {
-      // the first item with same run_id
-      const firstRunIndex = chunksCopy.findIndex((c) => c.detail?.run_id === chunk.detail?.run_id);
-      // if this is the first item with same run_id
-      if (firstRunIndex === i) {
-        // find all items with same run_id
-        const items = chunksCopy.filter((c) => c.detail?.run_id === chunk.detail?.run_id);
-        chunk.content = items.map((c) => c.content).join('');
-      } else {
-        // skip items not the first
         continue;
       }
     }
