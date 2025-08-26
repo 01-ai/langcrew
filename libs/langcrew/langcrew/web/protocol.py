@@ -88,15 +88,15 @@ class ToolResult(str, Enum):
 
 
 # Internal data structures
-class ExecutionInput(BaseModel):
-    """Unified execution input for both new conversations and resume scenarios
+class TaskInput(BaseModel):
+    """Unified task input for both new conversations and resume scenarios
 
     ID descriptions:
     - session_id: Session identifier for maintaining multi-turn conversation context, also used as LangGraph's thread_id
     """
 
     session_id: str  # Required for multi-turn conversations and context continuity
-    user_input: str
+    message: str
     language: str | None = None  # Language field for tool display
     interrupt_data: dict[str, Any] | None = None  # Interrupt data for resume scenarios
 
@@ -108,7 +108,7 @@ class ExecutionInput(BaseModel):
     def __init__(self, **data):
         # Ensure session_id is provided
         if "session_id" not in data or not data["session_id"]:
-            raise ValueError("session_id is required for ExecutionInput")
+            raise ValueError("session_id is required for TaskInput")
         super().__init__(**data)
 
 

@@ -11,7 +11,7 @@ from .factory import create_message_generator, create_sse_handler
 from .http_server import AdapterServer, create_langgraph_server, create_server
 from .protocol import (
     ChatRequest,
-    ExecutionInput,
+    TaskInput,
     MessageType,
     PlanAction,
     StepStatus,
@@ -35,7 +35,7 @@ __all__ = [
     # Protocol types
     "ChatRequest",
     "StopRequest",
-    "ExecutionInput",
+    "TaskInput",
     "StreamMessage",
     "MessageType",
     "TaskExecutionStatus",

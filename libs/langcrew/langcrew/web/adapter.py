@@ -25,7 +25,7 @@ from ..crew import Crew
 from ..utils.language import detect_language
 from ..utils.message_utils import generate_message_id
 from .protocol import (
-    ExecutionInput,
+    TaskInput,
     MessageType,
     PlanAction,
     StepStatus,
@@ -91,10 +91,10 @@ class LangGraphAdapter:
 
     # ============ TASK EXECUTION CONTROL ============
 
-    def _get_task_id(self, execution_input: ExecutionInput) -> str:
+    def _get_task_id(self, task_input: TaskInput) -> str:
         """Generate a unique task ID for this execution."""
         # Use session_id + timestamp for task-level control
-        return f"{execution_input.session_id}_{int(time.time() * 1000)}"
+        return f"{task_input.session_id}_{int(time.time() * 1000)}"
 
     def set_stop_flag(self, task_id: str, reason: str = "User stopped") -> bool:
         """Set stop flag for a specific task."""
@@ -126,7 +126,7 @@ class LangGraphAdapter:
 
     def _get_display_language(
         self,
-        user_input: str | None = None,
+        message: str | None = None,
         explicit_language: str | None = None,
     ) -> str:
         """Get display language (stateless).
@@ -134,7 +134,7 @@ class LangGraphAdapter:
         Priority: explicit_language > detected_language > default
 
         Args:
-            user_input: User input text for language detection (optional)
+            message: User message text for language detection (optional)
             explicit_language: Explicitly specified language (optional)
 
         Returns:
@@ -144,38 +144,48 @@ class LangGraphAdapter:
         if explicit_language:
             return explicit_language
 
-        # Priority 2: Detect from user input
-        if user_input:
-            return detect_language(user_input)
+        # Priority 2: Detect from user message
+        if message:
+            return detect_language(message)
 
         # Priority 3: Default to English
         return "en"
 
     # ============ CORE EXECUTION LOGIC ============
 
-    def _build_config(self, session_id: str, **additional_config) -> RunnableConfig:
-        """Build RunnableConfig for LangGraph execution."""
-        config = {
+    def _build_config(self, session_id: str, config: RunnableConfig | None = None) -> RunnableConfig:
+        """Build RunnableConfig for LangGraph execution.
+        
+        Args:
+            session_id: Session identifier used as thread_id
+            config: Optional RunnableConfig for advanced users
+            
+        Returns:
+            RunnableConfig with session_id properly set as thread_id
+        """
+        if config:
+            # Advanced users provide RunnableConfig, ensure session_id is set
+            result_config = config.copy() if hasattr(config, 'copy') else dict(config)
+            if "configurable" not in result_config:
+                result_config["configurable"] = {}
+            result_config["configurable"]["thread_id"] = session_id
+            return result_config
+        
+        # Default configuration for normal users
+        return {
             "configurable": {
-                "thread_id": session_id,
-                **additional_config.get("configurable", {}),
+                "thread_id": session_id
             }
         }
 
-        for key, value in additional_config.items():
-            if key != "configurable":
-                config[key] = value
-
-        return config
-
-    def _prepare_input(self, execution_input: ExecutionInput):
+    def _prepare_input(self, task_input: TaskInput):
         """Prepare input data for execution based on execution mode."""
-        if execution_input.is_resume:
-            return Command(resume=execution_input.user_input)
+        if task_input.is_resume:
+            return Command(resume=task_input.message)
         else:
             messages = []
-            if execution_input.user_input:
-                messages.append(HumanMessage(content=execution_input.user_input))
+            if task_input.message:
+                messages.append(HumanMessage(content=task_input.message))
             return {"messages": messages}
 
     async def _format_sse_message(self, message: StreamMessage) -> str:
@@ -183,12 +193,12 @@ class LangGraphAdapter:
         return f"data: {message.model_dump_json()}\n\n"
 
     async def execute(
-        self, execution_input: ExecutionInput, **config_kwargs
+        self, task_input: TaskInput, config: RunnableConfig | None = None
     ) -> AsyncGenerator[str, None]:
         """Unified execution method for both new conversations and resume scenarios."""
 
         # Generate unique task ID for this execution
-        task_id = self._get_task_id(execution_input)
+        task_id = self._get_task_id(task_input)
 
         try:
             # ============ 1. INITIALIZATION ============
@@ -200,20 +210,20 @@ class LangGraphAdapter:
 
             # Log task start with context
             logger.info(
-                f"Starting execution for session {execution_input.session_id}, task {task_id}"
+                f"Starting execution for session {task_input.session_id}, task {task_id}"
             )
 
             # Get display language (stateless)
             display_language = self._get_display_language(
-                execution_input.user_input,
-                execution_input.language,
+                task_input.message,
+                task_input.language,
             )
 
             # Configure message sending behavior for resume mode
-            if execution_input.is_resume:
+            if task_input.is_resume:
                 interrupt_type = (
-                    execution_input.interrupt_data.get("type", "")
-                    if execution_input.interrupt_data
+                    task_input.interrupt_data.get("type", "")
+                    if task_input.interrupt_data
                     else ""
                 )
                 # Only generic interrupts can send messages immediately
@@ -221,8 +231,8 @@ class LangGraphAdapter:
                 should_send_messages = interrupt_type == "generic_interrupt"
 
             # Prepare input data and configuration
-            input_data = self._prepare_input(execution_input)
-            config = self._build_config(execution_input.session_id, **config_kwargs)
+            input_data = self._prepare_input(task_input)
+            config = self._build_config(task_input.session_id, config)
 
             # ============ 2. EVENT PROCESSING LOOP ============
             async for event in self.executor.astream_events(
@@ -236,12 +246,12 @@ class LangGraphAdapter:
                 # Handle LangGraph native node interrupts
                 if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
                     interrupt_message = self._handle_node_interrupt(
-                        event_data, event, execution_input.session_id, task_id
+                        event_data, event, task_input.session_id, task_id
                     )
                     yield await self._format_sse_message(interrupt_message)
 
                 # Resume mode: enable messages after tool completion events
-                if execution_input.is_resume and event_type == "on_custom_event":
+                if task_input.is_resume and event_type == "on_custom_event":
                     event_name = event.get("name")
                     if event_name in [
                         "on_langcrew_user_input_completed",
@@ -249,7 +259,7 @@ class LangGraphAdapter:
                         "on_langcrew_tool_interrupt_after_completed",
                     ]:
                         logger.info(
-                            f"{event_name} for session {execution_input.session_id}. "
+                            f"{event_name} for session {task_input.session_id}. "
                             f"Resuming execution with response: {event.get('data', {})}"
                         )
                         should_send_messages = True
@@ -272,7 +282,7 @@ class LangGraphAdapter:
                             else "Task completed"
                         )
                         async for finish_message in self._handle_finish_signal(
-                            execution_input.session_id, task_id, reason, status
+                            task_input.session_id, task_id, reason, status
                         ):
                             yield finish_message
                         break
@@ -280,7 +290,7 @@ class LangGraphAdapter:
                         task_ended = True
                         error_msg = event.get("data", {}).get("error", "Unknown error")
                         async for finish_message in self._handle_finish_signal(
-                            execution_input.session_id,
+                            task_input.session_id,
                             task_id,
                             f"Task failed: {error_msg}",
                             TaskExecutionStatus.FAILED,
@@ -298,7 +308,7 @@ class LangGraphAdapter:
                     if control_data:
                         task_ended = True
                         async for stop_message in self._handle_stop_signal(
-                            execution_input.session_id, task_id, control_data
+                            task_input.session_id, task_id, control_data
                         ):
                             yield stop_message
                         break
@@ -314,19 +324,19 @@ class LangGraphAdapter:
                     executing_tools.add(run_id)
                     logger.debug(
                         f"Tool execution started: {event.get('name')} "
-                        f"(session: {execution_input.session_id}, task: {task_id}, run_id: {run_id})"
+                        f"(session: {task_input.session_id}, task: {task_id}, run_id: {run_id})"
                     )
                 elif event_type == "on_tool_end":
                     executing_tools.discard(run_id)
                     logger.debug(
                         f"Tool execution ended: {event.get('name')} "
-                        f"(session: {execution_input.session_id}, task: {task_id}, run_id: {run_id})"
+                        f"(session: {task_input.session_id}, task: {task_id}, run_id: {run_id})"
                     )
                 elif any(parent_id in executing_tools for parent_id in parent_ids):
                     # Filter tool internal events
                     logger.debug(
                         f"Filtered tool internal event: {event_type} {event.get('name', '')} "
-                        f"(session: {execution_input.session_id}, task: {task_id}, "
+                        f"(session: {task_input.session_id}, task: {task_id}, "
                         f"parent_ids: {parent_ids}, executing_tools: {executing_tools})"
                     )
                     continue
@@ -336,7 +346,7 @@ class LangGraphAdapter:
                 # Process tracked event types - only send if enabled
                 if event_type in self.TRACKED_EVENTS and should_send_messages:
                     message = await self._convert_langgraph_event(
-                        event, execution_input.session_id, display_language, task_id
+                        event, task_input.session_id, display_language, task_id
                     )
                     if message:
                         # Update user input requirement flags
@@ -356,7 +366,11 @@ class LangGraphAdapter:
 
                         # Handle special tool events
                         message = await self._handle_special_tool_events(
-                            event, execution_input.session_id, message, display_language
+                            event,
+                            task_input.session_id,
+                            task_id,
+                            message,
+                            display_language,
                         )
                         if message:
                             yield await self._format_sse_message(message)
@@ -366,15 +380,17 @@ class LangGraphAdapter:
             # Handle abnormal completion
             if not task_ended:
                 async for finish_message in self._handle_finish_signal(
-                    execution_input.session_id,
+                    task_input.session_id,
+                    task_id,
                     "Task completed: abnormal end",
                     TaskExecutionStatus.ABNORMAL,
                 ):
                     yield finish_message
-            elif execution_input.is_resume and task_ended and not need_user_input:
+            elif task_input.is_resume and task_ended and not need_user_input:
                 # Resume mode normal completion
                 async for finish_message in self._handle_finish_signal(
-                    execution_input.session_id,
+                    task_input.session_id,
+                    task_id,
                     "Task completed",
                     TaskExecutionStatus.COMPLETED,
                 ):
@@ -384,15 +400,15 @@ class LangGraphAdapter:
             # ============ 4. ERROR HANDLING ============
             logger.error(f"Execution failed: {e}")
             async for finish_message in self._handle_finish_signal(
-                execution_input.session_id, str(e), TaskExecutionStatus.FAILED
+                task_input.session_id, task_id, str(e), TaskExecutionStatus.FAILED
             ):
                 yield finish_message
         finally:
             # ============ 5. CLEANUP ============
             # Clear task-specific stop flag
             self._clear_stop_flag(task_id)
-            logger.info(
-                f"Task cleanup completed for session {execution_input.session_id}, task {task_id}"
+            logger.debug(
+                f"Task cleanup completed for session {task_input.session_id}, task {task_id}"
             )
 
     # ============ EVENT PROCESSING ============

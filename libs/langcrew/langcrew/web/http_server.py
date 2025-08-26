@@ -16,10 +16,10 @@ from ..utils.message_utils import generate_message_id
 from .adapter import LangGraphAdapter
 from .protocol import (
     ChatRequest,
-    ExecutionInput,
     MessageType,
     StopRequest,
     StreamMessage,
+    TaskInput,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,6 @@ class AdapterServer:
                 else request.session_id
             )
 
-            # Generate task_id for this execution (same logic as in adapter)
-            task_id = f"{session_id}_{int(time.time() * 1000)}"
-
             async def generate():
                 try:
                     # Send session init for new sessions
@@ -114,7 +111,6 @@ class AdapterServer:
                             detail={
                                 "session_id": session_id,
                                 "title": request.message,
-                                "task_id": task_id,
                             },
                             timestamp=int(time.time() * 1000),
                             session_id=session_id,
@@ -122,16 +118,16 @@ class AdapterServer:
                         )
                         yield await self.adapter._format_sse_message(init_message)
 
-                    # Create execution input
-                    execution_input = ExecutionInput(
+                    # Create task input
+                    task_input = TaskInput(
                         session_id=session_id,
-                        user_input=request.message,
+                        message=request.message,
                         language=request.language,
                         interrupt_data=request.interrupt_data,
                     )
 
                     # Stream execution results
-                    async for chunk in self.adapter.execute(execution_input):
+                    async for chunk in self.adapter.execute(task_input):
                         yield chunk
 
                 except asyncio.CancelledError:
@@ -159,7 +155,6 @@ class AdapterServer:
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
                     "X-Session-ID": session_id,
-                    "X-Task-ID": task_id,
                 },
             )
 

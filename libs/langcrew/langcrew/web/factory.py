@@ -10,19 +10,19 @@ from typing import Any
 
 from ..crew import Crew
 from .adapter import LangGraphAdapter
-from .protocol import ExecutionInput, StreamMessage
+from .protocol import TaskInput, StreamMessage
 
 
 def create_sse_handler(
     crew: Crew,
-) -> Callable[[ExecutionInput], AsyncGenerator[str, None]]:
+) -> Callable[[TaskInput], AsyncGenerator[str, None]]:
     """Create a simple SSE handler for integration with custom servers.
 
     Args:
         crew: LangCrew Crew instance
 
     Returns:
-        Async function that accepts ExecutionInput and yields SSE strings
+        Async function that accepts TaskInput and yields SSE strings
 
     Example:
         from langcrew.web import create_sse_handler
@@ -33,13 +33,13 @@ def create_sse_handler(
         # Use in your FastAPI/Flask app
         @app.post("/chat")
         async def chat(request: dict):
-            execution_input = ExecutionInput(
+            task_input = TaskInput(
                 session_id=request.get("session_id"),
-                user_input=request.get("content")
+                message=request.get("content")
             )
 
             return StreamingResponse(
-                sse_handler(execution_input),
+                sse_handler(task_input),
                 media_type="text/event-stream"
             )
     """
@@ -49,7 +49,7 @@ def create_sse_handler(
 
 def create_message_generator(
     crew: Crew,
-) -> Callable[[ExecutionInput], AsyncGenerator[StreamMessage, None]]:
+) -> Callable[[TaskInput], AsyncGenerator[StreamMessage, None]]:
     """Create a message generator for direct integration without SSE formatting.
 
     Args:
@@ -65,15 +65,15 @@ def create_message_generator(
         message_gen = create_message_generator(crew)
 
         # Use in your custom implementation
-        async for message in message_gen(execution_input):
+        async for message in message_gen(task_input):
             # Process message as needed
             await websocket.send(message.model_dump_json())
     """
     adapter = LangGraphAdapter(crew)
 
-    async def generate_messages(execution_input: ExecutionInput):
+    async def generate_messages(task_input: TaskInput):
         """Generate StreamMessage objects without SSE formatting."""
-        async for sse_chunk in adapter.execute(execution_input):
+        async for sse_chunk in adapter.execute(task_input):
             # Parse SSE format back to message
             if sse_chunk.startswith("data: "):
                 message_data = json.loads(sse_chunk[6:].strip())
