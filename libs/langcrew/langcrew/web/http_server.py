@@ -99,6 +99,9 @@ class AdapterServer:
                 else request.session_id
             )
 
+            # Generate task_id for this execution (same logic as in adapter)
+            task_id = f"{session_id}_{int(time.time() * 1000)}"
+
             async def generate():
                 try:
                     # Send session init for new sessions
@@ -108,9 +111,14 @@ class AdapterServer:
                             role="assistant",
                             type=MessageType.SESSION_INIT,
                             content=request.message,
-                            detail={"session_id": session_id, "title": request.message},
+                            detail={
+                                "session_id": session_id,
+                                "title": request.message,
+                                "task_id": task_id,
+                            },
                             timestamp=int(time.time() * 1000),
                             session_id=session_id,
+                            task_id="",
                         )
                         yield await self.adapter._format_sse_message(init_message)
 
@@ -151,33 +159,34 @@ class AdapterServer:
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
                     "X-Session-ID": session_id,
+                    "X-Task-ID": task_id,
                 },
             )
 
         @app.post("/api/v1/chat/stop", summary="Stop chat execution")
         async def stop_chat(request: StopRequest):
             """
-            Stop chat execution
+            Stop chat execution by task ID
 
-            This is a basic stop endpoint that relies on the adapter's stop mechanism.
-            For more complex stop logic (like force cancellation), users should implement
-            their own session management.
+            This endpoint stops a specific task by its task_id.
+            The task_id should be obtained from the chat API response headers.
             """
             success = False
             if hasattr(self.adapter, "set_stop_flag"):
                 try:
-                    success = await self.adapter.set_stop_flag(
-                        request.session_id, "User stopped"
+                    success = self.adapter.set_stop_flag(
+                        request.task_id, request.reason
                     )
                 except Exception as e:
-                    logger.error(f"Failed to stop session {request.session_id}: {e}")
+                    logger.error(f"Failed to stop task {request.task_id}: {e}")
 
             return {
                 "success": success,
-                "session_id": request.session_id,
+                "task_id": request.task_id,
+                "reason": request.reason,
                 "message": "Stop request sent"
                 if success
-                else "Stop not supported or failed",
+                else "Task not found or stop failed",
             }
 
     def run(self, host: str = "0.0.0.0", port: int = 8000, **kwargs):

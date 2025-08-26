@@ -96,44 +96,31 @@ class LangGraphAdapter:
         # Use session_id + timestamp for task-level control
         return f"{execution_input.session_id}_{int(time.time() * 1000)}"
 
-    async def set_stop_flag(
-        self, session_id: str, reason: str = "User stopped"
-    ) -> bool:
-        """Set stop flag for current task in a session."""
-        # Find the current active task for this session
-        current_task_id = None
-        for task_id in self._task_stop_flags:
-            if task_id.startswith(f"{session_id}_"):
-                current_task_id = task_id
-                break
+    def set_stop_flag(self, task_id: str, reason: str = "User stopped") -> bool:
+        """Set stop flag for a specific task."""
+        self._task_stop_flags[task_id] = {
+            "stop_requested": True,
+            "stop_reason": reason,
+            "timestamp": int(time.time() * 1000),
+        }
+        logger.info(f"Stop flag set for task {task_id}: {reason}")
+        return True
 
-        if current_task_id:
-            self._task_stop_flags[current_task_id] = {
-                "stop_requested": True,
-                "stop_reason": reason,
-                "timestamp": int(time.time() * 1000),
-            }
-            logger.info(f"Stop flag set for task {current_task_id}: {reason}")
-            return True
-        else:
-            logger.warning(f"No active task found for session {session_id}")
-            return False
+    def _get_stop_flag(self, task_id: str) -> dict[str, Any] | None:
+        """Get stop flag for a specific task."""
+        if task_id in self._task_stop_flags:
+            stop_info = self._task_stop_flags[task_id]
+            logger.info(
+                f"Stop flag detected for task {task_id}: {stop_info.get('stop_reason')}"
+            )
+            return stop_info
+        return None
 
     def _clear_stop_flag(self, task_id: str) -> None:
         """Clear stop flag for a specific task."""
         if task_id in self._task_stop_flags:
             del self._task_stop_flags[task_id]
             logger.info(f"Stop flag cleared for task {task_id}")
-
-    def _check_stop_signal(self, task_id: str) -> dict[str, Any] | None:
-        """Check for stop signal for a specific task."""
-        if task_id in self._task_stop_flags:
-            stop_info = self._task_stop_flags[task_id]
-            logger.info(
-                f"Stop signal detected for task {task_id}: {stop_info.get('stop_reason')}"
-            )
-            return stop_info
-        return None
 
     # ============ LANGUAGE MANAGEMENT ============
 
@@ -211,6 +198,11 @@ class LangGraphAdapter:
             need_user_input = False
             should_send_messages = True
 
+            # Log task start with context
+            logger.info(
+                f"Starting execution for session {execution_input.session_id}, task {task_id}"
+            )
+
             # Get display language (stateless)
             display_language = self._get_display_language(
                 execution_input.user_input,
@@ -244,7 +236,7 @@ class LangGraphAdapter:
                 # Handle LangGraph native node interrupts
                 if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
                     interrupt_message = self._handle_node_interrupt(
-                        event_data, event, execution_input.session_id
+                        event_data, event, execution_input.session_id, task_id
                     )
                     yield await self._format_sse_message(interrupt_message)
 
@@ -280,7 +272,7 @@ class LangGraphAdapter:
                             else "Task completed"
                         )
                         async for finish_message in self._handle_finish_signal(
-                            execution_input.session_id, reason, status
+                            execution_input.session_id, task_id, reason, status
                         ):
                             yield finish_message
                         break
@@ -289,6 +281,7 @@ class LangGraphAdapter:
                         error_msg = event.get("data", {}).get("error", "Unknown error")
                         async for finish_message in self._handle_finish_signal(
                             execution_input.session_id,
+                            task_id,
                             f"Task failed: {error_msg}",
                             TaskExecutionStatus.FAILED,
                         ):
@@ -301,11 +294,11 @@ class LangGraphAdapter:
                     "on_chat_model_end",
                     "on_custom_event",
                 ]:
-                    control_data = self._check_stop_signal(task_id)
+                    control_data = self._get_stop_flag(task_id)
                     if control_data:
                         task_ended = True
                         async for stop_message in self._handle_stop_signal(
-                            control_data, execution_input.session_id, task_id
+                            execution_input.session_id, task_id, control_data
                         ):
                             yield stop_message
                         break
@@ -320,18 +313,21 @@ class LangGraphAdapter:
                 if event_type == "on_tool_start":
                     executing_tools.add(run_id)
                     logger.debug(
-                        f"Tool execution started: {event.get('name')} (run_id: {run_id})"
+                        f"Tool execution started: {event.get('name')} "
+                        f"(session: {execution_input.session_id}, task: {task_id}, run_id: {run_id})"
                     )
                 elif event_type == "on_tool_end":
                     executing_tools.discard(run_id)
                     logger.debug(
-                        f"Tool execution ended: {event.get('name')} (run_id: {run_id})"
+                        f"Tool execution ended: {event.get('name')} "
+                        f"(session: {execution_input.session_id}, task: {task_id}, run_id: {run_id})"
                     )
                 elif any(parent_id in executing_tools for parent_id in parent_ids):
                     # Filter tool internal events
                     logger.debug(
                         f"Filtered tool internal event: {event_type} {event.get('name', '')} "
-                        f"(parent_ids: {parent_ids}, executing_tools: {executing_tools})"
+                        f"(session: {execution_input.session_id}, task: {task_id}, "
+                        f"parent_ids: {parent_ids}, executing_tools: {executing_tools})"
                     )
                     continue
 
@@ -340,7 +336,7 @@ class LangGraphAdapter:
                 # Process tracked event types - only send if enabled
                 if event_type in self.TRACKED_EVENTS and should_send_messages:
                     message = await self._convert_langgraph_event(
-                        event, execution_input.session_id, display_language
+                        event, execution_input.session_id, display_language, task_id
                     )
                     if message:
                         # Update user input requirement flags
@@ -395,12 +391,18 @@ class LangGraphAdapter:
             # ============ 5. CLEANUP ============
             # Clear task-specific stop flag
             self._clear_stop_flag(task_id)
-            logger.debug(f"Task {task_id} cleanup completed")
+            logger.info(
+                f"Task cleanup completed for session {execution_input.session_id}, task {task_id}"
+            )
 
     # ============ EVENT PROCESSING ============
 
     async def _convert_langgraph_event(
-        self, event: dict[str, Any], session_id: str, display_language: str
+        self,
+        event: dict[str, Any],
+        session_id: str,
+        display_language: str,
+        task_id: str,
     ) -> StreamMessage | None:
         """Convert LangGraph event to StreamMessage (stateless).
 
@@ -411,26 +413,28 @@ class LangGraphAdapter:
         # ============ STANDARD EVENT CONVERSION LOGIC ============
 
         if event_type == "on_chat_model_stream":
-            return self._handle_model_stream(event, session_id)
+            return self._handle_model_stream(event, session_id, task_id)
         elif event_type == "on_chat_model_end":
-            return self._handle_model_end(event, session_id)
+            return self._handle_model_end(event, session_id, task_id)
         elif event_type in ["on_chat_model_error", "on_llm_error"]:
-            return self._handle_model_error(event, session_id)
+            return self._handle_model_error(event, session_id, task_id)
         elif event_type == "on_tool_start":
-            return self._handle_tool_start(event, session_id, display_language)
+            return self._handle_tool_start(event, session_id, task_id, display_language)
         elif event_type == "on_tool_end":
-            return self._handle_tool_end(event, session_id)
+            return self._handle_tool_end(event, session_id, task_id)
         elif event_type == "on_tool_error":
-            return self._handle_tool_error(event, session_id)
+            return self._handle_tool_error(event, session_id, task_id)
         elif event_type == "on_custom_event":
-            return self._handle_custom_event(event, session_id, display_language)
+            return self._handle_custom_event(
+                event, session_id, task_id, display_language
+            )
 
         return None
 
     # ============ EVENT HANDLERS ============
 
     def _handle_model_stream(
-        self, event: dict[str, Any], session_id: str
+        self, event: dict[str, Any], session_id: str, task_id: str
     ) -> StreamMessage | None:
         """Handle streaming model output - no content filtering."""
         chunk = event.get("data", {}).get("chunk")
@@ -455,10 +459,11 @@ class LangGraphAdapter:
             role="assistant",
             timestamp=int(time.time() * 1000),
             session_id=session_id,
+            task_id=task_id,
         )
 
     def _handle_model_end(
-        self, event: dict[str, Any], session_id: str
+        self, event: dict[str, Any], session_id: str, task_id: str
     ) -> StreamMessage | None:
         """Handle model completion - provide complete information with empty content to avoid duplication."""
         output = event.get("data", {}).get("output")
@@ -508,10 +513,11 @@ class LangGraphAdapter:
             role="assistant",
             timestamp=int(time.time() * 1000),
             session_id=session_id,
+            task_id=task_id,
         )
 
     def _handle_model_error(
-        self, event: dict[str, Any], session_id: str
+        self, event: dict[str, Any], session_id: str, task_id: str
     ) -> StreamMessage | None:
         """Handle model errors."""
         error = event.get("data", {}).get("error", "Unknown model error")
@@ -534,10 +540,15 @@ class LangGraphAdapter:
             role="assistant",
             timestamp=int(time.time() * 1000),
             session_id=session_id,
+            task_id=task_id,
         )
 
     def _handle_tool_start(
-        self, event: dict[str, Any], session_id: str, display_language: str
+        self,
+        event: dict[str, Any],
+        session_id: str,
+        task_id: str,
+        display_language: str,
     ) -> StreamMessage | None:
         """Handle tool start events."""
         tool_name = event.get("name")
@@ -573,10 +584,11 @@ class LangGraphAdapter:
             role="assistant",
             timestamp=int(time.time() * 1000),
             session_id=session_id,
+            task_id=task_id,
         )
 
     def _handle_tool_end(
-        self, event: dict[str, Any], session_id: str
+        self, event: dict[str, Any], session_id: str, task_id: str
     ) -> StreamMessage | None:
         """Handle tool completion events."""
         tool_name = event.get("name")
@@ -602,10 +614,11 @@ class LangGraphAdapter:
             role="assistant",
             timestamp=int(time.time() * 1000),
             session_id=session_id,
+            task_id=task_id,
         )
 
     def _handle_tool_error(
-        self, event: dict[str, Any], session_id: str
+        self, event: dict[str, Any], session_id: str, task_id: str
     ) -> StreamMessage | None:
         """Handle tool error events."""
         tool_name = event.get("name")
@@ -632,10 +645,15 @@ class LangGraphAdapter:
             role="assistant",
             timestamp=int(time.time() * 1000),
             session_id=session_id,
+            task_id=task_id,
         )
 
     def _handle_custom_event(
-        self, event: dict[str, Any], session_id: str, display_language: str
+        self,
+        event: dict[str, Any],
+        session_id: str,
+        task_id: str,
+        display_language: str,
     ) -> StreamMessage | None:
         """Handle custom events from LangCrew."""
         data = event.get("data", {})
@@ -680,6 +698,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
 
         elif event_name == "on_langcrew_step_start":
@@ -720,6 +739,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
         elif event_name == "on_langcrew_step_end":
             # Step end event from Plan-and-Execute executor
@@ -744,6 +764,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
 
         elif event_name == "on_langcrew_plan_created":
@@ -768,6 +789,7 @@ class LangGraphAdapter:
                     role="assistant",
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
+                    task_id=task_id,
                 )
 
             steps = []
@@ -795,6 +817,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
 
         elif event_name == "on_langcrew_sandbox_created":
@@ -815,6 +838,7 @@ class LangGraphAdapter:
                 role="inner_message",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
 
         elif event_name == "on_langcrew_user_input_required":
@@ -842,6 +866,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
         elif event_name == "on_langcrew_tool_interrupt_before":
             # Tool before interrupt event from HITL tools
@@ -878,6 +903,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
         elif event_name == "on_langcrew_tool_interrupt_after":
             # Tool after interrupt event from HITL tools
@@ -915,6 +941,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
         elif event_name == "on_langcrew_tool_interrupt_before_completed":
             logger.info(f"Tool before interrupt completed: {data.get('tool_name')}")
@@ -933,6 +960,7 @@ class LangGraphAdapter:
                 role="user",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
 
         # Log unknown events for debugging (but don't send to frontend)
@@ -947,6 +975,7 @@ class LangGraphAdapter:
         self,
         event: dict[str, Any],
         session_id: str,
+        task_id: str,
         original_msg: StreamMessage | None = None,
         display_language: str = "en",
     ) -> StreamMessage | None:
@@ -1010,6 +1039,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
 
         elif tool_name == "agent_advance_phase":
@@ -1040,6 +1070,7 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
 
         return original_msg
@@ -1047,6 +1078,7 @@ class LangGraphAdapter:
     async def _handle_finish_signal(
         self,
         session_id: str,
+        task_id: str,
         reason: str = "Task completed",
         status: str = "completed",
     ):
@@ -1060,14 +1092,15 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
         )
 
     async def _handle_stop_signal(
         self,
-        control_data: dict[str, Any],
         session_id: str,
         task_id: str,
+        control_data: dict[str, Any],
     ):
         """Handle stop signal by sending cancellation message."""
         # Send cancellation message
@@ -1083,20 +1116,23 @@ class LangGraphAdapter:
                 role="assistant",
                 timestamp=int(time.time() * 1000),
                 session_id=session_id,
+                task_id=task_id,
             )
         )
 
     def _handle_node_interrupt(
-        self, event_data: dict, event: dict, session_id: str
+        self, event_data: dict, event: dict, session_id: str, task_id: str
     ) -> StreamMessage:
         """Handle any interrupts - return generic message to user"""
         chunk_data = event_data.get("chunk", {})
         interrupt_obj = chunk_data.get("__interrupt__")
 
-        return self._create_generic_interrupt_message(event, interrupt_obj, session_id)
+        return self._create_generic_interrupt_message(
+            event, interrupt_obj, session_id, task_id
+        )
 
     def _create_generic_interrupt_message(
-        self, event: dict, interrupt_obj, session_id: str
+        self, event: dict, interrupt_obj, session_id: str, task_id: str
     ) -> StreamMessage:
         """Create generic interrupt message for user input"""
         message_id = generate_message_id()
@@ -1126,6 +1162,7 @@ class LangGraphAdapter:
             },
             timestamp=int(time.time() * 1000),
             session_id=session_id,
+            task_id=task_id,
         )
 
     # ============ UTILITY METHODS ============

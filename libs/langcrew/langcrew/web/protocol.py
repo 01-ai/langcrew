@@ -49,6 +49,7 @@ class StreamMessage(BaseModel):
     detail: dict[str, Any] | None = None
     timestamp: int
     session_id: str | None = None
+    task_id: str | None = None  # Task identifier for precise control and tracking
 
 
 class TaskExecutionStatus(str, Enum):
@@ -124,4 +125,5 @@ class ChatRequest(BaseModel):
 class StopRequest(BaseModel):
     """Stop request for stopping chat execution"""
 
-    session_id: str
+    task_id: str
+    reason: str = "User stopped"
