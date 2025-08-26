@@ -12,15 +12,17 @@ export const useChunksProcessor = (chunks: MessageChunk[]) => {
   const { setPipelineMessages, setTaskPlan, setWorkspaceMessages } = useAgentStore();
 
   // 更新左侧消息列表和整体plan
-  useEffect(() => {
-    const newMessages = transformChunksToMessages(cloneDeep(chunks));
-    setPipelineMessages(newMessages);
-  }, [chunks, setPipelineMessages]);
+  // useEffect(() => {
+  //   const newMessages = transformChunksToMessages(cloneDeep(chunks));
+  //   requestAnimationFrame(() => {
+  //     setPipelineMessages(newMessages);
+  //   });
+  // }, [chunks, setPipelineMessages]);
 
   // 更新右下角plan
   useEffect(() => {
     const plan = getPlan(cloneDeep(chunks));
-    if (!isEqual(useAgentStore.getState().taskPlan, plan?.children)) {
+    if (plan && !isEqual(useAgentStore.getState().taskPlan, plan?.children)) {
       setTaskPlan(plan?.children || []);
     }
   }, [chunks, setTaskPlan]);
@@ -90,6 +92,8 @@ export const useChunksProcessor = (chunks: MessageChunk[]) => {
         type: (chunk as MessageToolChunk).detail.tool,
       }));
 
-    setWorkspaceMessages(detailList);
+    if (!isEqual(useAgentStore.getState().workspaceMessages, detailList)) {
+      setWorkspaceMessages(detailList);
+    }
   }, [chunks, setWorkspaceMessages]);
 };
