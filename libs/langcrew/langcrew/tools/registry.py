@@ -205,8 +205,6 @@ class ToolRegistry:
         current_dir = Path.cwd()
         possible_roots = [
             current_dir,
-            current_dir.parent,
-            current_dir.parent.parent,
         ]
 
         for root in possible_roots:

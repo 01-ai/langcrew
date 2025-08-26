@@ -121,12 +121,60 @@ class Crew:
             agent.checkpointer = self.checkpointer
             agent.store = self.store
 
-        # msgID -> MsgSource
-        # self._msg_source: dict[str, MsgSource] = {}
-
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
         """Inject ToolStateManager into E2BBaseToolV2 and HITLBaseTool instances."""
         return tools
+
+    def _sync_subgraph_message_deletions(
+        self, state: CrewState, result: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Process messages in subgraph results to ensure deletion operations sync to parent graph.
+
+        Design rationale:
+        When LangGraph subgraph runs as a node, if messages are trimmed via pre_model_hook,
+        the root namespace will not sync the RemoveMessage actions.
+        Explicit message state synchronization at node level is required to avoid
+        inconsistent message state between parent and child graphs.
+
+        Args:
+            state: Current CrewState
+            result: Result dictionary returned from ainvoke/invoke
+            item: The executing Task or Agent instance
+
+        Returns:
+            Processed result dictionary with synchronized message deletion operations
+        """
+        if "messages" not in result:
+            return result
+
+        # Extract message IDs that are preserved in the result
+        result_message_ids = {
+            msg.id
+            for msg in result["messages"]
+            if hasattr(msg, "id") and msg.id is not None
+        }
+
+        # Create RemoveMessage markers for original messages not in result
+        from langchain_core.messages.modifier import RemoveMessage
+
+        remove_messages = [
+            RemoveMessage(id=msg.id)
+            for msg in state.get("messages", [])
+            if hasattr(msg, "id")
+            and msg.id is not None
+            and msg.id not in result_message_ids
+        ]
+
+        # Build final message list: deletion operations + preserved messages
+        final_messages = remove_messages + result["messages"]
+
+        if self.verbose and remove_messages:
+            logger.info(
+                f"Message cleanup: removing {len(remove_messages)} messages from state"
+            )
+
+        return {**result, "messages": final_messages}
 
     def _get_task_node_name(self, task: Task, index: int) -> str:
         """Unified task node naming rule with namespace isolation"""
@@ -268,9 +316,12 @@ class Crew:
             return (state, config)
 
         def process_result_fn(state: CrewState, result: dict[str, Any], task: Task):
-            # Ensure task_outputs persisted into graph state by returning it with updates
+            # Process message synchronization (resolves subgraph message sync issues)
+            result_with_cleanup = self._sync_subgraph_message_deletions(state, result)
+
+            # Maintain original task_outputs functionality
             return {
-                **result,
+                **result_with_cleanup,
                 "task_outputs": state.get("task_outputs", []),
             }
 
@@ -317,11 +368,15 @@ class Crew:
             config = RunnableConfig(metadata={"langcrew_agent": agent.name})
             return (state, config)
 
+        def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
+            """Process Agent execution result with message synchronization functionality"""
+            return self._sync_subgraph_message_deletions(state, result)
+
         return self._create_generic_node_factory(
             is_async=is_async,
             item_type="agent",
             get_invoke_args_fn=get_agent_invoke_args,
-            process_result_fn=None,
+            process_result_fn=process_result_fn,
         )
 
     def _build_agent_sequential_graph(
@@ -573,11 +628,15 @@ class Crew:
             config = RunnableConfig(metadata={"langcrew_agent": agent.name})
             return (state, config)
 
+        def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
+            """Process Handoff Agent execution result with message synchronization functionality"""
+            return self._sync_subgraph_message_deletions(state, result)
+
         return self._create_generic_node_factory(
             is_async=is_async,
             item_type="agent",
             get_invoke_args_fn=get_handoff_invoke_args,
-            process_result_fn=None,  # Handoff doesn't need result processing
+            process_result_fn=process_result_fn,
         )(agent)
 
     def _build_agent_handoff_graph(
