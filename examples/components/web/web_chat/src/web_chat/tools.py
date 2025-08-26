@@ -38,6 +38,7 @@ class CalculatorTool(BaseTool):
 
             # Safety check - only allow basic math operations and functions
             allowed_chars = set("0123456789+-*/.()% ")
+            allowed_functions = ["abs", "round", "min", "max", "pow"]
 
             # Check for allowed characters
             if not all(c in allowed_chars or c.isalpha() for c in expression):
@@ -51,11 +52,14 @@ class CalculatorTool(BaseTool):
             if "^" in expression:
                 parts = expression.split("^")
                 if len(parts) == 2:
-                    base = float(eval(parts[0]))
-                    exp = float(eval(parts[1]))
-                    if abs(exp) > 100:  # Prevent very large exponentials
-                        return "Error: Exponent too large"
-                    result = pow(base, exp)
+                    try:
+                        base = float(eval(parts[0]))
+                        exp = float(eval(parts[1]))
+                        if abs(exp) > 100:  # Prevent very large exponentials
+                            return "Error: Exponent too large"
+                        result = pow(base, exp)
+                    except:
+                        return "Error: Invalid power operation"
                 else:
                     return "Error: Invalid power expression"
             else:

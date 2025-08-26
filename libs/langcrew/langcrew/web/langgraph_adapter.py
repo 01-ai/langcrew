@@ -7,7 +7,7 @@ real-time updates to web clients via SSE (Server-Sent Events).
 import json
 import logging
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from langchain_core.messages import AIMessage
@@ -63,6 +63,8 @@ class LangGraphAdapter:
         self.crew = crew
         self.compiled_graph = compiled_graph
 
+    # ============ Class Methods ============
+
     @classmethod
     def _get_session_state(cls, session_id: str) -> dict[str, Any]:
         """Get session state for the given session_id."""
@@ -83,8 +85,17 @@ class LangGraphAdapter:
         return cls._get_session_state(session_id).get(key, default)
 
     @classmethod
+    def _delete_session_key(cls, session_id: str, key: str) -> None:
+        """Delete a key from session state."""
+        if session_id in cls._session_states:
+            cls._session_states[session_id].pop(key, None)
+
+    @classmethod
     def _get_session_display_language(
-        cls, session_id: str, user_input: str = None, explicit_language: str = None
+        cls,
+        session_id: str,
+        user_input: str | None = None,
+        explicit_language: str | None = None,
     ) -> str:
         """Get session-level display language.
 
@@ -130,7 +141,7 @@ class LangGraphAdapter:
         Returns:
             True if stop flag was set successfully
         """
-        cls._set_session_state(session_id, "user_stop", 3)
+        cls._set_session_state(session_id, "user_stop", True)
         cls._set_session_state(session_id, "stop_reason", reason)
         logger.info(f"Stop flag set for session {session_id}: {reason}")
         return True
@@ -142,9 +153,84 @@ class LangGraphAdapter:
         Args:
             session_id: The session ID to clear
         """
-        cls._set_session_state(session_id, "user_stop", None)
-        cls._set_session_state(session_id, "stop_reason", None)
+        cls._delete_session_key(session_id, "user_stop")
+        cls._delete_session_key(session_id, "stop_reason")
         logger.info(f"Stop flag cleared for session {session_id}")
+
+    # ============ Static Methods ============
+
+    @staticmethod
+    def create_sse_handler(
+        crew: Crew,
+    ) -> Callable[[ExecutionInput], AsyncGenerator[str, None]]:
+        """
+        Create a simple SSE handler for integration with custom servers.
+
+        Args:
+            crew: LangCrew Crew instance
+
+        Returns:
+            Async function that accepts ExecutionInput and yields SSE strings
+
+        Example:
+            from langcrew.web import LangGraphAdapter
+
+            # Create SSE handler
+            sse_handler = LangGraphAdapter.create_sse_handler(crew)
+
+            # Use in your FastAPI/Flask app
+            @app.post("/chat")
+            async def chat(request: dict):
+                execution_input = ExecutionInput(
+                    session_id=request.get("session_id"),
+                    user_input=request.get("content")
+                )
+
+                return StreamingResponse(
+                    sse_handler(execution_input),
+                    media_type="text/event-stream"
+                )
+        """
+        adapter = LangGraphAdapter(crew)
+        return adapter.execute
+
+    @staticmethod
+    def create_message_generator(
+        crew: Crew,
+    ) -> Callable[[ExecutionInput], AsyncGenerator[StreamMessage, None]]:
+        """
+        Create a message generator for direct integration without SSE formatting.
+
+        Args:
+            crew: LangCrew Crew instance
+
+        Returns:
+            Async function that yields StreamMessage objects
+
+        Example:
+            from langcrew.web import LangGraphAdapter
+
+            # Create message generator
+            message_gen = LangGraphAdapter.create_message_generator(crew)
+
+            # Use in your custom implementation
+            async for message in message_gen(execution_input):
+                # Process message as needed
+                await websocket.send(message.model_dump_json())
+        """
+        adapter = LangGraphAdapter(crew)
+
+        async def generate_messages(execution_input: ExecutionInput):
+            """Generate StreamMessage objects without SSE formatting."""
+            async for sse_chunk in adapter.execute(execution_input):
+                # Parse SSE format back to message
+                if sse_chunk.startswith("data: "):
+                    message_data = json.loads(sse_chunk[6:].strip())
+                    yield StreamMessage(**message_data)
+
+        return generate_messages
+
+    # ============ Properties ============
 
     @property
     def executor(self) -> Union[Crew, "CompiledStateGraph"]:
@@ -154,7 +240,7 @@ class LangGraphAdapter:
         return self.compiled_graph
 
     @property
-    def checkpointer(self):
+    def checkpointer(self) -> Any:
         """Get checkpointer from executor with proper handling for both types."""
         if self.crew and hasattr(self.crew, "checkpointer"):
             return self.crew.checkpointer
@@ -162,6 +248,8 @@ class LangGraphAdapter:
             # CompiledStateGraph stores checkpointer differently
             return getattr(self.compiled_graph, "checkpointer", None)
         return None
+
+    # ============ Instance Methods ============
 
     def _build_config(self, session_id: str, **additional_config) -> RunnableConfig:
         """Build RunnableConfig for LangGraph execution."""
@@ -181,26 +269,7 @@ class LangGraphAdapter:
     def _prepare_input(self, execution_input: ExecutionInput):
         """Prepare input data for execution based on execution mode."""
         if execution_input.is_resume:
-            # Use enhanced modification processing method
-            processed_modifications = self._process_user_modifications(
-                execution_input.user_input, 
-                execution_input.interrupt_data
-            )
-            
-            action = processed_modifications.get("action")
-            modifications = processed_modifications.get("modifications", {})
-            
-            if action == "continue":
-                return Command(resume="continue")
-            elif action == "abort":
-                return Command(resume="abort")
-            elif action in ["modify", "modify_and_continue"]:
-                return Command(resume={
-                    "action": "continue",
-                    "modifications": modifications
-                })
-            else:
-                return Command(resume=execution_input.user_input)
+            return Command(resume=execution_input.user_input)
         else:
             messages = []
             if execution_input.user_input:
@@ -215,46 +284,53 @@ class LangGraphAdapter:
         self, execution_input: ExecutionInput, **config_kwargs
     ) -> AsyncGenerator[str, None]:
         """Unified execution method for both new conversations and resume scenarios."""
-        config = self._build_config(execution_input.session_id, **config_kwargs)
-
-        # Initialize session-level display language (cached for this session)
-        self._get_session_display_language(
-            execution_input.session_id,
-            execution_input.user_input,
-            execution_input.language,
-        )
 
         try:
-            input_data = self._prepare_input(execution_input)
+            # ============ 1. INITIALIZATION ============
+            # Initialize session-level display language (cached for this session)
+            self._get_session_display_language(
+                execution_input.session_id,
+                execution_input.user_input,
+                execution_input.language,
+            )
 
-            # Control whether to send messages to client
-            # Different logic for Node vs Tool interrupts
-            if execution_input.is_resume:
-                interrupt_type = execution_input.interrupt_data.get("type", "") if execution_input.interrupt_data else ""
-                # Node interrupts (Task/Agent) can send messages immediately after resume
-                should_send_messages = interrupt_type.startswith(("task_interrupt", "agent_interrupt"))
-            else:
-                should_send_messages = True
-
-            # Execution state tracking
+            # Initialize execution state
             task_ended = False
             need_user_input = False
+            should_send_messages = True
 
+            # Configure message sending behavior for resume mode
+            if execution_input.is_resume:
+                interrupt_type = (
+                    execution_input.interrupt_data.get("type", "")
+                    if execution_input.interrupt_data
+                    else ""
+                )
+                # Only generic interrupts can send messages immediately
+                # Tool and user_input interrupts need to wait for completion events to avoid duplicate messages
+                should_send_messages = interrupt_type == "generic_interrupt"
+
+            # Prepare input data and configuration
+            input_data = self._prepare_input(execution_input)
+            config = self._build_config(execution_input.session_id, **config_kwargs)
+
+            # ============ 2. EVENT PROCESSING LOOP ============
             async for event in self.executor.astream_events(
-                input=input_data, config=config, version="v2"
+                input=input_data, config=config
             ):
                 event_type = event.get("event")
                 event_data = event.get("data", {})
 
-                # Handle LangGraph native node interrupts
-                # Check for node-level interrupts that don't have custom events
-                if "__interrupt__" in event_data:
-                    interrupt_message = self._handle_node_interrupt(event_data, event)
-                    if interrupt_message:
-                        yield await self._format_sse_message(interrupt_message)
-                        continue
+                # -------- 2.1 High Priority: Interrupts & State Updates --------
 
-                # Resume mode: check for completed events
+                # Handle LangGraph native node interrupts
+                if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
+                    interrupt_message = self._handle_node_interrupt(
+                        event_data, event, execution_input.session_id
+                    )
+                    yield await self._format_sse_message(interrupt_message)
+
+                # Resume mode: enable messages after tool completion events
                 if execution_input.is_resume and event_type == "on_custom_event":
                     event_name = event.get("name")
                     if event_name in [
@@ -267,27 +343,28 @@ class LangGraphAdapter:
                             f"Resuming execution with response: {event.get('data', {})}"
                         )
                         should_send_messages = True
-                        continue
 
-                # Check task end conditions
+                # -------- 2.2 Termination Conditions --------
+
+                # Check task end conditions - ROOT EVENTS ONLY
                 is_root_event = len(event.get("parent_ids", [])) == 0
                 if is_root_event:
                     if event_type == "on_chain_end":
                         task_ended = True
-                        if need_user_input:
-                            async for finish_message in self._handle_finish_signal(
-                                execution_input.session_id,
-                                "Waiting for user input",
-                                TaskExecutionStatus.USER_INPUT,
-                            ):
-                                yield finish_message
-                        else:
-                            async for finish_message in self._handle_finish_signal(
-                                execution_input.session_id,
-                                "Task completed",
-                                TaskExecutionStatus.COMPLETED,
-                            ):
-                                yield finish_message
+                        status = (
+                            TaskExecutionStatus.USER_INPUT
+                            if need_user_input
+                            else TaskExecutionStatus.COMPLETED
+                        )
+                        reason = (
+                            "Waiting for user input"
+                            if need_user_input
+                            else "Task completed"
+                        )
+                        async for finish_message in self._handle_finish_signal(
+                            execution_input.session_id, reason, status
+                        ):
+                            yield finish_message
                         break
                     elif event_type == "on_chain_error":
                         task_ended = True
@@ -300,14 +377,32 @@ class LangGraphAdapter:
                             yield finish_message
                         break
 
+                # Check stop signal - USER REQUESTED TERMINATION
+                if event_type in [
+                    "on_tool_end",
+                    "on_chat_model_end",
+                    "on_custom_event",
+                ]:
+                    control_data = await self._check_stop_signal(
+                        execution_input.session_id
+                    )
+                    if control_data:
+                        task_ended = True
+                        async for stop_message in self._handle_stop_signal(
+                            control_data, execution_input.session_id
+                        ):
+                            yield stop_message
+                        break
+
+                # -------- 2.3 Regular Event Processing --------
+
                 # Process tracked event types - only send if enabled
                 if event_type in self.TRACKED_EVENTS and should_send_messages:
                     message = await self._convert_langgraph_event(
                         event, execution_input.session_id
                     )
-
                     if message:
-                        # Check if user input is needed
+                        # Update user input requirement flags
                         if message.type == MessageType.USER_INPUT:
                             need_user_input = True
                             logger.debug("User input needed due to USER_INPUT message")
@@ -326,22 +421,10 @@ class LangGraphAdapter:
                         message = await self._handle_special_tool_events(
                             event, execution_input.session_id, message
                         )
-
                         if message:
                             yield await self._format_sse_message(message)
 
-                # Check stop signal
-                if event_type == "on_tool_end":
-                    control_data = await self._check_stop_signal(
-                        execution_input.session_id
-                    )
-                    if control_data:
-                        task_ended = True
-                        async for stop_message in self._handle_stop_signal(
-                            control_data, execution_input.session_id
-                        ):
-                            yield stop_message
-                        break
+            # ============ 3. COMPLETION HANDLING ============
 
             # Handle abnormal completion
             if not task_ended:
@@ -361,11 +444,10 @@ class LangGraphAdapter:
                     yield finish_message
 
         except Exception as e:
+            # ============ 4. ERROR HANDLING ============
             logger.error(f"Execution failed: {e}")
             async for finish_message in self._handle_finish_signal(
-                execution_input.session_id,
-                str(e),
-                TaskExecutionStatus.FAILED,
+                execution_input.session_id, str(e), TaskExecutionStatus.FAILED
             ):
                 yield finish_message
 
@@ -681,13 +763,15 @@ class LangGraphAdapter:
                     elif phase_id < current_phase_id:
                         status = StepStatus.SUCCESS
 
-                    steps.append({
-                        "id": str(phase_id),
-                        "title": phase["title"],
-                        "description": phase.get("expected_output", ""),
-                        "status": status,
-                        "started_at": int(time.time() * 1000),
-                    })
+                    steps.append(
+                        {
+                            "id": str(phase_id),
+                            "title": phase["title"],
+                            "description": phase.get("expected_output", ""),
+                            "status": status,
+                            "started_at": int(time.time() * 1000),
+                        }
+                    )
 
                 return StreamMessage(
                     id=message_id,
@@ -715,18 +799,22 @@ class LangGraphAdapter:
 
                 # If this isn't the first step, add the previous step as completed
                 if step_id > 1:
-                    steps.append({
-                        "id": f"{step_id - 1}",
-                        "status": StepStatus.SUCCESS,
-                        "started_at": int(time.time() * 1000),
-                    })
+                    steps.append(
+                        {
+                            "id": f"{step_id - 1}",
+                            "status": StepStatus.SUCCESS,
+                            "started_at": int(time.time() * 1000),
+                        }
+                    )
 
                 # Add current step as running
-                steps.append({
-                    "id": f"{step_id}",
-                    "status": StepStatus.RUNNING,
-                    "started_at": int(time.time() * 1000),
-                })
+                steps.append(
+                    {
+                        "id": f"{step_id}",
+                        "status": StepStatus.RUNNING,
+                        "started_at": int(time.time() * 1000),
+                    }
+                )
 
                 return StreamMessage(
                     id=message_id,
@@ -747,11 +835,13 @@ class LangGraphAdapter:
                 # Step end event from Plan-and-Execute executor
                 step_data = data
                 steps = []
-                steps.append({
-                    "id": f"{step_data.get('step_id', '')}",
-                    "status": StepStatus.SUCCESS,
-                    "started_at": int(time.time() * 1000),
-                })
+                steps.append(
+                    {
+                        "id": f"{step_data.get('step_id', '')}",
+                        "status": StepStatus.SUCCESS,
+                        "started_at": int(time.time() * 1000),
+                    }
+                )
                 return StreamMessage(
                     id=message_id,
                     type=MessageType.PLAN_UPDATE,
@@ -797,14 +887,16 @@ class LangGraphAdapter:
                     plan = plan_data.get("plan", {})
                     steps_data = plan.get("steps", [])
                     for i, step in enumerate(steps_data):
-                        steps.append({
-                            "id": str(i + 1),
-                            "title": step.get("description", "Step"),
-                            "status": StepStatus.PENDING
-                            if i > 0
-                            else StepStatus.RUNNING,
-                            "started_at": int(time.time() * 1000),
-                        })
+                        steps.append(
+                            {
+                                "id": str(i + 1),
+                                "title": step.get("description", "Step"),
+                                "status": StepStatus.PENDING
+                                if i > 0
+                                else StepStatus.RUNNING,
+                                "started_at": int(time.time() * 1000),
+                            }
+                        )
 
                 return StreamMessage(
                     id=message_id,
@@ -1077,12 +1169,14 @@ class LangGraphAdapter:
                 if phase_id < current_phase_id:
                     status = StepStatus.SUCCESS
 
-                steps.append({
-                    "id": f"{phase_id}",
-                    "title": phase_title,
-                    "status": status,
-                    "started_at": int(time.time() * 1000),
-                })
+                steps.append(
+                    {
+                        "id": f"{phase_id}",
+                        "title": phase_title,
+                        "status": status,
+                        "started_at": int(time.time() * 1000),
+                    }
+                )
 
             return StreamMessage(
                 id=message_id,
@@ -1166,11 +1260,12 @@ class LangGraphAdapter:
             Stop signal data if stop is requested, None otherwise
         """
         stop_flag = self._get_session_value(session_id, "user_stop")
-        if stop_flag and stop_flag > 2:
-            logger.warning(
-                "User requested to stop the task, but the task not stopped, please check the task"
+        if stop_flag:
+            stop_reason = (
+                self._get_session_value(session_id, "stop_reason") or "User requested"
             )
-            return {"stop_requested": True, "stop_reason": "User requested"}
+            logger.info(f"Stop signal detected for session {session_id}: {stop_reason}")
+            return {"stop_requested": True, "stop_reason": stop_reason}
         return None
 
     async def _handle_stop_signal(
@@ -1228,278 +1323,44 @@ class LangGraphAdapter:
 
         return {**detail, **langcrew_info}
 
-    @staticmethod
-    def create_sse_handler(crew):
-        """
-        Create a simple SSE handler for integration with custom servers.
+    def _handle_node_interrupt(
+        self, event_data: dict, event: dict, session_id: str
+    ) -> StreamMessage:
+        """Handle any interrupts - return generic message to user"""
+        chunk_data = event_data.get("chunk", {})
+        interrupt_obj = chunk_data.get("__interrupt__")
 
-        Args:
-            crew: LangCrew Crew instance
+        return self._create_generic_interrupt_message(event, interrupt_obj, session_id)
 
-        Returns:
-            Async function that accepts ExecutionInput and yields SSE strings
-
-        Example:
-            from langcrew.web import LangGraphAdapter
-
-            # Create SSE handler
-            sse_handler = LangGraphAdapter.create_sse_handler(crew)
-
-            # Use in your FastAPI/Flask app
-            @app.post("/chat")
-            async def chat(request: dict):
-                execution_input = ExecutionInput(
-                    session_id=request.get("session_id"),
-                    user_input=request.get("content")
-                )
-
-                return StreamingResponse(
-                    sse_handler(execution_input),
-                    media_type="text/event-stream"
-                )
-        """
-        adapter = LangGraphAdapter(crew)
-        return adapter.execute
-
-    @staticmethod
-    def create_message_generator(crew):
-        """
-        Create a message generator for direct integration without SSE formatting.
-
-        Args:
-            crew: LangCrew Crew instance
-
-        Returns:
-            Async function that yields StreamMessage objects
-
-        Example:
-            from langcrew.web import LangGraphAdapter
-
-            # Create message generator
-            message_gen = LangGraphAdapter.create_message_generator(crew)
-
-            # Use in your custom implementation
-            async for message in message_gen(execution_input):
-                # Process message as needed
-                await websocket.send(message.model_dump_json())
-        """
-        adapter = LangGraphAdapter(crew)
-
-        async def generate_messages(execution_input: ExecutionInput):
-            """Generate StreamMessage objects without SSE formatting."""
-            async for sse_chunk in adapter.execute(execution_input):
-                # Parse SSE format back to message
-                if sse_chunk.startswith("data: "):
-                    message_data = json.loads(sse_chunk[6:].strip())
-                    yield StreamMessage(**message_data)
-
-        return generate_messages
-
-    def _handle_node_interrupt(self, event_data: dict, event: dict) -> StreamMessage | None:
-        """Handle Node-level interrupts (Task/Agent)"""
-        interrupt_obj = event_data.get("__interrupt__")
-        node_name = event.get("name", "")
-        
-        # Only handle Task/Agent node interrupts, skip Tool and User input
-        if not (node_name.startswith(("task__", "agent__")) and interrupt_obj):
-            return None
-            
-        # Check it's not a tool or user_input interrupt type
-        interrupt_value = getattr(interrupt_obj, 'value', {}) if hasattr(interrupt_obj, 'value') else {}
-        interrupt_type = interrupt_value.get('type', '')
-        
-        if interrupt_type in ['tool_interrupt_before', 'tool_interrupt_after', 'user_input']:
-            return None  # Skip, these have their own handling mechanisms
-        
-        return self._create_node_interrupt_message(event, node_name, interrupt_obj)
-
-    def _create_node_interrupt_message(self, event: dict, node_name: str, interrupt_obj) -> StreamMessage:
-        """Create Node interrupt message"""
+    def _create_generic_interrupt_message(
+        self, event: dict, interrupt_obj, session_id: str
+    ) -> StreamMessage:
+        """Create generic interrupt message for user input"""
         message_id = generate_message_id()
-        session_id = self._extract_session_id(event)
         session_language = self._get_session_display_language(session_id)
         is_chinese = session_language == "zh"
-        
-        # Parse interrupt details
-        interrupt_details = self._parse_interrupt_details(interrupt_obj)
-        is_before = interrupt_details.get('timing') == 'before'
-        
-        if node_name.startswith("task__"):
-            task_name = node_name[6:]  # Remove "task__" prefix
-            
-            if is_before:
-                content = f"任务执行前中断: {task_name}" if is_chinese else f"Task before interrupt: {task_name}"
-                interaction_type = "task_interrupt_before"
-            else:
-                content = f"任务执行后中断: {task_name}" if is_chinese else f"Task after interrupt: {task_name}"
-                interaction_type = "task_interrupt_after"
-            
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.USER_INPUT,
-                content=content,
-                detail={
-                    "interaction_type": interaction_type,
-                    "task_name": task_name,
-                    "interrupt_data": {
-                        "type": interaction_type,
-                        "task_name": task_name,
-                        "node_name": node_name,
-                        "timing": "before" if is_before else "after",
-                        "original_state": interrupt_details.get('state', {}),
-                        "editable_fields": {
-                            "messages": interrupt_details.get('input_messages' if is_before else 'output_messages', []),
-                            "context": interrupt_details.get('context', ''),
-                        }
-                    },
-                    "supports_modification": True,
-                    "modification_hint": "You can modify the content before continuing",
-                    "options": ["继续", "修改后继续", "终止"] if is_chinese else ["Continue", "Modify & Continue", "Abort"],
+
+        content = (
+            "执行过程中遇到中断，请提供必要信息以继续执行。"
+            if is_chinese
+            else "Execution interrupted. Please provide necessary information to continue."
+        )
+
+        return StreamMessage(
+            id=message_id,
+            type=MessageType.USER_INPUT,
+            content=content,
+            detail={
+                "interaction_type": "generic_interrupt",
+                "interrupt_data": {
+                    "type": "generic_interrupt",
+                    "interrupt_obj": str(
+                        interrupt_obj
+                    ),  # Convert to string for serialization
+                    "requires_user_input": True,
                 },
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-            
-        elif node_name.startswith("agent__"):
-            agent_name = node_name[7:]  # Remove "agent__" prefix
-            
-            if is_before:
-                content = f"智能体执行前中断: {agent_name}" if is_chinese else f"Agent before interrupt: {agent_name}"
-                interaction_type = "agent_interrupt_before"
-            else:
-                content = f"智能体执行后中断: {agent_name}" if is_chinese else f"Agent after interrupt: {agent_name}"
-                interaction_type = "agent_interrupt_after"
-            
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.USER_INPUT,
-                content=content,
-                detail={
-                    "interaction_type": interaction_type,
-                    "agent_name": agent_name,
-                    "interrupt_data": {
-                        "type": interaction_type,
-                        "agent_name": agent_name,
-                        "node_name": node_name,
-                        "timing": "before" if is_before else "after",
-                        "original_state": interrupt_details.get('state', {}),
-                        "editable_fields": {
-                            "messages": interrupt_details.get('input_messages' if is_before else 'output_messages', []),
-                            "context": interrupt_details.get('context', ''),
-                        }
-                    },
-                    "supports_modification": True,
-                    "modification_hint": "You can modify the content before continuing",
-                    "options": ["继续", "修改后继续", "终止"] if is_chinese else ["Continue", "Modify & Continue", "Abort"],
-                },
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-            )
-        
-        return None
-
-    def _parse_interrupt_details(self, interrupt_obj) -> dict:
-        """Parse interrupt object to get detailed information"""
-        if hasattr(interrupt_obj, 'value'):
-            interrupt_value = interrupt_obj.value
-            return {
-                'timing': interrupt_value.get('timing', 'before'),  # before/after
-                'state': interrupt_value.get('state', {}),
-                'input_messages': interrupt_value.get('input', []),
-                'output_messages': interrupt_value.get('output', []),
-                'context': interrupt_value.get('context', ''),
-            }
-        return {}
-
-    def _process_user_modifications(self, user_input: str, interrupt_data: dict) -> dict:
-        """Handle user modifications, supporting multiple input formats"""
-        
-        # 1. Try to parse JSON format structured modifications
-        if user_input.strip().startswith('{'):
-            try:
-                parsed_input = json.loads(user_input)
-                if isinstance(parsed_input, dict) and self._validate_json_modifications(parsed_input):
-                    return {"action": "modify", "modifications": parsed_input}
-            except json.JSONDecodeError:
-                logger.warning(f"Invalid JSON format in user input: {user_input}")
-        
-        # 2. Handle simple commands
-        normalized_input = user_input.strip().lower()
-        simple_commands = {
-            # Continue commands
-            **dict.fromkeys(["approve", "continue", "继续", "同意"], {"action": "continue"}),
-            # Abort commands  
-            **dict.fromkeys(["reject", "abort", "cancel", "终止", "取消", "拒绝"], {"action": "abort"}),
-        }
-        
-        if normalized_input in simple_commands:
-            return simple_commands[normalized_input]
-        
-        # 3. Handle natural language modification instructions
-        interrupt_type = interrupt_data.get("type", "") if interrupt_data else ""
-        
-        if interrupt_type.endswith("_before"):
-            # Before interrupt: user may want to modify input
-            return {
-                "action": "modify_and_continue",
-                "modifications": {
-                    "type": "natural_language_instruction",
-                    "instruction": user_input,
-                    "target": "input_modification",
-                    "timestamp": int(time.time())
-                }
-            }
-        elif interrupt_type.endswith("_after"):
-            # After interrupt: user may want to modify output
-            return {
-                "action": "modify_and_continue", 
-                "modifications": {
-                    "type": "natural_language_instruction",
-                    "instruction": user_input,
-                    "target": "output_modification",
-                    "timestamp": int(time.time())
-                }
-            }
-        else:
-            # Default handling
-            return {
-                "action": "modify_and_continue",
-                "modifications": {
-                    "type": "natural_language_instruction",
-                    "instruction": user_input,
-                    "timestamp": int(time.time())
-                }
-            }
-
-    def _validate_json_modifications(self, modifications: dict) -> bool:
-        """Validate that JSON modifications have legal structure"""
-        # Check for dangerous operations
-        dangerous_keys = ["__", "eval", "exec", "import", "class", "def"]
-        
-        def check_dangerous_content(obj, path=""):
-            if isinstance(obj, dict):
-                for key, value in obj.items():
-                    if any(dangerous in str(key).lower() for dangerous in dangerous_keys):
-                        logger.warning(f"Dangerous key detected: {path}.{key}")
-                        return False
-                    if not check_dangerous_content(value, f"{path}.{key}"):
-                        return False
-            elif isinstance(obj, list):
-                for i, item in enumerate(obj):
-                    if not check_dangerous_content(item, f"{path}[{i}]"):
-                        return False
-            elif isinstance(obj, str):
-                if any(dangerous in obj.lower() for dangerous in dangerous_keys):
-                    logger.warning(f"Dangerous content detected: {path}")
-                    return False
-            
-            return True
-        
-        return check_dangerous_content(modifications)
-
-    def _extract_session_id(self, event: dict) -> str:
-        """Extract session_id from event"""
-        # Try to get session_id from event metadata or use a default
-        return event.get('metadata', {}).get('session_id', 'unknown_session')
+                "session_id": session_id,
+            },
+            timestamp=int(time.time() * 1000),
+            session_id=session_id,
+        )

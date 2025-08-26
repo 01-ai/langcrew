@@ -30,7 +30,6 @@ COPY libs/langcrew-tools/ ./libs/langcrew-tools/
 
 # Stage 2: Copy project configuration files for dependency installation
 COPY examples/components/web/web_chat/pyproject.toml ./examples/components/web/web_chat/
-COPY examples/components/web/web_chat/uv.lock ./examples/components/web/web_chat/
 
 # Set working directory to web_chat example
 WORKDIR /app/examples/components/web/web_chat
@@ -41,7 +40,7 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 # Create virtual environment and install dependencies using uv sync
 # Note: --prerelease allow is needed for some dependencies (e.g., OpenTelemetry)
 RUN uv venv /opt/venv && \
-    uv sync --frozen --no-dev --prerelease allow
+    uv sync --no-dev --prerelease allow
 
 # Set virtual environment as default
 ENV PATH="/opt/venv/bin:${PATH}" \

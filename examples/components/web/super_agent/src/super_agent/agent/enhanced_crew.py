@@ -186,10 +186,29 @@ class EnhancedCrew(Crew):
         # Execute function callbacks
         for callback_fn in callback_copy:
             try:
-                if inspect.iscoroutinefunction(callback_fn):
-                    prev_result = await callback_fn(prev_result)
-                else:
-                    prev_result = callback_fn(prev_result)
+                if prev_result:
+                    # Handle the case where prev_result might be a list
+                    if isinstance(prev_result, list):
+                        # Process each item in the list through the callback
+                        processed_items = []
+                        for item in prev_result:
+                            if inspect.iscoroutinefunction(callback_fn):
+                                processed_item = await callback_fn(item)
+                            else:
+                                processed_item = callback_fn(item)
+                            if processed_item:
+                                # If processed_item is also a list, extend instead of append
+                                if isinstance(processed_item, list):
+                                    processed_items.extend(processed_item)
+                                else:
+                                    processed_items.append(processed_item)
+                        prev_result = processed_items
+                    else:
+                        # Original logic for dict input
+                        if inspect.iscoroutinefunction(callback_fn):
+                            prev_result = await callback_fn(prev_result)
+                        else:
+                            prev_result = callback_fn(prev_result)
             except Exception as e:
                 logger.error(f"Error in output processing callback: {e}")
 

@@ -15,6 +15,7 @@ from typing import Any, TypeVar, cast
 import yaml
 
 from .agent import Agent
+from .context.config import ContextConfig, create_context_config
 from .crew import Crew
 from .task import Task
 
@@ -324,6 +325,32 @@ def CrewBase(cls: T) -> T:
                 if "llm" in agent_config:
                     llm = self._create_llm_from_config(agent_config["llm"])
 
+                # Process context configuration
+                # Note: ContextConfig.pre_model supports:
+                # - Single strategy: ContextConfigType (current implementation)
+                # - Multiple strategies: list[ContextConfigType] (future enhancement)
+                # - None: No context management
+                context_config = None
+                if "context" in agent_config:
+                    context_data = agent_config["context"]
+
+                    # Handle single strategy configuration (current implementation)
+                    if isinstance(context_data, dict):
+                        strategy_config = create_context_config(context_data)
+                        if strategy_config:
+                            context_config = ContextConfig(pre_model=strategy_config)
+
+                    # Handle multiple strategies configuration
+                    elif isinstance(context_data, list):
+                        strategy_configs = [
+                            create_context_config(config) for config in context_data
+                        ]
+                        strategy_configs = [
+                            config for config in strategy_configs if config
+                        ]
+                        if strategy_configs:
+                            context_config = ContextConfig(pre_model=strategy_configs)
+
                 # Create agent instance - Agent.__init__ handles mutual exclusivity validation
                 agent_instance = Agent(
                     name=name,
@@ -334,6 +361,7 @@ def CrewBase(cls: T) -> T:
                     tools=tools,
                     llm=llm,
                     config=agent_config,  # Pass full config for other properties
+                    context_config=context_config,
                 )
 
                 agents.append(agent_instance)

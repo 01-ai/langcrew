@@ -5,7 +5,7 @@ services:
     ports:
       - "3600:3600"
     volumes:
-      - ./web:/app
+      - ../../../../web:/app
       - /app/node_modules
       - /app/.pnpm-store
     working_dir: /app
@@ -27,7 +27,7 @@ services:
   # Backend API service
   backend:
     build:
-      context: .
+      context: ../../../../
       dockerfile: examples/components/web/web_chat/Dockerfile
     ports:
       - "8000:8000"

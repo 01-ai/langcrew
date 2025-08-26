@@ -3,7 +3,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 
-
 class Driver:
     def __init__(self, url, cookie=None):
         self.driver = self._create_driver(url, cookie)

@@ -14,8 +14,12 @@ class MatchProfileCrew:
 
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"
-
+    
     @crew
     def crew(self) -> Crew:
         """Create and return the crew instance."""
-        return Crew(agents=self.agents, tasks=self.tasks, verbose=True)
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            verbose=True
+        )

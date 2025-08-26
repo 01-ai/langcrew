@@ -6,6 +6,7 @@ in the test suite.
 """
 
 import asyncio
+import json
 import os
 import tempfile
 from collections.abc import AsyncGenerator, Generator
@@ -15,7 +16,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from langchain_core.language_models.fake import FakeListLLM
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 # Set test environment variables
 os.environ["LANGCREW_ENV"] = "test"
@@ -233,6 +234,121 @@ async def async_mock_crew():
     mock.process = "sequential"
     mock.kickoff = Mock(return_value="Async crew execution result")
     return mock
+
+
+# Context-specific fixtures
+@pytest.fixture
+def ai_tool_messages():
+    """Messages with AI+Tool pairs for testing React Agent compatibility."""
+    return [
+        HumanMessage(content="Please analyze this data"),
+        AIMessage(
+            content="I'll use the analysis tool to examine the data",
+            tool_calls=[
+                {"id": "call_1", "name": "analyze_data", "args": {"data": "sample"}}
+            ],
+        ),
+        ToolMessage(content="Analysis complete: Data is valid", tool_call_id="call_1"),
+        AIMessage(content="Based on the analysis, the data looks good"),
+        HumanMessage(content="What about the second dataset?"),
+        AIMessage(
+            content="Let me check the second dataset",
+            tool_calls=[
+                {"id": "call_2", "name": "analyze_data", "args": {"data": "sample2"}}
+            ],
+        ),
+        ToolMessage(
+            content="Analysis complete: Data has some issues", tool_call_id="call_2"
+        ),
+        AIMessage(content="The second dataset needs cleaning"),
+    ]
+
+
+@pytest.fixture
+def large_content_messages():
+    """Messages with large content for compression testing."""
+    return [
+        SystemMessage(content="You are a helpful assistant"),
+        HumanMessage(content="Short question"),
+        AIMessage(content="A" * 2000),  # Very long response
+        ToolMessage(content="B" * 3000, tool_call_id="test"),  # Very long tool output
+        HumanMessage(content="Another short message"),
+        AIMessage(content="C" * 1500),  # Another long response
+    ]
+
+
+@pytest.fixture
+def mixed_message_types():
+    """Mixed message types for type filtering tests."""
+    return [
+        SystemMessage(content="System instruction"),
+        HumanMessage(content="User query 1"),
+        AIMessage(content="AI response 1"),
+        ToolMessage(content="Tool result 1", tool_call_id="1"),
+        HumanMessage(content="User query 2"),
+        AIMessage(content="AI response 2"),
+        SystemMessage(content="Another system message"),
+        HumanMessage(content="User query 3"),
+    ]
+
+
+@pytest.fixture
+def mock_crew_state():
+    """Mock CrewState for context building tests."""
+    from langcrew.types import CrewState, ExecutionPlan
+
+    state = CrewState()
+    state["messages"] = [
+        SystemMessage(content="You are a helpful assistant"),
+        HumanMessage(content="Hello"),
+        AIMessage(content="Hi there!"),
+    ]
+
+    # Create proper ExecutionPlan instance
+    execution_plan = ExecutionPlan()
+    execution_plan.initialize(
+        [
+            {
+                "name": "Analysis",
+                "description": "Analyze the input",
+                "expected_outcomes": ["Analysis complete"],
+            },
+            {
+                "name": "Processing",
+                "description": "Process the results",
+                "expected_outcomes": ["Processing done"],
+            },
+        ],
+        "Test execution plan",
+    )
+
+    state["execution_plan"] = execution_plan
+
+    # Add mock running summary for comprehensive testing
+    state["running_summary"] = "Test conversation summary"
+
+    return state
+
+
+@pytest.fixture
+def json_content_messages():
+    """Messages with JSON content for intelligent compression testing."""
+    json_data = {
+        "type": "tool_use",
+        "input": {
+            "content": "A" * 1000,
+            "text": "B" * 1000,
+            "metadata": {"normal": "data"},
+        },
+        "old_file_content": "Should be removed",
+        "new_file_content": "Should also be removed",
+    }
+
+    return [
+        HumanMessage(content="Test"),
+        AIMessage(content=json.dumps(json_data)),
+        ToolMessage(content='{"result": "' + "C" * 1000 + '"}', tool_call_id="1"),
+    ]
 
 
 # Test markers

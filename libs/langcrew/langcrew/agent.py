@@ -10,6 +10,8 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.utils.runnable import RunnableLike
 
+from .context.config import ContextConfig
+from .context.hooks import create_context_hooks
 from .executors.base import BaseExecutor
 from .executors.factory import ExecutorFactory
 from .guardrail import GuardrailFunc, with_guardrails
@@ -58,6 +60,8 @@ class Agent:
         # Guardrail support
         input_guards: list[GuardrailFunc] | None = None,
         output_guards: list[GuardrailFunc] | None = None,
+        # Context management
+        context_config: ContextConfig | None = None,
     ):
         """Initialize Agent with configuration.
 
@@ -85,6 +89,7 @@ class Agent:
             is_entry: Whether this agent is an entry point for the crew
             input_guards: List of input guardrail functions to apply to all tasks
             output_guards: List of output guardrail functions to apply to all tasks
+            context_config: Context management configuration (ContextConfig instance or None)
         """
         # Handle CrewAI-style config
         if config:
@@ -102,6 +107,12 @@ class Agent:
             # Handle entry agent flag
             if not is_entry and config.get("is_entry"):
                 is_entry = config.get("is_entry", False)
+            # Handle context configuration
+            if context_config is None and config.get("context"):
+                # Import here to avoid circular import
+                from .context.config import create_context_config
+
+                context_config = create_context_config(config.get("context"))
             # Other config options can be added here as needed
 
         # Mutual exclusivity check: cannot use both custom prompt and CrewAI-style attributes
@@ -135,6 +146,9 @@ class Agent:
         self.prompt = prompt
         self.executor_kwargs = executor_kwargs or {}
 
+        # Per-task executor cache to support reusing an agent across multiple tasks
+        self._executors: dict[str, BaseExecutor] = {}
+
         # Guardrail configuration
         self.input_guards = input_guards or []
         self.output_guards = output_guards or []
@@ -158,11 +172,20 @@ class Agent:
             self.memory_config = memory
         else:
             raise ValueError(f"Invalid memory parameter type: {type(memory)}")
-        
+
         self.memory = self.memory_config is not None
 
-        # Hooks
-        self.pre_model_hook = pre_model_hook
+        # Create hooks based on context configuration
+        if context_config:
+            self.pre_model_hook = create_context_hooks(
+                context_config=context_config,
+                user_pre_hook=pre_model_hook,
+                llm=self.llm,
+                verbose=self.verbose,
+            )
+        else:
+            # No context config, use user hooks directly
+            self.pre_model_hook = pre_model_hook
         self.post_model_hook = post_model_hook
 
         # Handoff configuration
@@ -177,7 +200,9 @@ class Agent:
         elif isinstance(hitl, HITLConfig):
             self.hitl_config = hitl
         else:
-            raise ValueError(f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance.")
+            raise ValueError(
+                f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance."
+            )
 
         # Setup HITL configuration
         if self.hitl_config is not None:
@@ -315,6 +340,19 @@ class Agent:
             expected_output="Complete and accurate response to the user's request",
         )
 
+    def _get_executor_cache_key(self, task=None) -> str:
+        """Compute a stable cache key for the executor based on the task.
+
+        - Prefer task name when available to keep keys readable and stable
+        - Fallback to the object's id to differentiate unnamed tasks
+        - Use "default" when no task is provided (agent-only mode)
+        """
+        if task is None:
+            return "default"
+        if getattr(task, "name", None):
+            return f"task_name::{task.name}"
+        return f"task_id::{id(task)}"
+
     def _create_executor(
         self, state: dict[str, Any], task=None, response_format=None
     ) -> BaseExecutor:
@@ -328,7 +366,10 @@ class Agent:
         Returns:
             Configured BaseExecutor instance
         """
-        if self.executor is not None:
+        # Check per-task executor cache first
+        key = self._get_executor_cache_key(task)
+        if key in self._executors:
+            self.executor = self._executors[key]
             return self.executor
 
         # Use task's spec if available, otherwise create default
@@ -389,13 +430,17 @@ class Agent:
             **self.executor_kwargs,
         )
 
+        # Store in cache and return
+        self._executors[key] = self.executor
+        return self.executor
+
     def _prepare_executor_input(
         self, input: dict[str, Any] | None, task=None
     ) -> dict[str, Any] | None:
         """Prepare executor input by building and handling user messages.
 
         Logic flow:
-        1. Get task_spec from executor or create default
+        1. Get task_spec from task or executor
         2. Ensure input is a dictionary (create empty dict if None)
         3. Based on prompt mode:
            - Native prompt: Create minimal HumanMessage with task details
@@ -411,10 +456,12 @@ class Agent:
         Raises:
             ValueError: If task_spec is not found in executor
         """
-        # Get task_spec from executor or task
-        task_spec = getattr(self.executor, "task_spec", None)
-        if task_spec is None and task and hasattr(task, "_spec"):
+        # Prefer provided task's spec; fallback to executor's
+        task_spec = None
+        if task and hasattr(task, "_spec"):
             task_spec = task._spec
+        if task_spec is None:
+            task_spec = getattr(self.executor, "task_spec", None)
         if task_spec is None:
             logger.error("task_spec is required but not found in executor or task")
             raise ValueError("task_spec is required but not found in executor or task")

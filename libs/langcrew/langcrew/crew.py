@@ -121,18 +121,60 @@ class Crew:
             agent.checkpointer = self.checkpointer
             agent.store = self.store
 
-        # msgID -> MsgSource
-        # self._msg_source: dict[str, MsgSource] = {}
-
-        # Create agent to task mapping for handoff mode
-        self._agent_task_map: dict[str, Task] = {}
-        for task in self.tasks:
-            if task.agent.name:  # Check if agent has a name
-                self._agent_task_map[task.agent.name] = task
-
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
         """Inject ToolStateManager into E2BBaseToolV2 and HITLBaseTool instances."""
         return tools
+
+    def _sync_subgraph_message_deletions(
+        self, state: CrewState, result: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Process messages in subgraph results to ensure deletion operations sync to parent graph.
+
+        Design rationale:
+        When LangGraph subgraph runs as a node, if messages are trimmed via pre_model_hook,
+        the root namespace will not sync the RemoveMessage actions.
+        Explicit message state synchronization at node level is required to avoid
+        inconsistent message state between parent and child graphs.
+
+        Args:
+            state: Current CrewState
+            result: Result dictionary returned from ainvoke/invoke
+            item: The executing Task or Agent instance
+
+        Returns:
+            Processed result dictionary with synchronized message deletion operations
+        """
+        if "messages" not in result:
+            return result
+
+        # Extract message IDs that are preserved in the result
+        result_message_ids = {
+            msg.id
+            for msg in result["messages"]
+            if hasattr(msg, "id") and msg.id is not None
+        }
+
+        # Create RemoveMessage markers for original messages not in result
+        from langchain_core.messages.modifier import RemoveMessage
+
+        remove_messages = [
+            RemoveMessage(id=msg.id)
+            for msg in state.get("messages", [])
+            if hasattr(msg, "id")
+            and msg.id is not None
+            and msg.id not in result_message_ids
+        ]
+
+        # Build final message list: deletion operations + preserved messages
+        final_messages = remove_messages + result["messages"]
+
+        if self.verbose and remove_messages:
+            logger.info(
+                f"Message cleanup: removing {len(remove_messages)} messages from state"
+            )
+
+        return {**result, "messages": final_messages}
 
     def _get_task_node_name(self, task: Task, index: int) -> str:
         """Unified task node naming rule with namespace isolation"""
@@ -176,10 +218,10 @@ class Crew:
 
         return interrupt_before, interrupt_after
 
-    def _compile_graph_with_interrupts(
+    def _compile_graph_with_checkpointer(
         self, builder: StateGraph, checkpointer=None
     ) -> CompiledStateGraph:
-        """Compile graph with interrupt configuration applied"""
+        """Compile graph with checkpointer and interrupt configuration applied"""
         interrupt_before, interrupt_after = self._collect_interrupt_config()
 
         compiled = builder.compile(
@@ -273,11 +315,21 @@ class Crew:
             )
             return (state, config)
 
+        def process_result_fn(state: CrewState, result: dict[str, Any], task: Task):
+            # Process message synchronization (resolves subgraph message sync issues)
+            result_with_cleanup = self._sync_subgraph_message_deletions(state, result)
+
+            # Maintain original task_outputs functionality
+            return {
+                **result_with_cleanup,
+                "task_outputs": state.get("task_outputs", []),
+            }
+
         return self._create_generic_node_factory(
             is_async=is_async,
             item_type="task",
             get_invoke_args_fn=get_task_invoke_args,
-            process_result_fn=None,  # Tasks don't need result processing
+            process_result_fn=process_result_fn,
         )
 
     def _build_task_sequential_graph(
@@ -303,7 +355,7 @@ class Crew:
             prev_node = node_name
 
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_interrupts(
+        return self._compile_graph_with_checkpointer(
             builder, checkpointer
         )  # Use interrupt-aware compilation
 
@@ -316,11 +368,15 @@ class Crew:
             config = RunnableConfig(metadata={"langcrew_agent": agent.name})
             return (state, config)
 
+        def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
+            """Process Agent execution result with message synchronization functionality"""
+            return self._sync_subgraph_message_deletions(state, result)
+
         return self._create_generic_node_factory(
             is_async=is_async,
             item_type="agent",
             get_invoke_args_fn=get_agent_invoke_args,
-            process_result_fn=None,
+            process_result_fn=process_result_fn,
         )
 
     def _build_agent_sequential_graph(
@@ -363,15 +419,9 @@ class Crew:
 
         # Last agent connects to END
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_interrupts(
+        return self._compile_graph_with_checkpointer(
             builder, checkpointer
         )  # Use interrupt-aware compilation
-
-    def _compile_graph_with_checkpointer(
-        self, builder: StateGraph, checkpointer=None
-    ) -> CompiledStateGraph:
-        """Legacy method - redirect to new interrupt-aware compilation"""
-        return self._compile_graph_with_interrupts(builder, checkpointer)
 
     def _has_agent_handoffs(self) -> bool:
         """Check if any agents are configured for handoff and validate configuration
@@ -578,11 +628,15 @@ class Crew:
             config = RunnableConfig(metadata={"langcrew_agent": agent.name})
             return (state, config)
 
+        def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
+            """Process Handoff Agent execution result with message synchronization functionality"""
+            return self._sync_subgraph_message_deletions(state, result)
+
         return self._create_generic_node_factory(
             is_async=is_async,
             item_type="agent",
             get_invoke_args_fn=get_handoff_invoke_args,
-            process_result_fn=None,  # Handoff doesn't need result processing
+            process_result_fn=process_result_fn,
         )(agent)
 
     def _build_agent_handoff_graph(
@@ -1427,15 +1481,43 @@ class Crew:
         return self.search_memory(query, memory_type, limit, is_async=True)
 
     def _setup_hitl(self):
-        """Setup HITL (Human-in-the-Loop) for all agents"""
+        """Setup HITL (Human-in-the-Loop) for all agents with configuration validation"""
         if self.verbose:
             logger.info("Setting up HITL tool approval for crew")
+
+        # Determine execution mode and validate HITL configuration
+        execution_mode = self._get_execution_mode()
+
+        # Validate HITL configuration against execution mode
+        if self.hitl_config:
+            self.hitl_config.validate_config(execution_mode)
+
+            if self.verbose:
+                logger.info("HITL Configuration:")
+                print(self.hitl_config.get_configuration_summary())
 
         # Apply crew-level HITL configuration to agents that don't have their own config
         for agent in self.agents:
             if not hasattr(agent, "hitl_config") or agent.hitl_config is None:
                 agent.hitl_config = self.hitl_config
                 agent._setup_hitl()
+
+    def _get_execution_mode(self) -> str:
+        """Determine the execution mode based on crew configuration
+
+        Returns:
+            "task_mode" if crew has tasks (regardless of agents or handoff)
+            "agent_mode" if crew has only agents without tasks
+        """
+        if self.tasks:
+            # Task mode takes priority when tasks are present (regardless of handoff)
+            return "task_mode"
+        elif self.agents:
+            return "agent_mode"
+        else:
+            raise ValueError(
+                "Cannot determine execution mode: no tasks or agents provided"
+            )
 
     # Memory access properties (CrewAI compatibility)
     @property

@@ -8,6 +8,7 @@ from langcrew.task import Task
 from langcrew.project import CrewBase, agent, crew, task
 
 
+
 @CrewBase
 class MapCrew:
     """Map crew"""
@@ -31,7 +32,7 @@ class MapCrew:
         return Agent(
             config=self.agents_config["planner"],
             mcp_servers=mcp_server_configs,
-            mcp_tool_filter=["xxx"],  # 只引入固定的tool
+            mcp_tool_filter=["xxx"], #只引入固定的tool
             llm=self._get_default_llm(),
             verbose=True,
         )
@@ -82,7 +83,7 @@ class MapStreamHttpCrew:
             "url": f"https://mcp.amap.com/mcp?key={os.getenv('AMAP_TOKEN')}",
             "transport": "streamable_http",
         }
-
+        
         mcp_server_configs = {"amap-streamable_http": server_config}
         return Agent(
             config=self.agents_config["planner"],

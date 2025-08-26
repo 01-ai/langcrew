@@ -15,7 +15,10 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from super_agent.common.session_state import SessionState
-from super_agent.common.sandbox_config import create_sandbox_source_by_session_id
+from super_agent.common.sandbox_config import (
+    create_cloud_phone_sandbox_by_session_id,
+    create_sandbox_source_by_session_id,
+)
 from super_agent.config.config import SuperAgentConfig, default_config
 from langcrew_tools.utils.s3.factory import create_s3_client
 from langcrew_tools.hitl.langchain_tools import UserInputTool
@@ -30,6 +33,7 @@ from langcrew_tools.filesystem.langchain_tools import (
 from langcrew_tools.image_gen import ImageGenerationTool
 from langcrew_tools.code_interpreter import CodeInterpreterTool
 from langcrew_tools.commands import RunCommandTool
+from super_agent.tool.cloud_phone_streaming_tool import CloudPhoneStreamingTool
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +100,18 @@ class SuperAgentCrew:
         )
 
     def get_tools(self) -> list[BaseTool]:
-        """Create browser tools"""
         # Web and search tools
         tools = [
             BrowserStreamingTool(
                 vl_llm=self.get_browser_llm(),
                 async_s3_client=self.async_s3_client,
                 # sandbox_source=none_sandbox,
+            ),
+            CloudPhoneStreamingTool(
+                base_model=self.get_llm_client(),
+                sandbox_source=create_cloud_phone_sandbox_by_session_id(
+                    self.session_id, checkpointer=self.checkpointer
+                ),
             ),
             UserInputTool(),
             WebSearchTool(),

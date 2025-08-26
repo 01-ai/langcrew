@@ -1,11 +1,13 @@
 # Message Notify User LangChain Tool
 # Provides user notification functionality for sending messages and deliverables
 
+import asyncio
 import json
 import logging
 import os
 from typing import Any, ClassVar, Literal
 
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from langcrew_tools.utils.s3.client import AsyncS3Client
@@ -33,7 +35,7 @@ class MessageToUserInput(BaseToolInput):
     )
 
 
-class MessageToUserTool(SandboxMixin):
+class MessageToUserTool(BaseTool, SandboxMixin):
     """Tool for sending notifications and messages to users without expecting immediate responses.
 
     This tool is used for:
@@ -60,6 +62,7 @@ class MessageToUserTool(SandboxMixin):
         "Used for progress updates, task completion reports, and general notifications. "
         "Does not expect immediate user response unlike user_input."
     )
+    config: MessageConfig | None = None
 
     def __init__(self, config: MessageConfig | None = None, **kwargs):
         """Initialize MessageToUserTool.
@@ -185,3 +188,13 @@ class MessageToUserTool(SandboxMixin):
             "attachments": attachments or [],
             "intent_type": intent_type,  # Include intent type in return value
         }
+        
+    def _run(
+        self,
+        text: str,
+        attachments: list[str] | str | None = None,
+        intent_type: str | None = "general",
+        **kwargs,
+    ) -> dict[str, Any]:
+        """Send notification to user synchronously."""
+        raise NotImplementedError("message_to_user only supports async execution.")
