@@ -381,7 +381,7 @@ class LangGraphAdapter:
                     task_input.session_id,
                     task_id,
                     "Task completed: abnormal end",
-                    TaskExecutionStatus.ABNORMAL,
+                    TaskExecutionStatus.FAILED,
                 ):
                     yield finish_message
             elif task_input.is_resume and task_ended and not need_user_input:

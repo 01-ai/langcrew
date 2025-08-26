@@ -59,7 +59,6 @@ class TaskExecutionStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     USER_INPUT = "user_input"  # Waiting for user input
-    ABNORMAL = "abnormal"  # Abnormal termination
 
 
 class StepStatus(str, Enum):
