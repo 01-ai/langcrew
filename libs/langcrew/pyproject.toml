@@ -53,6 +53,7 @@ dependencies = [
     "langchain-aws>=0.2.30",
     "boto3>=1.39.7,<2.0.0",
     "aiobotocore>=2.23.1",
+    "litellm>=1.72.6",
 ]
 
 [project.urls]

@@ -10,6 +10,8 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.utils.runnable import RunnableLike
 
+from .context.config import ContextConfig
+from .context.hooks import create_context_hooks
 from .executors.base import BaseExecutor
 from .executors.factory import ExecutorFactory
 from .guardrail import GuardrailFunc, with_guardrails
@@ -58,6 +60,8 @@ class Agent:
         # Guardrail support
         input_guards: list[GuardrailFunc] | None = None,
         output_guards: list[GuardrailFunc] | None = None,
+        # Context management
+        context_config: ContextConfig | None = None,
     ):
         """Initialize Agent with configuration.
 
@@ -85,6 +89,7 @@ class Agent:
             is_entry: Whether this agent is an entry point for the crew
             input_guards: List of input guardrail functions to apply to all tasks
             output_guards: List of output guardrail functions to apply to all tasks
+            context_config: Context management configuration (ContextConfig instance or None)
         """
         # Handle CrewAI-style config
         if config:
@@ -102,6 +107,12 @@ class Agent:
             # Handle entry agent flag
             if not is_entry and config.get("is_entry"):
                 is_entry = config.get("is_entry", False)
+            # Handle context configuration
+            if context_config is None and config.get("context"):
+                # Import here to avoid circular import
+                from .context.config import create_context_config
+
+                context_config = create_context_config(config.get("context"))
             # Other config options can be added here as needed
 
         # Mutual exclusivity check: cannot use both custom prompt and CrewAI-style attributes
@@ -164,8 +175,17 @@ class Agent:
 
         self.memory = self.memory_config is not None
 
-        # Hooks
-        self.pre_model_hook = pre_model_hook
+        # Create hooks based on context configuration
+        if context_config:
+            self.pre_model_hook = create_context_hooks(
+                context_config=context_config,
+                user_pre_hook=pre_model_hook,
+                llm=self.llm,
+                verbose=self.verbose,
+            )
+        else:
+            # No context config, use user hooks directly
+            self.pre_model_hook = pre_model_hook
         self.post_model_hook = post_model_hook
 
         # Handoff configuration
