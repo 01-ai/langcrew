@@ -130,23 +130,8 @@ class AdapterServer:
                     async for chunk in self.adapter.execute(task_input):
                         yield chunk
 
-                except asyncio.CancelledError:
-                    # Client disconnected - just log and exit gracefully
-                    # Don't re-raise, let the generator end naturally
-                    logger.info(f"Client disconnected for session: {session_id}")
-                    return  # Exit generator cleanly
-
                 except Exception as e:
                     logger.error(f"Execution failed for session {session_id}: {e}")
-                    error_message = StreamMessage(
-                        id=generate_message_id(),
-                        role="assistant",
-                        type=MessageType.ERROR,
-                        content=f"Execution failed: {str(e)}",
-                        timestamp=int(time.time() * 1000),
-                        session_id=session_id,
-                    )
-                    yield await self.adapter._format_sse_message(error_message)
 
             return StreamingResponse(
                 generate(),

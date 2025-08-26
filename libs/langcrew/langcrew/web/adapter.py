@@ -153,30 +153,28 @@ class LangGraphAdapter:
 
     # ============ CORE EXECUTION LOGIC ============
 
-    def _build_config(self, session_id: str, config: RunnableConfig | None = None) -> RunnableConfig:
+    def _build_config(
+        self, session_id: str, config: RunnableConfig | None = None
+    ) -> RunnableConfig:
         """Build RunnableConfig for LangGraph execution.
-        
+
         Args:
             session_id: Session identifier used as thread_id
             config: Optional RunnableConfig for advanced users
-            
+
         Returns:
             RunnableConfig with session_id properly set as thread_id
         """
         if config:
             # Advanced users provide RunnableConfig, ensure session_id is set
-            result_config = config.copy() if hasattr(config, 'copy') else dict(config)
+            result_config = config.copy() if hasattr(config, "copy") else dict(config)
             if "configurable" not in result_config:
                 result_config["configurable"] = {}
             result_config["configurable"]["thread_id"] = session_id
             return result_config
-        
+
         # Default configuration for normal users
-        return {
-            "configurable": {
-                "thread_id": session_id
-            }
-        }
+        return {"configurable": {"thread_id": session_id}}
 
     def _prepare_input(self, task_input: TaskInput):
         """Prepare input data for execution based on execution mode."""
@@ -407,7 +405,7 @@ class LangGraphAdapter:
             # ============ 5. CLEANUP ============
             # Clear task-specific stop flag
             self._clear_stop_flag(task_id)
-            logger.debug(
+            logger.info(
                 f"Task cleanup completed for session {task_input.session_id}, task {task_id}"
             )
 
