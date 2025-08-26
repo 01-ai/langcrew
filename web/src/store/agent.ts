@@ -12,6 +12,7 @@ import {
   MessageItem,
 } from '@/types';
 import { isFunction } from 'lodash-es';
+import { transformChunksToMessages } from '@/hooks/useChat/utils';
 
 interface AgentStore {
   // Agent基本信息
@@ -177,14 +178,16 @@ const useAgentStore = create<AgentStore>((set, get) => ({
   setFileViewerFile: (fileViewerFile?: E2BFile) => set({ fileViewerFile, workspaceVisible: false }),
   setTaskStage: (taskStage: TaskStage) => set({ taskStage }),
   setTaskPlan: (taskPlan: PlanStep[]) => set({ taskPlan }),
-  setChunks: (payload: MessageChunk[] | ((prev: MessageChunk[]) => MessageChunk[])) =>
-    set(({ chunks }) => ({
-      chunks: isFunction(payload) ? payload(chunks) : payload,
-    })),
-  addChunk: (chunk: MessageChunk) =>
-    set(({ chunks }) => ({
-      chunks: [...chunks, chunk],
-    })),
+  setChunks: (payload: MessageChunk[] | ((prev: MessageChunk[]) => MessageChunk[])) => {
+    const newChunks = isFunction(payload) ? payload(get().chunks) : payload;
+    const newMessages = transformChunksToMessages(newChunks);
+    set({ pipelineMessages: newMessages, chunks: newChunks });
+  },
+  addChunk: (chunk: MessageChunk) => {
+    const newChunks = [...get().chunks, chunk];
+    const newMessages = transformChunksToMessages(newChunks);
+    set({ pipelineMessages: newMessages, chunks: newChunks });
+  },
   clearChunks: () => set({ chunks: [] }),
   setSenderLoading: (senderLoading: boolean) => set({ senderLoading }),
   setSenderStopping: (senderStopping: boolean) => set({ senderStopping }),
