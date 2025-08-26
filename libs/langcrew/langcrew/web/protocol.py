@@ -117,6 +117,7 @@ class ChatRequest(BaseModel):
 
     message: str
     session_id: str | None = None
+    language: str | None = None  # Language preference for tool display and responses
     interrupt_data: dict[str, Any] | None = None  # For resume scenarios
 
 

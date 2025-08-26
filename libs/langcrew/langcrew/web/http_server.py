@@ -118,6 +118,7 @@ class AdapterServer:
                     execution_input = ExecutionInput(
                         session_id=session_id,
                         user_input=request.message,
+                        language=request.language,
                         interrupt_data=request.interrupt_data,
                     )
 
