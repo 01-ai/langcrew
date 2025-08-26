@@ -466,7 +466,12 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
 
   const stop = useCallback(() => {
     useAgentStore.getState().setSenderStopping(true);
-    sessionApi.stopTask(sessionIdRef.current);
+    const lastItemWithTaskId = useAgentStore.getState().chunks.findLast((chunk) => chunk?.task_id);
+    if (lastItemWithTaskId?.task_id) {
+      sessionApi.stopTask(lastItemWithTaskId?.task_id);
+    } else {
+      message.error('没有找到任务id，无法停止任务');
+    }
   }, []);
 
   // effects

@@ -84,15 +84,17 @@ export function isPlanChunk(message: MessageChunk) {
   return message.type === 'plan';
 }
 
-export const transformChunksToMessages = (chunks: MessageChunk[]) => {
+export const transformChunksToMessages = (chunks: MessageChunk[], existingMessages: MessageItem[] = []) => {
   // 创建 chunks 的深拷贝，避免修改原始数据
   // 使用 lodash cloneDeep 进行高性能深拷贝
   const chunksCopy = cloneDeep(chunks);
   // 要返回的
-  const newMessages: MessageItem[] = [];
+  const newMessages: MessageItem[] = existingMessages.slice();
 
   // 当前的AI消息
-  let currentAIMessage: MessageItem | null = null;
+  let currentAIMessage: MessageItem | undefined = newMessages.findLast((msg) => msg.role === 'assistant');
+
+  const existingAIMessage = !!currentAIMessage;
 
   // 最后一个live_status，别的live_status不显示
   const latestLiveStatusChunk = chunksCopy
@@ -124,7 +126,9 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
         currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
         currentAIMessage = hideFutureSteps(currentAIMessage);
         currentAIMessage = hideEmptySteps(currentAIMessage);
-        newMessages.push(currentAIMessage);
+        if (!existingAIMessage) {
+          newMessages.push(currentAIMessage);
+        }
         currentAIMessage = null;
       }
 
@@ -262,6 +266,11 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
     if (plan) {
       const step = plan.children.find((step: PlanStep) => step.status === 'running');
       if (step) {
+        const lastItem = step.children[step.children.length - 1];
+        if (lastItem?.detail?.run_id === chunk.detail?.run_id) {
+          lastItem.content += chunk.content;
+          continue;
+        }
         step.children.push(chunk);
         continue;
       }
@@ -269,7 +278,13 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
 
     // 没有step_id，则添加到messages中
     currentAIMessage = filterLiveStatus(currentAIMessage);
-    currentAIMessage.messages.push(chunk);
+    const lastItem = currentAIMessage.messages[currentAIMessage.messages.length - 1];
+
+    if (lastItem?.detail?.run_id === chunk.detail?.run_id) {
+      lastItem.content += chunk.content;
+    } else {
+      currentAIMessage.messages.push(chunk);
+    }
     continue;
   }
 
@@ -280,7 +295,9 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
     }
     currentAIMessage = hideFutureSteps(currentAIMessage);
     currentAIMessage = hideEmptySteps(currentAIMessage);
-    newMessages.push(currentAIMessage);
+    if (!existingAIMessage) {
+      newMessages.push(currentAIMessage);
+    }
   }
 
   // 如果最后一条是user，则添加一个live_status，用于显示任务执行中

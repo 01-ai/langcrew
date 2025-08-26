@@ -185,7 +185,7 @@ const useAgentStore = create<AgentStore>((set, get) => ({
   },
   addChunk: (chunk: MessageChunk) => {
     const newChunks = [...get().chunks, chunk];
-    const newMessages = transformChunksToMessages(newChunks);
+    const newMessages = transformChunksToMessages([chunk], get().pipelineMessages);
     set({ pipelineMessages: newMessages, chunks: newChunks });
   },
   clearChunks: () => set({ chunks: [] }),
