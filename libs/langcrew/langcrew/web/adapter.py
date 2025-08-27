@@ -68,7 +68,7 @@ class LangGraphAdapter:
         self.crew = crew
         self.compiled_graph = compiled_graph
 
-        self._task_stop_flags: dict[str, dict[str, Any]] = {}  # task_id -> stop_info
+        self._session_stop_flags: dict[str, dict[str, Any]] = {}  # session_id -> stop_info
 
     # ============ PROPERTIES ============
 
@@ -93,34 +93,36 @@ class LangGraphAdapter:
 
     def _get_task_id(self, task_input: TaskInput) -> str:
         """Generate a unique task ID for this execution."""
-        # Use session_id + timestamp for task-level control
-        return f"{task_input.session_id}_{int(time.time() * 1000)}"
+        # Use complete session_id + timestamp suffix for task-level control
+        timestamp = int(time.time() * 1000)
+        timestamp_suffix = str(timestamp)[-6:]  # 取时间戳后6位
+        return f"{task_input.session_id}_{timestamp_suffix}"
 
-    def set_stop_flag(self, task_id: str, reason: str = "User stopped") -> bool:
-        """Set stop flag for a specific task."""
-        self._task_stop_flags[task_id] = {
+    def set_stop_flag(self, session_id: str, reason: str = "User stopped") -> bool:
+        """Set stop flag for a specific session."""
+        self._session_stop_flags[session_id] = {
             "stop_requested": True,
             "stop_reason": reason,
             "timestamp": int(time.time() * 1000),
         }
-        logger.info(f"Stop flag set for task {task_id}: {reason}")
+        logger.info(f"Stop flag set for session {session_id}: {reason}")
         return True
 
-    def _get_stop_flag(self, task_id: str) -> dict[str, Any] | None:
-        """Get stop flag for a specific task."""
-        if task_id in self._task_stop_flags:
-            stop_info = self._task_stop_flags[task_id]
+    def _get_stop_flag(self, session_id: str) -> dict[str, Any] | None:
+        """Get stop flag for a specific session."""
+        if session_id in self._session_stop_flags:
+            stop_info = self._session_stop_flags[session_id]
             logger.info(
-                f"Stop flag detected for task {task_id}: {stop_info.get('stop_reason')}"
+                f"Stop flag detected for session {session_id}: {stop_info.get('stop_reason')}"
             )
             return stop_info
         return None
 
-    def _clear_stop_flag(self, task_id: str) -> None:
-        """Clear stop flag for a specific task."""
-        if task_id in self._task_stop_flags:
-            del self._task_stop_flags[task_id]
-            logger.info(f"Stop flag cleared for task {task_id}")
+    def _clear_stop_flag(self, session_id: str) -> None:
+        """Clear stop flag for a specific session."""
+        if session_id in self._session_stop_flags:
+            del self._session_stop_flags[session_id]
+            logger.info(f"Stop flag cleared for session {session_id}")
 
     # ============ LANGUAGE MANAGEMENT ============
 
@@ -195,9 +197,6 @@ class LangGraphAdapter:
     ) -> AsyncGenerator[str, None]:
         """Unified execution method for both new conversations and resume scenarios."""
 
-        # Generate unique task ID for this execution
-        task_id = self._get_task_id(task_input)
-
         try:
             # ============ 1. INITIALIZATION ============
             # Local execution state (no instance state)
@@ -206,10 +205,14 @@ class LangGraphAdapter:
             need_user_input = False
             should_send_messages = True
 
+            # Generate unique task ID for this execution
+            task_id = self._get_task_id(task_input)
+
             # Log task start with context
             logger.info(
                 f"Starting execution for session {task_input.session_id}, task {task_id}"
             )
+
 
             # Get display language (stateless)
             display_language = self._get_display_language(
@@ -236,6 +239,17 @@ class LangGraphAdapter:
             async for event in self.executor.astream_events(
                 input=input_data, config=config
             ):
+                # -------- 2.0 Early Stop Check --------
+                # Check stop signal at the beginning of each event processing
+                control_data = self._get_stop_flag(task_input.session_id)
+                if control_data:
+                    task_ended = True
+                    async for stop_message in self._handle_stop_signal(
+                        task_input.session_id, task_id, control_data
+                    ):
+                        yield stop_message
+                    break
+
                 event_type = event.get("event")
                 event_data = event.get("data", {})
 
@@ -249,7 +263,11 @@ class LangGraphAdapter:
                     yield await self._format_sse_message(interrupt_message)
 
                 # Resume mode: enable messages after tool completion events
-                if task_input.is_resume and event_type == "on_custom_event":
+                if (
+                    task_input.is_resume
+                    and not should_send_messages
+                    and event_type == "on_custom_event"
+                ):
                     event_name = event.get("name")
                     if event_name in [
                         "on_langcrew_user_input_completed",
@@ -294,21 +312,6 @@ class LangGraphAdapter:
                             TaskExecutionStatus.FAILED,
                         ):
                             yield finish_message
-                        break
-
-                # Check stop signal - USER REQUESTED TERMINATION
-                if event_type in [
-                    "on_tool_end",
-                    "on_chat_model_end",
-                    "on_custom_event",
-                ]:
-                    control_data = self._get_stop_flag(task_id)
-                    if control_data:
-                        task_ended = True
-                        async for stop_message in self._handle_stop_signal(
-                            task_input.session_id, task_id, control_data
-                        ):
-                            yield stop_message
                         break
 
                 # -------- 2.3 Tool Internal Event Filtering --------
@@ -403,8 +406,8 @@ class LangGraphAdapter:
                 yield finish_message
         finally:
             # ============ 5. CLEANUP ============
-            # Clear task-specific stop flag
-            self._clear_stop_flag(task_id)
+            # Clear session-specific stop flag
+            self._clear_stop_flag(task_input.session_id)
             logger.info(
                 f"Task cleanup completed for session {task_input.session_id}, task {task_id}"
             )

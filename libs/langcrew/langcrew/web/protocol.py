@@ -124,5 +124,5 @@ class ChatRequest(BaseModel):
 class StopRequest(BaseModel):
     """Stop request for stopping chat execution"""
 
-    task_id: str
+    session_id: str
     reason: str = "User stopped"

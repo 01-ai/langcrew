@@ -2,7 +2,6 @@
 LangCrew HTTP Server - Minimal & Focused
 """
 
-import asyncio
 import logging
 import time
 import uuid
@@ -12,7 +11,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from ..utils.message_utils import generate_message_id
 from .adapter import LangGraphAdapter
 from .protocol import (
     ChatRequest,
@@ -21,6 +19,7 @@ from .protocol import (
     StreamMessage,
     TaskInput,
 )
+from ..utils.message_utils import generate_message_id
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +93,14 @@ class AdapterServer:
             # Session ID handling - unified logic for empty/None session_id
             is_new_session = not request.session_id or request.session_id.strip() == ""
             session_id = (
-                f"session_{uuid.uuid4().hex[:16]}"
+                uuid.uuid4().hex[:16]  # 16位十六进制，无前缀
                 if is_new_session
                 else request.session_id
             )
 
             async def generate():
                 try:
-                    # Send session init for new sessions
+                    # Send SESSION_INIT message for new sessions
                     if is_new_session:
                         init_message = StreamMessage(
                             id=generate_message_id(),
@@ -146,27 +145,27 @@ class AdapterServer:
         @app.post("/api/v1/chat/stop", summary="Stop chat execution")
         async def stop_chat(request: StopRequest):
             """
-            Stop chat execution by task ID
+            Stop chat execution by session ID
 
-            This endpoint stops a specific task by its task_id.
-            The task_id should be obtained from the chat API response headers.
+            This endpoint stops the current execution for a specific session.
+            The session_id can be obtained from the chat API response headers.
             """
             success = False
             if hasattr(self.adapter, "set_stop_flag"):
                 try:
                     success = self.adapter.set_stop_flag(
-                        request.task_id, request.reason
+                        request.session_id, request.reason
                     )
                 except Exception as e:
-                    logger.error(f"Failed to stop task {request.task_id}: {e}")
+                    logger.error(f"Failed to stop session {request.session_id}: {e}")
 
             return {
                 "success": success,
-                "task_id": request.task_id,
+                "session_id": request.session_id,
                 "reason": request.reason,
                 "message": "Stop request sent"
                 if success
-                else "Task not found or stop failed",
+                else "Session not found or stop failed",
             }
 
     def run(self, host: str = "0.0.0.0", port: int = 8000, **kwargs):
