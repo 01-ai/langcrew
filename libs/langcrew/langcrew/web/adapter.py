@@ -114,13 +114,7 @@ class LangGraphAdapter:
 
     def _get_stop_flag(self, session_id: str) -> dict[str, Any] | None:
         """Get stop flag for a specific session."""
-        if session_id in self._session_stop_flags:
-            stop_info = self._session_stop_flags[session_id]
-            logger.info(
-                f"Stop flag detected for session {session_id}: {stop_info.get('stop_reason')}"
-            )
-            return stop_info
-        return None
+        return self._session_stop_flags.get(session_id)
 
     def _clear_stop_flag(self, session_id: str) -> None:
         """Clear stop flag for a specific session."""
