@@ -90,7 +90,7 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
     }
     const data = JSON.parse(chunk) as MessageChunk;
 
-    devLog('handleChunk', data);
+    // devLog('handleChunk', data);
 
     // 如果send返回了user消息，说明是add_message的返回，此时需要设置senderLoading为false
     if (data.role === 'user') {
