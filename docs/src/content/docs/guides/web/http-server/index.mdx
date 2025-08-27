@@ -92,7 +92,7 @@ server = create_server(crew)
 # Override CORS settings
 server.app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://yourdomain.com"],
+    allow_origins=["http://localhost:3600", "https://yourdomain.com"],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -195,7 +195,7 @@ LANGCREW_WORKERS=4
 LANGCREW_LOG_LEVEL=info
 
 # CORS settings
-LANGCREW_CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
+LANGCREW_CORS_ORIGINS=http://localhost:3600,https://yourdomain.com
 ```
 
 ## Monitoring and Logging

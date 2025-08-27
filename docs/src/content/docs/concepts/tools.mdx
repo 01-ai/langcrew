@@ -59,7 +59,7 @@ wikipedia = ToolRegistry.get_tool("langchain:wikipedia")
 Application-specific tools you create:
 
 ```python
-from langcrew.tools import tool
+from langcrew.tools.converter import tool
 
 @tool
 def custom_database_query(query: str) -> str:

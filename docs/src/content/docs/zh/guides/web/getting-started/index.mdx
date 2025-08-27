@@ -55,17 +55,12 @@ agent = Agent(
 crew = Crew(agents=[agent])
 
 # 创建并启动服务器
-server = create_server(
-    crew=crew,
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["http://localhost:3000"]
-)
+server = create_server(crew)
 
 # 启动服务器
 if __name__ == "__main__":
-    print("正在启动Web服务器，地址：http://localhost:8000")
-    server.run()
+    print("正在启动Web服务器，地址：http://0.0.0.0:8000")
+    server.run(host="0.0.0.0", port=8000)
 ```
 
 ### 方式二：使用LangGraph
@@ -82,17 +77,12 @@ def create_workflow():
 
 # 使用LangGraph创建服务器
 compiled_graph = create_workflow()
-server = create_langgraph_server(
-    graph=compiled_graph,
-    host="0.0.0.0",
-    port=8000,
-    cors_origins=["http://localhost:3000"]
-)
+server = create_langgraph_server(compiled_graph)
 
 # 启动服务器
 if __name__ == "__main__":
-    print("正在启动LangGraph Web服务器，地址：http://localhost:8000")
-    server.run()
+    print("正在启动LangGraph Web服务器，地址：http://0.0.0.0:8000")
+    server.run(host="0.0.0.0", port=8000)
 ```
 
 ## 测试您的服务器
@@ -113,7 +103,7 @@ pnpm install
 # 启动开发服务器
 pnpm dev
 
-# 在浏览器中打开 http://localhost:3000/chat
+# 在浏览器中打开 http://localhost:3600/chat
 ```
 
 Web UI包括：
@@ -237,7 +227,7 @@ pnpm install
 pnpm dev
 ```
 
-在浏览器中打开 **[http://localhost:3000/chat](http://localhost:3000/chat)**
+在浏览器中打开 **[http://localhost:3600/chat](http://localhost:3600/chat)**
 
 ## 下一步
 

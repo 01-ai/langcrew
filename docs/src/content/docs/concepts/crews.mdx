@@ -92,7 +92,7 @@ crew = Crew(
 )
 
 # Each agent processes the user input in order
-result = crew.kickoff({"messages": [HumanMessage(content="Analyze market trends")]})
+result = crew.invoke({"messages": [HumanMessage(content="Analyze market trends")]})
 ```
 
 ### Dynamic Handoffs
