@@ -68,7 +68,9 @@ class LangGraphAdapter:
         self.crew = crew
         self.compiled_graph = compiled_graph
 
-        self._session_stop_flags: dict[str, dict[str, Any]] = {}  # session_id -> stop_info
+        self._session_stop_flags: dict[
+            str, dict[str, Any]
+        ] = {}  # session_id -> stop_info
 
     # ============ PROPERTIES ============
 
@@ -98,7 +100,9 @@ class LangGraphAdapter:
         timestamp_suffix = str(timestamp)[-6:]  # 取时间戳后6位
         return f"{task_input.session_id}_{timestamp_suffix}"
 
-    def set_stop_flag(self, session_id: str, reason: str = "User stopped") -> bool:
+    async def set_stop_flag(
+        self, session_id: str, reason: str = "User stopped"
+    ) -> bool:
         """Set stop flag for a specific session."""
         self._session_stop_flags[session_id] = {
             "stop_requested": True,
@@ -213,7 +217,6 @@ class LangGraphAdapter:
                 f"Starting execution for session {task_input.session_id}, task {task_id}"
             )
 
-
             # Get display language (stateless)
             display_language = self._get_display_language(
                 task_input.message,
@@ -257,6 +260,15 @@ class LangGraphAdapter:
 
                 # Handle LangGraph native node interrupts
                 if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
+                    chunk_data = event_data.get("chunk", {})
+                    interrupt_obj = chunk_data.get("__interrupt__")
+
+                    # Skip tool interrupts
+                    if isinstance(interrupt_obj, dict) and interrupt_obj.get(
+                        "type"
+                    ) in ["tool_interrupt_before", "tool_interrupt_after"]:
+                        continue  # Don't send generic interrupt message for tool interrupts
+
                     interrupt_message = self._handle_node_interrupt(
                         event_data, event, task_input.session_id, task_id
                     )

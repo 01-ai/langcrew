@@ -2,6 +2,7 @@
 LangCrew HTTP Server - Minimal & Focused
 """
 
+import asyncio
 import logging
 import time
 import uuid
@@ -129,6 +130,12 @@ class AdapterServer:
                     async for chunk in self.adapter.execute(task_input):
                         yield chunk
 
+                except asyncio.CancelledError:
+                    # Client disconnected - just log and exit gracefully
+                    # Don't re-raise, let the generator end naturally
+                    logger.warning(f"Client disconnected for session: {session_id}")
+                    return
+
                 except Exception as e:
                     logger.error(f"Execution failed for session {session_id}: {e}")
 
@@ -153,7 +160,7 @@ class AdapterServer:
             success = False
             if hasattr(self.adapter, "set_stop_flag"):
                 try:
-                    success = self.adapter.set_stop_flag(
+                    success = await self.adapter.set_stop_flag(
                         request.session_id, request.reason
                     )
                 except Exception as e:
