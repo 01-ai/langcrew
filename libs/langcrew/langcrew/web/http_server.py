@@ -116,7 +116,7 @@ class AdapterServer:
                             session_id=session_id,
                             task_id="",
                         )
-                        yield await self.adapter._format_sse_message(init_message)
+                        yield self.adapter._format_sse_message(init_message)
 
                     # Create task input
                     task_input = TaskInput(

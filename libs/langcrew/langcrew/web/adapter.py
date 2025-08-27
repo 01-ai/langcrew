@@ -192,7 +192,7 @@ class LangGraphAdapter:
                 messages.append(HumanMessage(content=task_input.message))
             return {"messages": messages}
 
-    async def _format_sse_message(self, message: StreamMessage) -> str:
+    def _format_sse_message(self, message: StreamMessage) -> str:
         """Format a message for SSE transmission."""
         return f"data: {message.model_dump_json()}\n\n"
 
@@ -248,13 +248,12 @@ class LangGraphAdapter:
                 if control_data:
                     task_ended = True
                     stop_reason = control_data.get("stop_reason", "User requested")
-                    async for finish_message in self._handle_finish_signal(
+                    yield self._handle_finish_signal(
                         task_input.session_id,
                         task_id,
                         stop_reason,
                         TaskExecutionStatus.CANCELLED,
-                    ):
-                        yield finish_message
+                    )
                     break
 
                 event_type = event.get("event")
@@ -293,7 +292,7 @@ class LangGraphAdapter:
                     interrupt_message = self._handle_node_interrupt(
                         event_data, task_input.session_id, task_id
                     )
-                    yield await self._format_sse_message(interrupt_message)
+                    yield self._format_sse_message(interrupt_message)
 
                 # Resume mode: enable messages after tool completion events
                 if (
@@ -330,21 +329,19 @@ class LangGraphAdapter:
                             if need_user_input
                             else "Task completed"
                         )
-                        async for finish_message in self._handle_finish_signal(
+                        yield self._handle_finish_signal(
                             task_input.session_id, task_id, reason, status
-                        ):
-                            yield finish_message
+                        )
                         break
                     elif event_type == "on_chain_error":
                         task_ended = True
                         error_msg = event.get("data", {}).get("error", "Unknown error")
-                        async for finish_message in self._handle_finish_signal(
+                        yield self._handle_finish_signal(
                             task_input.session_id,
                             task_id,
                             f"Task failed: {error_msg}",
                             TaskExecutionStatus.FAILED,
-                        ):
-                            yield finish_message
+                        )
                         break
 
                 # -------- 2.4 Tool Internal Event Filtering --------
@@ -398,27 +395,25 @@ class LangGraphAdapter:
                         ):
                             need_user_input = True
 
-                        yield await self._format_sse_message(message)
+                        yield self._format_sse_message(message)
 
             # ============ 3. COMPLETION HANDLING ============
 
             # Handle abnormal completion
             if not task_ended:
-                async for finish_message in self._handle_finish_signal(
+                yield self._handle_finish_signal(
                     task_input.session_id,
                     task_id,
                     "Task completed: abnormal end",
                     TaskExecutionStatus.FAILED,
-                ):
-                    yield finish_message
+                )
 
         except Exception as e:
             # ============ 4. ERROR HANDLING ============
             logger.error(f"Execution failed: {e}")
-            async for finish_message in self._handle_finish_signal(
+            yield self._handle_finish_signal(
                 task_input.session_id, task_id, str(e), TaskExecutionStatus.FAILED
-            ):
-                yield finish_message
+            )
         finally:
             # ============ 5. CLEANUP ============
             # Clear session-specific stop flag
@@ -1107,15 +1102,15 @@ class LangGraphAdapter:
 
         return original_msg
 
-    async def _handle_finish_signal(
+    def _handle_finish_signal(
         self,
         session_id: str,
         task_id: str,
         reason: str = "Task completed",
         status: TaskExecutionStatus = TaskExecutionStatus.COMPLETED,
-    ):
+    ) -> str:
         """Send finish signal."""
-        yield await self._format_sse_message(
+        return self._format_sse_message(
             StreamMessage(
                 id=generate_message_id(),
                 type=MessageType.FINISH_REASON,

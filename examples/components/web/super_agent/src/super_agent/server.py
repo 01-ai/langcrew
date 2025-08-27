@@ -140,7 +140,7 @@ def create_app() -> FastAPI:
                         timestamp=int(time.time() * 1000),
                         session_id=session_id,
                     )
-                    yield await adapter._format_sse_message(init_message)
+                    yield adapter._format_sse_message(init_message)
 
                 # Create task input
                 task_input = TaskInput(
@@ -170,7 +170,7 @@ def create_app() -> FastAPI:
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
                 )
-                yield await adapter._format_sse_message(error_message)
+                yield adapter._format_sse_message(error_message)
 
             finally:
                 logger.info(f"Session {session_id} completed")
