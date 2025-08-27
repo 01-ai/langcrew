@@ -247,10 +247,14 @@ class LangGraphAdapter:
                 control_data = self._get_stop_flag(task_input.session_id)
                 if control_data:
                     task_ended = True
-                    async for stop_message in self._handle_stop_signal(
-                        task_input.session_id, task_id, control_data
+                    stop_reason = control_data.get("stop_reason", "User requested")
+                    async for finish_message in self._handle_finish_signal(
+                        task_input.session_id,
+                        task_id,
+                        stop_reason,
+                        TaskExecutionStatus.CANCELLED,
                     ):
-                        yield stop_message
+                        yield finish_message
                     break
 
                 event_type = event.get("event")
@@ -287,7 +291,7 @@ class LangGraphAdapter:
                             continue  # Don't send generic interrupt message
 
                     interrupt_message = self._handle_node_interrupt(
-                        event_data, event, task_input.session_id, task_id
+                        event_data, task_input.session_id, task_id
                     )
                     yield await self._format_sse_message(interrupt_message)
 
@@ -394,16 +398,7 @@ class LangGraphAdapter:
                         ):
                             need_user_input = True
 
-                        # Handle special tool events
-                        message = await self._handle_special_tool_events(
-                            event,
-                            task_input.session_id,
-                            task_id,
-                            message,
-                            display_language,
-                        )
-                        if message:
-                            yield await self._format_sse_message(message)
+                        yield await self._format_sse_message(message)
 
             # ============ 3. COMPLETION HANDLING ============
 
@@ -1117,14 +1112,14 @@ class LangGraphAdapter:
         session_id: str,
         task_id: str,
         reason: str = "Task completed",
-        status: str = "completed",
+        status: TaskExecutionStatus = TaskExecutionStatus.COMPLETED,
     ):
         """Send finish signal."""
         yield await self._format_sse_message(
             StreamMessage(
                 id=generate_message_id(),
                 type=MessageType.FINISH_REASON,
-                content="Task finished",
+                content=reason,
                 detail={"reason": reason, "status": status},
                 role="assistant",
                 timestamp=int(time.time() * 1000),
@@ -1133,43 +1128,19 @@ class LangGraphAdapter:
             )
         )
 
-    async def _handle_stop_signal(
-        self,
-        session_id: str,
-        task_id: str,
-        control_data: dict[str, Any],
-    ):
-        """Handle stop signal by sending cancellation message."""
-        # Send cancellation message
-        yield await self._format_sse_message(
-            StreamMessage(
-                id=generate_message_id(),
-                type=MessageType.FINISH_REASON,
-                content="Task cancelled by user",
-                detail={
-                    "reason": control_data.get("stop_reason", "User requested"),
-                    "status": TaskExecutionStatus.CANCELLED,
-                },
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-        )
-
     def _handle_node_interrupt(
-        self, event_data: dict, event: dict, session_id: str, task_id: str
+        self, event_data: dict, session_id: str, task_id: str
     ) -> StreamMessage:
         """Handle any interrupts - return generic message to user"""
         chunk_data = event_data.get("chunk", {})
         interrupt_obj = chunk_data.get("__interrupt__")
 
         return self._create_generic_interrupt_message(
-            event, interrupt_obj, session_id, task_id
+            interrupt_obj, session_id, task_id
         )
 
     def _create_generic_interrupt_message(
-        self, event: dict, interrupt_obj, session_id: str, task_id: str
+        self, interrupt_obj, session_id: str, task_id: str
     ) -> StreamMessage:
         """Create generic interrupt message for user input"""
         message_id = generate_message_id()
