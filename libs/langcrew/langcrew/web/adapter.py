@@ -242,7 +242,7 @@ class LangGraphAdapter:
             async for event in self.executor.astream_events(
                 input=input_data, config=config
             ):
-                # -------- 2.0 Early Stop Check --------
+                # -------- 2.1 Early Stop Check --------
                 # Check stop signal at the beginning of each event processing
                 control_data = self._get_stop_flag(task_input.session_id)
                 if control_data:
@@ -256,7 +256,7 @@ class LangGraphAdapter:
                 event_type = event.get("event")
                 event_data = event.get("data", {})
 
-                # -------- 2.1 High Priority: Interrupts & State Updates --------
+                # -------- 2.2 High Priority: Interrupts & State Updates --------
 
                 # Handle LangGraph native node interrupts
                 if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
@@ -292,7 +292,7 @@ class LangGraphAdapter:
                         )
                         should_send_messages = True
 
-                # -------- 2.2 Termination Conditions --------
+                # -------- 2.3 Termination Conditions --------
 
                 # Check task end conditions - ROOT EVENTS ONLY
                 is_root_event = len(event.get("parent_ids", [])) == 0
@@ -326,7 +326,7 @@ class LangGraphAdapter:
                             yield finish_message
                         break
 
-                # -------- 2.3 Tool Internal Event Filtering --------
+                # -------- 2.4 Tool Internal Event Filtering --------
 
                 # Extract event metadata for filtering
                 run_id = event.get("run_id")
@@ -354,7 +354,7 @@ class LangGraphAdapter:
                     )
                     continue
 
-                # -------- 2.4 Regular Event Processing --------
+                # -------- 2.5 Regular Event Processing --------
 
                 # Process tracked event types - only send if enabled
                 if event_type in self.TRACKED_EVENTS and should_send_messages:
