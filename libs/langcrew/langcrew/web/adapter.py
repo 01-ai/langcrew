@@ -242,7 +242,7 @@ class LangGraphAdapter:
             async for event in self.executor.astream_events(
                 input=input_data, config=config
             ):
-                # -------- 2.1 Early Stop Check --------
+                # -------- 2.1 Stop Flag Check --------
                 # Check stop signal at the beginning of each event processing
                 control_data = self._get_stop_flag(task_input.session_id)
                 if control_data:
@@ -263,11 +263,28 @@ class LangGraphAdapter:
                     chunk_data = event_data.get("chunk", {})
                     interrupt_obj = chunk_data.get("__interrupt__")
 
-                    # Skip tool interrupts
-                    if isinstance(interrupt_obj, dict) and interrupt_obj.get(
-                        "type"
-                    ) in ["tool_interrupt_before", "tool_interrupt_after"]:
-                        continue  # Don't send generic interrupt message for tool interrupts
+                    # Skip tool interrupts and user_input interrupts
+                    if interrupt_obj:
+                        interrupt_type = None
+
+                        # Extract interrupt type from various possible structures
+                        if isinstance(interrupt_obj, tuple) and len(interrupt_obj) > 0:
+                            # LangGraph Interrupt objects in tuple
+                            first_interrupt = interrupt_obj[0]
+                            if hasattr(first_interrupt, "value") and isinstance(
+                                first_interrupt.value, dict
+                            ):
+                                interrupt_type = first_interrupt.value.get("type")
+                        elif isinstance(interrupt_obj, dict):
+                            # Direct dict format
+                            interrupt_type = interrupt_obj.get("type")
+
+                        if interrupt_type in [
+                            "tool_interrupt_before",
+                            "tool_interrupt_after",
+                            "user_input",
+                        ]:
+                            continue  # Don't send generic interrupt message
 
                     interrupt_message = self._handle_node_interrupt(
                         event_data, event, task_input.session_id, task_id
@@ -397,15 +414,6 @@ class LangGraphAdapter:
                     task_id,
                     "Task completed: abnormal end",
                     TaskExecutionStatus.FAILED,
-                ):
-                    yield finish_message
-            elif task_input.is_resume and task_ended and not need_user_input:
-                # Resume mode normal completion
-                async for finish_message in self._handle_finish_signal(
-                    task_input.session_id,
-                    task_id,
-                    "Task completed",
-                    TaskExecutionStatus.COMPLETED,
                 ):
                     yield finish_message
 
