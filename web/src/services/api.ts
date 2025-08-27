@@ -56,9 +56,9 @@ export const sessionApi = {
     });
   },
 
-  stopTask: (taskId: string): Promise<any> => {
+  stopTask: (sessionId: string): Promise<any> => {
     return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/chat/stop`, {
-      task_id: taskId,
+      session_id: sessionId,
     });
   },
 
