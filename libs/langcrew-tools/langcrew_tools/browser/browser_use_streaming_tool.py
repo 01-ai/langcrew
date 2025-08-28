@@ -17,14 +17,14 @@ from browser_use.browser.views import BrowserStateSummary
 from browser_use.llm.base import BaseChatModel as BrowserBaseChatModel
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import StandardStreamEvent
-from pydantic import BaseModel, Field, PrivateAttr
-from typing_extensions import override
-
-from ..astream_tool import (
+from langcrew.tools import (
     EventType,
     StreamEventType,
     StreamingBaseTool,
 )
+from pydantic import BaseModel, Field, PrivateAttr
+from typing_extensions import override
+
 from ..utils.s3 import AsyncS3Client
 from ..utils.sandbox import SandboxMixin
 from ..utils.sandbox.s3_integration import SandboxS3Toolkit

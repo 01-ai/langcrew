@@ -141,7 +141,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from enum import Enum
 from typing import Any, override
 
@@ -184,7 +184,13 @@ class StreamTimeoutError(Exception):
             super().__init__(f"Stream event timeout after {timeout_seconds}s")
 
 
-class StreamingBaseTool(BaseTool, ABC):
+class ToolCallback(BaseTool):
+    @abstractmethod
+    def tool_order_callback(self) -> tuple[int | None, Callable]:
+        pass
+
+
+class StreamingBaseTool(ToolCallback):
     stream_event_timeout_seconds: int = Field(
         -1, description="Stream event timeout seconds"
     )
@@ -229,14 +235,16 @@ class StreamingBaseTool(BaseTool, ABC):
     async def get_handover_info(self) -> dict | None:
         pass
 
-    async def trigger_external_completion(self, event_type: EventType, event_data: Any):  # type: ignore
+    async def trigger_external_completion(
+        self, event_type: EventType, event_data: Any
+    ) -> Any:  # type: ignore
         if (
             not self._external_completion_future
             or self._external_completion_future.done()
         ):
             logger.debug("External completion ignored: future already done")
             return
-
+        result = None
         try:
             result = await self.handle_external_completion(event_type, event_data)
             if result:
@@ -248,8 +256,11 @@ class StreamingBaseTool(BaseTool, ABC):
                 logger.debug(
                     "External completion ignored: no result or future not ready"
                 )
-        except Exception as e:
+        except asyncio.CancelledError:
+            pass
+        except BaseException as e:
             self._external_completion_future.set_exception(e)
+        return result
 
     def _reset_external_completion(self):
         """Reset external completion state for new execution"""
@@ -366,6 +377,10 @@ class StreamingBaseTool(BaseTool, ABC):
             data={"output": data},
         )
 
+    @override
+    def tool_order_callback(self) -> tuple[int | None, Callable]:
+        return None, self.custom_event_hook
+
     async def custom_event_hook(self, custom_event: dict) -> Any:
         """
         Crew callback custom event hook for processing stream events.
@@ -402,7 +417,7 @@ class StreamingBaseTool(BaseTool, ABC):
             else:
                 result = await self.handle_standard_stream_event(custom_event)
                 return result
-        except Exception as e:
+        except BaseException as e:
             # Global error handling: log error and return original object if any error occurs
             logger.exception(f"Error in custom_event_hook: {e}")
             return custom_event
@@ -504,14 +519,18 @@ class StreamingBaseTool(BaseTool, ABC):
                         if custom_event_data
                         else None
                     )
-        except Exception as e:
-            logger.exception(f"Error in _astream_events: {e}")
+        except BaseException as e:
+            logger.exception(f"Error in _run_stream_processor: {e}")
             raise e
 
         if final_event_data is not None:
             logger.info(f"Stream completed with data: {final_event_data}")
             return final_event_data
-        return "Empty Done"
+        else:
+            return await self.none_result()
+
+    async def none_result(self) -> Any:
+        raise RuntimeError("Tool execution failed with no result data")
 
     async def _process_stream_with_timeout(
         self,
@@ -554,7 +573,7 @@ class StreamingBaseTool(BaseTool, ABC):
             finally:
                 new_event.set()  # Ensure the main loop unblocks if it's waiting
 
-            return final_event_data
+            return final_event_data if final_event_data else await self.none_result()
 
         async def external_monitor():
             """Monitor external completion future"""
@@ -623,7 +642,7 @@ class StreamingBaseTool(BaseTool, ABC):
     async def _arun(self, config: RunnableConfig, *args: Any, **kwargs: Any) -> Any:
         try:
             self.configure_runnable(config)
-        except Exception as e:
+        except BaseException as e:
             # Unified exception handling: use exception level to record full stack trace
             logger.exception(f"Error in set_runnable_config: {e}")
             raise e
@@ -644,7 +663,7 @@ class StreamingBaseTool(BaseTool, ABC):
                     *args,
                     **kwargs,
                 )
-            except Exception as e:
+            except BaseException as e:
                 # Unified exception handling: use exception level to record full stack trace
                 logger.exception(f"Stream processing error: {e}")
                 raise e
@@ -663,7 +682,7 @@ class StreamingBaseTool(BaseTool, ABC):
                 logger.exception("Stream processing timeout occurred")
                 self.handle_timeout_error(e)
                 raise e
-            except Exception as e:
+            except BaseException as e:
                 # General exception: log detailed information and propagate
                 logger.exception(f"Stream processing error occurred:  {e}")
                 raise e
@@ -727,7 +746,7 @@ class StreamingBaseTool(BaseTool, ABC):
 
             # Check if we have a parent run id
             return callback_manager.parent_run_id is not None
-        except Exception:
+        except BaseException:
             # If any error occurs during checking, assume not available
             return False
 
@@ -828,6 +847,6 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
                     return self.end_standard_stream_event(content)
 
             return event_data
-        except Exception as e:
+        except BaseException as e:
             logging.exception(f"Error in get_last_event_content: {e}")
             return event_data

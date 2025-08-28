@@ -1,12 +1,16 @@
 # HITL Tools for LangChain - Independent and reusable HITL tools
 # These tools can be used independently, without depending on HITLConfig
 
-from typing import ClassVar
+import logging
+import sys
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from langchain_core.callbacks.manager import adispatch_custom_event
 from langchain_core.tools import BaseTool
+from langcrew.tools import StreamingBaseTool, ToolCallback
 from langgraph.types import interrupt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from ..base import BaseToolInput
 
@@ -106,3 +110,60 @@ class UserInputTool(BaseTool):
                 **kwargs,
             )
         )
+
+
+class CallbackUserInputTool(UserInputTool, ToolCallback):
+    """User Input Tool - Based on LangGraph official pattern
+
+    Allows LLM to actively decide when user input is needed, this is the standard
+    pattern recommended by LangGraph.
+    Reference: https://langchain-ai.github.io/langgraph/how-tos/human_in_the_loop/add-human-in-the-loop/
+
+    This tool is independent of HITLConfig, users can flexibly choose whether to use it.
+    """
+
+    _logger = logging.getLogger(__name__)
+    tools: list[StreamingBaseTool] = Field(
+        None, description="Agent tools to use for the user input"
+    )
+    _tools_info: dict[str, StreamingBaseTool] = PrivateAttr(default={})
+    _last_tool_name: str | None = PrivateAttr(default=None)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.tools = kwargs.get("tools", [])
+        for tool in self.tools:
+            tool_name = getattr(tool, "name", "default")
+            self._tools_info[tool_name] = tool
+
+    def tool_order_callback(self) -> tuple[int | None, Callable]:
+        return sys.maxsize, self._callback
+
+    async def _callback(self, prev_result: Any) -> Any:
+        if not isinstance(prev_result, dict):
+            return prev_result
+
+        event = prev_result.get("event")
+        if event == "on_tool_start" or event == "on_tool_end":
+            tool_name = prev_result.get("name")
+            if tool_name == CallbackUserInputTool.name:
+                pass
+            elif tool_name:
+                self._last_tool_name = tool_name
+        elif (
+            event == "on_custom_event"
+            and prev_result.get("name") == "on_langcrew_user_input_required"
+        ):
+            if self._last_tool_name:
+                self._logger.debug(f"_last_tool_name: {self._last_tool_name}")
+                tool = self._tools_info.get(self._last_tool_name)
+                if tool:
+                    handover_info = await tool.get_handover_info()
+                    self._logger.info(
+                        f"_last_tool_name: {self._last_tool_name}, handover_info: {handover_info}"
+                    )
+                    if handover_info:
+                        data = prev_result.get("data", {})
+                        data.update(handover_info)
+                        prev_result["data"] = data
+        return prev_result

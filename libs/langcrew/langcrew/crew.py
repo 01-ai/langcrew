@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
@@ -9,7 +10,7 @@ from typing import (
     Literal,
 )
 
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, ensure_config
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END, START
@@ -23,9 +24,9 @@ from .agent import Agent
 from .hitl import HITLConfig
 from .memory import EntityMemory, LongTermMemory, MemoryConfig, ShortTermMemory
 from .memory.storage import get_checkpointer, get_storage
-
 from .task import Task
-from .types import CrewState
+from .tools import ToolCallback
+from .types import CrewState, OrderCallback
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,10 @@ class Crew:
         self._async_store_cm = None
         self._async_checkpointer_cm = None
 
+        # tools for crew
+        self._tools: list[BaseTool] = []
+        self.register_after_execute_callback: list[OrderCallback] = []
+
         # HITL configuration
         if hitl is None:
             self.hitl_config = None
@@ -121,19 +126,69 @@ class Crew:
             agent.checkpointer = self.checkpointer
             agent.store = self.store
 
-    def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
-        """Prepare tools for execution.
+    def add_after_execute_callbacks(self, callbacks: list[Callable | OrderCallback]):
+        """Add after execute callbacks to the crew"""
+        register_callback = self.register_after_execute_callback.copy()
+        for callback in callbacks:
+            if isinstance(callback, OrderCallback):
+                register_callback.append(callback)
+            else:
+                register_callback.append(
+                    OrderCallback(order_id=len(register_callback), callback=callback)
+                )
 
-        This method can be extended to inject dependencies or modify tools
-        before they are used by agents or tasks.
+        register_callback.sort(key=lambda x: x.order_id)
+        self.register_after_execute_callback = register_callback
+
+    async def _aprocess_output(self, output: Any) -> Any:
+        """
+        Asynchronously process output data through callback functions
+
+        This method processes any output data through registered callback functions.
+        It can handle both final results and streaming data.
 
         Args:
-            tools: List of tools to prepare
+            output: Output data to be processed
 
         Returns:
-            List of prepared tools
+            Processed output data
         """
-        return tools
+        if not isinstance(output, dict):
+            return output
+
+        result = output
+        prev_result = result
+        callbacks = [c.callback for c in self.register_after_execute_callback]
+        # Execute function callbacks
+        for callback_fn in callbacks:
+            try:
+                if prev_result:
+                    # Handle the case where prev_result might be a list
+                    if isinstance(prev_result, list):
+                        # Process each item in the list through the callback
+                        processed_items = []
+                        for item in prev_result:
+                            if inspect.iscoroutinefunction(callback_fn):
+                                processed_item = await callback_fn(item)
+                            else:
+                                processed_item = callback_fn(item)
+                            if processed_item:
+                                # If processed_item is also a list, extend instead of append
+                                if isinstance(processed_item, list):
+                                    processed_items.extend(processed_item)
+                                else:
+                                    processed_items.append(processed_item)
+                        prev_result = processed_items
+                    else:
+                        # Original logic for dict input
+                        if inspect.iscoroutinefunction(callback_fn):
+                            prev_result = await callback_fn(prev_result)
+                        else:
+                            prev_result = callback_fn(prev_result)
+            except Exception as e:
+                logger.error(f"Error in output processing callback: {e}")
+
+        return prev_result
 
     def _sync_subgraph_message_deletions(
         self, state: CrewState, result: dict[str, Any]
@@ -233,6 +288,7 @@ class Crew:
     ) -> CompiledStateGraph:
         """Compile graph with checkpointer and interrupt configuration applied"""
         interrupt_before, interrupt_after = self._collect_interrupt_config()
+        self._register_tools()
 
         compiled = builder.compile(
             checkpointer=checkpointer or self.checkpointer,
@@ -246,6 +302,21 @@ class Crew:
             )
 
         return compiled
+
+    def _register_tools(self):
+        """Register tools to the crew"""
+        after_execute_callbacks = []
+        for tool in self._tools:
+            if isinstance(tool, ToolCallback):
+                order_id, callback = tool.tool_order_callback()
+                if order_id:
+                    after_execute_callbacks.append(
+                        OrderCallback(order_id=order_id, callback=callback)
+                    )
+                else:
+                    after_execute_callbacks.append(callback)
+        # order by order_id
+        self.add_after_execute_callbacks(after_execute_callbacks)
 
     def _create_generic_node_factory(
         self,
@@ -315,14 +386,15 @@ class Crew:
             # Basic validation - task must have an agent
             if not hasattr(task, "agent") or task.agent is None:
                 raise ValueError("Task must have an agent to create executor")
-
+            config = ensure_config()
             # Create config with langcrew metadata
-            config = RunnableConfig(
-                metadata={
-                    "langcrew_agent": task.agent.name,
-                    "langcrew_task": task.name or f"task_{self.tasks.index(task)}",
-                }
+            if "metadata" not in config:
+                config["metadata"] = {}
+            config["metadata"]["langcrew_agent"] = task.agent.name
+            config["metadata"]["langcrew_task"] = (
+                task.name or f"task_{self.tasks.index(task)}"
             )
+
             return (state, config)
 
         def process_result_fn(state: CrewState, result: dict[str, Any], task: Task):
@@ -374,8 +446,11 @@ class Crew:
 
         def get_agent_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for agent"""
+            config = ensure_config()
             # Create config with langcrew metadata
-            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
+            if "metadata" not in config:
+                config["metadata"] = {}
+            config["metadata"]["langcrew_agent"] = agent.name
             return (state, config)
 
         def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
@@ -635,7 +710,11 @@ class Crew:
         def get_handoff_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for handoff agent"""
             # Create config with langcrew metadata
-            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
+            config = ensure_config()
+            # Create config with langcrew metadata
+            if "metadata" not in config:
+                config["metadata"] = {}
+            config["metadata"]["langcrew_agent"] = agent.name
             return (state, config)
 
         def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
@@ -648,6 +727,14 @@ class Crew:
             get_invoke_args_fn=get_handoff_invoke_args,
             process_result_fn=process_result_fn,
         )(agent)
+
+    def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
+        """Prepare tools for execution"""
+        if tools:
+            for tool in tools:
+                if tool not in self._tools:
+                    self._tools.append(tool)
+        return tools
 
     def _build_agent_handoff_graph(
         self, checkpointer=None, is_async=False
@@ -1202,7 +1289,13 @@ class Crew:
             subgraphs=subgraphs,
             **kwargs,
         ):
-            yield chunk
+            processed_event = await self._aprocess_output(chunk)
+            if processed_event:
+                if isinstance(processed_event, list):
+                    for item in processed_event:
+                        yield item
+                else:
+                    yield processed_event
 
     async def astream_events(
         self,
@@ -1284,7 +1377,13 @@ class Crew:
             exclude_tags=exclude_tags,
             **kwargs,
         ):
-            yield event
+            processed_event = await self._aprocess_output(event)
+            if processed_event:
+                if isinstance(processed_event, list):
+                    for item in processed_event:
+                        yield item
+                else:
+                    yield processed_event
 
     # CrewAI compatibility methods
     def kickoff(

@@ -1,7 +1,9 @@
+import logging
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from e2b import AsyncSandbox
+from langcrew.utils import CheckpointerSessionStateManager
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 # Import sandbox toolkit for unified sandbox management
@@ -12,6 +14,8 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
+
+logger = logging.getLogger(__name__)
 
 
 class SandboxMixin(BaseModel):
@@ -48,3 +52,46 @@ class SandboxMixin(BaseModel):
                     sandbox = await SandboxToolkit.create_async_sandbox(config)
             self._sandbox = sandbox
         return self._sandbox
+
+
+async def none_sandbox():
+    pass
+
+
+def create_sandbox_source_by_session_id(
+    session_id: str,
+    config: dict[str, Any] | None = None,
+    create_callback: Callable[[AsyncSandbox], Awaitable[None]] | None = None,
+    checkpointer_state_manager: CheckpointerSessionStateManager | None = None,
+) -> Callable[[], Awaitable["AsyncSandbox"]]:
+    async def _get_async_sandbox() -> "AsyncSandbox":
+        # For now, create a new sandbox (placeholder implementation)
+        sandbox_id = await checkpointer_state_manager.get_value(
+            session_id, "sandbox_id"
+        )
+        try:
+            if sandbox_id:
+                logger.info(
+                    f"sandbox session_id: {session_id} sandbox_id: {sandbox_id}"
+                )
+                connect_config = config.copy() if config else {}
+                connect_config["sandbox_id"] = sandbox_id
+                sandbox = await SandboxToolkit.connect_or_resume_async_sandbox(
+                    connect_config
+                )
+                return sandbox
+        except Exception as e:
+            logger.exception(f"sandbox session_id: {session_id} error: {e}")
+
+        logger.info(f"create sandbox session_id: {session_id}")
+        sandbox = await SandboxToolkit.create_async_sandbox(config)
+        await checkpointer_state_manager.set_state(
+            session_id, {"sandbox_id": sandbox.sandbox_id}
+        )
+        # Safely call the async callback if provided
+        if create_callback is not None:
+            await create_callback(sandbox)
+
+        return sandbox
+
+    return _get_async_sandbox

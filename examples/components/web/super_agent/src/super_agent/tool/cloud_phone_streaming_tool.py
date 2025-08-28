@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator
 
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field, PrivateAttr
-from langcrew_tools.astream_tool import GraphStreamingBaseTool
+from langcrew.tools import GraphStreamingBaseTool
 from langchain_core.runnables import RunnableConfig
 
 
@@ -21,8 +21,9 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import create_react_agent
 
 from langcrew_tools.cloud_phone.langchain_tools import get_cloudphone_tools
-from langcrew_tools.hitl.langchain_tools import UserInputTool
 from langchain_core.messages import HumanMessage
+
+from super_agent.tool.virtual_phone_hook import CloudPhoneMessageHandler
 
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,9 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     recursion_limit: int = Field(default=120, description="Recursion limit")
 
     _session_id: str | None = PrivateAttr(default=None)
+    _cloudphone_handler_with_model: CloudPhoneMessageHandler | None = PrivateAttr(
+        default=None
+    )
 
     def __init__(
         self,
@@ -189,32 +193,37 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
             model=self.base_model,
             tools=tools,
             prompt=system_prompt,
+            pre_model_hook=self.pre_model_hook,
+            post_model_hook=self.post_model_hook,
             checkpointer=checkpointer,
         )
+
+    async def pre_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
+        messages = state.get("messages", [])
+        await self._cloudphone_handler_with_model.pre_hook(messages)
+
+    async def post_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
+        messages = state.get("messages", [])
+        await self._cloudphone_handler_with_model.post_hook(messages)
 
     @override
     def configure_runnable(self, config: RunnableConfig):
         self._session_id = config.get("configurable", {}).get("thread_id")
+        self._cloudphone_handler_with_model = CloudPhoneMessageHandler(
+            model_name=self.base_model.model_name, runnable_config=config
+        )
 
     def get_agent_session_id(self) -> str:
         if self._session_id:
-            return self._session_id + "_" + self.name
+            return self._session_id
         else:
             raise ValueError("session_id is not set")
 
     async def _initialize_tools(self) -> List[Any]:
-        """
-        初始化所有云手机工具，传递 sandbox_id
-
-        Returns:
-            初始化后的工具列表
-        """
         sandbox_id = (
             await self.sandbox_source()
             if callable(self.sandbox_source)
             else self.sandbox_source
         )
         tools = get_cloudphone_tools(self.get_agent_session_id(), sandbox_id)
-        # 支持用户接入
-        tools.append(UserInputTool())
         return tools

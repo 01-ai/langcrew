@@ -25,12 +25,12 @@ from ..crew import Crew
 from ..utils.language import detect_language
 from ..utils.message_utils import generate_message_id
 from .protocol import (
-    TaskInput,
     MessageType,
     PlanAction,
     StepStatus,
     StreamMessage,
     TaskExecutionStatus,
+    TaskInput,
     ToolResult,
 )
 from .tool_display import ToolDisplayManager
@@ -256,7 +256,11 @@ class LangGraphAdapter:
                 # -------- 2.2 High Priority: Interrupts & State Updates --------
 
                 # Handle LangGraph native node interrupts
-                if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
+                if (
+                    "chunk" in event_data
+                    and event_data["chunk"]
+                    and "__interrupt__" in event_data["chunk"]
+                ):
                     chunk_data = event_data.get("chunk", {})
                     interrupt_obj = chunk_data.get("__interrupt__")
 
@@ -404,7 +408,7 @@ class LangGraphAdapter:
 
         except Exception as e:
             # ============ 4. ERROR HANDLING ============
-            logger.error(f"Execution failed: {e}")
+            logger.exception(f"Execution failed: {e}")
             yield self._handle_finish_signal(
                 task_input.session_id, task_id, str(e), TaskExecutionStatus.FAILED
             )

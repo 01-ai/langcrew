@@ -7,8 +7,8 @@ import os
 import time
 from typing import Any, ClassVar
 
-import requests
-from langchain_core.tools import BaseTool
+import httpx
+from langcrew.tools import ExternalCompletionBaseTool
 from pydantic import BaseModel, Field
 
 from ..base import BaseToolInput
@@ -23,7 +23,7 @@ class WebSearchInput(BaseToolInput):
     query_num: int = Field(default=20, description="Number of search results to return")
 
 
-class WebSearchTool(BaseTool):
+class WebSearchTool(ExternalCompletionBaseTool):
     """Tool for performing web search to obtain latest information."""
 
     name: ClassVar[str] = "web_search"
@@ -92,13 +92,13 @@ class WebSearchTool(BaseTool):
                 "LANGCREW_WEB_SEARCH_API_KEY environment variable."
             )
 
-    async def _arun(
+    async def _arun_custom_event(
         self,
         query: str,
         query_num: int = 10,
         **kwargs,
     ) -> list[dict[str, Any]]:
-        """Perform web search synchronously."""
+        """Perform web search asynchronously."""
         logger.info(f"Starting web search. Query: {query}, Language: {self.language}")
         start_time = time.time()
 
@@ -123,15 +123,17 @@ class WebSearchTool(BaseTool):
 
         search_result_list = []
         try:
-            response = requests.post(
-                url=self.endpoint,
-                headers=headers,
-                json=request_data,
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            response_data = response.json()
-            search_result_list = response_data.get("data", {}).get("search_info", [])
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    url=self.endpoint,
+                    headers=headers,
+                    json=request_data,
+                )
+                response.raise_for_status()
+                response_data = response.json()
+                search_result_list = response_data.get("data", {}).get(
+                    "search_info", []
+                )
 
         except Exception as e:
             logger.error(f"An error occurred during web search: {e}")

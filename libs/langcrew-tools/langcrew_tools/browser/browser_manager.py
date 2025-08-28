@@ -129,7 +129,9 @@ class SandboxBrowserSessionManager:
 
         try:
             self._browser_wss_url = await async_sandbox_playwright_wss(async_sandbox)
-            self._browser_vnc_url = get_browser_use_vnc_url(async_sandbox)
+            self._browser_vnc_url = get_browser_use_vnc_url(
+                async_sandbox, view_only=True
+            )
 
         except Exception as e:
             logger.error(
