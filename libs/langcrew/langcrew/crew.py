@@ -121,6 +121,20 @@ class Crew:
             agent.checkpointer = self.checkpointer
             agent.store = self.store
 
+    def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
+        """Prepare tools for execution.
+
+        This method can be extended to inject dependencies or modify tools
+        before they are used by agents or tasks.
+
+        Args:
+            tools: List of tools to prepare
+
+        Returns:
+            List of prepared tools
+        """
+        return tools
+
     def _sync_subgraph_message_deletions(
         self, state: CrewState, result: dict[str, Any]
     ) -> dict[str, Any]:
