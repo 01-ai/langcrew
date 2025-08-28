@@ -26,12 +26,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from super_agent.agent.crew import SuperAgentCrew
-from langcrew.web.langgraph_adapter import LangGraphAdapter
+from langcrew.web import LangGraphAdapter
 from langcrew.web.protocol import (
     ChatRequest,
     StreamMessage,
     StopRequest,
-    ExecutionInput,
+    TaskInput,
     MessageType,
 )
 from langcrew.web import generate_message_id
@@ -140,17 +140,18 @@ def create_app() -> FastAPI:
                         timestamp=int(time.time() * 1000),
                         session_id=session_id,
                     )
-                    yield await adapter._format_sse_message(init_message)
+                    yield adapter._format_sse_message(init_message)
 
-                # Create execution input
-                execution_input = ExecutionInput(
+                # Create task input
+                task_input = TaskInput(
                     session_id=session_id,
-                    user_input=request.message,
-                    is_resume=request.interrupt_data is not None,
+                    message=request.message,
+                    language=request.language,
+                    interrupt_data=request.interrupt_data,
                 )
 
                 # Stream execution results
-                async for chunk in adapter.execute(execution_input):
+                async for chunk in adapter.execute(task_input):
                     yield chunk
 
             except asyncio.CancelledError:
@@ -169,7 +170,7 @@ def create_app() -> FastAPI:
                     timestamp=int(time.time() * 1000),
                     session_id=session_id,
                 )
-                yield await adapter._format_sse_message(error_message)
+                yield adapter._format_sse_message(error_message)
 
             finally:
                 logger.info(f"Session {session_id} completed")

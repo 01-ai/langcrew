@@ -23,7 +23,7 @@ from .agent import Agent
 from .hitl import HITLConfig
 from .memory import EntityMemory, LongTermMemory, MemoryConfig, ShortTermMemory
 from .memory.storage import get_checkpointer, get_storage
-from .memory.tool_state import ToolStateManager
+
 from .task import Task
 from .types import CrewState
 
@@ -73,7 +73,7 @@ class Crew:
         self._short_term_memory = None
         self._long_term_memory = None
         self._entity_memory = None
-        self._tool_state_manager = None
+
         self._thread_id = None
 
         # Async components for async methods
@@ -85,7 +85,7 @@ class Crew:
         self._async_short_term_memory = None
         self._async_long_term_memory = None
         self._async_entity_memory = None
-        self._async_tool_state_manager = None
+
         self._async_components_initialized = False
 
         # Context managers for async components
@@ -122,7 +122,17 @@ class Crew:
             agent.store = self.store
 
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
-        """Inject ToolStateManager into E2BBaseToolV2 and HITLBaseTool instances."""
+        """Prepare tools for execution.
+
+        This method can be extended to inject dependencies or modify tools
+        before they are used by agents or tasks.
+
+        Args:
+            tools: List of tools to prepare
+
+        Returns:
+            List of prepared tools
+        """
         return tools
 
     def _sync_subgraph_message_deletions(
@@ -922,9 +932,6 @@ class Crew:
                 store=self.store, config=self.memory_config
             )
 
-        # Initialize tool state manager
-        self._tool_state_manager = ToolStateManager(checkpointer=self.checkpointer)
-
         if self.verbose:
             logger.info(
                 f"Memory system initialized with provider: {self.memory_config.provider}"
@@ -1011,12 +1018,6 @@ class Crew:
         if self.memory_config.entity_enabled and not self._async_entity_memory:
             self._async_entity_memory = EntityMemory(
                 store=self._async_store, config=self.memory_config
-            )
-
-        # Create async tool state manager (only if not already created)
-        if not self._async_tool_state_manager:
-            self._async_tool_state_manager = ToolStateManager(
-                checkpointer=self._async_checkpointer
             )
 
         # Mark async components as initialized

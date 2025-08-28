@@ -12,15 +12,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from ..utils.message_utils import generate_message_id
-from .langgraph_adapter import LangGraphAdapter
+from .adapter import LangGraphAdapter
 from .protocol import (
     ChatRequest,
-    ExecutionInput,
     MessageType,
     StopRequest,
     StreamMessage,
+    TaskInput,
 )
+from ..utils.message_utils import generate_message_id
 
 logger = logging.getLogger(__name__)
 
@@ -94,54 +94,50 @@ class AdapterServer:
             # Session ID handling - unified logic for empty/None session_id
             is_new_session = not request.session_id or request.session_id.strip() == ""
             session_id = (
-                f"session_{uuid.uuid4().hex[:16]}"
+                uuid.uuid4().hex[:16]  # 16位十六进制，无前缀
                 if is_new_session
                 else request.session_id
             )
 
             async def generate():
                 try:
-                    # Send session init for new sessions
+                    # Send SESSION_INIT message for new sessions
                     if is_new_session:
                         init_message = StreamMessage(
                             id=generate_message_id(),
                             role="assistant",
                             type=MessageType.SESSION_INIT,
                             content=request.message,
-                            detail={"session_id": session_id, "title": request.message},
+                            detail={
+                                "session_id": session_id,
+                                "title": request.message,
+                            },
                             timestamp=int(time.time() * 1000),
                             session_id=session_id,
+                            task_id="",
                         )
-                        yield await self.adapter._format_sse_message(init_message)
+                        yield self.adapter._format_sse_message(init_message)
 
-                    # Create execution input
-                    execution_input = ExecutionInput(
+                    # Create task input
+                    task_input = TaskInput(
                         session_id=session_id,
-                        user_input=request.message,
+                        message=request.message,
+                        language=request.language,
                         interrupt_data=request.interrupt_data,
                     )
 
                     # Stream execution results
-                    async for chunk in self.adapter.execute(execution_input):
+                    async for chunk in self.adapter.execute(task_input):
                         yield chunk
 
                 except asyncio.CancelledError:
                     # Client disconnected - just log and exit gracefully
                     # Don't re-raise, let the generator end naturally
-                    logger.info(f"Client disconnected for session: {session_id}")
-                    return  # Exit generator cleanly
+                    logger.warning(f"Client disconnected for session: {session_id}")
+                    return
 
                 except Exception as e:
                     logger.error(f"Execution failed for session {session_id}: {e}")
-                    error_message = StreamMessage(
-                        id=generate_message_id(),
-                        role="assistant",
-                        type=MessageType.ERROR,
-                        content=f"Execution failed: {str(e)}",
-                        timestamp=int(time.time() * 1000),
-                        session_id=session_id,
-                    )
-                    yield await self.adapter._format_sse_message(error_message)
 
             return StreamingResponse(
                 generate(),
@@ -156,17 +152,16 @@ class AdapterServer:
         @app.post("/api/v1/chat/stop", summary="Stop chat execution")
         async def stop_chat(request: StopRequest):
             """
-            Stop chat execution
+            Stop chat execution by session ID
 
-            This is a basic stop endpoint that relies on the adapter's stop mechanism.
-            For more complex stop logic (like force cancellation), users should implement
-            their own session management.
+            This endpoint stops the current execution for a specific session.
+            The session_id can be obtained from the chat API response headers.
             """
             success = False
             if hasattr(self.adapter, "set_stop_flag"):
                 try:
                     success = await self.adapter.set_stop_flag(
-                        request.session_id, "User stopped"
+                        request.session_id, request.reason
                     )
                 except Exception as e:
                     logger.error(f"Failed to stop session {request.session_id}: {e}")
@@ -174,9 +169,10 @@ class AdapterServer:
             return {
                 "success": success,
                 "session_id": request.session_id,
+                "reason": request.reason,
                 "message": "Stop request sent"
                 if success
-                else "Stop not supported or failed",
+                else "Session not found or stop failed",
             }
 
     def run(self, host: str = "0.0.0.0", port: int = 8000, **kwargs):
