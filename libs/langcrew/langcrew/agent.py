@@ -37,7 +37,7 @@ class Agent:
         tools: list[BaseTool] | None = None,
         llm: Any | None = None,
         verbose: bool = False,
-        debug: bool = True,
+        debug: bool = False,
         # Executor configuration
         executor_type: str = "react",
         prompt: str | SystemMessage | Callable | Runnable | None = None,
