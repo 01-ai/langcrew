@@ -56,33 +56,19 @@ function changePlanStepStatusToSuccess(message: MessageItem) {
   return message;
 }
 
-// 没开始的step不显示
-function hideFutureSteps(message: MessageItem) {
-  message.messages.forEach((msg) => {
-    if (isPlanChunk(msg)) {
-      (msg as MessagePlanChunk).children = (msg as MessagePlanChunk).children.filter((step: PlanStep) => {
-        return step.status === TaskStatus.Success || step.status === TaskStatus.Running;
-      });
-    }
-  });
-  return message;
-}
-
-// 没children的step不显示
-function hideEmptySteps(message: MessageItem) {
-  message.messages.forEach((msg) => {
-    if (isPlanChunk(msg)) {
-      (msg as MessagePlanChunk).children = (msg as MessagePlanChunk).children.filter(
-        (step: PlanStep) => step.children.length > 0,
-      );
-    }
-  });
-  return message;
-}
-
 export function isPlanChunk(message: MessageChunk) {
   return message.type === 'plan';
 }
+
+export const loadingMessage: MessageItem = {
+  role: 'assistant',
+  messages: [
+    {
+      type: 'live_status',
+      content: getTranslation('chatbot.task.thinking'),
+    },
+  ],
+};
 
 export const transformChunksToMessages = (chunks: MessageChunk[], existingMessages: MessageItem[] = []) => {
   // 创建 chunks 的深拷贝，避免修改原始数据
@@ -109,7 +95,9 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
     const futureChunks = chunksCopy.slice(i + 1);
     const hasUserMessage = futureChunks.some((chunk) => chunk.role === 'user');
 
-    chunk.isLast = !hasUserMessage;
+    if (!hasUserMessage && chunk.role === 'assistant') {
+      chunk.isLast = true;
+    }
 
     // 忽略某些特定工具调用
     if (ignoreToolChunks.includes((chunk as MessageToolChunk).detail?.tool) || ignoreToolChunks.includes(chunk.type)) {
@@ -124,8 +112,6 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
 
         currentAIMessage = filterLiveStatus(currentAIMessage);
         currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
-        currentAIMessage = hideFutureSteps(currentAIMessage);
-        currentAIMessage = hideEmptySteps(currentAIMessage);
         if (!existingAIMessage) {
           newMessages.push(currentAIMessage);
         }
@@ -189,7 +175,8 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
       continue;
     }
 
-    if (chunk.type !== 'tool_call' && chunk.type !== 'tool_result' && !!chunk.detail?.run_id) {
+    // no tool and has run_id: try to merge the items with same run_id
+    if (!chunk.detail?.tool && !!chunk.detail?.run_id) {
       // the first item with same run_id
       const firstRunIndex = chunksCopy.findIndex((c) => c.detail?.run_id === chunk.detail?.run_id);
       // find all items with same run_id
@@ -233,6 +220,16 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
       // 这里不执行操作，留给下面处理
     }
     if (chunk.type === 'tool_result') {
+      const lastItem = currentAIMessage.messages[currentAIMessage.messages.length - 1];
+      if (lastItem && lastItem.type === chunk.detail?.tool && lastItem.detail?.run_id === chunk.detail?.run_id) {
+        lastItem.detail = {
+          ...chunk.detail,
+          param: lastItem.detail.param,
+          action: lastItem.detail.action,
+          action_content: lastItem.detail.action_content,
+        };
+        continue;
+      }
       const toolResultChunk = chunk as MessageToolChunk;
       chunk.type = toolResultChunk.detail.tool;
     }
@@ -267,8 +264,26 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
       const step = plan.children.find((step: PlanStep) => step.status === 'running');
       if (step) {
         const lastItem = step.children[step.children.length - 1];
-        if (lastItem?.detail?.run_id === chunk.detail?.run_id) {
+        // merge tool_call and tool_result
+        if (lastItem && lastItem?.type === chunk.detail?.tool && lastItem?.detail?.run_id === chunk.detail?.run_id) {
+          lastItem.detail = {
+            ...chunk.detail,
+            param: lastItem.detail.param,
+            action: lastItem.detail.action,
+            action_content: lastItem.detail.action_content,
+          };
+          continue;
+        }
+        // run_id and type are the same, merge, avoid tool_call and tool_result merge
+        if (
+          !!lastItem?.detail?.run_id &&
+          lastItem?.detail?.run_id === chunk.detail?.run_id &&
+          lastItem?.type === chunk.type &&
+          !lastItem?.detail?.tool &&
+          !chunk?.detail?.tool
+        ) {
           lastItem.content += chunk.content;
+
           continue;
         }
         step.children.push(chunk);
@@ -280,7 +295,14 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
     currentAIMessage = filterLiveStatus(currentAIMessage);
     const lastItem = currentAIMessage.messages[currentAIMessage.messages.length - 1];
 
-    if (lastItem?.detail?.run_id === chunk.detail?.run_id) {
+    // run_id and type are the same, merge, avoid tool_call and tool_result merge
+    if (
+      !!lastItem?.detail?.run_id &&
+      lastItem?.detail?.run_id === chunk.detail?.run_id &&
+      lastItem?.type === chunk.type &&
+      !chunk.detail?.tool &&
+      !lastItem.detail?.tool
+    ) {
       lastItem.content += chunk.content;
     } else {
       currentAIMessage.messages.push(chunk);
@@ -293,24 +315,14 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
       currentAIMessage = filterLiveStatus(currentAIMessage);
       currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
     }
-    currentAIMessage = hideFutureSteps(currentAIMessage);
-    currentAIMessage = hideEmptySteps(currentAIMessage);
     if (!existingAIMessage) {
       newMessages.push(currentAIMessage);
     }
   }
 
-  // 如果最后一条是user，则添加一个live_status，用于显示任务执行中
+  // if the last item is user message, add a live_status
   if (newMessages[newMessages.length - 1]?.role === 'user') {
-    newMessages.push({
-      role: 'assistant',
-      messages: [
-        {
-          type: 'live_status',
-          content: getTranslation('chatbot.task.thinking'),
-        },
-      ],
-    });
+    newMessages.push(cloneDeep(loadingMessage));
   }
 
   return newMessages;

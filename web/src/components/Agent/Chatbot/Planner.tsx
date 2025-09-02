@@ -63,25 +63,27 @@ const Planner = (props: any) => {
     return <Paragraph>{item.content}</Paragraph>;
   };
 
-  const items = data.map((step) => ({
-    key: step.id,
-    title: step.title,
-    status: getStepStatus(step.status),
-    icon: getStepIcon(step.status),
-    description: step.description,
-    ...(step?.children?.length && {
-      content: (
-        <div className="flex flex-col gap-4 pl-2">
-          {step.children.map((item, idx) => (
-            <Fragment key={idx}>
-              {renderContent(item, idx)}
-              <MessageAttachments message={item} />
-            </Fragment>
-          ))}
-        </div>
-      ),
-    }),
-  }));
+  const items = data
+    .filter((step) => step.children.length > 0)
+    .map((step) => ({
+      key: step.id,
+      title: step.title,
+      status: getStepStatus(step.status),
+      icon: getStepIcon(step.status),
+      description: step.description,
+      ...(step?.children?.length && {
+        content: (
+          <div className="flex flex-col gap-4 pl-2">
+            {step.children.map((item, idx) => (
+              <Fragment key={idx}>
+                {renderContent(item, idx)}
+                <MessageAttachments message={item} />
+              </Fragment>
+            ))}
+          </div>
+        ),
+      }),
+    }));
 
   useEffect(() => {
     const currentDataLength = data.length;
