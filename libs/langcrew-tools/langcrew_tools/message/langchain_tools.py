@@ -1,7 +1,6 @@
 # Message Notify User LangChain Tool
 # Provides user notification functionality for sending messages and deliverables
 
-import asyncio
 import json
 import logging
 import os
@@ -10,8 +9,9 @@ from typing import Any, ClassVar, Literal
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from langcrew_tools.utils.s3.client import AsyncS3Client
+from langcrew_tools.utils.s3.factory import create_s3_client
 from langcrew_tools.utils.sandbox.base_sandbox import SandboxMixin
+from langcrew_tools.utils.sandbox.s3_integration import SandboxS3Toolkit
 
 from ..base import BaseToolInput
 from .config import MessageConfig, default_config
@@ -121,13 +121,15 @@ class MessageToUserTool(BaseTool, SandboxMixin):
 
             # Upload to S3 if enabled
             if self.config.s3_upload_enabled:
-                async_sandbox = await self.get_sandbox_and_upload_files()
-                s3_prefix = self.config.get_s3_prefix(self.sandbox_id)
-                s3_path_auto = await AsyncS3Client.upload_directory_to_s3(
-                    sandbox=async_sandbox,
-                    dir_path=self.config.sandbox_workspace_path,
-                    s3_prefix=s3_prefix,
-                )
+                async_sandbox = await self.get_sandbox()
+                s3_prefix = self.config.get_s3_prefix(async_sandbox.sandbox_id)
+                async with create_s3_client() as async_s3_client:
+                    s3_path_auto = await SandboxS3Toolkit.upload_directory_to_s3(
+                        async_sandbox=async_sandbox,
+                        dir_path=self.config.sandbox_workspace_path,
+                        s3_prefix=s3_prefix,
+                        async_s3_client=async_s3_client,
+                    )
 
                 # Get filenames from original attachments for comparison
                 original_filenames = []
@@ -188,7 +190,7 @@ class MessageToUserTool(BaseTool, SandboxMixin):
             "attachments": attachments or [],
             "intent_type": intent_type,  # Include intent type in return value
         }
-        
+
     def _run(
         self,
         text: str,

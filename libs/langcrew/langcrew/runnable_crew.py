@@ -1,11 +1,16 @@
 import inspect
 import logging
 from collections.abc import AsyncGenerator, Callable, Sequence
-from typing import Any, override
+from typing import Any
+
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
+
 from uuid import uuid4
 
 from langchain_core.messages.human import HumanMessage
-from langchain_core.tools import BaseTool
 
 from .crew import Crew
 from .tools import EventType, StreamingBaseTool
@@ -28,7 +33,7 @@ class RunnableCrew(Crew):
     intelligent agent functionality.
     """
 
-    def __init__(self, session_id: str, tools: list[BaseTool] | None = None, **kwargs):
+    def __init__(self, session_id: str, **kwargs):
         """
         Initialize EnhancedCrew
 
@@ -161,7 +166,7 @@ class RunnableCrew(Crew):
             )
             raise e
 
-    async def stop_agent(self) -> bool:
+    async def stop_agent(self, final_result: dict[str, Any] | None = None) -> bool:
         """
         Stop the intelligent agent for the current session
 
@@ -176,13 +181,7 @@ class RunnableCrew(Crew):
                 EventType.STOP.value, True
             )
             logger.info(f"result: {result}")
-            self._stream_wrapper.done_fetch_task(
-                dict(
-                    event="on_custom_event",
-                    name="super_agent",
-                    data={"stop": True},
-                )
-            )
+            self._stream_wrapper.done_fetch_task(final_result or {"stop": True})
             logger.info(f"Successfully set stop flag for session: {self.session_id}")
             return True
         except Exception as e:

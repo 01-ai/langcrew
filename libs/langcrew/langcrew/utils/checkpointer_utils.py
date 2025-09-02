@@ -37,12 +37,6 @@ class CheckpointerMessageManager:
                 checkpoint_ns = checkpoint_tuple.config.get("configurable", {}).get(
                     "checkpoint_ns", ""
                 )
-                if checkpoint_tuple.checkpoint:
-                    checkpoint_id = checkpoint_tuple.checkpoint["id"]
-                    logger.info(
-                        f"get_all_namespaces checkpoint_ns: {checkpoint_ns}, checkpoint_id: {checkpoint_id}"
-                    )
-
                 if filter_root_ns and not checkpoint_ns:
                     continue
                 if checkpoint_ns in seen:
@@ -50,7 +44,7 @@ class CheckpointerMessageManager:
                 seen.add(checkpoint_ns)
                 unique_namespaces.append(checkpoint_ns)
         except Exception as e:
-            logger.warning(f"Error listing checkpoints: {e}")
+            logger.exception(f"Error listing checkpoints: {e}")
 
         return unique_namespaces
 
@@ -62,14 +56,13 @@ class CheckpointerMessageManager:
         try:
             checkpoint_tuple = await self.checkpointer.aget_tuple(config)
             if checkpoint_tuple and checkpoint_tuple.checkpoint:
-                logger.info(
-                    f"get_messages_from_namespace checkpoint_ns: {namespace}, checkpoint_id: {checkpoint_tuple.checkpoint['id']}"
-                )
                 channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})
                 messages = channel_values.get("messages", [])
                 return messages if isinstance(messages, list) else []
         except Exception as e:
-            logger.warning(f"Error getting messages from namespace '{namespace}': {e}")
+            logger.exception(
+                f"Error getting messages from namespace '{namespace}': {e}"
+            )
 
         return []
 

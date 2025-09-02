@@ -159,6 +159,8 @@ def create_app() -> FastAPI:
                 # Stream execution results
                 async for chunk in adapter.execute(execution_input):
                     yield chunk
+                async with adapter.execute(execution_input) as result:
+                   result
 
             except asyncio.CancelledError:
                 # Client disconnected - just log and exit gracefully

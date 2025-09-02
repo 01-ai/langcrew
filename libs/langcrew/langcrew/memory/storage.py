@@ -210,6 +210,9 @@ class AsyncCheckpointerWrapper:
             self._context_entered = False
             return result
 
+    async def cleanup(self):
+        await self.checkpointer_cm.__aexit__(None, None, None)
+
 
 def get_storage(
     provider: str | None = None,

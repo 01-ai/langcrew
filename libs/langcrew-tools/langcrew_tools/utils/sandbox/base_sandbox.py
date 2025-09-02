@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Final, TypeVar, Union
 
 from e2b import AsyncSandbox
 from langcrew.utils import CheckpointerSessionStateManager
@@ -16,6 +16,9 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
+
+
+SANDBOX_ID_KEY: Final = "sandbox_id"
 
 
 class SandboxMixin(BaseModel):
@@ -52,6 +55,7 @@ class SandboxMixin(BaseModel):
                     sandbox = await SandboxToolkit.create_async_sandbox(config)
             self._sandbox = sandbox
         return self._sandbox
+    
 
 
 async def none_sandbox():
@@ -67,7 +71,7 @@ def create_sandbox_source_by_session_id(
     async def _get_async_sandbox() -> "AsyncSandbox":
         # For now, create a new sandbox (placeholder implementation)
         sandbox_id = await checkpointer_state_manager.get_value(
-            session_id, "sandbox_id"
+            session_id, SANDBOX_ID_KEY
         )
         try:
             if sandbox_id:
@@ -75,7 +79,7 @@ def create_sandbox_source_by_session_id(
                     f"sandbox session_id: {session_id} sandbox_id: {sandbox_id}"
                 )
                 connect_config = config.copy() if config else {}
-                connect_config["sandbox_id"] = sandbox_id
+                connect_config[SANDBOX_ID_KEY] = sandbox_id
                 sandbox = await SandboxToolkit.connect_or_resume_async_sandbox(
                     connect_config
                 )
@@ -86,7 +90,7 @@ def create_sandbox_source_by_session_id(
         logger.info(f"create sandbox session_id: {session_id}")
         sandbox = await SandboxToolkit.create_async_sandbox(config)
         await checkpointer_state_manager.set_state(
-            session_id, {"sandbox_id": sandbox.sandbox_id}
+            session_id, {SANDBOX_ID_KEY: sandbox.sandbox_id}
         )
         # Safely call the async callback if provided
         if create_callback is not None:

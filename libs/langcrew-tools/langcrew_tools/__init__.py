@@ -2,6 +2,7 @@
 # This package provides various tools for the LangCrew framework
 
 # Code execution tools
+from .base import SandboxS3ToolMixin
 from .code_interpreter.langchain_tools import CodeInterpreterTool
 
 # Command execution tools
@@ -78,4 +79,6 @@ __all__ = [
     "MessageToUserTool",
     # Search
     "WebSearchTool",
+    # Base
+    "SandboxS3ToolMixin",
 ]

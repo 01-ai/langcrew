@@ -143,7 +143,12 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from enum import Enum
-from typing import Any, override
+from typing import Any
+
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 from langchain_core.callbacks import adispatch_custom_event
 from langchain_core.runnables import RunnableConfig
@@ -663,6 +668,8 @@ class StreamingBaseTool(ToolCallback):
                     *args,
                     **kwargs,
                 )
+            except asyncio.CancelledError as e:
+                raise e
             except BaseException as e:
                 # Unified exception handling: use exception level to record full stack trace
                 logger.exception(f"Stream processing error: {e}")

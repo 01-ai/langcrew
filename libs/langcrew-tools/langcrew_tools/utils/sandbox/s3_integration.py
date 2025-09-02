@@ -306,7 +306,7 @@ class SandboxS3Toolkit:
             raise ValueError("dir_path is required")
         if not s3_prefix:
             raise ValueError("s3_prefix is required")
-
+    
         s3_prefix = SandboxS3Toolkit._get_s3_path(async_sandbox, s3_prefix)
 
         try:

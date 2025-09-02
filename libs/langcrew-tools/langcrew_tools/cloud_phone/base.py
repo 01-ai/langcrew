@@ -10,7 +10,7 @@ from langcrew.utils import CheckpointerSessionStateManager
 from pydantic import Field
 
 from ..utils.env_config import env_config
-from ..utils.s3 import create_s3_client
+from ..utils.s3 import S3ClientMixin
 from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 from .actions import enable_a11y, get_clickables, take_screenshot
 
@@ -18,8 +18,10 @@ logger = logging.getLogger(__name__)
 
 sandbox_map = {}
 
+CLOUD_PHONE_SANDBOX_ID_KEY: Final = "cloud_phone_sandbox_id"
 
-class CloudPhoneBaseTool(BaseTool):
+
+class CloudPhoneBaseTool(BaseTool, S3ClientMixin):
     """Base class for all CloudPhone tools providing sandbox access."""
 
     # adb connection configuration
@@ -115,10 +117,12 @@ class CloudPhoneBaseTool(BaseTool):
             _, image_bytes = await take_screenshot(self.sandbox)
             image_base_64 = base64.b64encode(image_bytes).decode("utf-8")
             if image_base_64:
-                image_url = await SandboxS3Toolkit.upload_base64_image(
-                    create_s3_client(),
-                    base64_data=image_base_64,
-                )
+                async_s3_client = await self.get_s3_client()
+                if async_s3_client:
+                    image_url = await SandboxS3Toolkit.upload_base64_image(
+                        async_s3_client,
+                        base64_data=image_base_64,
+                    )
 
             return {
                 "clickable_elements": clickable_elements,
@@ -136,7 +140,7 @@ def create_cloud_phone_sandbox_by_session_id(
     async def _get_cloud_phone_async_sandbox() -> "str":
         # For now, create a new sandbox (placeholder implementation)
         sandbox_id = await checkpointer_state_manager.get_value(
-            session_id, "cloud_phone_sandbox_id"
+            session_id, CLOUD_PHONE_SANDBOX_ID_KEY
         )
         if sandbox_id:
             logger.info(
@@ -144,6 +148,7 @@ def create_cloud_phone_sandbox_by_session_id(
             )
             return sandbox_id
         else:
+            # todo 异步改造
             logger.info(f"create cloud_phone_sandbox_id session_id: {session_id}")
             config = env_config.get_dict("AGENTBOX_")
             config = env_config.filter_valid_parameters(Sandbox, config)
@@ -155,6 +160,7 @@ def create_cloud_phone_sandbox_by_session_id(
             logger.info(
                 f"cloud_phone_sandbox_id session_id: {session_id} auth_info: {auth_info}"
             )
+            # todo  业务逻辑，输入决定
 
             try:
                 dispatch_custom_event(
@@ -182,7 +188,7 @@ def create_cloud_phone_sandbox_by_session_id(
                 )
 
             await checkpointer_state_manager.set_state(
-                session_id, {"cloud_phone_sandbox_id": sbx.sandbox_id}
+                session_id, {CLOUD_PHONE_SANDBOX_ID_KEY: sbx.sandbox_id}
             )
             # Safely call the async callback if provided
             return sbx.sandbox_id

@@ -12,7 +12,7 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from ..base import BaseToolInput
-from ..utils.s3.client import AsyncS3Client
+from ..utils.s3 import S3ClientMixin
 from ..utils.sandbox.base_sandbox import SandboxMixin
 from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 
@@ -33,7 +33,7 @@ class ImageGenerationInput(BaseToolInput):
     )
 
 
-class ImageGenerationTool(BaseTool, SandboxMixin):
+class ImageGenerationTool(BaseTool, SandboxMixin, S3ClientMixin):
     """Tool for generating images with timeout handling and retry mechanism."""
 
     name: ClassVar[str] = "image_generation"
@@ -56,7 +56,6 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
     enable_sandbox: bool = Field(
         default=False, description="Whether to enable sandbox integration"
     )
-    async_s3_client: AsyncS3Client = Field(default=None, description="Async S3 client")
 
     def __init__(
         self,
@@ -67,7 +66,6 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
         default_quality: str | None = None,
         default_n: int | None = None,
         enable_sandbox: bool = False,
-        async_s3_client: AsyncS3Client | None = None,
         **kwargs,
     ):
         """Initialize ImageGenerationTool with optional configuration.
@@ -85,12 +83,10 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
             default_quality: Default image quality
             default_n: Default number of images to generate
             enable_sandbox: Whether to enable sandbox integration
-            async_s3_client: Async S3 client
             sandbox_id: Existing sandbox ID to connect to (if None, creates new sandbox)
             sandbox_config: Optional sandbox configuration
         """
         super().__init__(**kwargs)
-        self.async_s3_client = async_s3_client
         # Load configuration with priority
         self.api_key = api_key or os.getenv("LANGCREW_IMAGE_GEN_API_KEY")
         self.base_url = (
@@ -307,11 +303,11 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
                 logger.info(
                     f"Image saved to sandbox: {sandbox_path}, sandbox_id: {sandbox_id}"
                 )
-
-                if self.async_s3_client:
+                async_s3_client = await self.get_s3_client()
+                if async_s3_client:
                     # Upload to S3 with the sandbox_id
                     s3_image_url = await SandboxS3Toolkit.upload_base64_image(
-                        async_s3_client=self.async_s3_client,
+                        async_s3_client=async_s3_client,
                         base64_data=image_b64,
                         sandbox_id=sandbox_id,
                     )
@@ -349,7 +345,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin):
                 "openai package is not installed. Please install it with 'pip install openai'"
             )
         except Exception as e:
-            logger.error(f"Image generation failed: {e}")
+            logger.exception(f"Image generation failed: {e}")
             return f"[ERROR] {type(e).__name__}: {str(e)}"
 
     async def _download_image_to_base64(self, image_url: str) -> str:

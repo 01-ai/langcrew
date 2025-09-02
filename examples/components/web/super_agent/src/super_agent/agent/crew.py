@@ -1,40 +1,36 @@
 import logging
-from typing import Any
 
 from browser_use.llm.base import BaseChatModel as BrowserBaseChatModel
 from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
+from langcrew import Agent, Crew
+from langcrew.project import CrewBase, agent, crew
+from langcrew.runnable_crew import RunnableCrew
 from langcrew.tools import StreamingBaseTool
 from langcrew.utils.checkpointer_utils import CheckpointerSessionStateManager
+from langcrew_tools.browser.browser_use_streaming_tool import BrowserStreamingTool
 from langcrew_tools.cloud_phone.base import create_cloud_phone_sandbox_by_session_id
+from langcrew_tools.code_interpreter import CodeInterpreterTool
+from langcrew_tools.commands import RunCommandTool
+from langcrew_tools.fetch.langchain_tools import WebFetchTool
+from langcrew_tools.filesystem import DeleteFileTool, ReadFileTool, WriteFileTool
+from langcrew_tools.filesystem.langchain_tools import (
+    FileAppendTextTool,
+    FileReplaceTextTool,
+)
+from langcrew_tools.hitl.langchain_tools import CallbackUserInputTool
+from langcrew_tools.image_gen import ImageGenerationTool
+from langcrew_tools.search.langchain_tools import WebSearchTool
+from langcrew_tools.utils.s3.factory import create_s3_client
 from langcrew_tools.utils.sandbox.base_sandbox import (
     SandboxMixin,
     create_sandbox_source_by_session_id,
 )
-from langcrew.runnable_crew import RunnableCrew
-from langcrew import Agent, Crew
-from langcrew.project import CrewBase, agent, crew
-from langcrew_tools.browser.browser_use_streaming_tool import BrowserStreamingTool
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.base import BaseCheckpointSaver
-
-
+from langgraph.checkpoint.memory import InMemorySaver
 from super_agent.config.config import SuperAgentConfig, default_config
-from langcrew_tools.utils.s3.factory import create_s3_client
-from langcrew_tools.hitl.langchain_tools import CallbackUserInputTool
-from langchain_core.tools import BaseTool
-from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew_tools.fetch.langchain_tools import WebFetchTool
-from langcrew_tools.filesystem import WriteFileTool, ReadFileTool, DeleteFileTool
-from langcrew_tools.filesystem.langchain_tools import (
-    FileReplaceTextTool,
-    FileAppendTextTool,
-)
-from langcrew_tools.image_gen import ImageGenerationTool
-from langcrew_tools.code_interpreter import CodeInterpreterTool
-from langcrew_tools.commands import RunCommandTool
 from super_agent.tool.cloud_phone_streaming_tool import CloudPhoneStreamingTool
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +61,6 @@ class SuperAgentCrew:
             self.checkpointer
         )
         self.async_s3_client = create_s3_client()
-
         self.tools = self.get_tools()
         # Configure logging
         logging.basicConfig(
@@ -159,6 +154,5 @@ class SuperAgentCrew:
             agents=self.agents,  # Automatically created by @agent decorator
             async_checkpointer=self.checkpointer,
             session_id=self.session_id,
-            tools=self.tools,
             verbose=self.config.verbose,
         )

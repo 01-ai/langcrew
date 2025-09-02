@@ -236,12 +236,17 @@ class LangGraphAdapter:
             async for event in self.executor.astream_events(
                 input=input_data, config=config
             ):
+                event_type = event.get("event")
                 # -------- 2.1 Stop Flag Check --------
                 # Check stop signal at the beginning of each event processing
                 control_data = self._get_stop_flag(task_input.session_id)
-                if control_data:
+                if control_data or event_type == TaskExecutionStatus.CANCELLED:
                     task_ended = True
-                    stop_reason = control_data.get("stop_reason", "User requested")
+                    stop_reason = (
+                        control_data.get("stop_reason", "User requested")
+                        if control_data
+                        else "User requested"
+                    )
                     yield self._handle_finish_signal(
                         task_input.session_id,
                         task_id,
@@ -250,7 +255,6 @@ class LangGraphAdapter:
                     )
                     break
 
-                event_type = event.get("event")
                 event_data = event.get("data", {})
 
                 # -------- 2.2 High Priority: Interrupts & State Updates --------
