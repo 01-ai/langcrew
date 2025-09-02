@@ -221,7 +221,9 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
     }
     if (chunk.type === 'tool_result') {
       const lastItem = currentAIMessage.messages[currentAIMessage.messages.length - 1];
+      // merge tool_call and tool_result
       if (lastItem && lastItem.type === chunk.detail?.tool && lastItem.detail?.run_id === chunk.detail?.run_id) {
+        lastItem.id = chunk.id;
         lastItem.detail = {
           ...chunk.detail,
           param: lastItem.detail.param,
@@ -266,6 +268,7 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
         const lastItem = step.children[step.children.length - 1];
         // merge tool_call and tool_result
         if (lastItem && lastItem?.type === chunk.detail?.tool && lastItem?.detail?.run_id === chunk.detail?.run_id) {
+          lastItem.id = chunk.id;
           lastItem.detail = {
             ...chunk.detail,
             param: lastItem.detail.param,
