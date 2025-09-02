@@ -524,6 +524,8 @@ class StreamingBaseTool(ToolCallback):
                         if custom_event_data
                         else None
                     )
+        except asyncio.CancelledError:
+            raise
         except BaseException as e:
             logger.exception(f"Error in _run_stream_processor: {e}")
             raise e

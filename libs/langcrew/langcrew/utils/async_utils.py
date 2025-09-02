@@ -65,10 +65,13 @@ class AstreamEventTaskWrapper:
         self._stream_producer_task = None
         self._thread_id = None
 
-    def reset(self):
+    async def reset(self):
+        pre_queue = self._event_queue
         self._event_queue = asyncio.Queue(maxsize=self.max_queue_size)
         self._exception_holder = {"exception": None}
         self._stream_producer_task = None
+        # notify to change
+        await pre_queue.put(AstreamEventTaskWrapper._END_EVENT)
 
     async def astream_event_task(self, *args, **kwargs):
         if self._external_completion_future.done():
@@ -95,7 +98,7 @@ class AstreamEventTaskWrapper:
                 cancel_result=current_result,
             )
 
-        self.reset()
+        await self.reset()
         current_queue = self._event_queue
         current_exception_holder = self._exception_holder
         update_task_event = kwargs.pop("update_task_event", None)
@@ -172,7 +175,7 @@ class AstreamEventTaskWrapper:
                             if event == AstreamEventTaskWrapper._END_EVENT:
                                 if (
                                     self._stream_producer_task
-                                    and not self._stream_producer_task.done()
+                                    and self._stream_producer_task.done()
                                 ):
                                     return
                                 else:
