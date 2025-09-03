@@ -1000,7 +1000,7 @@ describe('transformChunksToMessages', () => {
                 started_at: 1756784062580,
                 children: [
                   {
-                    id: '1756784066577_7cde3c6f',
+                    id: '1756784071572_753e6987',
                     role: 'assistant',
                     type: 'choose_and_read_template_pptx_info',
                     content: '',
