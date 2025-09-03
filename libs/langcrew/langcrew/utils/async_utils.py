@@ -26,13 +26,36 @@ def async_timer(func):
     return wrapper
 
 
-def clear_queue(queue: asyncio.Queue):
-    logger.info(f"clear_queue {queue.qsize()}")
-    while not queue.empty():
-        try:
-            queue.get_nowait()
-        except asyncio.QueueEmpty:
-            break
+class EventQueueTask:
+    _END_EVENT: Final[object] = object()
+
+    def __init__(
+        self,
+        queue: asyncio.Queue,
+        stream_producer_task: asyncio.Task[Any],
+    ):
+        self.queue: Final[asyncio.Queue] = queue
+        self.stream_producer_task: Final[asyncio.Task[Any]] = stream_producer_task
+        # 业务
+        self._done_event = False
+        # 已经被正式使用的future
+        self.use_future: Final[asyncio.Future[Any]] = asyncio.Future()
+
+    async def get_event(self):
+        self.done_use_future(True)
+        if self._done_event:
+            return self._done_event
+        event = await self.queue.get()
+        if event == EventQueueTask._END_EVENT or isinstance(event, BaseException):
+            self._done_event = event
+        return event
+
+    async def put_end_event(self, execption: BaseException | None = None):
+        await self.queue.put(execption or EventQueueTask._END_EVENT)
+
+    def done_use_future(self, is_use: bool):
+        if not self.use_future.done():
+            self.use_future.set_result(is_use)
 
 
 class AstreamEventTaskWrapper:
@@ -40,8 +63,6 @@ class AstreamEventTaskWrapper:
     Generic streaming task wrapper that can execute any _astream_events method in asyncio.create_task
     and retrieve streaming results in the main thread
     """
-
-    _END_EVENT: Final[object] = object()
 
     def __init__(
         self,
@@ -60,20 +81,10 @@ class AstreamEventTaskWrapper:
         self.max_queue_size = max_queue_size
         self.callback_on_cancel = callback_on_cancel
         self._external_completion_future: asyncio.Future[Any] = asyncio.Future()
-        self._event_queue = asyncio.Queue(maxsize=self.max_queue_size)
-        self._exception_holder = {"exception": None}
-        self._stream_producer_task = None
+        self._event_queue_task: EventQueueTask = None
         self._thread_id = None
 
-    async def reset(self):
-        pre_queue = self._event_queue
-        self._event_queue = asyncio.Queue(maxsize=self.max_queue_size)
-        self._exception_holder = {"exception": None}
-        self._stream_producer_task = None
-        # notify to change
-        await pre_queue.put(AstreamEventTaskWrapper._END_EVENT)
-
-    async def astream_event_task(self, *args, **kwargs):
+    async def astream_event_task(self, *args, **kwargs) -> asyncio.Future[Any]:
         if self._external_completion_future.done():
             raise RuntimeError(
                 f"astream_event_task is already done stream_producer_{self._thread_id}"
@@ -90,17 +101,18 @@ class AstreamEventTaskWrapper:
         self._thread_id = (
             kwargs.get("config", {}).get("configurable", {}).get("thread_id", "")
         )
-        if self._stream_producer_task:
+        pre_event_queue_task = self._event_queue_task
+
+        if pre_event_queue_task:
             current_result = kwargs.pop("current_result", None)
             await self.cancel_fetch_task(
-                current_stream_producer_task=self._stream_producer_task,
+                current_stream_producer_task=pre_event_queue_task.stream_producer_task,
                 cancel_reason=f"user update task :{new_message}",
                 cancel_result=current_result,
             )
 
-        await self.reset()
-        current_queue = self._event_queue
-        current_exception_holder = self._exception_holder
+        current_queue = asyncio.Queue(maxsize=self.max_queue_size)
+
         update_task_event = kwargs.pop("update_task_event", None)
         if update_task_event:
             await current_queue.put(update_task_event)
@@ -111,22 +123,26 @@ class AstreamEventTaskWrapper:
                 async for event in self.stream_method(*args, **kwargs):
                     # Put event into queue, will wait if queue is full
                     await current_queue.put(event)
-                await current_queue.put(AstreamEventTaskWrapper._END_EVENT)
+                await current_queue.put(EventQueueTask._END_EVENT)
             except asyncio.CancelledError:
+                # 取消任务，不主动发送结束事件,由取消任务的代码来发送结束事件
                 pass
             except BaseException as e:
-                current_exception_holder["exception"] = e
-                await current_queue.put(AstreamEventTaskWrapper._END_EVENT)
-                logger.exception(f"Error in stream_producer: {e}")
-
+                await current_queue.put(e)
             logger.info(
                 f"stream_producer end stream_producer_{self._thread_id}_{new_message}"
             )
-            # current_queue.put(AstreamEventTaskWrapper._END_EVENT)) cannot be put in finally block, because when current task is cancelled, completion event should not be set in finally.
 
-        self._stream_producer_task = asyncio.create_task(
+        stream_producer_task = asyncio.create_task(
             stream_producer(), name=f"stream_producer_{self._thread_id}_{new_message}"
         )
+        self._event_queue_task = EventQueueTask(
+            queue=current_queue, stream_producer_task=stream_producer_task
+        )
+        if pre_event_queue_task:
+            await pre_event_queue_task.put_end_event()
+
+        return self._event_queue_task.use_future
 
     async def astream_event_result(self) -> AsyncIterator[Any]:
         """
@@ -150,21 +166,20 @@ class AstreamEventTaskWrapper:
                     # Wait for event or completion signal
                     done, _ = await asyncio.wait(
                         [
-                            asyncio.create_task(self._event_queue.get()),
+                            asyncio.create_task(self._event_queue_task.get_event()),
                             self._external_completion_future,
                         ],
                         return_when=asyncio.FIRST_COMPLETED,
                     )
-                    # Check if there are any exceptions
-                    if self._exception_holder["exception"]:
-                        raise self._exception_holder["exception"]
 
                     if self._external_completion_future.done():
                         final_result = self._external_completion_future.result()
                         # It must be ensured that the cancellation information is saved before returning the cancellation information; otherwise,
                         # the message cannot be saved correctly after the outer resources are cleaned up.
                         await self.cancel_fetch_task(
-                            self._stream_producer_task, "cancel by user", final_result
+                            self._event_queue_task.stream_producer_task,
+                            "cancel by user",
+                            final_result,
                         )
                         yield final_result
                         return
@@ -172,11 +187,12 @@ class AstreamEventTaskWrapper:
                         # Get completed task results
                         for task in done:
                             event = task.result()
-                            if event == AstreamEventTaskWrapper._END_EVENT:
-                                if (
-                                    self._stream_producer_task
-                                    and self._stream_producer_task.done()
-                                ):
+                            if event == EventQueueTask._END_EVENT or isinstance(
+                                event, BaseException
+                            ):
+                                if self._event_queue_task.stream_producer_task.done():
+                                    if isinstance(event, BaseException):
+                                        raise event
                                     return
                                 else:
                                     # update task
@@ -189,6 +205,7 @@ class AstreamEventTaskWrapper:
             logger.info(
                 f"session {self._thread_id} stream_event_result finally {final_result}"
             )
+            self._event_queue_task.done_use_future(False)
             # Clean up tasks
             if not self._external_completion_future.done():
                 self._external_completion_future.cancel()

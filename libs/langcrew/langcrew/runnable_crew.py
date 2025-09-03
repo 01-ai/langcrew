@@ -1,7 +1,10 @@
+import asyncio
 import inspect
 import logging
 from collections.abc import AsyncGenerator, Callable, Sequence
 from typing import Any
+
+from langcrew.utils.async_utils import async_timer
 
 try:
     from typing import override
@@ -166,6 +169,7 @@ class RunnableCrew(Crew):
             )
             raise e
 
+    @async_timer
     async def stop_agent(self, final_result: dict[str, Any] | None = None) -> bool:
         """
         Stop the intelligent agent for the current session
@@ -188,6 +192,7 @@ class RunnableCrew(Crew):
             logger.error(f"Failed to set stop flag for session {self.session_id}: {e}")
             return False
 
+    @async_timer
     async def send_new_message(self, message: str) -> bool:
         """
         Send new message to running intelligent agent
@@ -205,7 +210,9 @@ class RunnableCrew(Crew):
                 EventType.NEW_MESSAGE.value, message
             )
             human_message = HumanMessage(content=message, id=str(uuid4()))
-            await self._stream_wrapper.astream_event_task(
+            use_future: asyncio.Future[
+                bool
+            ] = await self._stream_wrapper.astream_event_task(
                 input={"messages": [human_message]},
                 config=self._final_config.copy(),
                 current_result=result,
@@ -215,8 +222,18 @@ class RunnableCrew(Crew):
                     data={"new_message": message},
                 ),
             )
-            logger.info(f"Successfully set new message for session {self.session_id}")
-            return True
+            timeout = 10
+            try:
+                await asyncio.wait_for(use_future, timeout=timeout)
+                ret = use_future.result()
+                logger.info(f"set new message [{ret}] for session {self.session_id}")
+                return ret
+            except TimeoutError:
+                logger.warning(
+                    f"Message processing timeout after {timeout} seconds for session {self.session_id}"
+                )
+                use_future.cancel()
+                return False
         except Exception as e:
             logger.exception(
                 f"Failed to set new message for session {self.session_id}: {e}"
