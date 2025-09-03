@@ -1363,7 +1363,6 @@ class Crew:
         """
         # Get async compiled graph with async components
         compiled_graph = await self._get_async_compiled_graph()
-
         # Stream events from the compiled graph
         async for event in compiled_graph.astream_events(
             input,

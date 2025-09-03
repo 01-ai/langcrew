@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def async_timer(func):
-    """异步方法执行时间装饰器"""
+    """Asynchronous method execution time decorator"""
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
@@ -20,8 +20,8 @@ def async_timer(func):
             return result
         finally:
             end_time = time.perf_counter()
-            execution_time = (end_time - start_time) * 1000  # 转换为毫秒
-            logger.info(f"{func.__name__} 执行时间: {execution_time:.2f}ms")
+            execution_time = (end_time - start_time) * 1000
+            logger.info(f"{func.__name__} execution time: {execution_time:.2f}ms")
 
     return wrapper
 
@@ -36,9 +36,9 @@ class EventQueueTask:
     ):
         self.queue: Final[asyncio.Queue] = queue
         self.stream_producer_task: Final[asyncio.Task[Any]] = stream_producer_task
-        # 业务
+
         self._done_event = False
-        # 已经被正式使用的future
+
         self.use_future: Final[asyncio.Future[Any]] = asyncio.Future()
 
     async def get_event(self):
@@ -125,7 +125,7 @@ class AstreamEventTaskWrapper:
                     await current_queue.put(event)
                 await current_queue.put(EventQueueTask._END_EVENT)
             except asyncio.CancelledError:
-                # 取消任务，不主动发送结束事件,由取消任务的代码来发送结束事件
+                # Cancel the task, do not actively send the end event, the end event is sent by the code that cancels the task.
                 pass
             except BaseException as e:
                 await current_queue.put(e)
