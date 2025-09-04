@@ -21,7 +21,7 @@ from langgraph_supervisor.handoff import create_handoff_tool
 
 from .agent import Agent
 from .hitl import HITLConfig
-from .memory import EntityMemory, LongTermMemory, MemoryConfig, ShortTermMemory
+from .memory.config import MemoryConfig
 from .memory.storage import get_checkpointer, get_storage
 
 from .task import Task
@@ -37,8 +37,8 @@ class Crew:
         tasks: list[Task] | None = None,
         verbose: bool = False,
         graph: StateGraph | None = None,
-        # Memory configuration - CrewAI compatible
-        memory: bool | MemoryConfig | None = None,
+        # Memory configuration
+        memory_config: MemoryConfig | None = None,
         embedder: dict[str, Any] | None = None,
         # LangGraph enhancements
         checkpointer: BaseCheckpointSaver | None = None,
@@ -55,24 +55,16 @@ class Crew:
         self.graph = graph
 
         # Memory configuration
-        if memory is None:
-            self.memory_config = None
-        elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig() if memory else None
-        elif isinstance(memory, MemoryConfig):
-            self.memory_config = memory
-        else:
-            raise ValueError(f"Invalid memory parameter type: {type(memory)}")
+        self.memory_config = memory_config
         self.embedder = embedder
 
         self.checkpointer = checkpointer
         self.store = store
         self._compiled_graph = None
-
-        # Memory instances
-        self._short_term_memory = None
-        self._long_term_memory = None
-        self._entity_memory = None
+        
+        # Setup memory for agents without memory config
+        if memory_config:
+            self._setup_memory(memory_config)
 
         self._thread_id = None
 
@@ -81,10 +73,7 @@ class Crew:
         self._async_checkpointer = async_checkpointer
         self._async_compiled_graph = None
 
-        # Async memory instances
-        self._async_short_term_memory = None
-        self._async_long_term_memory = None
-        self._async_entity_memory = None
+        # Remove old async memory instances - no longer needed
 
         self._async_components_initialized = False
 
@@ -108,7 +97,7 @@ class Crew:
 
         # Setup memory if enabled (check final config, not original parameter)
         if self.memory_config is not None:
-            self._setup_crew_memory()
+            # Memory setup is now handled in constructor
 
         if self.graph is None and not self.tasks and not self.agents:
             raise ValueError("Either tasks, agents, or graph must be provided")
@@ -895,47 +884,15 @@ class Crew:
 
         return self._async_compiled_graph
 
-    def _setup_crew_memory(self):
-        """Setup crew-level memory system"""
-        # Unified config with connection_string
-        config = {"connection_string": self.memory_config.connection_string}
-
-        # Create checkpointer if not provided
-        if not self.checkpointer:
-            self.checkpointer = get_checkpointer(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=False,  # Sync version for sync methods
-            )
-
-        # Create store if not provided
-        if not self.store:
-            self.store = get_storage(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=False,  # Sync version for sync methods
-            )
-
-        # Initialize memory instances
-        if self.memory_config.short_term_enabled:
-            self._short_term_memory = ShortTermMemory(
-                checkpointer=self.checkpointer, config=self.memory_config
-            )
-
-        if self.memory_config.long_term_enabled:
-            self._long_term_memory = LongTermMemory(
-                store=self.store, config=self.memory_config
-            )
-
-        if self.memory_config.entity_enabled:
-            self._entity_memory = EntityMemory(
-                store=self.store, config=self.memory_config
-            )
-
+    def _setup_memory(self, config: MemoryConfig):
+        """Setup memory for agents without existing memory configuration"""
+        for agent in self.agents:
+            # Only apply to agents without memory configuration
+            if not hasattr(agent, 'memory_config') or agent.memory_config is None:
+                agent._setup_memory(config)
+        
         if self.verbose:
-            logger.info(
-                f"Memory system initialized with provider: {self.memory_config.provider}"
-            )
+            logger.info(f"Memory system applied to agents with provider: {config.provider}")
 
     async def _setup_async_components(self):
         """Setup async components for async methods"""
@@ -1004,21 +961,7 @@ class Crew:
                 else:
                     self._async_store.setup()
 
-        # Create async memory instances using async components (only if not already created)
-        if self.memory_config.short_term_enabled and not self._async_short_term_memory:
-            self._async_short_term_memory = ShortTermMemory(
-                checkpointer=self._async_checkpointer, config=self.memory_config
-            )
-
-        if self.memory_config.long_term_enabled and not self._async_long_term_memory:
-            self._async_long_term_memory = LongTermMemory(
-                store=self._async_store, config=self.memory_config
-            )
-
-        if self.memory_config.entity_enabled and not self._async_entity_memory:
-            self._async_entity_memory = EntityMemory(
-                store=self._async_store, config=self.memory_config
-            )
+        # Memory is now handled at agent level - no need for crew-level memory instances
 
         # Mark async components as initialized
         self._async_components_initialized = True

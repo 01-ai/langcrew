@@ -16,7 +16,7 @@ from .executors.base import BaseExecutor
 from .executors.factory import ExecutorFactory
 from .guardrail import GuardrailFunc, with_guardrails
 from .hitl import HITLConfig
-from .memory import MemoryConfig
+from .memory.config import MemoryConfig
 from .prompt_builder import PromptBuilder
 from .tools.mcp import MCPToolAdapter
 from .types import TaskSpec
@@ -46,7 +46,7 @@ class Agent:
         mcp_servers: dict[str, dict[str, Any]] | None = None,
         mcp_tool_filter: list[str] | None = None,
         # Memory support
-        memory: bool | MemoryConfig | None = None,
+        memory_config: MemoryConfig | None = None,
         # Pre-model hook
         pre_model_hook: RunnableLike | None = None,
         # Post-model hook
@@ -79,7 +79,7 @@ class Agent:
             executor_kwargs: Additional kwargs for executor
             mcp_servers: MCP server configurations
             mcp_tool_filter: Filter for MCP tools
-            memory: Memory configuration (bool, MemoryConfig instance, or None to disable)
+            memory_config: Memory configuration (MemoryConfig instance or None to disable)
             pre_model_hook: Hook to run before model execution
             post_model_hook: Hook to run after model execution
 
@@ -163,17 +163,13 @@ class Agent:
         if self.mcp_servers:
             self._load_mcp_tools()
 
-        # Memory configuration
-        if memory is None:
-            self.memory_config = None
-        elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig() if memory else None
-        elif isinstance(memory, MemoryConfig):
-            self.memory_config = memory
-        else:
-            raise ValueError(f"Invalid memory parameter type: {type(memory)}")
-
-        self.memory = self.memory_config is not None
+        # Memory system initialization
+        self.memory_config = memory_config
+        self.memory_tools = {}  # Internal memory tools dictionary
+        
+        # Setup memory system if config is provided
+        if memory_config:
+            self._setup_memory(memory_config)
 
         # Create hooks based on context configuration
         if context_config:
@@ -624,3 +620,104 @@ class Agent:
 
         # Call executor's ainvoke method with guardrails applied to prepared_input
         return await self._executor_ainvoke(prepared_input, config, **kwargs)
+
+    def get_all_tools(self) -> list:
+        """Get all tools including memory tools"""
+        all_tools = self.tools.copy()  # User tools
+        
+        # Add memory tools
+        for scope_tools in self.memory_tools.values():
+            if isinstance(scope_tools, dict):
+                all_tools.extend(scope_tools.values())
+            else:
+                all_tools.append(scope_tools)
+        
+        return all_tools
+    
+    def get_memory_tools(self, scope: str = None) -> dict | list:
+        """Get memory tools by scope or all memory tools"""
+        if scope:
+            return self.memory_tools.get(scope, {})
+        return self.memory_tools
+
+    def _setup_memory(self, config: MemoryConfig):
+        """Setup memory system"""
+        if config.short_term.enabled:
+            self._setup_short_term_memory(config)
+        
+        if config.long_term.enabled:
+            self._setup_long_term_memory(config)
+
+    def _setup_short_term_memory(self, config: MemoryConfig):
+        """Setup short-term memory (checkpointer)"""
+        from .memory.storage import get_checkpointer
+        
+        self.checkpointer = get_checkpointer(
+            provider=config.get_short_term_provider(),
+            connection_string=config.short_term.connection_string or config.connection_string
+        )
+
+    def _setup_long_term_memory(self, config: MemoryConfig):
+        """Setup long-term memory (langmem tools)"""
+        from langmem import create_manage_memory_tool, create_search_memory_tool
+        from .memory.storage import get_storage
+        
+        ltm_config = config.long_term
+        store = get_storage(
+            provider=config.get_long_term_provider(),
+            connection_string=ltm_config.connection_string or config.connection_string
+        )
+        
+        # User memory tools
+        if ltm_config.user_memory.enabled:
+            user_namespace = ("user_memories", "{user_id}")
+            
+            user_manage = create_manage_memory_tool(
+                namespace=user_namespace,
+                name="manage_user_memory",
+                instructions=ltm_config.user_memory.instructions,
+                schema=ltm_config.user_memory.schema,
+                actions_permitted=ltm_config.user_memory.actions,
+                store=store,
+                **ltm_config.user_memory.langmem_tool_config
+            )
+            
+            user_search = create_search_memory_tool(
+                namespace=user_namespace,
+                name="search_user_memory",
+                response_format=ltm_config.search_response_format,
+                store=store
+            )
+            
+            # Store in internal memory_tools dictionary
+            self.memory_tools["user"] = {
+                "manage": user_manage,
+                "search": user_search
+            }
+        
+        # App memory tools
+        if ltm_config.app_memory.enabled:
+            app_namespace = ("app_memories", ltm_config.app_id)
+            
+            app_manage = create_manage_memory_tool(
+                namespace=app_namespace,
+                name="manage_app_memory",
+                instructions=ltm_config.app_memory.instructions,
+                schema=ltm_config.app_memory.schema,
+                actions_permitted=ltm_config.app_memory.actions,
+                store=store,
+                **ltm_config.app_memory.langmem_tool_config
+            )
+            
+            app_search = create_search_memory_tool(
+                namespace=app_namespace,
+                name="search_app_memory",
+                response_format=ltm_config.search_response_format,
+                store=store
+            )
+            
+            # Store in internal memory_tools dictionary
+            self.memory_tools["app"] = {
+                "manage": app_manage,
+                "search": app_search
+            }
