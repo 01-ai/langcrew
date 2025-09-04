@@ -45,11 +45,20 @@ class LongTermMemoryConfig:
     
     # Memory scope configurations with default instructions
     user_memory: MemoryScopeConfig = field(default_factory=lambda: MemoryScopeConfig(
-        instructions="Store personal preferences, habits, and important information specific to this user."
+        instructions="Proactively call this tool when you:\n\n"
+                    "1. Identify a new USER preference, habit, or personal information.\n"
+                    "2. Receive an explicit USER request to remember something or otherwise alter your behavior.\n"
+                    "3. Are working and want to record important context specific to this user.\n"
+                    "4. Identify that an existing USER MEMORY is incorrect or outdated."
     ))
     app_memory: MemoryScopeConfig = field(default_factory=lambda: MemoryScopeConfig(
         enabled=False,
-        instructions="Store general knowledge, best practices, and information that benefits all users."
+        instructions="Proactively call this tool when you:\n\n"
+                    "1. Learn general knowledge, best practices, or patterns that benefit all users.\n"
+                    "2. Receive explicit requests to remember application-wide information.\n"
+                    "3. Identify outdated or incorrect general knowledge in existing memories.\n"
+                    "4. Want to record important context that applies across different users.\n\n"
+                    "IMPORTANT: NEVER store user personal information, preferences, or user-specific data here."
     ))
     app_id: str | None = None
     
