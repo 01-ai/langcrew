@@ -45,7 +45,7 @@ Call `request_human_intervention` (NOT `done`) when encountering:
 </security_and_intervention_rules>
 
 <search_engine_rules>
-- **Default to Bing search unless user explicitly requests otherwise**
+- When performing web searches, use Bing (https://www.bing.com) as the default search engine unless the user specifically requests a different search engine.
 </search_engine_rules>
 """
 

@@ -869,6 +869,30 @@ class LangGraphAdapter:
                 session_id=session_id,
                 task_id=task_id,
             )
+        elif event_name == "on_langcrew_agentbox_created":
+            # Agentbox creation event from cloud phone tools
+            agentbox_data = data
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.CONFIG,
+                content="update_session",
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "session_id": agentbox_data.get("session_id"),
+                        "sandbox_id": agentbox_data.get("sandbox_id"),
+                        "instance_no": agentbox_data.get("instance_no"),
+                        "access_key": agentbox_data.get("access_key"),
+                        "access_secret_key": agentbox_data.get("access_secret_key"),
+                        "expire_time": agentbox_data.get("expire_time"),
+                        "user_id": agentbox_data.get("user_id"),
+                    },
+                ),
+                role="inner_message",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+                task_id=task_id,
+            )
 
         elif event_name == "on_langcrew_user_input_required":
             # User input required event from HITL tools

@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Final
 
 from agentbox import Sandbox
+from agentbox.api.client.models import InstanceAuthInfo
 from langchain_core.callbacks.manager import dispatch_custom_event
 from langchain_core.tools import BaseTool
 from langcrew.utils import CheckpointerSessionStateManager
@@ -136,6 +137,8 @@ class CloudPhoneBaseTool(BaseTool, S3ClientMixin):
 def create_cloud_phone_sandbox_by_session_id(
     session_id: str,
     checkpointer_state_manager: CheckpointerSessionStateManager | None = None,
+    create_callback: Callable[[Sandbox, InstanceAuthInfo], Awaitable[None]]
+    | None = None,
 ) -> Callable[[], Awaitable["str"]]:
     async def _get_cloud_phone_async_sandbox() -> "str":
         # For now, create a new sandbox (placeholder implementation)
@@ -160,33 +163,8 @@ def create_cloud_phone_sandbox_by_session_id(
             logger.info(
                 f"cloud_phone_sandbox_id session_id: {session_id} auth_info: {auth_info}"
             )
-            # todo  业务逻辑，输入决定
-
-            try:
-                dispatch_custom_event(
-                    "on_langcrew_agentbox_created",
-                    {
-                        "sandbox_id": sbx.sandbox_id,
-                        "session_id": session_id,
-                        "instance_no": auth_info.instance_no,
-                        **(
-                            {
-                                "access_key": auth_info.access_key,
-                                "access_secret_key": auth_info.access_secret_key,
-                                "expire_time": auth_info.expire_time,
-                                "user_id": auth_info.user_id,
-                            }
-                            if auth_info
-                            else {}
-                        ),
-                    },
-                    config={"configurable": {"thread_id": session_id}},
-                )
-            except Exception as e:
-                logger.warning(
-                    f"create cloud_phone_sandbox_id session_id: {session_id} error: {e}"
-                )
-
+            if create_callback is not None:
+                await create_callback(sbx, auth_info)
             await checkpointer_state_manager.set_state(
                 session_id, {CLOUD_PHONE_SANDBOX_ID_KEY: sbx.sandbox_id}
             )

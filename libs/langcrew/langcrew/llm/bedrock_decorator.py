@@ -266,7 +266,9 @@ def create_cache_modifier(
     if "system" in cache_config.get("supported_fields", []):
 
         def system_modifier(x):
-            return x + [{"cachePoint": {"type": "default"}}]
+            if x:
+                x = x + [{"cachePoint": {"type": "default"}}]
+            return x
 
     if "tools" in cache_config.get("supported_fields", []):
 

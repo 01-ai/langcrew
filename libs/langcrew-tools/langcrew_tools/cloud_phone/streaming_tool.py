@@ -145,6 +145,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     )
     base_model: BaseChatModel = Field(default=None, description="Base model")
     recursion_limit: int = Field(default=120, description="Recursion limit")
+    model_name: str = Field(default=None, description="Model name")
 
     _session_id: str | None = PrivateAttr(default=None)
     _cloudphone_handler_with_model: CloudPhoneMessageHandler | None = PrivateAttr(
@@ -153,6 +154,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
 
     def __init__(
         self,
+        model_name: str,
         base_model: BaseChatModel,
         sandbox_source: Callable[[], Awaitable[str]] | str,
         **kwargs: Any,
@@ -160,6 +162,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         super().__init__(**kwargs)
         self.sandbox_source = sandbox_source
         self.base_model = base_model
+        self.model_name = model_name
 
     @override
     async def _arun_graph_astream_events(
@@ -211,7 +214,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     def configure_runnable(self, config: RunnableConfig):
         self._session_id = config.get("configurable", {}).get("thread_id")
         self._cloudphone_handler_with_model = CloudPhoneMessageHandler(
-            model_name=self.base_model.model_name, runnable_config=config
+            model_name=self.model_name, runnable_config=config
         )
 
     def get_agent_session_id(self) -> str:
