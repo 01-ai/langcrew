@@ -15,7 +15,7 @@ import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, AIMessageChunk
 from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
@@ -25,12 +25,12 @@ from ..crew import Crew
 from ..utils.language import detect_language
 from ..utils.message_utils import generate_message_id
 from .protocol import (
-    TaskInput,
     MessageType,
     PlanAction,
     StepStatus,
     StreamMessage,
     TaskExecutionStatus,
+    TaskInput,
     ToolResult,
 )
 from .tool_display import ToolDisplayManager
@@ -463,25 +463,47 @@ class LangGraphAdapter:
             return None
 
         content = self._extract_content_from_chunk(chunk)
-        if not content:
-            return None
+        if content:
+            detail = {
+                "streaming": True,
+                "run_id": event.get("run_id"),
+            }
+            detail = self._enhance_detail_with_metadata(event, detail)
 
-        detail = {
-            "streaming": True,
-            "run_id": event.get("run_id"),
-        }
-        detail = self._enhance_detail_with_metadata(event, detail)
-
-        return StreamMessage(
-            id=generate_message_id(),
-            type=MessageType.TEXT,
-            content=content,
-            detail=detail,
-            role="assistant",
-            timestamp=int(time.time() * 1000),
-            session_id=session_id,
-            task_id=task_id,
-        )
+            return StreamMessage(
+                id=generate_message_id(),
+                type=MessageType.TEXT,
+                content=content,
+                detail=detail,
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+                task_id=task_id,
+                field_name="content",
+            )
+        elif isinstance(chunk, AIMessageChunk) and hasattr(chunk, "tool_call_chunks"):
+            for tool_call_chunk in chunk.tool_call_chunks:
+                return StreamMessage(
+                    id=generate_message_id(),
+                    type=MessageType.TOOL_CALL_CHUNK,
+                    field_name="detail.name"
+                    if tool_call_chunk.get("name")
+                    else "detail.args",
+                    content="",
+                    detail={
+                        "streaming": True,
+                        "run_id": event.get("run_id"),
+                        "tool_call_id": tool_call_chunk.get("id"),
+                        "args": tool_call_chunk.get("args"),
+                        "name": tool_call_chunk.get("name"),
+                        "index": tool_call_chunk.get("index"),
+                    },
+                    role="assistant",
+                    timestamp=int(time.time() * 1000),
+                    session_id=session_id,
+                    task_id=task_id,
+                )
+        return None
 
     def _handle_model_end(
         self, event: dict[str, Any], session_id: str, task_id: str
