@@ -21,8 +21,8 @@ from langgraph_supervisor.handoff import create_handoff_tool
 
 from .agent import Agent
 from .hitl import HITLConfig
-from .memory.config import MemoryConfig
-from .memory.storage import get_checkpointer, get_storage
+from .memory import MemoryConfig
+from .memory.factory import get_checkpointer, get_storage
 
 from .task import Task
 from .types import CrewState
@@ -61,7 +61,7 @@ class Crew:
         self.checkpointer = checkpointer
         self.store = store
         self._compiled_graph = None
-        
+
         # Setup memory for agents without memory config
         if memory_config:
             self._setup_memory(memory_config)
@@ -96,8 +96,8 @@ class Crew:
             self._setup_hitl()
 
         # Setup memory if enabled (check final config, not original parameter)
-        if self.memory_config is not None:
-            # Memory setup is now handled in constructor
+        # if self.memory_config is not None:
+        # Memory setup is now handled in constructor
 
         if self.graph is None and not self.tasks and not self.agents:
             raise ValueError("Either tasks, agents, or graph must be provided")
@@ -888,11 +888,13 @@ class Crew:
         """Setup memory for agents without existing memory configuration"""
         for agent in self.agents:
             # Only apply to agents without memory configuration
-            if not hasattr(agent, 'memory_config') or agent.memory_config is None:
+            if not hasattr(agent, "memory_config") or agent.memory_config is None:
                 agent._setup_memory(config)
-        
+
         if self.verbose:
-            logger.info(f"Memory system applied to agents with provider: {config.provider}")
+            logger.info(
+                f"Memory system applied to agents with provider: {config.provider}"
+            )
 
     async def _setup_async_components(self):
         """Setup async components for async methods"""
@@ -939,7 +941,7 @@ class Crew:
             store_or_cm = get_storage(
                 provider=self.memory_config.provider,
                 config=config,
-                is_async=True,
+                is_async=True
             )
 
             # Special handling for InMemoryStore: it's already a usable instance, not a context manager

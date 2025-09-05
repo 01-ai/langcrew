@@ -1,7 +1,45 @@
 """Memory configuration for LangCrew Memory System"""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
+
+
+@dataclass
+class IndexConfig:
+    """Configuration for vector indexing in storage"""
+    
+    # Embedding configuration
+    dims: int | None = None
+    embed: str | Callable | None = None
+    
+    # Field configuration for indexing
+    fields: list[str] | None = None
+    
+    # Additional index parameters
+    distance_strategy: str = "cosine"  # cosine, euclidean, dot_product
+    
+    def __post_init__(self):
+        # Validate dims
+        if self.dims is not None and self.dims <= 0:
+            raise ValueError("dims must be a positive integer")
+        
+        # Validate distance strategy
+        valid_strategies = {"cosine", "euclidean", "dot_product"}
+        if self.distance_strategy not in valid_strategies:
+            raise ValueError(f"distance_strategy must be one of {valid_strategies}")
+    
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for storage initialization"""
+        config = {}
+        if self.dims is not None:
+            config["dims"] = self.dims
+        if self.embed is not None:
+            config["embed"] = self.embed
+        if self.fields is not None:
+            config["fields"] = self.fields
+        if self.distance_strategy != "cosine":
+            config["distance_strategy"] = self.distance_strategy
+        return config
 
 
 @dataclass
@@ -42,6 +80,12 @@ class LongTermMemoryConfig:
     model: str = "anthropic:claude-3-5-sonnet-latest"
     provider: str | None = None
     connection_string: str | None = None
+    
+    # Index configuration with sensible defaults
+    index: IndexConfig | None = field(default_factory=lambda: IndexConfig(
+        dims=1536,
+        embed="openai:text-embedding-3-small"
+    ))
     
     # Memory scope configurations with default instructions
     user_memory: MemoryScopeConfig = field(default_factory=lambda: MemoryScopeConfig(
