@@ -154,27 +154,33 @@ class LangGraphAdapter:
     # ============ CORE EXECUTION LOGIC ============
 
     def _build_config(
-        self, session_id: str, config: RunnableConfig | None = None
+        self, session_id: str, user_id: str | None = None, config: RunnableConfig | None = None
     ) -> RunnableConfig:
         """Build RunnableConfig for LangGraph execution.
 
         Args:
             session_id: Session identifier used as thread_id
+            user_id: User identifier for long-term memory (None disables user-specific memory)
             config: Optional RunnableConfig for advanced users
 
         Returns:
-            RunnableConfig with session_id properly set as thread_id
+            RunnableConfig with session_id and user_id properly set
         """
         if config:
-            # Advanced users provide RunnableConfig, ensure session_id is set
+            # Advanced users provide RunnableConfig, ensure session_id and user_id are set
             result_config = config.copy() if hasattr(config, "copy") else dict(config)
             if "configurable" not in result_config:
                 result_config["configurable"] = {}
             result_config["configurable"]["thread_id"] = session_id
+            if user_id:  # Only set if user_id is not None and not empty
+                result_config["configurable"]["user_id"] = user_id
             return result_config
 
         # Default configuration for normal users
-        return {"configurable": {"thread_id": session_id}}
+        config_dict = {"configurable": {"thread_id": session_id}}
+        if user_id:  # Only set if user_id is not None and not empty
+            config_dict["configurable"]["user_id"] = user_id
+        return config_dict
 
     def _prepare_input(self, task_input: TaskInput):
         """Prepare input data for execution based on execution mode."""
@@ -230,7 +236,7 @@ class LangGraphAdapter:
 
             # Prepare input data and configuration
             input_data = self._prepare_input(task_input)
-            config = self._build_config(task_input.session_id, config)
+            config = self._build_config(task_input.session_id, task_input.user_id, config)
 
             # ============ 2. EVENT PROCESSING LOOP ============
             async for event in self.executor.astream_events(

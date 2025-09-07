@@ -92,10 +92,12 @@ class TaskInput(BaseModel):
 
     ID descriptions:
     - session_id: Session identifier for maintaining multi-turn conversation context, also used as LangGraph's thread_id
+    - user_id: User identifier for personalization (optional)
     """
 
     session_id: str  # Required for multi-turn conversations and context continuity
     message: str
+    user_id: str | None = None  # User identifier for personalization (optional)
     language: str | None = None  # Language field for tool display
     interrupt_data: dict[str, Any] | None = None  # Interrupt data for resume scenarios
 
@@ -117,6 +119,7 @@ class ChatRequest(BaseModel):
 
     message: str
     session_id: str | None = None
+    user_id: str | None = None  # User identifier for personalization (optional)
     language: str | None = None  # Language preference for tool display and responses
     interrupt_data: dict[str, Any] | None = None  # For resume scenarios
 

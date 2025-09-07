@@ -402,7 +402,7 @@ class Agent:
             executor_type=self.executor_type,
             llm=self.llm,
             task_spec=task_spec,
-            tools=self.get_all_tools(),
+            tools=self.tools,  # Now all tools are in self.tools
             prompt=executor_prompt,  # Use the decided prompt
             checkpointer=self.checkpointer,
             store=self.store,
@@ -619,19 +619,6 @@ class Agent:
         # Call executor's ainvoke method with guardrails applied to prepared_input
         return await self._executor_ainvoke(prepared_input, config, **kwargs)
 
-    def get_all_tools(self) -> list:
-        """Get all tools including memory tools"""
-        all_tools = self.tools.copy()  # User tools
-
-        # Add memory tools
-        for scope_tools in self.memory_tools.values():
-            if isinstance(scope_tools, dict):
-                all_tools.extend(scope_tools.values())
-            else:
-                all_tools.append(scope_tools)
-
-        return all_tools
-
     def get_memory_tools(self, scope: str = None) -> dict | list:
         """Get memory tools by scope or all memory tools"""
         if scope:
@@ -666,7 +653,7 @@ class Agent:
             user_manage = create_manage_memory_tool(
                 namespace=user_namespace,
                 name="manage_user_memory",
-                instructions=ltm_config.user_memory.instructions,
+                instructions=ltm_config.user_memory.manage_instructions,
                 schema=ltm_config.user_memory.schema,
                 actions_permitted=ltm_config.user_memory.actions,
                 store=store,
@@ -676,11 +663,15 @@ class Agent:
             user_search = create_search_memory_tool(
                 namespace=user_namespace,
                 name="search_user_memory",
+                instructions=ltm_config.user_memory.search_instructions,
                 response_format=ltm_config.search_response_format,
                 store=store,
             )
 
-            # Store in internal memory_tools dictionary
+            # Add memory tools directly to agent.tools for unified access
+            self.tools.extend([user_manage, user_search])
+
+            # Store in internal memory_tools dictionary for debugging/querying
             self.memory_tools["user"] = {"manage": user_manage, "search": user_search}
 
         # App memory tools
@@ -690,7 +681,7 @@ class Agent:
             app_manage = create_manage_memory_tool(
                 namespace=app_namespace,
                 name="manage_app_memory",
-                instructions=ltm_config.app_memory.instructions,
+                instructions=ltm_config.app_memory.manage_instructions,
                 schema=ltm_config.app_memory.schema,
                 actions_permitted=ltm_config.app_memory.actions,
                 store=store,
@@ -700,9 +691,13 @@ class Agent:
             app_search = create_search_memory_tool(
                 namespace=app_namespace,
                 name="search_app_memory",
+                instructions=ltm_config.app_memory.search_instructions,
                 response_format=ltm_config.search_response_format,
                 store=store,
             )
 
-            # Store in internal memory_tools dictionary
+            # Add memory tools directly to agent.tools for unified access
+            self.tools.extend([app_manage, app_search])
+
+            # Store in internal memory_tools dictionary for debugging/querying
             self.memory_tools["app"] = {"manage": app_manage, "search": app_search}
