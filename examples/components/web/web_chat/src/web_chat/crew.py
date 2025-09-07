@@ -9,6 +9,7 @@ from langcrew import Agent, Crew, Task
 from langcrew.llm_factory import LLMFactory
 from langcrew.web import ToolDisplayManager
 from .tools import get_chat_tools
+from langcrew.memory import MemoryConfig
 
 
 class WebChatCrew:
@@ -127,7 +128,7 @@ class WebChatCrew:
             tasks=[self.chat_task()],
             # process=Process.sequential,  # Default in langcrew
             verbose=True,
-            memory=True,  # Enable conversation memory for context
+            memory_config=MemoryConfig(),  # Enable conversation memory for context
             # max_rpm=10,  # Rate limiting will be handled differently in langcrew
         )
 

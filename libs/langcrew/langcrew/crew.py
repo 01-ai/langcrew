@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
@@ -22,7 +21,6 @@ from langgraph_supervisor.handoff import create_handoff_tool
 from .agent import Agent
 from .hitl import HITLConfig
 from .memory import MemoryConfig
-from .memory.factory import get_checkpointer, get_storage
 
 from .task import Task
 from .types import CrewState
@@ -72,14 +70,7 @@ class Crew:
         self._async_store = async_store
         self._async_checkpointer = async_checkpointer
         self._async_compiled_graph = None
-
-        # Remove old async memory instances - no longer needed
-
         self._async_components_initialized = False
-
-        # Context managers for async components
-        self._async_store_cm = None
-        self._async_checkpointer_cm = None
 
         # HITL configuration
         if hitl is None:
@@ -217,14 +208,15 @@ class Crew:
 
         return interrupt_before, interrupt_after
 
-    def _compile_graph_with_checkpointer(
-        self, builder: StateGraph, checkpointer=None
+    def _compile_graph(
+        self, builder: StateGraph, checkpointer=None, store=None
     ) -> CompiledStateGraph:
-        """Compile graph with checkpointer and interrupt configuration applied"""
+        """Compile graph with memory components and interrupt configuration applied"""
         interrupt_before, interrupt_after = self._collect_interrupt_config()
 
         compiled = builder.compile(
             checkpointer=checkpointer or self.checkpointer,
+            store=store or self.store,
             interrupt_before=interrupt_before,
             interrupt_after=interrupt_after,
         )
@@ -354,7 +346,7 @@ class Crew:
             prev_node = node_name
 
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_checkpointer(
+        return self._compile_graph(
             builder, checkpointer
         )  # Use interrupt-aware compilation
 
@@ -418,7 +410,7 @@ class Crew:
 
         # Last agent connects to END
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_checkpointer(
+        return self._compile_graph(
             builder, checkpointer
         )  # Use interrupt-aware compilation
 
@@ -686,7 +678,7 @@ class Crew:
         # No conditional edges needed - LangGraph's Command mechanism handles routing
         # The handoff tools return Command(goto=agent_name) which LangGraph processes automatically
 
-        return self._compile_graph_with_checkpointer(builder, checkpointer)
+        return self._compile_graph(builder, checkpointer)
 
     def _build_task_handoff_graph(
         self, checkpointer=None, is_async=False
@@ -810,14 +802,14 @@ class Crew:
                 f"Task handoff graph built: {len(backbone_tasks)} backbone + {len(handoff_subgraph_tasks)} handoff + 1 router"
             )
 
-        return self._compile_graph_with_checkpointer(builder, checkpointer)
+        return self._compile_graph(builder, checkpointer)
 
     def _get_compiled_graph(self) -> CompiledStateGraph:
         """Get the compiled graph for execution with caching"""
         # Handle custom graph if provided
         if self.graph is not None:
             # User provided StateGraph, compile it with crew's checkpointer
-            return self._compile_graph_with_checkpointer(self.graph)
+            return self._compile_graph(self.graph)
 
         # Use cached compiled graph if available
         if self._compiled_graph is not None:
@@ -846,9 +838,7 @@ class Crew:
         # Handle custom graph if provided
         if self.graph is not None:
             # User provided StateGraph, compile it with async checkpointer
-            return self._compile_graph_with_checkpointer(
-                self.graph, self._async_checkpointer
-            )
+            return self._compile_graph(self.graph, self._async_checkpointer)
 
         # Use cached async compiled graph if available
         if self._async_compiled_graph is not None:
@@ -885,15 +875,43 @@ class Crew:
         return self._async_compiled_graph
 
     def _setup_memory(self, config: MemoryConfig):
-        """Setup memory for agents without existing memory configuration"""
+        """Setup memory system for crew and agents"""
+        # 1. Create checkpointer at Crew level (if not explicitly provided)
+        if self.checkpointer is None and config.short_term.enabled:
+            from langcrew.memory.factory import get_checkpointer
+
+            self.checkpointer = get_checkpointer(
+                provider=config.get_short_term_provider(),
+                config={
+                    "connection_string": config.short_term.connection_string
+                    or config.connection_string
+                },
+            )
+
+        # 2. Create store at Crew level (if not explicitly provided)
+        if self.store is None and config.long_term.enabled:
+            from langcrew.memory.factory import get_storage
+
+            self.store = get_storage(
+                provider=config.get_long_term_provider(),
+                config={
+                    "connection_string": config.long_term.connection_string
+                    or config.connection_string
+                },
+            )
+
+        # 3. Unify memory_config for all agents and inject store
         for agent in self.agents:
-            # Only apply to agents without memory configuration
-            if not hasattr(agent, "memory_config") or agent.memory_config is None:
-                agent._setup_memory(config)
+            # Use crew's memory_config to ensure consistency
+            agent.memory_config = config
+            # Inject crew-level store so agent's executor can access it
+            agent.store = self.store
+            # Setup agent's memory (only handles long_term memory tools)
+            agent._setup_memory(config, is_async=False)
 
         if self.verbose:
             logger.info(
-                f"Memory system applied to agents with provider: {config.provider}"
+                f"Memory system applied to crew and agents with provider: {config.provider}"
             )
 
     async def _setup_async_components(self):
@@ -905,67 +923,13 @@ class Crew:
         if self._async_components_initialized:
             return
 
-        config = {"connection_string": self.memory_config.connection_string}
+        # Re-initialize all agents with async memory setup
+        for agent in self.agents:
+            if agent.memory_config:
+                agent.memory_tools.clear()
+                agent._setup_memory(agent.memory_config, is_async=True)
+                agent._async_memory_initialized = True
 
-        # Create async checkpointer if not already created
-        if not self._async_checkpointer:
-            checkpointer_or_cm = get_checkpointer(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=True,
-            )
-
-            # Special handling for InMemorySaver: it's already a usable instance, not a context manager
-            if (
-                self.memory_config.provider == "memory"
-                or checkpointer_or_cm.__class__.__name__ == "InMemorySaver"
-            ):
-                self._async_checkpointer = checkpointer_or_cm
-                self._async_checkpointer_cm = None
-            else:
-                # Other checkpointers are context managers returned by wrappers
-                self._async_checkpointer_cm = checkpointer_or_cm
-                self._async_checkpointer = (
-                    await self._async_checkpointer_cm.__aenter__()
-                )
-
-            # Setup if needed
-            if hasattr(self._async_checkpointer, "setup"):
-                if asyncio.iscoroutinefunction(self._async_checkpointer.setup):
-                    await self._async_checkpointer.setup()
-                else:
-                    self._async_checkpointer.setup()
-
-        # Create async store if not already created
-        if not self._async_store:
-            store_or_cm = get_storage(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=True
-            )
-
-            # Special handling for InMemoryStore: it's already a usable instance, not a context manager
-            if (
-                self.memory_config.provider == "memory"
-                or store_or_cm.__class__.__name__ == "InMemoryStore"
-            ):
-                self._async_store = store_or_cm
-                self._async_store_cm = None
-            else:
-                # Other storage are context managers returned by wrappers
-                self._async_store_cm = store_or_cm
-                self._async_store = await self._async_store_cm.__aenter__()
-
-            # Setup if needed
-            if hasattr(self._async_store, "setup"):
-                if asyncio.iscoroutinefunction(self._async_store.setup):
-                    await self._async_store.setup()
-                else:
-                    self._async_store.setup()
-
-        # Memory is now handled at agent level - no need for crew-level memory instances
-
-        # Mark async components as initialized
         self._async_components_initialized = True
 
     def invoke(
@@ -1352,80 +1316,6 @@ class Crew:
 
         return result
 
-    def search_memory(
-        self,
-        query: str,
-        memory_type: str = "all",
-        limit: int = 5,
-        is_async: bool = False,
-    ) -> list[dict[str, Any]]:
-        """Search through crew memories
-
-        Args:
-            query: Search query
-            memory_type: Type of memory to search ("short_term", "long_term", "entity", "all")
-            limit: Maximum number of results
-            is_async: Whether to use async memory instances (for internal use)
-
-        Returns:
-            List of memory items
-        """
-        results = []
-
-        # Select memory instances based on execution mode
-        if is_async:
-            stm = self.async_short_term_memory
-            ltm = self.async_long_term_memory
-            em = self.async_entity_memory
-        else:
-            stm = self._short_term_memory
-            ltm = self._long_term_memory
-            em = self._entity_memory
-
-        if memory_type in ["short_term", "all"] and stm:
-            short_term_results = stm.search(query, self._thread_id, limit)
-            for item in short_term_results:
-                item["memory_type"] = "short_term"
-                results.append(item)
-
-        if memory_type in ["long_term", "all"] and ltm:
-            long_term_results = ltm.search(query, limit)
-            for item in long_term_results:
-                item["memory_type"] = "long_term"
-                results.append(item)
-
-        if memory_type in ["entity", "all"] and em:
-            entity_results = em.search(query, limit=limit)
-            for item in entity_results:
-                item["memory_type"] = "entity"
-                results.append(item)
-
-        # Sort by relevance if searching all
-        if memory_type == "all":
-            results = results[:limit]
-
-        return results
-
-    async def asearch_memory(
-        self, query: str, memory_type: str = "all", limit: int = 5
-    ) -> list[dict[str, Any]]:
-        """Async version of search_memory
-
-        Args:
-            query: Search query
-            memory_type: Type of memory to search ("short_term", "long_term", "entity", "all")
-            limit: Maximum number of results
-
-        Returns:
-            List of memory items
-        """
-        # Ensure async components are set up
-        if self.memory_config:
-            await self._setup_async_components()
-
-        # Use the unified search_memory with async flag
-        return self.search_memory(query, memory_type, limit, is_async=True)
-
     def _setup_hitl(self):
         """Setup HITL (Human-in-the-Loop) for all agents with configuration validation"""
         if self.verbose:
@@ -1470,64 +1360,6 @@ class Crew:
     def memory(self):
         """Access memory configuration status"""
         return self.memory_config is not None
-
-    @property
-    def short_term_memory(self):
-        """Access short-term memory instance"""
-        return self._short_term_memory
-
-    @property
-    def long_term_memory(self):
-        """Access long-term memory instance"""
-        return self._long_term_memory
-
-    @property
-    def entity_memory(self):
-        """Access entity memory instance"""
-        return self._entity_memory
-
-    # Async memory access properties
-    @property
-    def async_short_term_memory(self):
-        """Access async short-term memory instance
-
-        Returns:
-            ShortTermMemory instance if async components are initialized, None otherwise.
-
-        Note:
-            This property returns None if async components haven't been initialized.
-            Use async methods like akickoff() or asearch_memory() to trigger initialization,
-            or manually call await crew._setup_async_components().
-        """
-        return self._async_short_term_memory
-
-    @property
-    def async_long_term_memory(self):
-        """Access async long-term memory instance
-
-        Returns:
-            LongTermMemory instance if async components are initialized, None otherwise.
-
-        Note:
-            This property returns None if async components haven't been initialized.
-            Use async methods like akickoff() or asearch_memory() to trigger initialization,
-            or manually call await crew._setup_async_components().
-        """
-        return self._async_long_term_memory
-
-    @property
-    def async_entity_memory(self):
-        """Access async entity memory instance
-
-        Returns:
-            EntityMemory instance if async components are initialized, None otherwise.
-
-        Note:
-            This property returns None if async components haven't been initialized.
-            Use async methods like akickoff() or asearch_memory() to trigger initialization,
-            or manually call await crew._setup_async_components().
-        """
-        return self._async_entity_memory
 
     def get_agent_by_name(self, name: str) -> Agent:
         """Get an agent by name

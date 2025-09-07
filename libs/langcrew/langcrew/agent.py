@@ -167,7 +167,7 @@ class Agent:
         self.memory_config = memory_config
         self.memory_tools = {}  # Internal memory tools dictionary
         self._async_memory_initialized = False  # Track async memory initialization
-        
+
         # Setup memory system if config is provided
         if memory_config:
             self._setup_memory(memory_config)
@@ -276,18 +276,6 @@ class Agent:
         )
 
         self._setup_and_process_mcp_tools(tools)
-
-    def _create_default_store(self):
-        """Create default store based on config"""
-        from langcrew.memory.storage import get_storage
-
-        return get_storage(
-            provider=self.memory_config.provider,
-            config={
-                "connection": self.memory_config.connection,
-                "path": self.memory_config.path,
-            },
-        )
 
     def _setup_hitl(self):
         """Setup HITL tool wrapping for the agent"""
@@ -617,8 +605,14 @@ class Agent:
             Output dictionary for LangGraph
         """
         # Initialize async memory if needed
-        await self._ensure_async_memory_initialized()
-        
+        if self.memory_config and not self._async_memory_initialized:
+            # Clear existing sync memory tools
+            self.memory_tools.clear()
+
+            # Reinitialize with async versions
+            self._setup_memory(self.memory_config, is_async=True)
+            self._async_memory_initialized = True
+
         # Prepare execution
         prepared_input = self._prepare_execution(input, **kwargs)
 
@@ -628,72 +622,47 @@ class Agent:
     def get_all_tools(self) -> list:
         """Get all tools including memory tools"""
         all_tools = self.tools.copy()  # User tools
-        
+
         # Add memory tools
         for scope_tools in self.memory_tools.values():
             if isinstance(scope_tools, dict):
                 all_tools.extend(scope_tools.values())
             else:
                 all_tools.append(scope_tools)
-        
+
         return all_tools
-    
+
     def get_memory_tools(self, scope: str = None) -> dict | list:
         """Get memory tools by scope or all memory tools"""
         if scope:
             return self.memory_tools.get(scope, {})
         return self.memory_tools
 
-    def _setup_memory(self, config: MemoryConfig):
-        """Setup memory system for sync environments"""
-        if config.short_term.enabled:
-            self._setup_short_term_memory(config)
-        
+    def _setup_memory(self, config: MemoryConfig, is_async: bool = False):
+        """Setup memory system - only handles long-term memory tools (checkpointer managed by Crew)"""
+        # Short-term memory (checkpointer) is managed at Crew level and auto-propagated by LangGraph
+        # Agent only needs to setup long-term memory tools
         if config.long_term.enabled:
-            self._setup_long_term_memory(config)
+            self._setup_long_term_memory(config, is_async)
 
-    async def _setup_memory_async(self, config: MemoryConfig):
-        """Setup memory system for async environments"""
-        if config.short_term.enabled:
-            await self._setup_short_term_memory_async(config)
-        
-        if config.long_term.enabled:
-            await self._setup_long_term_memory_async(config)
-
-    def _setup_short_term_memory(self, config: MemoryConfig):
-        """Setup short-term memory (checkpointer)"""
-        from .memory.factory import get_checkpointer
-        
-        self.checkpointer = get_checkpointer(
-            provider=config.get_short_term_provider(),
-            config={"connection_string": config.short_term.connection_string or config.connection_string}
-        )
-
-    def _setup_long_term_memory(self, config: MemoryConfig):
-        """Setup long-term memory (langmem tools)"""
+    def _setup_long_term_memory(self, config: MemoryConfig, is_async: bool = False):
+        """Setup long-term memory with sync/async support"""
         from langmem import create_manage_memory_tool, create_search_memory_tool
-        from .memory.factory import get_storage
-        
+
         ltm_config = config.long_term
-        
-        # Build storage configuration
-        storage_config = {
-            "connection_string": ltm_config.connection_string or config.connection_string
-        }
-        
-        # Add index configuration if exists
-        if ltm_config.index:
-            storage_config["index"] = ltm_config.index.to_dict()
-        
-        store = get_storage(
-            provider=config.get_long_term_provider(),
-            config=storage_config
-        )
-        
+
+        # Use the store injected by Crew (self.store)
+        # This avoids duplicate store creation and ensures consistency
+        store = self.store
+        if store is None:
+            raise ValueError(
+                "Agent store is None. Ensure Crew._setup_memory() is called before Agent._setup_memory()"
+            )
+
         # User memory tools
         if ltm_config.user_memory.enabled:
             user_namespace = ("user_memories", "{user_id}")
-            
+
             user_manage = create_manage_memory_tool(
                 namespace=user_namespace,
                 name="manage_user_memory",
@@ -701,26 +670,23 @@ class Agent:
                 schema=ltm_config.user_memory.schema,
                 actions_permitted=ltm_config.user_memory.actions,
                 store=store,
-                **ltm_config.user_memory.langmem_tool_config
+                **ltm_config.user_memory.langmem_tool_config,
             )
-            
+
             user_search = create_search_memory_tool(
                 namespace=user_namespace,
                 name="search_user_memory",
                 response_format=ltm_config.search_response_format,
-                store=store
+                store=store,
             )
-            
+
             # Store in internal memory_tools dictionary
-            self.memory_tools["user"] = {
-                "manage": user_manage,
-                "search": user_search
-            }
-        
+            self.memory_tools["user"] = {"manage": user_manage, "search": user_search}
+
         # App memory tools
         if ltm_config.app_memory.enabled:
             app_namespace = ("app_memories", ltm_config.app_id)
-            
+
             app_manage = create_manage_memory_tool(
                 namespace=app_namespace,
                 name="manage_app_memory",
@@ -728,129 +694,15 @@ class Agent:
                 schema=ltm_config.app_memory.schema,
                 actions_permitted=ltm_config.app_memory.actions,
                 store=store,
-                **ltm_config.app_memory.langmem_tool_config
+                **ltm_config.app_memory.langmem_tool_config,
             )
-            
+
             app_search = create_search_memory_tool(
                 namespace=app_namespace,
                 name="search_app_memory",
                 response_format=ltm_config.search_response_format,
-                store=store
-            )
-            
-            # Store in internal memory_tools dictionary
-            self.memory_tools["app"] = {
-                "manage": app_manage,
-                "search": app_search
-            }
-
-    async def _setup_short_term_memory_async(self, config: MemoryConfig):
-        """Setup short-term memory (checkpointer) for async environments"""
-        from .memory.factory import get_checkpointer
-        
-        self.checkpointer = get_checkpointer(
-            provider=config.get_short_term_provider(),
-            config={"connection_string": config.short_term.connection_string or config.connection_string},
-            is_async=True
-        )
-
-    async def _setup_long_term_memory_async(self, config: MemoryConfig):
-        """Setup long-term memory (langmem tools) for async environments"""
-        from langmem import create_manage_memory_tool, create_search_memory_tool
-        from .memory.factory import get_storage
-        
-        ltm_config = config.long_term
-        
-        # Build storage configuration
-        storage_config = {
-            "connection_string": ltm_config.connection_string or config.connection_string
-        }
-        
-        # Add index configuration if exists
-        if ltm_config.index:
-            storage_config["index"] = ltm_config.index.to_dict()
-        
-        store = get_storage(
-            provider=config.get_long_term_provider(),
-            config=storage_config,
-            is_async=True
-        )
-        
-        # User memory tools
-        if ltm_config.user_memory.enabled:
-            user_namespace = ("user_memories", "{user_id}")
-            
-            user_manage = create_manage_memory_tool(
-                namespace=user_namespace,
-                name="manage_user_memory",
-                instructions=ltm_config.user_memory.instructions,
-                schema=ltm_config.user_memory.schema,
-                actions_permitted=ltm_config.user_memory.actions,
                 store=store,
-                **ltm_config.user_memory.langmem_tool_config
             )
-            
-            user_search = create_search_memory_tool(
-                namespace=user_namespace,
-                name="search_user_memory",
-                response_format=ltm_config.search_response_format,
-                store=store
-            )
-            
-            # Store in internal memory_tools dictionary
-            self.memory_tools["user"] = {
-                "manage": user_manage,
-                "search": user_search
-            }
-        
-        # App memory tools
-        if ltm_config.app_memory.enabled:
-            app_namespace = ("app_memories", ltm_config.app_id)
-            
-            app_manage = create_manage_memory_tool(
-                namespace=app_namespace,
-                name="manage_app_memory",
-                instructions=ltm_config.app_memory.instructions,
-                schema=ltm_config.app_memory.schema,
-                actions_permitted=ltm_config.app_memory.actions,
-                store=store,
-                **ltm_config.app_memory.langmem_tool_config
-            )
-            
-            app_search = create_search_memory_tool(
-                namespace=app_namespace,
-                name="search_app_memory",
-                response_format=ltm_config.search_response_format,
-                store=store
-            )
-            
-            # Store in internal memory_tools dictionary
-            self.memory_tools["app"] = {
-                "manage": app_manage,
-                "search": app_search
-            }
 
-    async def _ensure_async_memory_initialized(self):
-        """Ensure async memory is initialized if needed"""
-        # Only initialize if we have memory config and haven't initialized async memory yet
-        if (self.memory_config and 
-            not self._async_memory_initialized and 
-            self._needs_async_memory_upgrade()):
-            
-            # Clear existing sync memory tools to avoid duplicates
-            self.memory_tools.clear()
-            
-            # Initialize with async versions
-            await self._setup_memory_async(self.memory_config)
-            self._async_memory_initialized = True
-    
-    def _needs_async_memory_upgrade(self) -> bool:
-        """Check if we need to upgrade to async memory setup"""
-        # If we have a memory config and long-term memory is enabled, we might benefit from async setup
-        if not self.memory_config or not self.memory_config.long_term.enabled:
-            return False
-            
-        # Check if the provider needs async handling (non-memory providers usually benefit from async)
-        provider = self.memory_config.get_long_term_provider()
-        return provider != "memory"  # Non-memory providers (postgres, redis, etc.) benefit from async
-
+            # Store in internal memory_tools dictionary
+            self.memory_tools["app"] = {"manage": app_manage, "search": app_search}
