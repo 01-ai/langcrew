@@ -30,7 +30,7 @@ dependencies = [
     "langchain-core>=0.3.72",
     "langchain-text-splitters>=0.3.9",
     "langcrew>=0.1.0",
-    "langgraph>=0.6.3",
+    "langgraph>=0.6.0",
     # HTTP and API clients
     "aiohttp>=3.12.15",
     "httpx>=0.28.1",
