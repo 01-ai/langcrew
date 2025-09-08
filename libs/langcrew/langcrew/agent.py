@@ -46,7 +46,7 @@ class Agent:
         mcp_servers: dict[str, dict[str, Any]] | None = None,
         mcp_tool_filter: list[str] | None = None,
         # Memory support
-        memory_config: MemoryConfig | None = None,
+        memory: MemoryConfig | bool | None = None,
         # Pre-model hook
         pre_model_hook: RunnableLike | None = None,
         # Post-model hook
@@ -79,7 +79,7 @@ class Agent:
             executor_kwargs: Additional kwargs for executor
             mcp_servers: MCP server configurations
             mcp_tool_filter: Filter for MCP tools
-            memory_config: Memory configuration (MemoryConfig instance or None to disable)
+            memory: Memory configuration (MemoryConfig instance, True for default config, or None to disable)
             pre_model_hook: Hook to run before model execution
             post_model_hook: Hook to run after model execution
 
@@ -164,13 +164,26 @@ class Agent:
             self._load_mcp_tools()
 
         # Memory system initialization
-        self.memory_config = memory_config
+        # Handle memory parameter conversion
+        if isinstance(memory, bool):
+            if memory:
+                # memory=True: use default MemoryConfig
+                from .memory import MemoryConfig
+
+                self.memory_config = MemoryConfig()
+            else:
+                # memory=False: disable memory
+                self.memory_config = None
+        else:
+            # memory is MemoryConfig instance or None
+            self.memory_config = memory
+
         self.memory_tools = {}  # Internal memory tools dictionary
         self._async_memory_initialized = False  # Track async memory initialization
 
         # Setup memory system if config is provided
-        if memory_config:
-            self._setup_memory(memory_config)
+        if self.memory_config:
+            self._setup_memory(self.memory_config)
 
         # Create hooks based on context configuration
         if context_config:

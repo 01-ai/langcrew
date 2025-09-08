@@ -36,7 +36,7 @@ class Crew:
         verbose: bool = False,
         graph: StateGraph | None = None,
         # Memory configuration
-        memory_config: MemoryConfig | None = None,
+        memory: MemoryConfig | bool | None = None,
         # LangGraph enhancements
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
@@ -52,15 +52,27 @@ class Crew:
         self.graph = graph
 
         # Memory configuration
-        self.memory_config = memory_config
+        # Handle memory parameter conversion
+        if isinstance(memory, bool):
+            if memory:
+                # memory=True: use default MemoryConfig
+                from .memory import MemoryConfig
+
+                self.memory_config = MemoryConfig()
+            else:
+                # memory=False: disable memory
+                self.memory_config = None
+        else:
+            # memory is MemoryConfig instance or None
+            self.memory_config = memory
 
         self.checkpointer = checkpointer
         self.store = store
         self._compiled_graph = None
 
         # Setup memory for agents without memory config
-        if memory_config:
-            self._setup_memory(memory_config)
+        if self.memory_config:
+            self._setup_memory(self.memory_config)
 
         self._thread_id = None
 

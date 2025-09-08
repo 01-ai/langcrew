@@ -135,7 +135,7 @@ class WebChatCrew:
             tasks=[self.chat_task()],
             # process=Process.sequential,  # Default in langcrew
             verbose=True,
-            memory_config=MemoryConfig(
+            memory=MemoryConfig(
                 provider="memory",  # Use in-memory provider
                 long_term=LongTermMemoryConfig(
                     enabled=True,  # Enable long-term memory
