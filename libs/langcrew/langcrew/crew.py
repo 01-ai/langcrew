@@ -910,12 +910,6 @@ class Crew:
                 # Setup agent's memory (only handles long_term memory tools)
                 agent._setup_memory(config, is_async=False)
 
-        # 4. Inject checkpointer and store into all agents after memory setup
-        # This ensures agents get the correct references (possibly created in steps 1-2)
-        for agent in self.agents:
-            agent.checkpointer = self.checkpointer
-            agent.store = self.store
-
         if self.verbose:
             logger.info(
                 f"Memory system applied to crew and agents with provider: {config.provider}"
@@ -929,6 +923,32 @@ class Crew:
         # Skip if already initialized
         if self._async_components_initialized:
             return
+
+        # Create async checkpointer if not explicitly provided
+        if self._async_checkpointer is None and self.memory_config.short_term.enabled:
+            from langcrew.memory.factory import get_checkpointer
+
+            self._async_checkpointer = get_checkpointer(
+                provider=self.memory_config.get_short_term_provider(),
+                config={
+                    "connection_string": self.memory_config.short_term.connection_string
+                    or self.memory_config.connection_string
+                },
+                is_async=True,
+            )
+
+        # Create async store if not explicitly provided
+        if self._async_store is None and self.memory_config.long_term.enabled:
+            from langcrew.memory.factory import get_storage
+
+            self._async_store = get_storage(
+                provider=self.memory_config.get_long_term_provider(),
+                config={
+                    "connection_string": self.memory_config.long_term.connection_string
+                    or self.memory_config.connection_string
+                },
+                is_async=True,
+            )
 
         # Re-initialize all agents with async memory setup
         for agent in self.agents:

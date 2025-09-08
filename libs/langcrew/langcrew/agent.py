@@ -136,10 +136,6 @@ class Agent:
         self.debug = debug
         self.config = config
 
-        # Crew dependencies for executor creation
-        self.checkpointer = None
-        self.store = None
-
         # Executor configuration
         self.executor: BaseExecutor | None = None
         self.executor_type = executor_type
@@ -417,8 +413,7 @@ class Agent:
             task_spec=task_spec,
             tools=self.tools,  # Now all tools are in self.tools
             prompt=executor_prompt,  # Use the decided prompt
-            checkpointer=self.checkpointer,
-            store=self.store,
+            # Removed checkpointer/store - LangGraph handles this automatically
             pre_model_hook=self.pre_model_hook,
             post_model_hook=self.post_model_hook,
             interrupt_before=interrupt_before,  # LangGraph native node-level interrupt
@@ -651,13 +646,7 @@ class Agent:
 
         ltm_config = config.long_term
 
-        # Use the store injected by Crew (self.store)
-        # This avoids duplicate store creation and ensures consistency
-        store = self.store
-        if store is None:
-            raise ValueError(
-                "Agent store is None. Ensure Crew._setup_memory() is called before Agent._setup_memory()"
-            )
+        # Note: Removed manual store handling - LangMem automatically gets store from LangGraph
 
         # User memory tools
         if ltm_config.user_memory.enabled:
@@ -669,7 +658,7 @@ class Agent:
                 instructions=ltm_config.user_memory.manage_instructions,
                 schema=ltm_config.user_memory.schema,
                 actions_permitted=ltm_config.user_memory.actions,
-                store=store,
+                # Removed store parameter - LangMem automatically gets it from LangGraph
                 **ltm_config.user_memory.langmem_tool_config,
             )
 
@@ -678,7 +667,7 @@ class Agent:
                 name="search_user_memory",
                 instructions=ltm_config.user_memory.search_instructions,
                 response_format=ltm_config.search_response_format,
-                store=store,
+                # Removed store parameter - LangMem automatically gets it from LangGraph
             )
 
             # Add memory tools directly to agent.tools for unified access
@@ -697,7 +686,7 @@ class Agent:
                 instructions=ltm_config.app_memory.manage_instructions,
                 schema=ltm_config.app_memory.schema,
                 actions_permitted=ltm_config.app_memory.actions,
-                store=store,
+                # Removed store parameter - LangMem automatically gets it from LangGraph
                 **ltm_config.app_memory.langmem_tool_config,
             )
 
@@ -706,7 +695,7 @@ class Agent:
                 name="search_app_memory",
                 instructions=ltm_config.app_memory.search_instructions,
                 response_format=ltm_config.search_response_format,
-                store=store,
+                # Removed store parameter - LangMem automatically gets it from LangGraph
             )
 
             # Add memory tools directly to agent.tools for unified access
