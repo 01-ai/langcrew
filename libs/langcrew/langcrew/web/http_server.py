@@ -123,8 +123,8 @@ class AdapterServer:
                     test_user_id = request.user_id or "test_user_123"
                     task_input = TaskInput(
                         session_id=session_id,
-                        message=request.message,
                         user_id=test_user_id,  # Use test user_id if not provided
+                        message=request.message,
                         language=request.language,
                         interrupt_data=request.interrupt_data,
                     )

@@ -37,7 +37,6 @@ class Crew:
         graph: StateGraph | None = None,
         # Memory configuration
         memory_config: MemoryConfig | None = None,
-        embedder: dict[str, Any] | None = None,
         # LangGraph enhancements
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
@@ -54,7 +53,6 @@ class Crew:
 
         # Memory configuration
         self.memory_config = memory_config
-        self.embedder = embedder
 
         self.checkpointer = checkpointer
         self.store = store
@@ -86,20 +84,11 @@ class Crew:
         if self.hitl_config is not None:
             self._setup_hitl()
 
-        # Setup memory if enabled (check final config, not original parameter)
-        # if self.memory_config is not None:
-        # Memory setup is now handled in constructor
-
         if self.graph is None and not self.tasks and not self.agents:
             raise ValueError("Either tasks, agents, or graph must be provided")
 
         # Setup handoff if needed (automatically detect based on agent configuration)
         self._setup_handoff_if_needed()
-
-        # Inject checkpointer and store into all agents for executor creation
-        for agent in self.agents:
-            agent.checkpointer = self.checkpointer
-            agent.store = self.store
 
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
         """Prepare tools for execution.
@@ -900,14 +889,20 @@ class Crew:
                 },
             )
 
-        # 3. Unify memory_config for all agents and inject store
+        # 3. Setup memory for agents that don't have their own memory config
         for agent in self.agents:
-            # Use crew's memory_config to ensure consistency
-            agent.memory_config = config
-            # Inject crew-level store so agent's executor can access it
+            # Only setup agents without memory_config
+            if not hasattr(agent, "memory_config") or agent.memory_config is None:
+                # Use crew's memory_config
+                agent.memory_config = config
+                # Setup agent's memory (only handles long_term memory tools)
+                agent._setup_memory(config, is_async=False)
+
+        # 4. Inject checkpointer and store into all agents after memory setup
+        # This ensures agents get the correct references (possibly created in steps 1-2)
+        for agent in self.agents:
+            agent.checkpointer = self.checkpointer
             agent.store = self.store
-            # Setup agent's memory (only handles long_term memory tools)
-            agent._setup_memory(config, is_async=False)
 
         if self.verbose:
             logger.info(
@@ -1355,11 +1350,7 @@ class Crew:
                 "Cannot determine execution mode: no tasks or agents provided"
             )
 
-    # Memory access properties (CrewAI compatibility)
-    @property
-    def memory(self):
-        """Access memory configuration status"""
-        return self.memory_config is not None
+    # Agent and task lookup methods
 
     def get_agent_by_name(self, name: str) -> Agent:
         """Get an agent by name

@@ -95,8 +95,8 @@ class TaskInput(BaseModel):
     - user_id: User identifier for personalization (optional)
     """
 
-    session_id: str  # Required for multi-turn conversations and context continuity
     message: str
+    session_id: str  # Required for multi-turn conversations and context continuity
     user_id: str | None = None  # User identifier for personalization (optional)
     language: str | None = None  # Language field for tool display
     interrupt_data: dict[str, Any] | None = None  # Interrupt data for resume scenarios
