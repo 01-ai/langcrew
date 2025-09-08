@@ -9,7 +9,7 @@ from langcrew import Agent, Crew, Task
 from langcrew.llm_factory import LLMFactory
 from langcrew.web import ToolDisplayManager
 from .tools import get_chat_tools
-from langcrew.memory import MemoryConfig, LongTermMemoryConfig
+from langcrew.memory import MemoryConfig, LongTermMemoryConfig, IndexConfig
 
 
 class WebChatCrew:
@@ -123,6 +123,13 @@ class WebChatCrew:
 
     def crew(self) -> Crew:
         """Create and configure the crew"""
+        from urllib.parse import quote_plus
+
+        # Database configuration
+        DB_PASSWORD = "v%WSJc+9uzj5r_Z"
+        DB_PASSWORD_ENCODED = quote_plus(DB_PASSWORD)
+        DB_CONNECTION_STRING = f"postgresql://appdevhub_rw:{DB_PASSWORD_ENCODED}@pgm-uf6i95ox5p3utovu.pg.rds.aliyuncs.com:5432/appdevhub-dev"
+
         return Crew(
             agents=[self.chat_agent()],
             tasks=[self.chat_task()],
@@ -132,8 +139,13 @@ class WebChatCrew:
                 provider="memory",  # Use in-memory provider
                 long_term=LongTermMemoryConfig(
                     enabled=True,  # Enable long-term memory
-                    provider="memory",  # Use in-memory provider for long-term storage
-                    index=None,  # Disable index for now
+                    provider="postgres",
+                    connection_string=DB_CONNECTION_STRING,
+                    # Enable vector indexing for better memory search
+                    index=IndexConfig(
+                        dims=1536,  # OpenAI text-embedding-3-small dimensions
+                        embed="openai:text-embedding-3-small",  # Embedding model
+                    ),
                 ),
             ),  # Enable conversation memory and long-term memory
             # max_rpm=10,  # Rate limiting will be handled differently in langcrew
