@@ -11,9 +11,6 @@ from .commands.langchain_tools import KillCommandTool, RunCommandTool
 # Web fetching tools
 from .fetch.langchain_tools import WebFetchTool
 
-# File parsing tools
-from .file_parser.langchain_tools import ChunkRetrievalTool, DocumentParserTool
-
 # File system tools
 from .filesystem.langchain_tools import (
     CreateDirectoryTool,
@@ -56,9 +53,6 @@ __all__ = [
     "RunCommandTool",
     # Web fetching
     "WebFetchTool",
-    # File parsing
-    "ChunkRetrievalTool",
-    "DocumentParserTool",
     # File system
     "CreateDirectoryTool",
     "DeleteFileTool",
