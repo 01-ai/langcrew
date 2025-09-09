@@ -36,17 +36,19 @@ from .image_gen.langchain_tools import ImageGenerationTool
 # Image parsing tools
 from .image_parser.langchain_tools import ImageParserTool
 
-# Knowledge base tools
-from .knowledge.langchain_tools import PgVectorSearchTool
-
 # Message tools
 from .message.langchain_tools import MessageToUserTool
+
+# Plan tools
+from .plan.langchain_tool import PlanTool
 
 # Search tools
 from .search.langchain_tools import WebSearchTool
 
 # Export all tools
 __all__ = [
+    # Plan
+    "PlanTool",
     # Code execution
     "CodeInterpreterTool",
     # Commands
@@ -73,8 +75,6 @@ __all__ = [
     "ImageGenerationTool",
     # Image parsing
     "ImageParserTool",
-    # Knowledge
-    "PgVectorSearchTool",
     # Message
     "MessageToUserTool",
     # Search

@@ -26,7 +26,6 @@ from ..utils.language import detect_language
 from ..utils.message_utils import generate_message_id
 from .protocol import (
     MessageType,
-    PlanAction,
     StepStatus,
     StreamMessage,
     TaskExecutionStatus,
@@ -590,6 +589,10 @@ class LangGraphAdapter:
 
         tool_input = event.get("data", {}).get("input", {})
 
+        # Special handling for plan tool
+        if tool_name == "plan":
+            return self._handle_plan_tool(event, session_id, task_id)
+
         # Get display information using passed language
         display_fields = ToolDisplayManager.get_display(
             tool_name, tool_input, display_language
@@ -621,7 +624,8 @@ class LangGraphAdapter:
     ) -> StreamMessage | None:
         """Handle tool completion events."""
         tool_name = event.get("name")
-        if not tool_name or tool_name in ["user_input"]:
+        # Skip user_input and plan tools
+        if not tool_name or tool_name in ["user_input", "plan"]:
             return None
 
         tool_input = event.get("data", {}).get("input", {}) or {}
@@ -689,167 +693,7 @@ class LangGraphAdapter:
         event_name = event.get("name")
         message_id = generate_message_id()
 
-        if event_name == "on_langcrew_plan_start":
-            # Plan creation event from Plan-and-Execute executor
-            plan_data = data
-            # Convert phases to steps format for frontend compatibility
-            steps = []
-            current_phase_id = plan_data.get("current_phase_id", 1)
-
-            for phase in plan_data.get("phases", []):
-                phase_id = phase.get("id")
-
-                # Determine status based on phase_id and current_phase_id
-                status = StepStatus.PENDING
-                if phase_id == current_phase_id:
-                    status = StepStatus.RUNNING
-                elif phase_id < current_phase_id:
-                    status = StepStatus.SUCCESS
-
-                steps.append({
-                    "id": str(phase_id),
-                    "title": phase["title"],
-                    "description": phase.get("expected_output", ""),
-                    "status": status,
-                    "started_at": int(time.time() * 1000),
-                })
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN,
-                content=plan_data.get("goal", "Planning execution"),
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif event_name == "on_langcrew_step_start":
-            # Step start event from Plan-and-Execute executor
-            step_data = data
-            step_id = step_data.get("step_id", "")
-
-            # Create steps array with current step marked as running
-            # and previous step (if any) marked as success
-            steps = []
-
-            # If this isn't the first step, add the previous step as completed
-            if step_id > 1:
-                steps.append({
-                    "id": f"{step_id - 1}",
-                    "status": StepStatus.SUCCESS,
-                    "started_at": int(time.time() * 1000),
-                })
-
-            # Add current step as running
-            steps.append({
-                "id": f"{step_id}",
-                "status": StepStatus.RUNNING,
-                "started_at": int(time.time() * 1000),
-            })
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN_UPDATE,
-                content=f"开始执行步骤 {step_id}: {step_data.get('step_description', '')}",
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-        elif event_name == "on_langcrew_step_end":
-            # Step end event from Plan-and-Execute executor
-            step_data = data
-            steps = []
-            steps.append({
-                "id": f"{step_data.get('step_id', '')}",
-                "status": StepStatus.SUCCESS,
-                "started_at": int(time.time() * 1000),
-            })
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN_UPDATE,
-                content=f"步骤 {step_data.get('step_id', '')} 完成",
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif event_name == "on_langcrew_plan_created":
-            # Plan creation event from Plan-and-Execute executor
-            plan_data = data
-            task_type = plan_data.get("task_type", "")
-
-            # For simple tasks, return a text message with the direct response
-            if task_type == "simple":
-                direct_response = plan_data.get("direct_response", "")
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.TEXT,
-                    content=direct_response,
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "streaming": False,
-                            "final": True,
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                    task_id=task_id,
-                )
-
-            steps = []
-            if "plan" in plan_data:
-                plan = plan_data.get("plan", {})
-                steps_data = plan.get("steps", [])
-                for i, step in enumerate(steps_data):
-                    steps.append({
-                        "id": str(i + 1),
-                        "title": step.get("description", "Step"),
-                        "status": StepStatus.PENDING if i > 0 else StepStatus.RUNNING,
-                        "started_at": int(time.time() * 1000),
-                    })
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN,
-                content=plan_data.get("task_type", "Planning execution"),
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif event_name == "on_langcrew_sandbox_created":
+        if event_name == "on_langcrew_sandbox_created":
             # Sandbox creation event from E2B tools
             sandbox_data = data
             return StreamMessage(
@@ -1022,112 +866,6 @@ class LangGraphAdapter:
 
         return None
 
-    # ============ SPECIAL EVENT HANDLERS ============
-
-    async def _handle_special_tool_events(
-        self,
-        event: dict[str, Any],
-        session_id: str,
-        task_id: str,
-        original_msg: StreamMessage | None = None,
-        display_language: str = "en",
-    ) -> StreamMessage | None:
-        """Handle special tool events for agent_update_plan and agent_advance_phase."""
-        event_type = event.get("event", "unknown")
-        tool_name = event.get("name", "unknown_tool")
-
-        if event_type == "on_tool_start" and tool_name in ["agent_advance_phase"]:
-            return None
-
-        if tool_name not in [
-            "agent_update_plan",
-            "agent_advance_phase",
-        ]:
-            return original_msg
-
-        message_id = generate_message_id()
-
-        if event_type == "on_tool_start" and tool_name == "agent_update_plan":
-            tool_input = event.get("data", {}).get("input", {})
-            phases = tool_input.get("phases", [])
-            # Validate phases type
-            if not isinstance(phases, list):
-                logger.error(
-                    f"Invalid phases type: {type(phases)}, expected list, got {phases}"
-                )
-                return None
-            # Use display language for content
-            is_chinese = display_language == "zh"
-            if is_chinese:
-                goal_lines = ["我将按照下列计划进行工作：\n"]
-            else:
-                goal_lines = ["I will work according to the following plan:\n"]
-            steps = []
-            for phase in phases:
-                phase_id = (
-                    phase.get("id")
-                    if isinstance(phase, dict)
-                    else getattr(phase, "id", None)
-                )
-                phase_title = (
-                    phase.get("title")
-                    if isinstance(phase, dict)
-                    else getattr(phase, "title", "")
-                )
-                goal_lines.append(f"{phase_id}. {phase_title}")
-            if is_chinese:
-                goal_lines.append(
-                    "\n在我的工作过程中，你可以随时打断我，告诉我新的信息或者调整计划。"
-                )
-            else:
-                goal_lines.append(
-                    "\nDuring my work, you can interrupt me at any time to provide new information or adjust the plan."
-                )
-            content = "\n".join(goal_lines)
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.MESSAGE_TO_USER,
-                content=content,
-                detail={},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif tool_name == "agent_advance_phase":
-            tool_input = event.get("data", {}).get("input", {})
-            from_phase_id = tool_input.get("from_phase_id", 1)
-            to_phase_id = tool_input.get("to_phase_id", 2)
-            steps = [
-                {
-                    "id": f"{from_phase_id}",
-                    "status": StepStatus.SUCCESS,
-                    "started_at": int(time.time() * 1000),
-                },
-                {
-                    "id": f"{to_phase_id}",
-                    "status": StepStatus.RUNNING,
-                    "started_at": int(time.time() * 1000),
-                },
-            ]
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN_UPDATE,
-                content="计划推进说明",
-                detail={
-                    "action": PlanAction.UPDATE.value,
-                    "steps": steps,
-                },
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        return original_msg
-
     def _handle_finish_signal(
         self,
         session_id: str,
@@ -1254,3 +992,83 @@ class LangGraphAdapter:
             return str(error.args[0])
         else:
             return str(error)
+
+    def _handle_plan_tool(
+        self,
+        event: dict[str, Any],
+        session_id: str,
+        task_id: str,
+    ) -> StreamMessage | None:
+        """Handle plan tool start events.
+
+        This method processes plan tool events from the PlanTool defined in langchain_tool.py,
+        converting them to the appropriate StreamMessage format for the frontend.
+
+        Args:
+            event: The LangGraph event containing plan data
+            session_id: Current session identifier
+            task_id: Current task identifier
+            display_language: Display language (zh or en)
+
+        Returns:
+            A StreamMessage with plan data formatted for frontend rendering
+        """
+        # We only handle on_tool_start events for plan tool
+        if event.get("event") != "on_tool_start":
+            return None
+
+        # Extract data from event
+        tool_input = event.get("data", {}).get("input", {})
+        plans = tool_input.get("plans", [])
+
+        if not plans or not isinstance(plans, list):
+            logger.error(f"Invalid plans data: {plans}")
+            return None
+
+        # Convert plan items to steps for frontend
+        steps = []
+        timestamp = int(time.time() * 1000)
+
+        # Process each plan item
+        for plan in plans:
+            # Extract plan data, handling both dict and object formats
+            plan_id = str(
+                plan.get("id") if isinstance(plan, dict) else getattr(plan, "id", "")
+            )
+            plan_content = (
+                plan.get("content")
+                if isinstance(plan, dict)
+                else getattr(plan, "content", "")
+            )
+            plan_status = (
+                plan.get("status")
+                if isinstance(plan, dict)
+                else getattr(plan, "status", "pending")
+            )
+
+            # Map status from PlanItem format to StepStatus format
+            if plan_status == "running":
+                status = StepStatus.RUNNING
+            elif plan_status == "done":
+                status = StepStatus.SUCCESS
+            else:  # "pending" or any other value
+                status = StepStatus.PENDING
+
+            # Create step object for frontend matching the required format
+            steps.append({
+                "id": plan_id,
+                "title": plan_content,
+                "status": status,
+                "started_at": timestamp,
+            })
+
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.PLAN,
+            content="",
+            detail={"steps": steps},
+            role="assistant",
+            timestamp=timestamp,
+            session_id=session_id,
+            task_id=task_id,
+        )

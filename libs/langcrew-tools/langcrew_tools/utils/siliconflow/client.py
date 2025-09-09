@@ -5,17 +5,54 @@ This module provides a unified client for SiliconFlow API operations including
 embedding generation and document reranking with proper error handling and logging.
 """
 
+import asyncio
 import logging
 import time
 from collections.abc import Iterable
 from typing import Any
 
 import httpx
+from langchain_core.embeddings import Embeddings
 
 from .config import SiliconFlowConfig
 from .exceptions import SiliconFlowError
 
 logger = logging.getLogger(__name__)
+
+
+class SiliconFlowEmbeddings(Embeddings):
+    """SiliconFlow embeddings adapter for LangChain compatibility."""
+
+    def __init__(self, model: str = "BAAI/bge-m3"):
+        """Initialize SiliconFlow embeddings.
+
+        Args:
+            model: The embedding model to use (default: BAAI/bge-m3)
+        """
+        self.client = SiliconFlowClient()
+        self.model = model
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Embed a list of documents synchronously."""
+
+        return asyncio.run(self.aembed_documents(texts))
+
+    def embed_query(self, text: str) -> list[float]:
+        """Embed a single query synchronously."""
+
+        return asyncio.run(self.aembed_query(text))
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Embed a list of documents asynchronously."""
+        return await self.client.embed_documents(
+            file_md5="",  # Not needed for embedding generation
+            chunk_texts=texts,
+            model=self.model,
+        )
+
+    async def aembed_query(self, text: str) -> list[float]:
+        """Embed a single query asynchronously."""
+        return await self.client.embed_query(text=text, model=self.model)
 
 
 class SiliconFlowClient:

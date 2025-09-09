@@ -16,11 +16,12 @@ Usage:
     client = SiliconFlowClient(config=config)
 """
 
-from .client import SiliconFlowClient
+from .client import SiliconFlowClient, SiliconFlowEmbeddings
 from .config import SiliconFlowConfig
 from .exceptions import SiliconFlowError
 
 __all__ = [
+    "SiliconFlowEmbeddings",
     "SiliconFlowClient",
     "SiliconFlowConfig",
     "SiliconFlowError",

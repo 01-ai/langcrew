@@ -29,7 +29,6 @@ class MessageType(str, Enum):
     TOOL_RESULT = "tool_result"
 
     PLAN = "plan"
-    PLAN_UPDATE = "plan_update"
 
     MESSAGE_TO_USER = "message_to_user"
 
@@ -68,14 +67,6 @@ class StepStatus(str, Enum):
     RUNNING = "running"  # Step is currently running
     SUCCESS = "success"  # Step completed successfully
     FAILED = "failed"
-
-
-class PlanAction(str, Enum):
-    """Plan action type"""
-
-    ADD = "add"
-    UPDATE = "update"
-    REMOVE = "remove"
 
 
 class ToolResult(str, Enum):
