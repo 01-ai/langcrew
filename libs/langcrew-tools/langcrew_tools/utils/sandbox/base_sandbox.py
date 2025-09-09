@@ -55,7 +55,6 @@ class SandboxMixin(BaseModel):
                     sandbox = await SandboxToolkit.create_async_sandbox(config)
             self._sandbox = sandbox
         return self._sandbox
-    
 
 
 async def none_sandbox():

@@ -15,7 +15,7 @@ try:
 except ImportError:
     from typing_extensions import override
 
-
+from agentbox import AsyncSandbox
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -148,12 +148,12 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         "Use this tool to interact with cloud phones. Input should be a natural language description of what you want to do with the cloud phone, such as 'Open WeChat and send a message', 'Take a screenshot of the home screen', or 'Navigate to a specific app and perform actions'."
     )
 
-    sandbox_source: Callable[[], Awaitable[str]] | str = Field(
-        default=None, description="AsyncSandbox instance"
+    sandbox_source: Callable[[], Awaitable[AsyncSandbox]] | None = Field(
+        default=None, description="AsyncSandbox"
     )
-    base_model: BaseChatModel = Field(default=None, description="Base model")
+    base_model: BaseChatModel | None = Field(default=None, description="Base model")
     recursion_limit: int = Field(default=120, description="Recursion limit")
-    model_name: str = Field(default=None, description="Model name")
+    model_name: str | None = Field(default=None, description="Model name")
 
     _session_id: str | None = PrivateAttr(default=None)
     _cloudphone_handler_with_model: CloudPhoneMessageHandler | None = PrivateAttr(
@@ -164,7 +164,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         self,
         model_name: str,
         base_model: BaseChatModel,
-        sandbox_source: Callable[[], Awaitable[str]] | str,
+        sandbox_source: Callable[[], Awaitable[AsyncSandbox]],
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
@@ -231,10 +231,5 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
             raise ValueError("session_id is not set")
 
     async def _initialize_tools(self) -> list[Any]:
-        sandbox_id = (
-            await self.sandbox_source()
-            if callable(self.sandbox_source)
-            else self.sandbox_source
-        )
-        tools = get_cloudphone_tools(self.get_agent_session_id(), sandbox_id)
+        tools = get_cloudphone_tools(self.sandbox_source)
         return tools

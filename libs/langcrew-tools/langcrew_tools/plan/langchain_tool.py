@@ -57,6 +57,7 @@ class PlanTool(BaseTool):
         - done: Completed successfully
 
         **Key Rules:**
+        - IMPORTANT: Always set the FIRST STEP to 'running' state when creating a new plan
         - Only ONE item can be 'running' at a time
         - Must mark current 'running' as 'done' or 'pending' before starting another
         - Only mark 'done' when fully accomplished

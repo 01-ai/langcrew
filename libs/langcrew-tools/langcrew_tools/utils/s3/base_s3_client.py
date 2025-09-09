@@ -44,9 +44,11 @@ class S3ClientMixin(BaseModel):
                 config = self.s3_client_source or {}
             self._s3_client = ClientFactory.create_s3_client(config)
         return self._s3_client
+
     def __del__(self):
         if self._s3_client:
             run_async_func_no_wait(self._s3_client.close())
+
 
 async def none_s3_client():
     pass
