@@ -490,5 +490,5 @@ input keyevent KEYCODE_HOME || input keyevent 3 || true
     )
     await sbx.adb_shell.shell("ime enable com.android.adbkeyboard/.AdbIME")
     await sbx.adb_shell.shell("ime set com.android.adbkeyboard/.AdbIME")
-    result = sbx.adb_shell.shell(droidrun_overlay_disable)
+    result = await sbx.adb_shell.shell(droidrun_overlay_disable)
     logger.info(f"Could phone droidrun_overlay_disable result: {result}")
