@@ -28,10 +28,7 @@ class TapToolInput(BaseToolInput):
     """Input for TapTool."""
 
     index: int = Field(..., description="Index of the element to tap")
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
+   
 
 
 class TapTool(CloudPhoneBaseTool):
@@ -65,10 +62,7 @@ class SwipeToolInput(BaseToolInput):
     end_x: int = Field(..., description="Ending X coordinate")
     end_y: int = Field(..., description="Ending Y coordinate")
     duration_ms: int = Field(300, description="Duration of swipe in milliseconds")
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
+   
 
 
 class SwipeTool(CloudPhoneBaseTool):
@@ -107,10 +101,7 @@ class InputTextToolInput(BaseToolInput):
     text: str = Field(
         ..., description="Text to input. Can contain spaces and special characters."
     )
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
+   
 
 
 class InputTextTool(CloudPhoneBaseTool):
@@ -139,10 +130,7 @@ class PressKeyToolInput(BaseToolInput):
         ...,
         description="Android keycode to press. Common: 3=HOME, 4=BACK, 24=VOLUME UP, 25=VOLUME DOWN, 26=POWER, 82=MENU.",
     )
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
+   
 
 
 class PressKeyTool(CloudPhoneBaseTool):
@@ -171,10 +159,7 @@ class StartAppToolInput(BaseToolInput):
 
     package: str = Field(..., description="Package name (e.g., 'com.android.settings')")
     activity: str = Field("", description="Optional activity name")
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
+   
 
 
 class StartAppTool(CloudPhoneBaseTool):
@@ -255,10 +240,7 @@ class CompleteTaskTool(CloudPhoneBaseTool):
 class EnterToolInput(BaseToolInput):
     """Input for EnterTool."""
 
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
+   
 
 
 class EnterTool(CloudPhoneBaseTool):
@@ -301,11 +283,6 @@ class SwitchAppTool(CloudPhoneBaseTool):
 
 class BackToolInput(BaseToolInput):
     """Input for BackTool."""
-
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
 
 
 class BackTool(CloudPhoneBaseTool):
@@ -433,10 +410,7 @@ class TapByCoordinatesToolInput(BaseToolInput):
 
     x: int = Field(..., description="X coordinate to tap (screen size 720*1280)")
     y: int = Field(..., description="Y coordinate to tap (screen size 720*1280)")
-    thinking: str = Field(
-        default="",
-        description="Your detail reasoning about the current state, what you observe, current status description, if the previous actions are succesful，what to do next",
-    )
+   
 
 
 class TapByCoordinatesTool(CloudPhoneBaseTool):
@@ -550,7 +524,7 @@ class GetClickablesTool(CloudPhoneBaseTool):
 
 
 ALL_PHONE_TOOLS = [
-    TapTool,
+    # TapTool,
     TapByCoordinatesTool,
     SwipeTool,
     InputTextTool,

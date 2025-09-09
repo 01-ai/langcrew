@@ -73,7 +73,7 @@ class CloudPhoneBaseTool(BaseTool, S3ClientMixin):
                 sbx = Sandbox(
                     api_key=config["api_key"],
                     template=config["template"],
-                    timeout=config["timeout"],
+                    timeout=int(config["timeout"]),
                 )
                 sbx.adb_shell.connect()
                 await enable_a11y(sbx)

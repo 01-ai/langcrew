@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+import logging
 import os
 import tempfile
 import time
@@ -9,9 +10,7 @@ from typing import Any
 from agentbox import Sandbox
 from PIL import Image
 
-from .adb_manager import ADB
-
-CLICKABLE_ELEMENTS_CACHE = []  # Global variable to store clickable elements for index-based tapping
+logger = logging.getLogger(__name__)
 
 
 async def get_clickables(sbx: Sandbox) -> dict[str, Any]:
@@ -22,9 +21,6 @@ async def get_clickables(sbx: Sandbox) -> dict[str, Any]:
     to capture only the clickable UI elements. The service writes UI data
     to a JSON file on the device, which is then pulled to the host.
     """
-
-    global CLICKABLE_ELEMENTS_CACHE
-
     # Add a short sleep to ensure UI is fully loaded/processed
     await asyncio.sleep(0.5)  # 500ms sleep
 
@@ -39,8 +35,7 @@ async def get_clickables(sbx: Sandbox) -> dict[str, Any]:
     DROIDRUN_STATE_CMD = "content query --uri content://com.droidrun.portal/state"
 
     try:
-        with ADB(sbx) as adb:
-            output = adb.shell(DROIDRUN_STATE_CMD)
+        output = sbx.adb_shell2.shell(DROIDRUN_STATE_CMD)
 
         all = []
         for line in output.strip().split("\n"):
@@ -53,21 +48,36 @@ async def get_clickables(sbx: Sandbox) -> dict[str, Any]:
 
         all.sort(key=lambda x: x.get("index", 0))
 
-        CLICKABLE_ELEMENTS_CACHE = all
-
-        # todo: Create a summary of important text elements for each clickable parent
-        text_summary = []
-        tappable_elements = []
-
-        return {
-            "clickable_elements": all,
-            "count": len(all),
-            "tappable_indices": sorted(tappable_elements),
-            "text_summary": text_summary,
-        }
+        return {"clickable_elements": all, "count": len(all)}
     except Exception as e:
         raise ValueError(f"Error getting clickable elements: {e}")
 
+
+async def clear_text(sbx: Sandbox, x: int, y: int, num_chars: int = 20) -> str:
+    """Clear text from an input field by tapping and deleting characters."""
+    try:
+        sbx.adb_shell2.shell(f"input tap {x} {y}")
+        await asyncio.sleep(0.5)
+
+        sbx.adb_shell2.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
+        for _ in range(num_chars):  # 多次删除以确保清空
+            sbx.adb_shell2.shell("input keyevent KEYCODE_DEL")
+        await asyncio.sleep(0.5)
+        return f"Cleared up to {num_chars} characters from text field at ({x},{y})"
+
+    except ValueError as e:
+        print(f"Error clearing text: {e}")
+        return f"Error: {str(e)}"
+
+
+# Rename the old tap function to tap_by_coordinates for backward compatibility
+async def tap_by_coordinates(x: int, y: int, sbx: Sandbox) -> str:
+    """Tap on the device screen at specific coordinates."""
+    try:
+        sbx.adb_shell2.shell(f"input tap {x} {y}")
+        return f"Tapped at ({x}, {y})"
+    except ValueError as e:
+        return f"Error: {str(e)}"
 
 async def tap(sbx: Sandbox, index: int) -> str:
     """
@@ -127,8 +137,7 @@ async def tap(sbx: Sandbox, index: int) -> str:
         y = (top + bottom) // 2
 
         # Get the device and tap at the coordinates
-        with ADB(sbx) as adb:
-            adb.shell(f"input tap {x} {y}")
+        sbx.adb_shell2.shell(f"input tap {x} {y}")
 
         # Gather element details for the response
         element_text = element.get("text", "No text")
@@ -193,40 +202,10 @@ async def tap(sbx: Sandbox, index: int) -> str:
     except ValueError as e:
         return f"Error: {str(e)}"
 
-
-async def clear_text(sbx: Sandbox, x: int, y: int, num_chars: int = 20) -> str:
-    """Clear text from an input field by tapping and deleting characters."""
-    try:
-        with ADB(sbx) as adb:
-            adb.shell(f"input tap {x} {y}")
-            await asyncio.sleep(0.5)
-
-            adb.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
-            for _ in range(num_chars):  # 多次删除以确保清空
-                adb.shell("input keyevent KEYCODE_DEL")
-        await asyncio.sleep(0.5)
-        return f"Cleared up to {num_chars} characters from text field at ({x},{y})"
-
-    except ValueError as e:
-        print(f"Error clearing text: {e}")
-        return f"Error: {str(e)}"
-
-
-# Rename the old tap function to tap_by_coordinates for backward compatibility
-async def tap_by_coordinates(x: int, y: int, sbx: Sandbox) -> str:
-    """Tap on the device screen at specific coordinates."""
-    try:
-        with ADB(sbx) as adb:
-            adb.shell(f"input tap {x} {y}")
-        return f"Tapped at ({x}, {y})"
-    except ValueError as e:
-        return f"Error: {str(e)}"
-
-
 async def long_tap(x: int, y: int, sbx: Sandbox) -> str:
     """
     Perform a long press action on the device screen.
-    Implemented by calling swipe function with same start and end coordinates and 2000ms duration.
+    Implemented by calling swipe function with same start and end coordinates 2000ms duration.
     """
     return await swipe(sbx, x, y, x, y, 2000)
 
@@ -241,8 +220,9 @@ async def swipe(
 ) -> str:
     """Perform a swipe gesture on the device screen."""
     try:
-        with ADB(sbx) as adb:
-            adb.shell(f"input swipe {start_x} {start_y} {end_x} {end_y} {duration_ms}")
+        sbx.adb_shell2.shell(
+            f"input swipe {start_x} {start_y} {end_x} {end_y} {duration_ms}"
+        )
         return f"Swiped from ({start_x}, {start_y}) to ({end_x}, {end_y})"
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -271,37 +251,34 @@ async def input_text(sbx: Sandbox, text: str) -> str:
         chunk_size = 500
         chunks = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
 
-        with ADB(sbx) as adb:
-            for chunk in chunks:
-                # Escape the text chunk
-                escaped_chunk = escape_text(chunk)
+        for chunk in chunks:
+            # Escape the text chunk
+            escaped_chunk = escape_text(chunk)
 
-                # Try different input methods if one fails
-                methods = [
-                    f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped_chunk}"',  # Broadcast intent method
-                    f'input text "{escaped_chunk}"',  # Standard method
-                    f'input keyboard text "{escaped_chunk}"',  # Keyboard method
-                ]
+            # Try different input methods if one fails
+            methods = [
+                f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped_chunk}"',  # Broadcast intent method
+                f'input text "{escaped_chunk}"',  # Standard method
+                f'input keyboard text "{escaped_chunk}"',  # Keyboard method
+            ]
 
-                success = False
-                last_error = None
+            success = False
+            last_error = None
 
-                for method in methods:
-                    try:
-                        adb.shell(method)
-                        success = True
-                        break
-                    except Exception as e:
-                        last_error = str(e)
-                        continue
+            for method in methods:
+                try:
+                    sbx.adb_shell2.shell(method)
+                    success = True
+                    break
+                except Exception as e:
+                    last_error = str(e)
+                    continue
 
-                if not success:
-                    return (
-                        f"Error: Failed to input text chunk. Last error: {last_error}"
-                    )
+            if not success:
+                return f"Error: Failed to input text chunk. Last error: {last_error}"
 
-                # Small delay between chunks
-                await asyncio.sleep(0.1)
+            # Small delay between chunks
+            await asyncio.sleep(0.1)
 
         return f"Text input tool executed with uncertain success: {text}"
     except ValueError as e:
@@ -321,8 +298,7 @@ async def press_key(sbx: Sandbox, keycode: int) -> str:
             82: "MENU",
         }
         key_name = key_names.get(keycode, str(keycode))
-        with ADB(sbx) as adb:
-            adb.shell(f"input keyevent {keycode}")
+        sbx.adb_shell2.shell(f"input keyevent {keycode}")
         return f"Pressed key {key_name}"
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -331,8 +307,7 @@ async def press_key(sbx: Sandbox, keycode: int) -> str:
 async def switch_app(sbx: Sandbox) -> str:
     """Switch to recent apps view on the device."""
     try:
-        with ADB(sbx) as adb:
-            adb.shell("input keyevent KEYCODE_APP_SWITCH")
+        sbx.adb_shell2.shell("input keyevent KEYCODE_APP_SWITCH")
         return "Opened recent apps view"
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -341,28 +316,29 @@ async def switch_app(sbx: Sandbox) -> str:
 async def tap_input_and_enter(x: int, y: int, text: str, sbx: Sandbox) -> str:
     """Tap an input box at position (x,y), clear previous text, input new text, and press Enter."""
     try:
-        with ADB(sbx) as adb:
-            # Tap at coordinates
-            adb.shell(f"input tap {x} {y}")
+        # Tap at coordinates
+        sbx.adb_shell2.shell(f"input tap {x} {y}")
+        await asyncio.sleep(0.5)
+
+        sbx.adb_shell2.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
+        for _ in range(20):  # 多次删除以确保清空
+            sbx.adb_shell2.shell("input keyevent KEYCODE_DEL")
+        await asyncio.sleep(0.5)
+
+        # Input new text using am broadcast (更可靠的方式)
+        if text:
+            try:
+                # 尝试使用 am broadcast 方式
+                sbx.adb_shell2.shell(
+                    f'am broadcast -a ADB_INPUT_TEXT --es msg "{text}"'
+                )
+            except Exception:
+                # 如果失败，尝试使用 input keyboard text
+                sbx.adb_shell2.shell(f'input keyboard text "{text}"')
             await asyncio.sleep(0.5)
 
-            adb.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
-            for _ in range(20):  # 多次删除以确保清空
-                adb.shell("input keyevent KEYCODE_DEL")
-            await asyncio.sleep(0.5)
-
-            # Input new text using am broadcast (更可靠的方式)
-            if text:
-                try:
-                    # 尝试使用 am broadcast 方式
-                    adb.shell(f'am broadcast -a ADB_INPUT_TEXT --es msg "{text}"')
-                except Exception:
-                    # 如果失败，尝试使用 input keyboard text
-                    adb.shell(f'input keyboard text "{text}"')
-                await asyncio.sleep(0.5)
-
-            # Press Enter
-            adb.shell("input keyevent 66")
+        # Press Enter
+        sbx.adb_shell2.shell("input keyevent 66")
 
         return f"Tapped at ({x},{y}), cleared text, input '{text}' and pressed Enter"
     except ValueError as e:
@@ -404,8 +380,7 @@ async def start_app(sbx: Sandbox, package: str, activity: str = "") -> str:
             # Start main activity using monkey
             cmd = f"monkey -p {package} -c android.intent.category.LAUNCHER 1"
 
-        with ADB(sbx) as adb:
-            adb.shell(cmd)
+        sbx.adb_shell2.shell(cmd)
         # Wait 3 seconds for app to load
         await asyncio.sleep(2)
         return f"Started {package}"
@@ -419,8 +394,7 @@ async def install_app(sbx: Sandbox, apk_path: str, reinstall: bool = False) -> s
     if not os.path.exists(apk_path):
         return f"Error: APK file not found: {apk_path}"
     try:
-        with ADB(sbx) as adb:
-            adb.install(apk_path, reinstall=reinstall)
+        sbx.adb_shell2.install(apk_path, reinstall=reinstall)
         return f"Successfully installed {os.path.basename(apk_path)}"
     except Exception as e:
         return f"Installation failed: {str(e)}"
@@ -430,8 +404,7 @@ async def uninstall_app(sbx: Sandbox, package: str, keep_data: bool = False) -> 
     """Uninstall an app from the device."""
     try:
         cmd = f"pm uninstall {'-k' if keep_data else ''} {package}"
-        with ADB(sbx) as adb:
-            return adb.shell(cmd)
+        return sbx.adb_shell2.shell(cmd)
     except ValueError as e:
         return f"Error: {str(e)}"
 
@@ -444,10 +417,9 @@ async def take_screenshot(sbx: Sandbox) -> tuple[str, bytes]:
         try:
             device_path = f"/data/local/tmp/screenshot_{int(time.time() * 1000)}.png"
 
-            with ADB(sbx) as adb:
-                adb.shell(f"screencap -p {device_path}")
-                await asyncio.sleep(0.5)
-                adb.pull(remote=device_path, local=screenshot_path)
+            sbx.adb_shell2.shell(f"screencap -p {device_path}")
+            await asyncio.sleep(0.5)
+            sbx.adb_shell2.pull(remote=device_path, local=screenshot_path)
 
             # Read the screenshot file
             with open(screenshot_path, "rb") as f:
@@ -472,8 +444,7 @@ async def list_packages(sbx: Sandbox, include_system_apps: bool = False) -> list
     """List installed packages on the device."""
     try:
         cmd = f"pm list packages {'' if include_system_apps else '-3'}"
-        with ADB(sbx) as adb:
-            output = adb.shell(cmd)
+        output = sbx.adb_shell2.shell(cmd)
         return [ln.split(":")[1].strip() for ln in output.splitlines() if ":" in ln]
     except ValueError as e:
         raise ValueError(f"Error listing packages: {str(e)}")
@@ -491,11 +462,22 @@ async def enable_a11y(sbx: Sandbox) -> None:
     """Enable could phone sandbox accessibility"""
     pkg = "com.droidrun.portal"
     aty = f"{pkg}/{pkg}.DroidrunPortalService:{pkg}/{pkg}.DroidrunAccessibilityService"
-    with ADB(sbx) as adb:
-        adb.shell(f"settings put secure enabled_accessibility_services {aty}")
-        adb.shell("settings put secure accessibility_enabled 1")
-        adb.shell(
-            "appops set com.tencent.android.qqdownloader REQUEST_INSTALL_PACKAGES allow"
-        )
-        adb.shell("ime enable com.android.adbkeyboard/.AdbIME")
-        adb.shell("ime set com.android.adbkeyboard/.AdbIME")
+    sbx.adb_shell2.push(
+        os.path.join(os.path.dirname(__file__), "init_configs", "droidrun_config.xml"),
+        "/data/local/tmp/droidrun_config.xml",
+    )
+    droidrun_overlay_disable = """su -c '
+cp /data/local/tmp/droidrun_config.xml /data/data/com.droidrun.portal/shared_prefs/droidrun_config.xml
+ps -ef|grep com.droidrun.portal|grep -v grep |awk "{print \$2}"|xargs kill -9 2>/dev/null || true
+am start com.droidrun.portal/.MainActivity 2>/dev/null || true
+input keyevent KEYCODE_HOME || input keyevent 3 || true
+' """
+    sbx.adb_shell2.shell(f"settings put secure enabled_accessibility_services {aty}")
+    sbx.adb_shell2.shell("settings put secure accessibility_enabled 1")
+    sbx.adb_shell2.shell(
+        "appops set com.tencent.android.qqdownloader REQUEST_INSTALL_PACKAGES allow"
+    )
+    sbx.adb_shell2.shell("ime enable com.android.adbkeyboard/.AdbIME")
+    sbx.adb_shell2.shell("ime set com.android.adbkeyboard/.AdbIME")
+    result = sbx.adb_shell2.shell(droidrun_overlay_disable)
+    logger.info(f"Could phone droidrun_overlay_disable result: {result}")

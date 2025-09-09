@@ -1,9 +1,13 @@
+import copy
 import json
 import logging
 
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_openai import ChatOpenAI
+
 from langcrew.utils.runnable_config_utils import RunnableStateManager
+from langcrew_tools.cloud_phone.context import create_async_summary_pre_hook
 
 logger = logging.getLogger(__name__)
 
@@ -48,18 +52,32 @@ class CloudPhoneMessageHandler:
                 "current_clickable_elements": current_clickable_elements,
                 "previous_clickable_elements": previous_clickable_elements,
                 "description": f"""\nCurrent screenshot url: {screenshot_url}\n\n Screenshots and clickable elements are temporary and will be cleared from message history, Help you make judgments""",
-                "think": """Please make full use of visual analysis:
-                1. Analyze the current page image and clickable elements
-                2. Determine if this is the target page
-                3. Compare the differences between current page and previous page clickable elements
-                4. If elements are completely identical, the click operation may not have taken effect
-                5. If 2 screens have the same elements, think about not falling into repetitive operations and getting stuck in error loops
-                6. Consider closing popups or finding other solutions
-                7. For gaining focus or clearing textbox text, it's normal that the 2 screens may not change, you can continue with the next operation
-                8. **CRITICAL: Always carefully analyze and fully consider the system prompts - do not ignore guidance while focusing solely on operations!**
-                9. Before each action, verify it aligns with the overall system instructions and task objectives
+                "think": """1、请先使用视觉分析，再做决策, 不要盲目操作
+                2、请先分析当前页面和上一页面的可点击元素，再做决策
+                3、如果要点击坐标，请精确计算坐标，不要估计坐标，估计的坐标不准确
+                4、我以提供了当前页面的可点击元素和当前屏幕截图，不要再使用phone_task_screenshot和 phone_get_clickable_elements重复获取了，重复获取和我们的简洁高效原则不符
                 """,
             }
+            
+            # Check for repeated tap_by_coordinates calls to detect potential error loops
+            # Extract recent tool calls from message history
+            recent_tool_names = []
+            for msg in reversed(messages[-10:]):  # Check last 10 messages
+                if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
+                    for tool_call in msg.tool_calls:
+                        tool_name = tool_call.get("name", "")
+                        if tool_name:
+                            recent_tool_names.append(tool_name)
+                            
+            # If we have at least 3 recent calls and they're all phone_tap_coordinates
+            if len(recent_tool_names) >= 3 and all(
+                tool_name == "phone_tap_coordinates" for tool_name in recent_tool_names[-3:]
+            ):
+                logger.warning(
+                    f"Detected potential error loop: last 3 tool calls were all 'phone_tap_coordinates'. "
+                    f"Tool calls: {recent_tool_names[-3:]}"
+                )
+                text["warning"] = "⚠️ WARNING: Detected repeated phone_tap_coordinates calls. You may be stuck in an error loop. Consider using alternative approaches like phone_tap (index-based), phone_swipe, back button, or notifying the user."
 
             text = json.dumps(text)
             RunnableStateManager.set_value(
@@ -67,7 +85,13 @@ class CloudPhoneMessageHandler:
                 "previous_clickable_elements",
                 current_clickable_elements,
             )
-            messages[-1].content = content
+            # messages[-1].content = content
+
+            # 深度拷贝最后一条消息，然后修改content，再赋值回去
+            copied_message = copy.deepcopy(messages[-1])
+            copied_message.content = content
+            messages[-1] = copied_message
+            
             if self.model_name.startswith("claude"):
                 messages.append(
                     HumanMessage(
@@ -173,13 +197,40 @@ class CloudPhoneMessageHandler:
         """Pre-model hook executed before the model."""
         if not messages:
             return messages
-
-        last_message = messages[-1]
-        if not await self._is_cloudphone_tool_message(last_message):
-            return messages
-
         try:
+            # # 摘要处理
+            # llm = ChatOpenAI(model="gpt-4.1")
+            # summary_hook = create_async_summary_pre_hook(llm)
+            
+            # # 获取或初始化 running_summary
+            # running_summary = RunnableStateManager.get_value(
+            #     self.runnable_config, "running_summary"
+            # )
+            
+            # # 构造状态字典 - 这是 LangGraphSummaryHook 期待的格式
+            # state = {
+            #     "messages": messages,
+            #     "running_summary": running_summary
+            # }
+            
+            # # 调用异步摘要hook
+            # updated_state = await summary_hook(state)
+            
+            # # 更新消息和摘要状态
+            # messages = updated_state.get("messages", messages)
+            # new_summary = updated_state.get("running_summary")
+            
+            # # 保存更新的摘要状态
+            # if new_summary and new_summary != running_summary:
+            #     RunnableStateManager.set_value(
+            #         self.runnable_config, "running_summary", new_summary
+            #     )
+            #     logger.info(f"Summary updated, message count: {len(messages)}")
+            
+            # 处理CloudPhone消息
             await self._process_message(messages)
+            print(len(messages))
+            
         except (json.JSONDecodeError, KeyError, AttributeError) as e:
             logger.warning(f"Failed to process CloudPhone message: {e}")
         except Exception as e:
