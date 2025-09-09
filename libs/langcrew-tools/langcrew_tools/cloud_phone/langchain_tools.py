@@ -1,11 +1,13 @@
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
+from agentbox import AsyncSandbox
 from pydantic import BaseModel, Field
 
 from ..base import BaseToolInput
-from .actions import (
+from ..utils.cloud_phone.actions import (
     clear_text,
     complete,
     input_text,
@@ -19,7 +21,7 @@ from .actions import (
     tap_input_and_enter,
     user_takeover,
 )
-from .base import CloudPhoneBaseTool
+from ..utils.cloud_phone.base import CloudPhoneMixin
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ class TapToolInput(BaseToolInput):
     )
 
 
-class TapTool(CloudPhoneBaseTool):
+class TapTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_tap"
     args_schema: ClassVar[type[BaseModel]] = TapToolInput
     description: ClassVar[str] = (
@@ -46,7 +48,7 @@ class TapTool(CloudPhoneBaseTool):
         """
         Asynchronously tap on a UI element by its index.
         """
-        tap_result = await tap(await self._get_cloud_phone(), index)
+        tap_result = await tap(await self.get_cloud_phone(), index)
         current_state = await self._get_current_state()
         return {
             "result": tap_result,
@@ -71,7 +73,7 @@ class SwipeToolInput(BaseToolInput):
     )
 
 
-class SwipeTool(CloudPhoneBaseTool):
+class SwipeTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_swipe"
     args_schema: ClassVar[type[BaseModel]] = SwipeToolInput
     description: ClassVar[str] = (
@@ -89,7 +91,7 @@ class SwipeTool(CloudPhoneBaseTool):
         thinking: str = "",
         **kwargs,
     ) -> dict:
-        phone = await self._get_cloud_phone()
+        phone = await self.get_cloud_phone()
         swipe_result = await swipe(phone, start_x, start_y, end_x, end_y, duration_ms)
         current_state = await self._get_current_state()
         return {
@@ -113,7 +115,7 @@ class InputTextToolInput(BaseToolInput):
     )
 
 
-class InputTextTool(CloudPhoneBaseTool):
+class InputTextTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_input_text"
     args_schema: ClassVar[type[BaseModel]] = InputTextToolInput
     description: ClassVar[str] = (
@@ -121,7 +123,7 @@ class InputTextTool(CloudPhoneBaseTool):
     )
 
     async def _arun(self, text: str, thinking: str = "", **kwargs) -> dict:
-        input_result = await input_text(await self._get_cloud_phone(), text)
+        input_result = await input_text(await self.get_cloud_phone(), text)
         current_state = await self._get_current_state()
         return {
             "result": input_result,
@@ -145,7 +147,7 @@ class PressKeyToolInput(BaseToolInput):
     )
 
 
-class PressKeyTool(CloudPhoneBaseTool):
+class PressKeyTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_press_key"
     args_schema: ClassVar[type[BaseModel]] = PressKeyToolInput
     description: ClassVar[str] = (
@@ -155,7 +157,7 @@ class PressKeyTool(CloudPhoneBaseTool):
     )
 
     async def _arun(self, keycode: int, thinking: str = "", **kwargs) -> dict:
-        press_result = await press_key(await self._get_cloud_phone(), keycode)
+        press_result = await press_key(await self.get_cloud_phone(), keycode)
         current_state = await self._get_current_state()
         return {
             "result": press_result,
@@ -177,7 +179,7 @@ class StartAppToolInput(BaseToolInput):
     )
 
 
-class StartAppTool(CloudPhoneBaseTool):
+class StartAppTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_start_app"
     args_schema: ClassVar[type[BaseModel]] = StartAppToolInput
     description: ClassVar[str] = (
@@ -188,7 +190,7 @@ class StartAppTool(CloudPhoneBaseTool):
     async def _arun(
         self, package: str, activity: str = "", thinking: str = "", **kwargs
     ) -> dict:
-        start_result = await start_app(await self._get_cloud_phone(), package, activity)
+        start_result = await start_app(await self.get_cloud_phone(), package, activity)
         current_state = await self._get_current_state()
         return {
             "result": start_result,
@@ -207,7 +209,7 @@ class ListPackagesToolInput(BaseToolInput):
     )
 
 
-class ListPackagesTool(CloudPhoneBaseTool):
+class ListPackagesTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_list_packages"
     args_schema: ClassVar[type[BaseModel]] = ListPackagesToolInput
     description: ClassVar[str] = (
@@ -217,7 +219,7 @@ class ListPackagesTool(CloudPhoneBaseTool):
     )
 
     async def _arun(self, include_system_apps: bool = False, **kwargs) -> dict:
-        ret = await list_packages(await self._get_cloud_phone(), include_system_apps)
+        ret = await list_packages(await self.get_cloud_phone(), include_system_apps)
         current_state = await self._get_current_state()
         return {
             "result": ", ".join(ret),
@@ -235,7 +237,7 @@ class CompleteTaskToolInput(BaseToolInput):
     result: str = Field(..., description="Reason for failure/success.")
 
 
-class CompleteTaskTool(CloudPhoneBaseTool):
+class CompleteTaskTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_complete_task"
     args_schema: ClassVar[type[BaseModel]] = CompleteTaskToolInput
     description: ClassVar[str] = (
@@ -261,13 +263,13 @@ class EnterToolInput(BaseToolInput):
     )
 
 
-class EnterTool(CloudPhoneBaseTool):
+class EnterTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_enter"
     args_schema: ClassVar[type[BaseModel]] = EnterToolInput
     description: ClassVar[str] = "Press the ENTER key on the device."
 
     async def _arun(self, thinking: str = "", **kwargs) -> dict:
-        enter_result = await press_key(await self._get_cloud_phone(), 66)
+        enter_result = await press_key(await self.get_cloud_phone(), 66)
         current_state = await self._get_current_state()
         return {
             "result": enter_result,
@@ -282,13 +284,13 @@ class SwitchAppToolInput(BaseToolInput):
     """Input for SwitchAppTool."""
 
 
-class SwitchAppTool(CloudPhoneBaseTool):
+class SwitchAppTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_switch_app"
     args_schema: ClassVar[type[BaseModel]] = SwitchAppToolInput
     description: ClassVar[str] = "Switch to the previous app on the device."
 
     async def _arun(self, **kwargs) -> dict:
-        switch_result = await switch_app(await self._get_cloud_phone())
+        switch_result = await switch_app(await self.get_cloud_phone())
         current_state = await self._get_current_state()
         return {
             "result": switch_result,
@@ -308,13 +310,13 @@ class BackToolInput(BaseToolInput):
     )
 
 
-class BackTool(CloudPhoneBaseTool):
+class BackTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_back"
     args_schema: ClassVar[type[BaseModel]] = BackToolInput
     description: ClassVar[str] = "Press the BACK key on the device."
 
     async def _arun(self, thinking: str = "", **kwargs) -> dict:
-        back_result = await press_key(await self._get_cloud_phone(), 4)
+        back_result = await press_key(await self.get_cloud_phone(), 4)
         current_state = await self._get_current_state()
         return {
             "result": back_result,
@@ -329,13 +331,13 @@ class HomeToolInput(BaseToolInput):
     """Input for HomeTool."""
 
 
-class HomeTool(CloudPhoneBaseTool):
+class HomeTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_home"
     args_schema: ClassVar[type[BaseModel]] = HomeToolInput
     description: ClassVar[str] = "Press the HOME key on the device."
 
     async def _arun(self, **kwargs) -> dict:
-        home_result = await press_key(await self._get_cloud_phone(), 3)
+        home_result = await press_key(await self.get_cloud_phone(), 3)
         current_state = await self._get_current_state()
         return {
             "result": home_result,
@@ -352,7 +354,7 @@ class WaitToolInput(BaseToolInput):
     duration: int = Field(5, description="Duration to wait in seconds (default: 5)")
 
 
-class WaitTool(CloudPhoneBaseTool):
+class WaitTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_wait"
     args_schema: ClassVar[type[BaseModel]] = WaitToolInput
     description: ClassVar[str] = (
@@ -361,7 +363,7 @@ class WaitTool(CloudPhoneBaseTool):
 
     async def _arun(self, duration: int = 5, **kwargs) -> dict:
         await asyncio.sleep(duration)
-        await self._get_cloud_phone()
+        await self.get_cloud_phone()
         current_state = await self._get_current_state()
         return {
             "result": f"Waited {duration} seconds",
@@ -376,7 +378,7 @@ class UserTakeOverToolInput(BaseToolInput):
     """Input for UserTakeOverTool."""
 
 
-class UserTakeOverTool(CloudPhoneBaseTool):
+class UserTakeOverTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_user_takeover"
     args_schema: ClassVar[type[BaseModel]] = UserTakeOverToolInput
     description: ClassVar[str] = (
@@ -388,7 +390,7 @@ class UserTakeOverTool(CloudPhoneBaseTool):
     )
 
     async def _arun(self, **kwargs) -> dict:
-        await self._get_cloud_phone()
+        await self.get_cloud_phone()
         await user_takeover()
         current_state = await self._get_current_state()
         return {
@@ -408,7 +410,7 @@ class TapInputAndEnterToolInput(BaseToolInput):
     text: str = Field(..., description="Text to input after tap")
 
 
-class TapInputAndEnterTool(CloudPhoneBaseTool):
+class TapInputAndEnterTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_tap_input_and_enter"
     args_schema: ClassVar[type[BaseModel]] = TapInputAndEnterToolInput
     description: ClassVar[str] = (
@@ -416,7 +418,7 @@ class TapInputAndEnterTool(CloudPhoneBaseTool):
     )
 
     async def _arun(self, x: int, y: int, text: str, **kwargs) -> dict:
-        phone = await self._get_cloud_phone()
+        phone = await self.get_cloud_phone()
         tap_input_result = await tap_input_and_enter(x, y, text, phone)
         current_state = await self._get_current_state()
         return {
@@ -439,7 +441,7 @@ class TapByCoordinatesToolInput(BaseToolInput):
     )
 
 
-class TapByCoordinatesTool(CloudPhoneBaseTool):
+class TapByCoordinatesTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_tap_coordinates"
     args_schema: ClassVar[type[BaseModel]] = TapByCoordinatesToolInput
     description: ClassVar[str] = (
@@ -452,7 +454,7 @@ class TapByCoordinatesTool(CloudPhoneBaseTool):
         """
         Asynchronously tap on the device screen at specific coordinates.
         """
-        phone = await self._get_cloud_phone()
+        phone = await self.get_cloud_phone()
         tap_result = await tap_by_coordinates(x=x, y=y, sbx=phone)
         current_state = await self._get_current_state()
         return {
@@ -478,7 +480,7 @@ class ClearTextToolInput(BaseToolInput):
     )
 
 
-class ClearTextTool(CloudPhoneBaseTool):
+class ClearTextTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_clear_text"
     args_schema: ClassVar[type[BaseModel]] = ClearTextToolInput
     description: ClassVar[str] = (
@@ -491,7 +493,7 @@ class ClearTextTool(CloudPhoneBaseTool):
         Asynchronously clear text from an input field.
         First taps the field, then sends delete key events.
         """
-        phone = await self._get_cloud_phone()
+        phone = await self.get_cloud_phone()
         clear_text_result = await clear_text(phone, x, y, num_chars)
         current_state = await self._get_current_state()
         return {
@@ -507,7 +509,7 @@ class TaskScreenShotToolInput(BaseToolInput):
     """Input for TaskScreenShotTool."""
 
 
-class TaskScreenShotTool(CloudPhoneBaseTool):
+class TaskScreenShotTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_task_screenshot"
     args_schema: ClassVar[type[BaseModel]] = TaskScreenShotToolInput
     description: ClassVar[str] = (
@@ -515,7 +517,7 @@ class TaskScreenShotTool(CloudPhoneBaseTool):
     )
 
     async def _arun(self, **kwargs) -> dict:
-        await self._get_cloud_phone()
+        await self.get_cloud_phone()
         current_state = await self._get_current_state()
         return {
             "result": "",
@@ -530,7 +532,7 @@ class GetClickablesToolInput(BaseToolInput):
     """Input for GetClickablesTool."""
 
 
-class GetClickablesTool(CloudPhoneBaseTool):
+class GetClickablesTool(CloudPhoneMixin):
     name: ClassVar[str] = "phone_get_clickables"
     args_schema: ClassVar[type[BaseModel]] = GetClickablesToolInput
     description: ClassVar[str] = (
@@ -538,7 +540,7 @@ class GetClickablesTool(CloudPhoneBaseTool):
     )
 
     async def _arun(self, **kwargs) -> dict:
-        await self._get_cloud_phone()
+        await self.get_cloud_phone()
         current_state = await self._get_current_state()
         return {
             "result": "",
@@ -570,8 +572,11 @@ ALL_PHONE_TOOLS = [
 
 
 def get_cloudphone_tools(
-    session_id: str, sandbox_id: str | None = None
-) -> list[CloudPhoneBaseTool]:
+    sandbox_source: Callable[[], Awaitable[AsyncSandbox]]
+    | AsyncSandbox
+    | dict[str, Any]
+    | None,
+) -> list[CloudPhoneMixin]:
     """Initialize CloudPhone specific tools.
 
     Returns:
@@ -582,9 +587,7 @@ def get_cloudphone_tools(
     tools = []
 
     for tool_class in ALL_PHONE_TOOLS:
-        tool = tool_class(
-            session_id=session_id, sandbox_id=sandbox_id, tool_state_manager=None
-        )
+        tool = tool_class(sandbox_source=sandbox_source)
         # Add mobile device description prefix for each tool
         original_description = tool.description
         tool.__class__.description = (
@@ -593,8 +596,3 @@ def get_cloudphone_tools(
         tools.append(tool)
 
     return tools
-
-
-def is_cloudphone_tool(tool_name: str) -> bool:
-    """Check if a tool name is a CloudPhone tool."""
-    return tool_name.lower() in {x.name for x in ALL_PHONE_TOOLS}
