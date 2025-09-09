@@ -1,10 +1,13 @@
 import logging
 from typing import Any
 
-from langchain_core.messages import BaseMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+)
 from langchain_core.prompts import ChatPromptTemplate
 from langmem.short_term.summarization import asummarize_messages
-
 
 # Prompt templates configuration
 SUMMARY_PROMPTS = {
@@ -225,7 +228,7 @@ class LangGraphSummaryHook:
                 
                 # Create summary system message
                 summary_prefix = "[历史对话摘要]" if self.language == "chinese" else "[Historical Conversation Summary]"
-                summary_message = SystemMessage(
+                summary_message = HumanMessage(
                     content=f"{summary_prefix}\n{new_summary.summary}"
                 )
                 
@@ -259,7 +262,7 @@ class LangGraphSummaryHook:
             # Check and skip existing summary messages
             real_messages = messages
             if (messages and 
-                isinstance(messages[0], SystemMessage) and 
+                isinstance(messages[0], HumanMessage) and 
                 (messages[0].content.startswith("[Historical Conversation Summary]") or 
                  messages[0].content.startswith("[历史对话摘要]"))):
                 # Skip the first summary message, only process real conversation messages
@@ -269,8 +272,14 @@ class LangGraphSummaryHook:
                 return None, messages
             
             keep_count = max(4, len(real_messages) // 4)
-            messages_to_summarize = real_messages[:-keep_count]
-            messages_to_keep = real_messages[-keep_count:]
+            
+            # 确保起始消息是AI message，如果倒数第keep_count个不是，就往前找
+            start_index = len(real_messages) - keep_count
+            while start_index > 0 and not isinstance(real_messages[start_index], AIMessage):
+                start_index -= 1
+            
+            messages_to_summarize = real_messages[:start_index]
+            messages_to_keep = real_messages[start_index:]
             
             # Force trigger summary: set a very small max_tokens_before_summary
             # This ensures summary will be triggered regardless of actual token count
