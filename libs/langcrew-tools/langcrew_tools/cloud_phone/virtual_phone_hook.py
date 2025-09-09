@@ -1,12 +1,13 @@
 import copy
 import json
 import logging
+from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
-
 from langcrew.utils.runnable_config_utils import RunnableStateManager
+
 from langcrew_tools.cloud_phone.context import create_async_summary_pre_hook
 
 logger = logging.getLogger(__name__)
@@ -54,30 +55,46 @@ class CloudPhoneMessageHandler:
                 "description": f"""\nCurrent screenshot url: {screenshot_url}\n\n Screenshots and clickable elements are temporary and will be cleared from message history, Help you make judgments""",
                 "think": """1、请先使用视觉分析，再做决策, 不要盲目操作
                 2、请先分析当前页面和上一页面的可点击元素，再做决策
-                3、如果要点击坐标，请精确计算坐标，不要估计坐标，估计的坐标不准确
-                4、我以提供了当前页面的可点击元素和当前屏幕截图，不要再使用phone_task_screenshot和 phone_get_clickable_elements重复获取了，重复获取和我们的简洁高效原则不符
+                3、如果要点击坐标，请精确计算坐标(x,y) = ((left+right)/2, (top+bottom)/2)，不要估计坐标，估计的坐标不准确
+                4、我以提供了当前页面（最新）的可点击元素和当前屏幕截图，不要再使用phone_task_screenshot和 phone_get_clickable_elements重复获取了，重复获取和我们的简洁高效原则不符
                 """,
             }
-            
+
             # Check for repeated tap_by_coordinates calls to detect potential error loops
             # Extract recent tool calls from message history
-            recent_tool_names = []
-            for msg in reversed(messages[-10:]):  # Check last 10 messages
-                if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
+            recent_tool_calls = []
+            for msg in reversed(messages[-15:]):  # Check last 10 messages
+                if (
+                    isinstance(msg, AIMessage)
+                    and hasattr(msg, "tool_calls")
+                    and msg.tool_calls
+                ):
                     for tool_call in msg.tool_calls:
                         tool_name = tool_call.get("name", "")
                         if tool_name:
-                            recent_tool_names.append(tool_name)
-                            
-            # If we have at least 3 recent calls and they're all phone_tap_coordinates
-            if len(recent_tool_names) >= 3 and all(
-                tool_name == "phone_tap_coordinates" for tool_name in recent_tool_names[-3:]
-            ):
-                logger.warning(
-                    f"Detected potential error loop: last 3 tool calls were all 'phone_tap_coordinates'. "
-                    f"Tool calls: {recent_tool_names[-3:]}"
-                )
-                text["warning"] = "⚠️ WARNING: Detected repeated phone_tap_coordinates calls. You may be stuck in an error loop. Consider using alternative approaches like phone_tap (index-based), phone_swipe, back button, or notifying the user."
+                            # Store both name and args for comparison
+                            recent_tool_calls.append({
+                                "name": tool_name,
+                                "args": tool_call.get("args", {}),
+                            })
+
+            # If we have at least 3 recent calls, check if they're all identical phone_tap_coordinates
+            if len(recent_tool_calls) >= 3:
+                last_three_calls = recent_tool_calls[-3:]
+                # Check if all three calls are identical (same name and same args)
+                if all(
+                    call["name"] == "phone_tap_coordinates" for call in last_three_calls
+                ) and all(
+                    call["args"] == last_three_calls[0]["args"]
+                    for call in last_three_calls
+                ):
+                    logger.warning(
+                        f"Detected potential error loop: last 3 tool calls were identical 'phone_tap_coordinates' with same args. "
+                        f"Tool calls: {[call['name'] for call in last_three_calls]} with args: {last_three_calls[0]['args']}"
+                    )
+                    text["warning"] = (
+                        "你在重复调用phone_tap_corporates。不要陷入错误循环，停下来反思，考虑使用其他方法, 如果想输入内容，现在已经点击了输入框，直接输入即可. 如果仍执行相同点击操作请说明原因！！！"
+                    )
 
             text = json.dumps(text)
             RunnableStateManager.set_value(
@@ -91,7 +108,7 @@ class CloudPhoneMessageHandler:
             copied_message = copy.deepcopy(messages[-1])
             copied_message.content = content
             messages[-1] = copied_message
-            
+
             if self.model_name.startswith("claude"):
                 messages.append(
                     HumanMessage(
@@ -164,78 +181,41 @@ class CloudPhoneMessageHandler:
 
     async def _restore_format(self, messages: list[BaseMessage]):
         """Restore messages to original format."""
-        # Check if the third-to-last message is a CloudPhone tool message
-        # If so, remove the second-to-last message (which should be a HumanMessage)
-        if len(messages) >= 3:
-            # Find the first CloudPhone tool message from the end, checking at most 6 messages
-            phone_tool_found = False
-            max_search = min(6, len(messages))
+        # Find the first CloudPhone tool message from the end, checking at most 6 messages
+        max_search = min(6, len(messages))
+        for i in range(1, max_search + 1):
+            if i > 1:  # Make sure there's a message after this one
+                next_message = messages[-(i - 1)]
+                if isinstance(next_message, HumanMessage):
+                    if isinstance(next_message.content, list):
+                        # Check if the previous message is a ToolMessage
+                        prev_message_index = (
+                            -(i - 1) - 1
+                        )  # Index of the message before next_message
+                        if abs(prev_message_index) <= len(messages):
+                            prev_message = messages[prev_message_index]
+                            if isinstance(prev_message, ToolMessage):
+                                messages.remove(next_message)
 
-            for i in range(1, max_search + 1):
-                current_message = messages[-i]
-                if await self._is_cloudphone_tool_message(current_message):
-                    # Mark as phone scene
-                    RunnableStateManager.update_state(
-                        self.runnable_config, {"scene": "phone"}
-                    )
-                    phone_tool_found = True
-
-                    # Check if the next message (closer to end) is a HumanMessage
-                    if i > 1:  # Make sure there's a message after this one
-                        next_message = messages[-(i - 1)]
-                        if isinstance(next_message, HumanMessage):
-                            messages.remove(next_message)
-                    break
-
-            if not phone_tool_found:
-                # Mark as not phone scene
-                RunnableStateManager.update_state(
-                    self.runnable_config, {"scene": "not_phone"}
-                )
-
-    async def pre_hook(self, messages: list[BaseMessage]) -> list[BaseMessage]:
+    async def pre_hook(self, state: dict[str, Any]) -> list[BaseMessage]:
         """Pre-model hook executed before the model."""
+        messages = state.get("messages", [])
         if not messages:
             return messages
         try:
-            # # 摘要处理
-            # llm = ChatOpenAI(model="gpt-4.1")
-            # summary_hook = create_async_summary_pre_hook(llm)
-            
-            # # 获取或初始化 running_summary
-            # running_summary = RunnableStateManager.get_value(
-            #     self.runnable_config, "running_summary"
-            # )
-            
-            # # 构造状态字典 - 这是 LangGraphSummaryHook 期待的格式
-            # state = {
-            #     "messages": messages,
-            #     "running_summary": running_summary
-            # }
-            
-            # # 调用异步摘要hook
-            # updated_state = await summary_hook(state)
-            
-            # # 更新消息和摘要状态
-            # messages = updated_state.get("messages", messages)
-            # new_summary = updated_state.get("running_summary")
-            
-            # # 保存更新的摘要状态
-            # if new_summary and new_summary != running_summary:
-            #     RunnableStateManager.set_value(
-            #         self.runnable_config, "running_summary", new_summary
-            #     )
-            #     logger.info(f"Summary updated, message count: {len(messages)}")
-            
+            # 摘要处理
+            llm = ChatOpenAI(model="gpt-4.1")
+            summary_hook = create_async_summary_pre_hook(llm, 40)
+            await summary_hook.summary(state)
             # 处理CloudPhone消息
             await self._process_message(messages)
             print(len(messages))
-            
+
         except (json.JSONDecodeError, KeyError, AttributeError) as e:
             logger.warning(f"Failed to process CloudPhone message: {e}")
         except Exception as e:
             logger.error(f"Unexpected error occurred in pre-model hook: {e}")
-        return messages
+        return {}
 
     async def post_hook(self, messages: list[BaseMessage]) -> list[BaseMessage]:
         """Post-model hook executed after the model."""

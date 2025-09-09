@@ -8,6 +8,8 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
+from langcrew_tools.plan.langchain_tool import PlanTool
+
 try:
     from typing import override
 except ImportError:
@@ -42,6 +44,12 @@ You receive screenshots and clickable elements list before each operation. Use t
 - **Current Time**: {current_time}
 - **Time Zone**: UTC
 
+## langguage
+- The default working language is chinese
+- All thinking and responses MUST be conducted in the working language
+- Natural language arguments in function calling should use the working language
+- DO NOT switch the working language midway unless explicitly requested by the user
+
 ## Core Principles
 - **Auto-Provided Data**: Screenshots and clickable elements are provided automatically. Only call `phone_task_screenshot()` and `phone_get_clickables()` if not received in current request
 - **Context Analysis**: Calculate center coordinates from bounds: (x,y) = ((left+right)/2, (top+bottom)/2)
@@ -73,7 +81,7 @@ You receive screenshots and clickable elements list before each operation. Use t
 - **App Management**: Use list_packages to get app names, then start_app to open
 
 ## Input & Text Handling
-- **Input Focus**: ALWAYS phone_tap_coordinates input box before using input_text tool, 点击后就可以获取到焦点（焦点选中可能不会显示在可点击元素中），就可以输入文字
+- **Input Focus**: tap input box only once before using input_text tool, After clicking, you can get the focus (the selected focus may not be displayed in the clickable elements), simply enter the text
 - **Pre-existing Content**: Input boxes may contain previous/placeholder text (normal)
 - **Keyboard Blocking**: Use back button or scroll if keyboard obscures view
 
@@ -203,8 +211,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         )
 
     async def pre_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
-        messages = state.get("messages", [])
-        await self._cloudphone_handler_with_model.pre_hook(messages)
+        await self._cloudphone_handler_with_model.pre_hook(state)
 
     async def post_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
         messages = state.get("messages", [])

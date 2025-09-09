@@ -27,7 +27,7 @@ class PlanInput(BaseModel):
     """Input for Plan tool."""
 
     plans: list[PlanItem] = Field(
-        description='The updated plan list (e.g., [{"id": "1", "content": "plan 1", "status": "pending"}, {"id": "2", "content": "plan 2", "status": "pending"}])'
+        description='The updated plan list (e.g., [{"id": "1", "content": "plan 1", "status": "pending"}, {"id": "2", "content": "plan 2", "status": "pending"}]), 是标准的json格式'
     )
 
 
@@ -61,7 +61,12 @@ class PlanTool(BaseTool):
         - Must mark current 'running' as 'done' or 'pending' before starting another
         - Only mark 'done' when fully accomplished
         - Update status in real-time
-        - Break complex tasks into specific, actionable items"""
+        - Break complex tasks into specific, actionable items
+        
+        **Example:**
+        {"plans":[{"id": "1", "content": "plan 1", "status": "pending"}, {"id": "2", "content": "plan 2", "status": "pending"}]}
+        """
+        
 
     args_schema: type[PlanInput] = PlanInput
 
