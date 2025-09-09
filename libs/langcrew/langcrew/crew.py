@@ -66,13 +66,11 @@ class Crew:
             # memory is MemoryConfig instance or None
             self.memory_config = memory
 
+        # Memory will be setup lazily when needed to avoid resource waste
+
         self.checkpointer = checkpointer
         self.store = store
         self._compiled_graph = None
-
-        # Setup memory for agents without memory config
-        if self.memory_config:
-            self._setup_memory(self.memory_config)
 
         self._thread_id = None
 
@@ -80,7 +78,6 @@ class Crew:
         self._async_store = async_store
         self._async_checkpointer = async_checkpointer
         self._async_compiled_graph = None
-        self._async_components_initialized = False
 
         # HITL configuration
         if hitl is None:
@@ -325,12 +322,13 @@ class Crew:
         )
 
     def _build_task_sequential_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a sequential graph from tasks with native interrupt support
 
         Args:
             checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
+            store: Optional store to use. If not provided, uses self.store
             is_async: Whether to create async task nodes
         """
         builder = StateGraph(CrewState)
@@ -348,7 +346,7 @@ class Crew:
 
         builder.add_edge(prev_node, END)
         return self._compile_graph(
-            builder, checkpointer
+            builder, checkpointer, store
         )  # Use interrupt-aware compilation
 
     def _create_agent_node_factory(self, is_async: bool = False):
@@ -372,12 +370,13 @@ class Crew:
         )
 
     def _build_agent_sequential_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a sequential graph from agents with native interrupt support
 
         Args:
             checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
+            store: Optional store to use. If not provided, uses self.store
             is_async: Whether to create async agent nodes
         """
         builder = StateGraph(CrewState)
@@ -412,7 +411,7 @@ class Crew:
         # Last agent connects to END
         builder.add_edge(prev_node, END)
         return self._compile_graph(
-            builder, checkpointer
+            builder, checkpointer, store
         )  # Use interrupt-aware compilation
 
     def _has_agent_handoffs(self) -> bool:
@@ -632,12 +631,13 @@ class Crew:
         )(agent)
 
     def _build_agent_handoff_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a graph that supports handoff with dynamic routing
 
         Args:
             checkpointer: Optional checkpointer to use
+            store: Optional store to use
             is_async: Whether to create async nodes
         """
         builder = StateGraph(CrewState)
@@ -679,10 +679,10 @@ class Crew:
         # No conditional edges needed - LangGraph's Command mechanism handles routing
         # The handoff tools return Command(goto=agent_name) which LangGraph processes automatically
 
-        return self._compile_graph(builder, checkpointer)
+        return self._compile_graph(builder, checkpointer, store)
 
     def _build_task_handoff_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a graph that supports task-to-task handoff with backbone+router architecture
 
@@ -693,6 +693,7 @@ class Crew:
 
         Args:
             checkpointer: Optional checkpointer to use
+            store: Optional store to use
             is_async: Whether to create async nodes
         """
         builder = StateGraph(CrewState)
@@ -803,18 +804,25 @@ class Crew:
                 f"Task handoff graph built: {len(backbone_tasks)} backbone + {len(handoff_subgraph_tasks)} handoff + 1 router"
             )
 
-        return self._compile_graph(builder, checkpointer)
+        return self._compile_graph(builder, checkpointer, store)
 
     def _get_compiled_graph(self) -> CompiledStateGraph:
         """Get the compiled graph for execution with caching"""
         # Handle custom graph if provided
         if self.graph is not None:
-            # User provided StateGraph, compile it with crew's checkpointer
+            # User provided StateGraph, compile it with crew's checkpointer and store
             return self._compile_graph(self.graph)
 
         # Use cached compiled graph if available
         if self._compiled_graph is not None:
             return self._compiled_graph
+
+        # Setup sync memory components if needed
+        if self.memory_config and (
+            (self.memory_config.short_term.enabled and self.checkpointer is None)
+            or (self.memory_config.long_term.enabled and self.store is None)
+        ):
+            self._setup_memory(is_async=False)
 
         # Check if handoff is needed and build appropriate graph
         if any(task.handoff_to for task in self.tasks):
@@ -838,126 +846,131 @@ class Crew:
         """Get the async compiled graph with async components"""
         # Handle custom graph if provided
         if self.graph is not None:
-            # User provided StateGraph, compile it with async checkpointer
-            return self._compile_graph(self.graph, self._async_checkpointer)
+            # User provided StateGraph, compile it with async checkpointer and store
+            return self._compile_graph(
+                self.graph, self._async_checkpointer, self._async_store
+            )
 
         # Use cached async compiled graph if available
         if self._async_compiled_graph is not None:
             return self._async_compiled_graph
 
-        # Ensure async components are set up
-        await self._setup_async_components()
+        # Setup async memory components if needed
+        if self.memory_config and (
+            (self.memory_config.short_term.enabled and self._async_checkpointer is None)
+            or (self.memory_config.long_term.enabled and self._async_store is None)
+        ):
+            await self._setup_memory(is_async=True)
 
         # Build graph with async checkpointer
         # Check if handoff is needed and build appropriate graph
         if any(task.handoff_to for task in self.tasks):
             # Build task-based handoff graph with mixed sequential and dynamic routing
             self._async_compiled_graph = self._build_task_handoff_graph(
-                checkpointer=self._async_checkpointer, is_async=True
+                checkpointer=self._async_checkpointer,
+                store=self._async_store,
+                is_async=True,
             )
         elif any(agent.handoff_to for agent in self.agents):
             # Build handoff-aware graph with dynamic routing
             self._async_compiled_graph = self._build_agent_handoff_graph(
-                checkpointer=self._async_checkpointer, is_async=True
+                checkpointer=self._async_checkpointer,
+                store=self._async_store,
+                is_async=True,
             )
         elif self.tasks:
             # Build task-based sequential graph with async support
             self._async_compiled_graph = self._build_task_sequential_graph(
-                checkpointer=self._async_checkpointer, is_async=True
+                checkpointer=self._async_checkpointer,
+                store=self._async_store,
+                is_async=True,
             )
         elif self.agents:
             # Build agent-based sequential graph with async support
             self._async_compiled_graph = self._build_agent_sequential_graph(
-                checkpointer=self._async_checkpointer, is_async=True
+                checkpointer=self._async_checkpointer,
+                store=self._async_store,
+                is_async=True,
             )
         else:
             raise ValueError("No tasks or agents provided to build graph")
 
         return self._async_compiled_graph
 
-    def _setup_memory(self, config: MemoryConfig):
-        """Setup memory system for crew and agents"""
-        # 1. Create checkpointer at Crew level (if not explicitly provided)
-        if self.checkpointer is None and config.short_term.enabled:
-            from langcrew.memory.factory import get_checkpointer
-
-            self.checkpointer = get_checkpointer(
-                provider=config.get_short_term_provider(),
-                config={
-                    "connection_string": config.short_term.connection_string
-                    or config.connection_string
-                },
-            )
-
-        # 2. Create store at Crew level (if not explicitly provided)
-        if self.store is None and config.long_term.enabled:
-            from langcrew.memory.factory import get_storage
-
-            self.store = get_storage(
-                provider=config.get_long_term_provider(),
-                config={
-                    "connection_string": config.long_term.connection_string
-                    or config.connection_string
-                },
-            )
-
-        # 3. Setup memory for agents that don't have their own memory config
-        for agent in self.agents:
-            # Only setup agents without memory_config
-            if not hasattr(agent, "memory_config") or agent.memory_config is None:
-                # Use crew's memory_config
-                agent.memory_config = config
-                # Setup agent's memory (only handles long_term memory tools)
-                agent._setup_memory(config, is_async=False)
-
-        if self.verbose:
-            logger.info(
-                f"Memory system applied to crew and agents with provider: {config.provider}"
-            )
-
-    async def _setup_async_components(self):
-        """Setup async components for async methods"""
+    async def _setup_memory(self, is_async: bool = False):
+        """Setup memory system for crew and agents (sync or async)"""
         if self.memory_config is None:
             return
 
-        # Skip if already initialized
-        if self._async_components_initialized:
-            return
+        if is_async:
+            # Create async checkpointer if not explicitly provided
+            if (
+                self._async_checkpointer is None
+                and self.memory_config.short_term.enabled
+            ):
+                from langcrew.memory.factory import get_checkpointer
 
-        # Create async checkpointer if not explicitly provided
-        if self._async_checkpointer is None and self.memory_config.short_term.enabled:
-            from langcrew.memory.factory import get_checkpointer
+                self._async_checkpointer = get_checkpointer(
+                    provider=self.memory_config.get_short_term_provider(),
+                    config={
+                        "connection_string": self.memory_config.short_term.connection_string
+                        or self.memory_config.connection_string
+                    },
+                    is_async=True,
+                )
 
-            self._async_checkpointer = get_checkpointer(
-                provider=self.memory_config.get_short_term_provider(),
-                config={
-                    "connection_string": self.memory_config.short_term.connection_string
-                    or self.memory_config.connection_string
-                },
-                is_async=True,
-            )
+            # Create async store if not explicitly provided
+            if self._async_store is None and self.memory_config.long_term.enabled:
+                from langcrew.memory.factory import get_storage
 
-        # Create async store if not explicitly provided
-        if self._async_store is None and self.memory_config.long_term.enabled:
-            from langcrew.memory.factory import get_storage
+                self._async_store = get_storage(
+                    provider=self.memory_config.get_long_term_provider(),
+                    config={
+                        "connection_string": self.memory_config.long_term.connection_string
+                        or self.memory_config.connection_string
+                    },
+                    is_async=True,
+                )
+        else:
+            # Create sync checkpointer if not explicitly provided
+            if self.checkpointer is None and self.memory_config.short_term.enabled:
+                from langcrew.memory.factory import get_checkpointer
 
-            self._async_store = get_storage(
-                provider=self.memory_config.get_long_term_provider(),
-                config={
-                    "connection_string": self.memory_config.long_term.connection_string
-                    or self.memory_config.connection_string
-                },
-                is_async=True,
-            )
+                self.checkpointer = get_checkpointer(
+                    provider=self.memory_config.get_short_term_provider(),
+                    config={
+                        "connection_string": self.memory_config.short_term.connection_string
+                        or self.memory_config.connection_string
+                    },
+                    is_async=False,
+                )
 
-        # Re-initialize all agents with async memory setup
+            # Create sync store if not explicitly provided
+            if self.store is None and self.memory_config.long_term.enabled:
+                from langcrew.memory.factory import get_storage
+
+                self.store = get_storage(
+                    provider=self.memory_config.get_long_term_provider(),
+                    config={
+                        "connection_string": self.memory_config.long_term.connection_string
+                        or self.memory_config.connection_string
+                    },
+                    is_async=False,
+                )
+
+        # Setup agents (same logic for both sync and async)
         for agent in self.agents:
-            if agent.memory_config:
-                agent.memory_tools.clear()
-                agent._setup_memory(agent.memory_config, is_async=True)
-                agent._async_memory_initialized = True
+            if not hasattr(agent, "memory_config") or agent.memory_config is None:
+                agent.memory_config = self.memory_config
+                # Only setup memory if agent hasn't been initialized yet
+                if not agent.memory_tools:
+                    agent._setup_memory(self.memory_config)
 
-        self._async_components_initialized = True
+        if self.verbose:
+            mode = "Async" if is_async else "Sync"
+            logger.info(
+                f"{mode} memory system applied to crew and agents with provider: {self.memory_config.provider}"
+            )
 
     def invoke(
         self,
@@ -1275,10 +1288,6 @@ class Crew:
 
         # Use provided thread_id or generate new one
         self._thread_id = thread_id or str(uuid.uuid4())
-
-        # Ensure async components are set up
-        if self.memory_config:
-            await self._setup_async_components()
 
         # Create config with thread_id
         config = RunnableConfig(configurable={"thread_id": self._thread_id})

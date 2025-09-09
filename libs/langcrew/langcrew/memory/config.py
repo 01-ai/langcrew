@@ -94,6 +94,7 @@ class LongTermMemoryConfig:
     # Memory scope configurations with default instructions
     user_memory: MemoryScopeConfig = field(
         default_factory=lambda: MemoryScopeConfig(
+            enabled=True,
             manage_instructions="Proactively call this tool when you:\n\n"
             "1. Identify a new USER preference, habit, or personal information.\n"
             "2. Receive an explicit USER request to remember something or otherwise alter your behavior.\n"

@@ -175,7 +175,6 @@ class Agent:
             self.memory_config = memory
 
         self.memory_tools = {}  # Internal memory tools dictionary
-        self._async_memory_initialized = False  # Track async memory initialization
 
         # Setup memory system if config is provided
         if self.memory_config:
@@ -612,15 +611,6 @@ class Agent:
         Returns:
             Output dictionary for LangGraph
         """
-        # Initialize async memory if needed
-        if self.memory_config and not self._async_memory_initialized:
-            # Clear existing sync memory tools
-            self.memory_tools.clear()
-
-            # Reinitialize with async versions
-            self._setup_memory(self.memory_config, is_async=True)
-            self._async_memory_initialized = True
-
         # Prepare execution
         prepared_input = self._prepare_execution(input, **kwargs)
 
@@ -633,20 +623,20 @@ class Agent:
             return self.memory_tools.get(scope, {})
         return self.memory_tools
 
-    def _setup_memory(self, config: MemoryConfig, is_async: bool = False):
+    def _setup_memory(self, config: MemoryConfig):
         """Setup memory system - only handles long-term memory tools (checkpointer managed by Crew)"""
         # Short-term memory (checkpointer) is managed at Crew level and auto-propagated by LangGraph
         # Agent only needs to setup long-term memory tools
         if config.long_term.enabled:
-            self._setup_long_term_memory(config, is_async)
+            self._setup_long_term_memory(config)
 
-    def _setup_long_term_memory(self, config: MemoryConfig, is_async: bool = False):
-        """Setup long-term memory with sync/async support"""
+    def _setup_long_term_memory(self, config: MemoryConfig):
+        """Setup long-term memory tools that work with both sync and async execution"""
         from langmem import create_manage_memory_tool, create_search_memory_tool
 
         ltm_config = config.long_term
 
-        # Note: Removed manual store handling - LangMem automatically gets store from LangGraph
+        # LangMem automatically gets store from LangGraph context
 
         # User memory tools
         if ltm_config.user_memory.enabled:
@@ -658,7 +648,6 @@ class Agent:
                 instructions=ltm_config.user_memory.manage_instructions,
                 schema=ltm_config.user_memory.schema,
                 actions_permitted=ltm_config.user_memory.actions,
-                # Removed store parameter - LangMem automatically gets it from LangGraph
                 **ltm_config.user_memory.langmem_tool_config,
             )
 
@@ -667,7 +656,6 @@ class Agent:
                 name="search_user_memory",
                 instructions=ltm_config.user_memory.search_instructions,
                 response_format=ltm_config.search_response_format,
-                # Removed store parameter - LangMem automatically gets it from LangGraph
             )
 
             # Add memory tools directly to agent.tools for unified access
@@ -686,7 +674,6 @@ class Agent:
                 instructions=ltm_config.app_memory.manage_instructions,
                 schema=ltm_config.app_memory.schema,
                 actions_permitted=ltm_config.app_memory.actions,
-                # Removed store parameter - LangMem automatically gets it from LangGraph
                 **ltm_config.app_memory.langmem_tool_config,
             )
 
@@ -695,7 +682,6 @@ class Agent:
                 name="search_app_memory",
                 instructions=ltm_config.app_memory.search_instructions,
                 response_format=ltm_config.search_response_format,
-                # Removed store parameter - LangMem automatically gets it from LangGraph
             )
 
             # Add memory tools directly to agent.tools for unified access

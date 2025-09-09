@@ -8,21 +8,20 @@ from langgraph.store.base import BaseStore
 
 
 class StoreWrapper:
-    """Wrapper that manages store connection lifecycle"""
+    """Wrapper that manages store connection lifecycle with immediate initialization"""
 
     def __init__(self, store_cm):
         self.store_cm = store_cm
-        self.store = None
-        self._context_entered = False
+        # Immediately establish connection
+        self.store = self.store_cm.__enter__()
+        self._context_entered = True
+
+        # Setup if needed
+        if hasattr(self.store, "setup"):
+            self.store.setup()
 
     def _ensure_connection(self):
-        """Ensure connection is established"""
-        if not self._context_entered:
-            self.store = self.store_cm.__enter__()
-            self._context_entered = True
-            # Setup if needed
-            if hasattr(self.store, "setup"):
-                self.store.setup()
+        """Connection is already established during init"""
         return self.store
 
     def __getattr__(self, name):
@@ -41,21 +40,20 @@ class StoreWrapper:
 
 
 class CheckpointerWrapper:
-    """Wrapper that manages checkpointer connection lifecycle"""
+    """Wrapper that manages checkpointer connection lifecycle with immediate initialization"""
 
     def __init__(self, checkpointer_cm):
         self.checkpointer_cm = checkpointer_cm
-        self.checkpointer = None
-        self._context_entered = False
+        # Immediately establish connection
+        self.checkpointer = self.checkpointer_cm.__enter__()
+        self._context_entered = True
+
+        # Setup if needed
+        if hasattr(self.checkpointer, "setup"):
+            self.checkpointer.setup()
 
     def _ensure_connection(self):
-        """Ensure connection is established"""
-        if not self._context_entered:
-            self.checkpointer = self.checkpointer_cm.__enter__()
-            self._context_entered = True
-            # Setup if needed
-            if hasattr(self.checkpointer, "setup"):
-                self.checkpointer.setup()
+        """Connection is already established during init"""
         return self.checkpointer
 
     def __getattr__(self, name):
@@ -74,16 +72,17 @@ class CheckpointerWrapper:
 
 
 class AsyncStoreWrapper:
-    """Async wrapper that manages store connection lifecycle with smart delegation"""
+    """Async wrapper that manages store connection lifecycle with immediate initialization"""
 
     def __init__(self, store_cm):
         self.store_cm = store_cm
         self.store = None
         self._context_entered = False
         self._connection_lock = None
+        self._initialization_task = None
 
     async def _ensure_connection(self):
-        """Ensure connection is established"""
+        """Ensure connection is established - initialize on first call"""
         if not self._context_entered:
             if self._connection_lock is None:
                 self._connection_lock = asyncio.Lock()
@@ -93,8 +92,8 @@ class AsyncStoreWrapper:
                     if hasattr(self.store_cm, "__aenter__"):
                         self.store = await self.store_cm.__aenter__()
                     else:
-                        # For non-async stores wrapped in async context
-                        self.store = self.store_cm
+                        # For non-async stores wrapped in async context, use sync context manager
+                        self.store = self.store_cm.__enter__()
                     self._context_entered = True
                     # Setup if needed
                     if hasattr(self.store, "setup"):
@@ -143,16 +142,17 @@ class AsyncStoreWrapper:
 
 
 class AsyncCheckpointerWrapper:
-    """Async wrapper that manages checkpointer connection lifecycle with smart delegation"""
+    """Async wrapper that manages checkpointer connection lifecycle with immediate initialization"""
 
     def __init__(self, checkpointer_cm):
         self.checkpointer_cm = checkpointer_cm
         self.checkpointer = None
         self._context_entered = False
         self._connection_lock = None
+        self._initialization_task = None
 
     async def _ensure_connection(self):
-        """Ensure connection is established"""
+        """Ensure connection is established - initialize on first call"""
         if not self._context_entered:
             if self._connection_lock is None:
                 self._connection_lock = asyncio.Lock()
@@ -162,8 +162,8 @@ class AsyncCheckpointerWrapper:
                     if hasattr(self.checkpointer_cm, "__aenter__"):
                         self.checkpointer = await self.checkpointer_cm.__aenter__()
                     else:
-                        # For non-async checkpointers wrapped in async context
-                        self.checkpointer = self.checkpointer_cm
+                        # For non-async checkpointers wrapped in async context, use sync context manager
+                        self.checkpointer = self.checkpointer_cm.__enter__()
                     self._context_entered = True
                     # Setup if needed
                     if hasattr(self.checkpointer, "setup"):
@@ -217,7 +217,7 @@ def get_storage(
     is_async: bool = False,
 ) -> BaseStore:
     """Get storage instance for data persistence
-    
+
     Args:
         provider: Storage provider type
         config: Configuration dict that can contain:
@@ -242,10 +242,12 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.postgres.aio import AsyncPostgresStore
+
                 store_cm = AsyncPostgresStore.from_conn_string(conn_str, index=index)
                 return AsyncStoreWrapper(store_cm)
             else:
                 from langgraph.store.postgres import PostgresStore
+
                 store_cm = PostgresStore.from_conn_string(conn_str, index=index)
                 return StoreWrapper(store_cm)
         except ImportError:
@@ -258,10 +260,12 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.redis.aio import AsyncRedisStore
+
                 store_cm = AsyncRedisStore.from_conn_string(conn_str, index=index)
                 return AsyncStoreWrapper(store_cm)
             else:
                 from langgraph.store.redis import RedisStore
+
                 store_cm = RedisStore.from_conn_string(conn_str, index=index)
                 return StoreWrapper(store_cm)
         except ImportError:
@@ -274,10 +278,12 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.sqlite.aio import AsyncSqliteStore
+
                 store_cm = AsyncSqliteStore.from_conn_string(conn_str, index=index)
                 return AsyncStoreWrapper(store_cm)
             else:
                 from langgraph.store.sqlite import SqliteStore
+
                 store_cm = SqliteStore.from_conn_string(conn_str, index=index)
                 return StoreWrapper(store_cm)
         except ImportError:
@@ -289,7 +295,7 @@ def get_storage(
             raise ValueError("MongoDB storage requires connection_string in config")
         try:
             from langgraph.store.mongodb import MongoDBStore
-            
+
             store_cm = MongoDBStore.from_conn_string(conn_str, index=index)
             if is_async:
                 return AsyncStoreWrapper(store_cm)

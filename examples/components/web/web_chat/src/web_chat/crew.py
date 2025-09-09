@@ -89,6 +89,7 @@ class WebChatCrew:
             tools=self.tools,
             llm=self.llm,  # Add LLM configuration
             verbose=True,
+            debug=True,
             # allow_delegation=False,  # Not supported in langcrew
             # max_iter=5,  # Will be handled by executor configuration
             # max_execution_time=30,  # Will be handled by executor configuration
@@ -136,11 +137,13 @@ class WebChatCrew:
             # process=Process.sequential,  # Default in langcrew
             verbose=True,
             memory=MemoryConfig(
-                provider="memory",  # Use in-memory provider
+                # provider="memory",  # Use in-memory provider
+                provider="postgres",
+                connection_string=DB_CONNECTION_STRING,
                 long_term=LongTermMemoryConfig(
                     enabled=True,  # Enable long-term memory
-                    provider="postgres",
-                    connection_string=DB_CONNECTION_STRING,
+                    # provider="postgres",
+                    # connection_string=DB_CONNECTION_STRING,
                     # Enable vector indexing for better memory search
                     index=IndexConfig(
                         dims=1536,  # OpenAI text-embedding-3-small dimensions
