@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Callable
 from typing import Any
 
 from langchain_core.messages import BaseMessage, SystemMessage
@@ -7,32 +6,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langmem.short_term.summarization import asummarize_messages
 
 
-class LangGraphSummaryHook:
-    """LangGraph 专用的轻量级摘要 Hook"""
-    
-    def __init__(
-        self,
-        llm,
-        max_messages: int = 30,  # 修改为30条固定触发
-        max_tokens: int = 64000,  # 最大 token 限制（可选检查）
-        language: str = "chinese",
-    ):
-        self.llm = llm
-        self.max_messages = max_messages
-        self.max_tokens = max_tokens
-        self.language = language
-
-        
-        # 初始化提示词
-        self._init_prompts()
-        self.logger = logging.getLogger(__name__)
-    
-    def _init_prompts(self):
-        """初始化简化的提示词"""
-        if self.language == "chinese":
-            self.initial_prompt = ChatPromptTemplate.from_messages([
-                ("placeholder", "{messages}"),
-                ("user", """请按照以下8个结构化段落压缩对话历史：
+# Prompt templates configuration
+SUMMARY_PROMPTS = {
+    "chinese": {
+        "initial": [
+            ("placeholder", "{messages}"),
+            ("user", """请按照以下8个结构化段落压缩对话历史：
 1. 用户指令 (User Instruction)
 - 用户的指令和当前状态
 2. 关键决策 (Key Decisions)
@@ -60,11 +39,10 @@ class LangGraphSummaryHook:
    3. 任务C [pending]
 8. 后续计划 (Future Plans)
 - 下一步行动计划""")
-            ])
-            
-            self.update_prompt = ChatPromptTemplate.from_messages([
-                ("placeholder", "{messages}"),
-                ("user", """现有摘要：{existing_summary}
+        ],
+        "update": [
+            ("placeholder", "{messages}"),
+            ("user", """现有摘要：{existing_summary}
 
 新对话内容如上，请更新摘要，保留重要信息，整合新内容：
 请按照以下8个结构化段落压缩对话历史
@@ -96,25 +74,122 @@ class LangGraphSummaryHook:
 8. 后续计划 (Future Plans)
 - 下一步行动计划
 """)
-            ])
-        else:
-            self.initial_prompt = ChatPromptTemplate.from_messages([
-                ("placeholder", "{messages}"),
-                ("user", "Please summarize the key points, conclusions, and pending issues from the above conversation:")
-            ])
-            
-            self.update_prompt = ChatPromptTemplate.from_messages([
-                ("placeholder", "{messages}"),
-                ("user", """Existing summary: {existing_summary}
+        ]
+    },
+    "english": {
+        "initial": [
+            ("placeholder", "{messages}"),
+            ("user", """Please summarize the conversation history according to the following 8 structured sections:
+1. User Instructions
+- User's commands and current status
+- Primary objectives and requirements
+2. Key Decisions
+- Important technical choices and rationales
+- Problem-solving approach selections
+- Architecture and design decisions
+3. Tool Usage Log
+- Main tool types utilized
+- File operation history
+- Command execution results
+- API calls and responses
+4. User Intent Evolution
+- Requirement change process
+- New feature requests
+- Scope modifications
+5. Execution Results Summary
+- Successfully completed tasks
+- Generated important intermediate results
+- Deliverables and outcomes
+6. Errors and Solutions
+- Types of issues encountered
+- Error handling methods
+- Lessons learned and workarounds
+7. TODO List
+- Established work plans with progress and status
+   Format example:
+   1. Task A [completed]
+   2. Task B [in_progress]
+   3. Task C [pending]
+8. Future Plans
+- Next action items
+- Upcoming milestones
+- Strategic directions""")
+        ],
+        "update": [
+            ("placeholder", "{messages}"),
+            ("user", """Existing summary: {existing_summary}
 
-New conversation content above, please update the summary, retain important info, integrate new content:""")
-            ])
+New conversation content above. Please update the summary, retain important information, and integrate new content:
+Please follow the 8 structured sections to compress conversation history:
+1. User Instructions
+- User's commands and current status
+- Primary objectives and requirements
+2. Key Decisions
+- Important technical choices and rationales
+- Problem-solving approach selections
+- Architecture and design decisions
+3. Tool Usage Log
+- Main tool types utilized
+- File operation history
+- Command execution results
+- API calls and responses
+4. User Intent Evolution
+- Requirement change process
+- New feature requests
+- Scope modifications
+5. Execution Results Summary
+- Successfully completed tasks
+- Generated important intermediate results
+- Deliverables and outcomes
+6. Errors and Solutions
+- Types of issues encountered
+- Error handling methods
+- Lessons learned and workarounds
+7. TODO List
+- Established work plans with progress and status
+   Format example:
+   1. Task A [completed]
+   2. Task B [in_progress]
+   3. Task C [pending]
+8. Future Plans
+- Next action items
+- Upcoming milestones
+- Strategic directions
+""")
+        ]
+    }
+}
+
+
+class LangGraphSummaryHook:
+    """Lightweight summary hook specifically designed for LangGraph"""
+    
+    def __init__(
+        self,
+        llm,
+        max_messages: int = 30,  # Fixed trigger at 30 messages
+        max_tokens: int = 64000,  # Maximum token limit (optional check)
+        language: str = "chinese",
+    ):
+        self.llm = llm
+        self.max_messages = max_messages
+        self.max_tokens = max_tokens
+        self.language = language   
+        self._init_prompts()
+        self.logger = logging.getLogger(__name__)
+    
+    def _init_prompts(self):
+        """Initialize simplified prompt templates"""
+        prompts = SUMMARY_PROMPTS.get(self.language, SUMMARY_PROMPTS["english"])
+        
+        self.initial_prompt = ChatPromptTemplate.from_messages(prompts["initial"])
+        self.update_prompt = ChatPromptTemplate.from_messages(prompts["update"])
     
     def _estimate_tokens(self, messages: list[BaseMessage], running_summary: str = None) -> int:
-        """更准确的token估算"""
+        """More accurate token estimation"""
         try:
             import tiktoken
-            # 使用tiktoken进行更准确的计算
+            # Use tiktoken for more accurate calculation
             encoding = tiktoken.get_encoding("cl100k_base")
             total_tokens = 0
             
@@ -127,65 +202,67 @@ New conversation content above, please update the summary, retain important info
                 
             return total_tokens
         except Exception:
-            # 降级到简单估算（乘以1.3系数更接近实际token数）
+            # Fallback to simple estimation (multiply by 1.3 coefficient to get closer to actual token count)
             total_tokens = sum(len(msg.content.split()) * 1.3 for msg in messages if hasattr(msg, 'content'))
             if running_summary:
                 total_tokens += len(running_summary.split()) * 1.3
             return int(total_tokens)
     
     async def summary(self, state: dict[str, Any]) -> dict[str, Any]:
-        """异步版本的调用方法"""
+        """Asynchronous version of the summary method"""
         try:
             messages = state.get("messages", [])
-            running_summary =   state.get("running_summary")
+            running_summary = state.get("running_summary")
             
             if not self._should_summarize(messages, running_summary):
                 return state
             
-            # 异步执行摘要
+            # Execute summary asynchronously
             new_summary, trimmed_messages = await self._create_summary_async(messages, running_summary)
             
             if new_summary:
                 state["messages"] = new_summary
                 
-                # 创建摘要系统消息
+                # Create summary system message
+                summary_prefix = "[历史对话摘要]" if self.language == "chinese" else "[Historical Conversation Summary]"
                 summary_message = SystemMessage(
-                    content=f"[历史对话摘要]\n{new_summary.summary}"
+                    content=f"{summary_prefix}\n{new_summary.summary}"
                 )
                 
-                # 将摘要消息添加到消息列表开头，后跟保留的最近消息
+                # Add summary message to the beginning of message list, followed by retained recent messages
                 new_messages = [summary_message] + trimmed_messages
                 messages = state["messages"]
                 messages.clear()
                 messages.extend(new_messages)
-                self.logger.info(f"异步摘要更新完成，减少到 {len(new_messages)} 条（包含1条摘要消息）")
+                self.logger.info(f"Async summary update completed, reduced to {len(new_messages)} messages (including 1 summary message)")
                 return state
                 
         except Exception as e:
-            self.logger.error(f"异步摘要处理失败: {e}")
+            self.logger.error(f"Async summary processing failed: {e}")
         
         return state
     
     def _should_summarize(self, messages: list[BaseMessage], running_summary: str | None) -> bool:
-        """判断是否需要摘要 - 支持固定条数模式"""
-        # 达到一定的条数固定触发
+        """Determine whether summarization is needed - supports fixed message count mode"""
+        # Trigger when reaching a certain number of messages
         if self.max_messages > 0:
             return len(messages) >= self.max_messages
-        # 条数没达到、token达到一定数量触发
+        # If message count not reached, trigger when token count reaches threshold
         total_tokens = self._estimate_tokens(messages, running_summary)
         print(f"total_tokens: {total_tokens}, max_tokens: {self.max_tokens}")
         return total_tokens > self.max_tokens
     
     
     async def _create_summary_async(self, messages: list[BaseMessage], running_summary: str | None) -> tuple:
-        """异步创建摘要 - 强制触发版本"""
+        """Create summary asynchronously - forced trigger version"""
         try:
-            # 检查并跳过现有的摘要消息
+            # Check and skip existing summary messages
             real_messages = messages
             if (messages and 
                 isinstance(messages[0], SystemMessage) and 
-                messages[0].content.startswith("[历史对话摘要]")):
-                # 跳过第一条摘要消息，只处理真实的对话消息
+                (messages[0].content.startswith("[Historical Conversation Summary]") or 
+                 messages[0].content.startswith("[历史对话摘要]"))):
+                # Skip the first summary message, only process real conversation messages
                 real_messages = messages[1:]
             
             if not real_messages:
@@ -195,12 +272,12 @@ New conversation content above, please update the summary, retain important info
             messages_to_summarize = real_messages[:-keep_count]
             messages_to_keep = real_messages[-keep_count:]
             
-            # 强制触发摘要：设置一个很小的max_tokens_before_summary
-            # 这样无论实际token数多少，都会触发摘要
+            # Force trigger summary: set a very small max_tokens_before_summary
+            # This ensures summary will be triggered regardless of actual token count
             result = await asummarize_messages(
                 messages_to_summarize,
                 max_tokens=self.max_tokens,
-                max_tokens_before_summary=1,  # 强制触发！设置为1确保一定会摘要
+                max_tokens_before_summary=1,  # Force trigger! Set to 1 to ensure summary always happens
                 max_summary_tokens=8192,
                 running_summary=running_summary,
                 model=self.llm,
@@ -215,27 +292,27 @@ New conversation content above, please update the summary, retain important info
                 return None, messages
                 
         except Exception as e:
-            self.logger.error(f"异步摘要创建失败: {e}")
+            self.logger.error(f"Async summary creation failed: {e}")
             return None, messages
 
 
 def create_async_summary_pre_hook(
     llm,
-    max_messages: int = 30,  # 固定30条触发
+    max_messages: int = 30,  # Fixed trigger at 30 messages
     language: str = "chinese",
     **kwargs
 ) -> LangGraphSummaryHook:
     """
-    创建固定条数触发的摘要 hook
+    Create a summary hook with fixed message count trigger
     
     Args:
-        llm: 语言模型
-        max_messages: 触发摘要的固定消息数量（默认30条）
-        language: 语言设置
-        **kwargs: 其他配置参数
+        llm: Language model
+        max_messages: Fixed message count to trigger summary (default 30 messages)
+        language: Language setting
+        **kwargs: Other configuration parameters
         
     Returns:
-        pre-hook 函数
+        pre-hook instance
     """
     hook = LangGraphSummaryHook(
         llm, 
