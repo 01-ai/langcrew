@@ -10,11 +10,8 @@ from typing import Any
 from agentbox import AsyncSandbox
 from PIL import Image
 
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
 logger = logging.getLogger(__name__)
-=======
 CLICKABLE_ELEMENTS_CACHE = []  # Global variable to store clickable elements for index-based tapping
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +38,7 @@ async def get_clickables(sbx: AsyncSandbox) -> dict[str, Any]:
     DROIDRUN_STATE_CMD = "content query --uri content://com.droidrun.portal/state"
 
     try:
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        output = sbx.adb_shell2.shell(DROIDRUN_STATE_CMD)
-=======
         output = await sbx.adb_shell.shell(DROIDRUN_STATE_CMD)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
 
         all = []
         for line in output.strip().split("\n"):
@@ -63,37 +56,7 @@ async def get_clickables(sbx: AsyncSandbox) -> dict[str, Any]:
         raise ValueError(f"Error getting clickable elements: {e}")
 
 
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-async def clear_text(sbx: Sandbox, x: int, y: int, num_chars: int = 20) -> str:
-    """Clear text from an input field by tapping and deleting characters."""
-    try:
-        sbx.adb_shell2.shell(f"input tap {x} {y}")
-        await asyncio.sleep(0.5)
-
-        sbx.adb_shell2.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
-        for _ in range(num_chars):  # 多次删除以确保清空
-            sbx.adb_shell2.shell("input keyevent KEYCODE_DEL")
-        await asyncio.sleep(0.5)
-        return f"Cleared up to {num_chars} characters from text field at ({x},{y})"
-
-    except ValueError as e:
-        print(f"Error clearing text: {e}")
-        return f"Error: {str(e)}"
-
-
-# Rename the old tap function to tap_by_coordinates for backward compatibility
-async def tap_by_coordinates(x: int, y: int, sbx: Sandbox) -> str:
-    """Tap on the device screen at specific coordinates."""
-    try:
-        sbx.adb_shell2.shell(f"input tap {x} {y}")
-        return f"Tapped at ({x}, {y})"
-    except ValueError as e:
-        return f"Error: {str(e)}"
-
-async def tap(sbx: Sandbox, index: int) -> str:
-=======
 async def tap(sbx: AsyncSandbox, index: int) -> str:
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
     """
     Tap on a UI element by its index.
 
@@ -151,11 +114,7 @@ async def tap(sbx: AsyncSandbox, index: int) -> str:
         y = (top + bottom) // 2
 
         # Get the device and tap at the coordinates
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        sbx.adb_shell2.shell(f"input tap {x} {y}")
-=======
         await sbx.adb_shell.shell(f"input tap {x} {y}")
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
 
         # Gather element details for the response
         element_text = element.get("text", "No text")
@@ -220,9 +179,6 @@ async def tap(sbx: AsyncSandbox, index: int) -> str:
     except ValueError as e:
         return f"Error: {str(e)}"
 
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-async def long_tap(x: int, y: int, sbx: Sandbox) -> str:
-=======
 
 async def clear_text(sbx: AsyncSandbox, x: int, y: int, num_chars: int = 20) -> str:
     """Clear text from an input field by tapping and deleting characters."""
@@ -252,7 +208,6 @@ async def tap_by_coordinates(x: int, y: int, sbx: AsyncSandbox) -> str:
 
 
 async def long_tap(x: int, y: int, sbx: AsyncSandbox) -> str:
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
     """
     Perform a long press action on the device screen.
     Implemented by calling swipe function with same start and end coordinates 2000ms duration.
@@ -270,11 +225,7 @@ async def swipe(
 ) -> str:
     """Perform a swipe gesture on the device screen."""
     try:
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        sbx.adb_shell2.shell(
-=======
         await sbx.adb_shell.shell(
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
             f"input swipe {start_x} {start_y} {end_x} {end_y} {duration_ms}"
         )
         return f"Swiped from ({start_x}, {start_y}) to ({end_x}, {end_y})"
@@ -321,11 +272,7 @@ async def input_text(sbx: AsyncSandbox, text: str) -> str:
 
             for method in methods:
                 try:
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-                    sbx.adb_shell2.shell(method)
-=======
                     await sbx.adb_shell.shell(method)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
                     success = True
                     break
                 except Exception as e:
@@ -356,11 +303,7 @@ async def press_key(sbx: AsyncSandbox, keycode: int) -> str:
             82: "MENU",
         }
         key_name = key_names.get(keycode, str(keycode))
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        sbx.adb_shell2.shell(f"input keyevent {keycode}")
-=======
         await sbx.adb_shell.shell(f"input keyevent {keycode}")
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
         return f"Pressed key {key_name}"
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -369,11 +312,7 @@ async def press_key(sbx: AsyncSandbox, keycode: int) -> str:
 async def switch_app(sbx: AsyncSandbox) -> str:
     """Switch to recent apps view on the device."""
     try:
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        sbx.adb_shell2.shell("input keyevent KEYCODE_APP_SWITCH")
-=======
         await sbx.adb_shell.shell("input keyevent KEYCODE_APP_SWITCH")
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
         return "Opened recent apps view"
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -383,49 +322,28 @@ async def tap_input_and_enter(x: int, y: int, text: str, sbx: AsyncSandbox) -> s
     """Tap an input box at position (x,y), clear previous text, input new text, and press Enter."""
     try:
         # Tap at coordinates
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        sbx.adb_shell2.shell(f"input tap {x} {y}")
-        await asyncio.sleep(0.5)
-
-        sbx.adb_shell2.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
-        for _ in range(20):  # 多次删除以确保清空
-            sbx.adb_shell2.shell("input keyevent KEYCODE_DEL")
-=======
         await sbx.adb_shell.shell(f"input tap {x} {y}")
         await asyncio.sleep(0.5)
 
         await sbx.adb_shell.shell("input keyevent KEYCODE_MOVE_END")  # 移动到结尾
         for _ in range(20):  # 多次删除以确保清空
             await sbx.adb_shell.shell("input keyevent KEYCODE_DEL")
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
         await asyncio.sleep(0.5)
 
         # Input new text using am broadcast (更可靠的方式)
         if text:
             try:
                 # 尝试使用 am broadcast 方式
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-                sbx.adb_shell2.shell(
-=======
                 await sbx.adb_shell.shell(
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
                     f'am broadcast -a ADB_INPUT_TEXT --es msg "{text}"'
                 )
             except Exception:
                 # 如果失败，尝试使用 input keyboard text
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-                sbx.adb_shell2.shell(f'input keyboard text "{text}"')
-            await asyncio.sleep(0.5)
-
-        # Press Enter
-        sbx.adb_shell2.shell("input keyevent 66")
-=======
                 await sbx.adb_shell.shell(f'input keyboard text "{text}"')
             await asyncio.sleep(0.5)
 
         # Press Enter
         await sbx.adb_shell.shell("input keyevent 66")
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
 
         return f"Tapped at ({x},{y}), cleared text, input '{text}' and pressed Enter"
     except ValueError as e:
@@ -467,11 +385,7 @@ async def start_app(sbx: AsyncSandbox, package: str, activity: str = "") -> str:
             # Start main activity using monkey
             cmd = f"monkey -p {package} -c android.intent.category.LAUNCHER 1"
 
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        sbx.adb_shell2.shell(cmd)
-=======
         await sbx.adb_shell.shell(cmd)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
         # Wait 3 seconds for app to load
         await asyncio.sleep(2)
         return f"Started {package}"
@@ -485,11 +399,7 @@ async def install_app(sbx: AsyncSandbox, apk_path: str, reinstall: bool = False)
     if not os.path.exists(apk_path):
         return f"Error: APK file not found: {apk_path}"
     try:
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        sbx.adb_shell2.install(apk_path, reinstall=reinstall)
-=======
         await sbx.adb_shell.install(apk_path, reinstall=reinstall)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
         return f"Successfully installed {os.path.basename(apk_path)}"
     except Exception as e:
         return f"Installation failed: {str(e)}"
@@ -501,11 +411,7 @@ async def uninstall_app(
     """Uninstall an app from the device."""
     try:
         cmd = f"pm uninstall {'-k' if keep_data else ''} {package}"
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        return sbx.adb_shell2.shell(cmd)
-=======
         return await sbx.adb_shell.shell(cmd)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
     except ValueError as e:
         return f"Error: {str(e)}"
 
@@ -518,15 +424,9 @@ async def take_screenshot(sbx: AsyncSandbox) -> tuple[str, bytes]:
         try:
             device_path = f"/data/local/tmp/screenshot_{int(time.time() * 1000)}.png"
 
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-            sbx.adb_shell2.shell(f"screencap -p {device_path}")
-            await asyncio.sleep(0.5)
-            sbx.adb_shell2.pull(remote=device_path, local=screenshot_path)
-=======
             await sbx.adb_shell.shell(f"screencap -p {device_path}")
             await asyncio.sleep(0.5)
             await sbx.adb_shell.pull(remote=device_path, local=screenshot_path)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
 
             # Read the screenshot file
             with open(screenshot_path, "rb") as f:
@@ -553,11 +453,7 @@ async def list_packages(
     """List installed packages on the device."""
     try:
         cmd = f"pm list packages {'' if include_system_apps else '-3'}"
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-        output = sbx.adb_shell2.shell(cmd)
-=======
         output = await sbx.adb_shell.shell(cmd)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
         return [ln.split(":")[1].strip() for ln in output.splitlines() if ":" in ln]
     except ValueError as e:
         raise ValueError(f"Error listing packages: {str(e)}")
@@ -575,11 +471,7 @@ async def enable_a11y(sbx: AsyncSandbox) -> None:
     """Enable could phone sandbox accessibility"""
     pkg = "com.droidrun.portal"
     aty = f"{pkg}/{pkg}.DroidrunPortalService:{pkg}/{pkg}.DroidrunAccessibilityService"
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-    sbx.adb_shell2.push(
-=======
     await sbx.adb_shell.push(
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
         os.path.join(os.path.dirname(__file__), "init_configs", "droidrun_config.xml"),
         "/data/local/tmp/droidrun_config.xml",
     )
@@ -589,16 +481,6 @@ ps -ef|grep com.droidrun.portal|grep -v grep |awk "{print \$2}"|xargs kill -9 2>
 am start com.droidrun.portal/.MainActivity 2>/dev/null || true
 input keyevent KEYCODE_HOME || input keyevent 3 || true
 ' """
-<<<<<<< HEAD:libs/langcrew-tools/langcrew_tools/cloud_phone/actions.py
-    sbx.adb_shell2.shell(f"settings put secure enabled_accessibility_services {aty}")
-    sbx.adb_shell2.shell("settings put secure accessibility_enabled 1")
-    sbx.adb_shell2.shell(
-        "appops set com.tencent.android.qqdownloader REQUEST_INSTALL_PACKAGES allow"
-    )
-    sbx.adb_shell2.shell("ime enable com.android.adbkeyboard/.AdbIME")
-    sbx.adb_shell2.shell("ime set com.android.adbkeyboard/.AdbIME")
-    result = sbx.adb_shell2.shell(droidrun_overlay_disable)
-=======
     await sbx.adb_shell.shell(
         f"settings put secure enabled_accessibility_services {aty}"
     )
@@ -609,5 +491,4 @@ input keyevent KEYCODE_HOME || input keyevent 3 || true
     await sbx.adb_shell.shell("ime enable com.android.adbkeyboard/.AdbIME")
     await sbx.adb_shell.shell("ime set com.android.adbkeyboard/.AdbIME")
     result = sbx.adb_shell.shell(droidrun_overlay_disable)
->>>>>>> acaf48609aa4c66916820dd8e6f2990acd274ccc:libs/langcrew-tools/langcrew_tools/utils/cloud_phone/actions.py
     logger.info(f"Could phone droidrun_overlay_disable result: {result}")

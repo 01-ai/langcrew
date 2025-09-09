@@ -159,6 +159,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     _cloudphone_handler_with_model: CloudPhoneMessageHandler | None = PrivateAttr(
         default=None
     )
+    config: RunnableConfig | None = None
 
     def __init__(
         self,
@@ -186,6 +187,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
             "configurable": {"thread_id": self.get_agent_session_id()},
             "recursion_limit": self.recursion_limit,
         }
+        self.config = final_config
         async for event in graph.astream_events(inputs, config=final_config):
             yield event
 
@@ -231,5 +233,5 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
             raise ValueError("session_id is not set")
 
     async def _initialize_tools(self) -> list[Any]:
-        tools = get_cloudphone_tools(self.sandbox_source)
+        tools = get_cloudphone_tools(self.sandbox_source, self.config)
         return tools

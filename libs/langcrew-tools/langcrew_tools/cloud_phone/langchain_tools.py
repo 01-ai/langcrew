@@ -3,6 +3,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
+from langchain_core.runnables import RunnableConfig
 from agentbox import AsyncSandbox
 from pydantic import BaseModel, Field
 
@@ -544,12 +545,12 @@ ALL_PHONE_TOOLS = [
     GetClickablesTool,
 ]
 
-
+        
 def get_cloudphone_tools(
     sandbox_source: Callable[[], Awaitable[AsyncSandbox]]
-    | AsyncSandbox
     | dict[str, Any]
     | None,
+    config: RunnableConfig | None = None,
 ) -> list[CloudPhoneMixin]:
     """Initialize CloudPhone specific tools.
 
@@ -567,6 +568,7 @@ def get_cloudphone_tools(
         tool.__class__.description = (
             f"This is a mobile phone automation tool. {original_description}"
         )
+        tool.config = config
         tools.append(tool)
 
     return tools

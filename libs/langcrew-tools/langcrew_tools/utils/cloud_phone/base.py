@@ -5,8 +5,11 @@ from typing import Any, Final, Union
 
 from agentbox import AsyncSandbox
 from agentbox.api.client.models import InstanceAuthInfo
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langcrew.utils import CheckpointerSessionStateManager
+from langcrew.utils.runnable_config_utils import RunnableStateManager
+
 from pydantic import ConfigDict, Field, PrivateAttr
 
 from ..env_config import env_config
@@ -29,7 +32,7 @@ class CloudPhoneMixin(BaseTool, S3ClientMixin):
     ] = Field(default=None, description="AsyncSandbox instance")
     _sandbox: AsyncSandbox | None = PrivateAttr(default=None)
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
+    config: RunnableConfig | None = None
     def __init__(self, **kwargs) -> None:
         """Initialize the CloudPhone tool."""
         super().__init__(**kwargs)
@@ -70,7 +73,12 @@ class CloudPhoneMixin(BaseTool, S3ClientMixin):
                         base64_data=image_base_64,
                         sandbox_id=self._sandbox.sandbox_id,
                     )
-
+                    if self.config:                       
+                        RunnableStateManager.set_value(
+                            self.config,
+                            image_url,
+                            image_base_64,
+                        )
             return {
                 "clickable_elements": clickable_elements,
                 "screenshot_url": image_url,
