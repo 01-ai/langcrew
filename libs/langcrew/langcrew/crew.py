@@ -59,7 +59,6 @@ class Crew:
             self.memory_config = memory
 
         # Memory will be setup dynamically when needed
-        self._thread_id = None
 
         # HITL configuration
         if hitl is None:
@@ -1283,21 +1282,21 @@ class Crew:
         if inputs:
             self._replace_all_placeholders(inputs)
 
-        # Use provided thread_id or generate new one
-        self._thread_id = thread_id or str(uuid.uuid4())
+        # Use provided thread_id or generate new one (local variable)
+        current_thread_id = thread_id or str(uuid.uuid4())
 
         # Create config with thread_id
-        config = RunnableConfig(configurable={"thread_id": self._thread_id})
+        config = RunnableConfig(configurable={"thread_id": current_thread_id})
 
         # Execute with empty state (task_outputs initialized by CrewState default)
         result = self.invoke({}, config)
 
         # Add thread_id to result for continuity
         if isinstance(result, dict):
-            result["thread_id"] = self._thread_id
+            result["thread_id"] = current_thread_id
         else:
             # Create a wrapper if result is not dict
-            result = {"output": result, "thread_id": self._thread_id}
+            result = {"output": result, "thread_id": current_thread_id}
 
         return result
 
@@ -1317,21 +1316,21 @@ class Crew:
         if inputs:
             self._replace_all_placeholders(inputs)
 
-        # Use provided thread_id or generate new one
-        self._thread_id = thread_id or str(uuid.uuid4())
+        # Use provided thread_id or generate new one (local variable)
+        current_thread_id = thread_id or str(uuid.uuid4())
 
         # Create config with thread_id
-        config = RunnableConfig(configurable={"thread_id": self._thread_id})
+        config = RunnableConfig(configurable={"thread_id": current_thread_id})
 
         # Execute with empty state (task_outputs initialized by CrewState default)
         result = await self.ainvoke({}, config)
 
         # Add thread_id to result for continuity
         if isinstance(result, dict):
-            result["thread_id"] = self._thread_id
+            result["thread_id"] = current_thread_id
         else:
             # Create a wrapper if result is not dict
-            result = {"output": result, "thread_id": self._thread_id}
+            result = {"output": result, "thread_id": current_thread_id}
 
         return result
 
