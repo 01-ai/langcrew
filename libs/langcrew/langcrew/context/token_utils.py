@@ -91,8 +91,9 @@ def count_message_tokens(
     # Handle both model_name (standard) and model_id (Bedrock) attributes
     if hasattr(llm, "model_name"):
         effective_model_name = llm.model_name
+    elif hasattr(llm, "model"):
+        effective_model_name = llm.model
     elif hasattr(llm, "model_id"):
-        # For Bedrock models that use model_id instead of model_name
         effective_model_name = llm.model_id
     else:
         raise ValueError("LLM must have either model_name or model_id attribute")
