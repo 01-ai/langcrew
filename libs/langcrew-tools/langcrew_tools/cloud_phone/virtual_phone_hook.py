@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import ensure_config
 from langchain_openai import ChatOpenAI
 from langcrew.utils.runnable_config_utils import RunnableStateManager
 
@@ -19,7 +19,6 @@ class CloudPhoneMessageHandler:
     def __init__(
         self,
         model_name: str | None = None,
-        runnable_config: RunnableConfig | None = None,
     ):
         """Initialize CloudPhoneMessageHandler.
 
@@ -27,7 +26,6 @@ class CloudPhoneMessageHandler:
             model_name: Model name, can be used in message processing
         """
         self.model_name = model_name
-        self.runnable_config = runnable_config
 
     @staticmethod
     async def _is_cloudphone_tool_message(message: BaseMessage) -> bool:
@@ -45,7 +43,7 @@ class CloudPhoneMessageHandler:
         if screenshot_url:
             current_clickable_elements = clickable_elements
             previous_clickable_elements = RunnableStateManager.get_value(
-                self.runnable_config, "previous_clickable_elements"
+                ensure_config(), "previous_clickable_elements"
             )
             if not previous_clickable_elements:
                 previous_clickable_elements = []
@@ -98,7 +96,7 @@ class CloudPhoneMessageHandler:
 
             text = json.dumps(text)
             RunnableStateManager.set_value(
-                self.runnable_config,
+                ensure_config(),
                 "previous_clickable_elements",
                 current_clickable_elements,
             )
@@ -123,7 +121,7 @@ class CloudPhoneMessageHandler:
                 )
             elif self.model_name.startswith("us.anthropic.claude"):
                 base_64 = RunnableStateManager.get_value(
-                    self.runnable_config, screenshot_url
+                    ensure_config(), screenshot_url
                 )
                 if base_64:
                     messages.append(
@@ -141,7 +139,7 @@ class CloudPhoneMessageHandler:
                             ]
                         )
                     )
-                RunnableStateManager.del_key(self.runnable_config, screenshot_url)
+                RunnableStateManager.del_key(ensure_config(), screenshot_url)
             else:
                 messages.append(
                     HumanMessage(

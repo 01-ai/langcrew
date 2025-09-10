@@ -16,7 +16,7 @@ from ..env_config import env_config
 from ..s3 import S3ClientMixin
 from ..sandbox.s3_integration import SandboxS3Toolkit
 from .actions import enable_a11y, get_clickables, take_screenshot
-
+from langchain_core.runnables import RunnableConfig, ensure_config
 logger = logging.getLogger(__name__)
 
 
@@ -72,13 +72,12 @@ class CloudPhoneMixin(BaseTool, S3ClientMixin):
                         async_s3_client,
                         base64_data=image_base_64,
                         sandbox_id=self._sandbox.sandbox_id,
+                    )                         
+                    RunnableStateManager.set_value(
+                        ensure_config(),
+                        image_url,
+                        image_base_64,
                     )
-                    if self.config:                       
-                        RunnableStateManager.set_value(
-                            self.config,
-                            image_url,
-                            image_base_64,
-                        )
             return {
                 "clickable_elements": clickable_elements,
                 "screenshot_url": image_url,

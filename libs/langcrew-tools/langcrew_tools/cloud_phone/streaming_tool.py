@@ -28,6 +28,8 @@ from pydantic import BaseModel, Field, PrivateAttr
 from langcrew_tools.cloud_phone.langchain_tools import get_cloudphone_tools
 
 from .virtual_phone_hook import CloudPhoneMessageHandler
+from langcrew.utils.runnable_config_utils import RunnableStateManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -183,12 +185,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         logger.info(f"run graph with instruction: {instruction}")
         messages = [HumanMessage(content=instruction)]
         inputs = {"messages": messages}
-        final_config = {
-            "configurable": {"thread_id": self.get_agent_session_id()},
-            "recursion_limit": self.recursion_limit,
-        }
-        self.config = final_config
-        async for event in graph.astream_events(inputs, config=final_config):
+        async for event in graph.astream_events(inputs, config=self.config):
             yield event
 
     @override
@@ -222,8 +219,14 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     @override
     def configure_runnable(self, config: RunnableConfig):
         self._session_id = config.get("configurable", {}).get("thread_id")
+        final_config = {
+            "configurable": {"thread_id": self.get_agent_session_id()},
+            "recursion_limit": self.recursion_limit,
+        }
+        self.config = final_config
+        RunnableStateManager.init_state(self.config)
         self._cloudphone_handler_with_model = CloudPhoneMessageHandler(
-            model_name=self.model_name, runnable_config=config
+            model_name=self.model_name
         )
 
     def get_agent_session_id(self) -> str:
