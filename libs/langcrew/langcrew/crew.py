@@ -10,11 +10,9 @@ from typing import (
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
-from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.store.base import BaseStore
 from langgraph.types import All, StreamMode
 from langgraph_supervisor.handoff import create_handoff_tool
 
@@ -37,12 +35,6 @@ class Crew:
         graph: StateGraph | None = None,
         # Memory configuration
         memory: MemoryConfig | bool | None = None,
-        # LangGraph enhancements
-        checkpointer: BaseCheckpointSaver | None = None,
-        store: BaseStore | None = None,
-        # Async components - for advanced users
-        async_checkpointer: BaseCheckpointSaver | None = None,
-        async_store: BaseStore | None = None,
         # HITL configuration
         hitl: HITLConfig | None = None,
     ):
@@ -66,18 +58,8 @@ class Crew:
             # memory is MemoryConfig instance or None
             self.memory_config = memory
 
-        # Memory will be setup lazily when needed to avoid resource waste
-
-        self.checkpointer = checkpointer
-        self.store = store
-        self._compiled_graph = None
-
+        # Memory will be setup dynamically when needed
         self._thread_id = None
-
-        # Async components for async methods
-        self._async_store = async_store
-        self._async_checkpointer = async_checkpointer
-        self._async_compiled_graph = None
 
         # HITL configuration
         if hitl is None:
@@ -95,6 +77,9 @@ class Crew:
 
         if self.graph is None and not self.tasks and not self.agents:
             raise ValueError("Either tasks, agents, or graph must be provided")
+
+        # Setup agents memory configuration
+        self._setup_agents_memory()
 
         # Setup handoff if needed (automatically detect based on agent configuration)
         self._setup_handoff_if_needed()
@@ -806,159 +791,197 @@ class Crew:
 
         return self._compile_graph(builder, checkpointer, store)
 
-    def _get_compiled_graph(self) -> CompiledStateGraph:
-        """Get the compiled graph for execution with caching"""
+    def _get_compiled_graph(
+        self, checkpointer=None, store=None, is_async=False
+    ) -> CompiledStateGraph:
+        """Get the compiled graph for execution (unified sync/async version)"""
         # Handle custom graph if provided
         if self.graph is not None:
-            # User provided StateGraph, compile it with crew's checkpointer and store
-            return self._compile_graph(self.graph)
+            # User provided StateGraph, compile it with passed checkpointer and store
+            return self._compile_graph(self.graph, checkpointer, store)
 
-        # Use cached compiled graph if available
-        if self._compiled_graph is not None:
-            return self._compiled_graph
-
-        # Setup sync memory components if needed
-        if self.memory_config and (
-            (self.memory_config.short_term.enabled and self.checkpointer is None)
-            or (self.memory_config.long_term.enabled and self.store is None)
-        ):
-            self._setup_memory(is_async=False)
-
-        # Check if handoff is needed and build appropriate graph
+        # Build graph based on configuration
         if any(task.handoff_to for task in self.tasks):
-            # Build task-based handoff graph with mixed sequential and dynamic routing
-            self._compiled_graph = self._build_task_handoff_graph()
+            # Build task-based handoff graph
+            return self._build_task_handoff_graph(
+                checkpointer, store, is_async=is_async
+            )
         elif any(agent.handoff_to for agent in self.agents):
-            # Build handoff-aware graph with dynamic routing
-            self._compiled_graph = self._build_agent_handoff_graph()
+            # Build handoff-aware graph
+            return self._build_agent_handoff_graph(
+                checkpointer, store, is_async=is_async
+            )
         elif self.tasks:
             # Build task-based sequential graph
-            self._compiled_graph = self._build_task_sequential_graph(is_async=False)
+            return self._build_task_sequential_graph(
+                checkpointer, store, is_async=is_async
+            )
         elif self.agents:
             # Build agent-based sequential graph
-            self._compiled_graph = self._build_agent_sequential_graph(is_async=False)
-        else:
-            raise ValueError("No tasks or agents provided to build graph")
-
-        return self._compiled_graph
-
-    async def _get_async_compiled_graph(self) -> CompiledStateGraph:
-        """Get the async compiled graph with async components"""
-        # Handle custom graph if provided
-        if self.graph is not None:
-            # User provided StateGraph, compile it with async checkpointer and store
-            return self._compile_graph(
-                self.graph, self._async_checkpointer, self._async_store
-            )
-
-        # Use cached async compiled graph if available
-        if self._async_compiled_graph is not None:
-            return self._async_compiled_graph
-
-        # Setup async memory components if needed
-        if self.memory_config and (
-            (self.memory_config.short_term.enabled and self._async_checkpointer is None)
-            or (self.memory_config.long_term.enabled and self._async_store is None)
-        ):
-            await self._setup_memory(is_async=True)
-
-        # Build graph with async checkpointer
-        # Check if handoff is needed and build appropriate graph
-        if any(task.handoff_to for task in self.tasks):
-            # Build task-based handoff graph with mixed sequential and dynamic routing
-            self._async_compiled_graph = self._build_task_handoff_graph(
-                checkpointer=self._async_checkpointer,
-                store=self._async_store,
-                is_async=True,
-            )
-        elif any(agent.handoff_to for agent in self.agents):
-            # Build handoff-aware graph with dynamic routing
-            self._async_compiled_graph = self._build_agent_handoff_graph(
-                checkpointer=self._async_checkpointer,
-                store=self._async_store,
-                is_async=True,
-            )
-        elif self.tasks:
-            # Build task-based sequential graph with async support
-            self._async_compiled_graph = self._build_task_sequential_graph(
-                checkpointer=self._async_checkpointer,
-                store=self._async_store,
-                is_async=True,
-            )
-        elif self.agents:
-            # Build agent-based sequential graph with async support
-            self._async_compiled_graph = self._build_agent_sequential_graph(
-                checkpointer=self._async_checkpointer,
-                store=self._async_store,
-                is_async=True,
+            return self._build_agent_sequential_graph(
+                checkpointer, store, is_async=is_async
             )
         else:
             raise ValueError("No tasks or agents provided to build graph")
 
-        return self._async_compiled_graph
+    async def _execute_with_memory_context_async(self, execution_func):
+        """Execute function with proper async memory context management"""
+        from .memory.factory import get_storage, get_checkpointer
 
-    async def _setup_memory(self, is_async: bool = False):
-        """Setup memory system for crew and agents (sync or async)"""
+        checkpointer_cm = None
+        store_cm = None
+
+        if self.memory_config:
+            if self.memory_config.short_term.enabled:
+                checkpointer_config = self.memory_config.to_checkpointer_config()
+                checkpointer_cm = get_checkpointer(
+                    self.memory_config.get_short_term_provider(),
+                    checkpointer_config,
+                    is_async=True,
+                )
+
+            if self.memory_config.long_term.enabled:
+                store_config = self.memory_config.to_storage_config()
+                store_cm = get_storage(
+                    self.memory_config.get_long_term_provider(),
+                    store_config,
+                    is_async=True,
+                )
+
+        # Use appropriate context manager combination
+        if checkpointer_cm and store_cm:
+            async with checkpointer_cm as checkpointer, store_cm as store:
+                return await execution_func(checkpointer, store)
+        elif checkpointer_cm:
+            async with checkpointer_cm as checkpointer:
+                return await execution_func(checkpointer, None)
+        elif store_cm:
+            async with store_cm as store:
+                return await execution_func(None, store)
+        else:
+            return await execution_func(None, None)
+
+    async def _execute_with_memory_context_generator_async(self, execution_func):
+        """Execute async generator function with proper memory context management"""
+        from .memory.factory import get_storage, get_checkpointer
+
+        checkpointer_cm = None
+        store_cm = None
+
+        if self.memory_config:
+            if self.memory_config.short_term.enabled:
+                checkpointer_config = self.memory_config.to_checkpointer_config()
+                checkpointer_cm = get_checkpointer(
+                    self.memory_config.get_short_term_provider(),
+                    checkpointer_config,
+                    is_async=True,
+                )
+
+            if self.memory_config.long_term.enabled:
+                store_config = self.memory_config.to_storage_config()
+                store_cm = get_storage(
+                    self.memory_config.get_long_term_provider(),
+                    store_config,
+                    is_async=True,
+                )
+
+        # Use appropriate context manager combination
+        if checkpointer_cm and store_cm:
+            async with checkpointer_cm as checkpointer, store_cm as store:
+                async for item in execution_func(checkpointer, store):
+                    yield item
+        elif checkpointer_cm:
+            async with checkpointer_cm as checkpointer:
+                async for item in execution_func(checkpointer, None):
+                    yield item
+        elif store_cm:
+            async with store_cm as store:
+                async for item in execution_func(None, store):
+                    yield item
+        else:
+            async for item in execution_func(None, None):
+                yield item
+
+    def _execute_with_memory_context(self, execution_func):
+        """Execute function with proper sync memory context management"""
+        from .memory.factory import get_storage, get_checkpointer
+
+        checkpointer_cm = None
+        store_cm = None
+
+        if self.memory_config:
+            if self.memory_config.short_term.enabled:
+                checkpointer_config = self.memory_config.to_checkpointer_config()
+                checkpointer_cm = get_checkpointer(
+                    self.memory_config.get_short_term_provider(),
+                    checkpointer_config,
+                    is_async=False,
+                )
+
+            if self.memory_config.long_term.enabled:
+                store_config = self.memory_config.to_storage_config()
+                store_cm = get_storage(
+                    self.memory_config.get_long_term_provider(),
+                    store_config,
+                    is_async=False,
+                )
+
+        # Use appropriate context manager combination
+        if checkpointer_cm and store_cm:
+            with checkpointer_cm as checkpointer, store_cm as store:
+                return execution_func(checkpointer, store)
+        elif checkpointer_cm:
+            with checkpointer_cm as checkpointer:
+                return execution_func(checkpointer, None)
+        elif store_cm:
+            with store_cm as store:
+                return execution_func(None, store)
+        else:
+            return execution_func(None, None)
+
+    def _execute_with_memory_context_generator(self, execution_func):
+        """Execute sync generator function with proper memory context management"""
+        from .memory.factory import get_storage, get_checkpointer
+
+        checkpointer_cm = None
+        store_cm = None
+
+        if self.memory_config:
+            if self.memory_config.short_term.enabled:
+                checkpointer_config = self.memory_config.to_checkpointer_config()
+                checkpointer_cm = get_checkpointer(
+                    self.memory_config.get_short_term_provider(),
+                    checkpointer_config,
+                    is_async=False,
+                )
+
+            if self.memory_config.long_term.enabled:
+                store_config = self.memory_config.to_storage_config()
+                store_cm = get_storage(
+                    self.memory_config.get_long_term_provider(),
+                    store_config,
+                    is_async=False,
+                )
+
+        # Use appropriate context manager combination
+        if checkpointer_cm and store_cm:
+            with checkpointer_cm as checkpointer, store_cm as store:
+                yield from execution_func(checkpointer, store)
+        elif checkpointer_cm:
+            with checkpointer_cm as checkpointer:
+                yield from execution_func(checkpointer, None)
+        elif store_cm:
+            with store_cm as store:
+                yield from execution_func(None, store)
+        else:
+            yield from execution_func(None, None)
+
+    def _setup_agents_memory(self):
+        """Setup memory configuration for agents"""
         if self.memory_config is None:
             return
 
-        if is_async:
-            # Create async checkpointer if not explicitly provided
-            if (
-                self._async_checkpointer is None
-                and self.memory_config.short_term.enabled
-            ):
-                from langcrew.memory.factory import get_checkpointer
-
-                self._async_checkpointer = get_checkpointer(
-                    provider=self.memory_config.get_short_term_provider(),
-                    config={
-                        "connection_string": self.memory_config.short_term.connection_string
-                        or self.memory_config.connection_string
-                    },
-                    is_async=True,
-                )
-
-            # Create async store if not explicitly provided
-            if self._async_store is None and self.memory_config.long_term.enabled:
-                from langcrew.memory.factory import get_storage
-
-                self._async_store = get_storage(
-                    provider=self.memory_config.get_long_term_provider(),
-                    config={
-                        "connection_string": self.memory_config.long_term.connection_string
-                        or self.memory_config.connection_string
-                    },
-                    is_async=True,
-                )
-        else:
-            # Create sync checkpointer if not explicitly provided
-            if self.checkpointer is None and self.memory_config.short_term.enabled:
-                from langcrew.memory.factory import get_checkpointer
-
-                self.checkpointer = get_checkpointer(
-                    provider=self.memory_config.get_short_term_provider(),
-                    config={
-                        "connection_string": self.memory_config.short_term.connection_string
-                        or self.memory_config.connection_string
-                    },
-                    is_async=False,
-                )
-
-            # Create sync store if not explicitly provided
-            if self.store is None and self.memory_config.long_term.enabled:
-                from langcrew.memory.factory import get_storage
-
-                self.store = get_storage(
-                    provider=self.memory_config.get_long_term_provider(),
-                    config={
-                        "connection_string": self.memory_config.long_term.connection_string
-                        or self.memory_config.connection_string
-                    },
-                    is_async=False,
-                )
-
-        # Setup agents (same logic for both sync and async)
+        # Setup agents memory configuration
         for agent in self.agents:
             if not hasattr(agent, "memory_config") or agent.memory_config is None:
                 agent.memory_config = self.memory_config
@@ -967,9 +990,8 @@ class Crew:
                     agent._setup_memory(self.memory_config)
 
         if self.verbose:
-            mode = "Async" if is_async else "Sync"
             logger.info(
-                f"{mode} memory system applied to crew and agents with provider: {self.memory_config.provider}"
+                f"Memory configuration applied to agents with provider: {self.memory_config.provider}"
             )
 
     def invoke(
@@ -996,22 +1018,20 @@ class Crew:
             The output of the graph run
         """
 
-        # Enhance config with crew-level settings if needed
-        if config is None and (self.memory_config or self.checkpointer):
-            config = RunnableConfig()
+        def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=False
+            )
+            return compiled_graph.invoke(
+                input,
+                config=config,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                **kwargs,
+            )
 
-        # Get compiled graph and execute
-        compiled_graph = self._get_compiled_graph()
-        result = compiled_graph.invoke(
-            input,
-            config=config,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            **kwargs,
-        )
-
-        return result
+        return self._execute_with_memory_context(execute_with_memory)
 
     async def ainvoke(
         self,
@@ -1037,22 +1057,20 @@ class Crew:
             Output from graph execution
         """
 
-        # Enhance config as needed
-        if config is None and (self.memory_config or self.checkpointer):
-            config = RunnableConfig()
+        async def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=True
+            )
+            return await compiled_graph.ainvoke(
+                input,
+                config=config,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                **kwargs,
+            )
 
-        # Get compiled graph and execute asynchronously
-        compiled_graph = await self._get_async_compiled_graph()
-        result = await compiled_graph.ainvoke(
-            input,
-            config=config,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            **kwargs,
-        )
-
-        return result
+        return await self._execute_with_memory_context_async(execute_with_memory)
 
     def stream(
         self,
@@ -1088,20 +1106,22 @@ class Crew:
             The output of each step in the graph
         """
 
-        # Get compiled graph
-        compiled_graph = self._get_compiled_graph()
+        def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=False
+            )
+            yield from compiled_graph.stream(
+                input,
+                config=config,
+                stream_mode=stream_mode,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                subgraphs=subgraphs,
+                **kwargs,
+            )
 
-        # Stream from the compiled graph
-        yield from compiled_graph.stream(
-            input,
-            config=config,
-            stream_mode=stream_mode,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            subgraphs=subgraphs,
-            **kwargs,
-        )
+        yield from self._execute_with_memory_context_generator(execute_with_memory)
 
     async def astream(
         self,
@@ -1137,19 +1157,24 @@ class Crew:
             The output of each step in the graph
         """
 
-        # Get async compiled graph with async components
-        compiled_graph = await self._get_async_compiled_graph()
+        async def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=True
+            )
+            async for chunk in compiled_graph.astream(
+                input,
+                config=config,
+                stream_mode=stream_mode,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                subgraphs=subgraphs,
+                **kwargs,
+            ):
+                yield chunk
 
-        # Stream from the compiled graph
-        async for chunk in compiled_graph.astream(
-            input,
-            config=config,
-            stream_mode=stream_mode,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            subgraphs=subgraphs,
-            **kwargs,
+        async for chunk in self._execute_with_memory_context_generator_async(
+            execute_with_memory
         ):
             yield chunk
 
@@ -1217,21 +1242,27 @@ class Crew:
                 if event["event"] == "on_crew_task_start":
                     print(f"Starting task: {event['data']['task_name']}")
         """
-        # Get async compiled graph with async components
-        compiled_graph = await self._get_async_compiled_graph()
 
-        # Stream events from the compiled graph
-        async for event in compiled_graph.astream_events(
-            input,
-            config=config,
-            version=version,
-            include_names=include_names,
-            include_types=include_types,
-            include_tags=include_tags,
-            exclude_names=exclude_names,
-            exclude_types=exclude_types,
-            exclude_tags=exclude_tags,
-            **kwargs,
+        async def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=True
+            )
+            async for event in compiled_graph.astream_events(
+                input,
+                config=config,
+                version=version,
+                include_names=include_names,
+                include_types=include_types,
+                include_tags=include_tags,
+                exclude_names=exclude_names,
+                exclude_types=exclude_types,
+                exclude_tags=exclude_tags,
+                **kwargs,
+            ):
+                yield event
+
+        async for event in self._execute_with_memory_context_generator_async(
+            execute_with_memory
         ):
             yield event
 

@@ -169,6 +169,32 @@ class MemoryConfig:
         """Get actual provider for long-term memory"""
         return self.long_term.provider or self.provider
 
+    def to_checkpointer_config(self) -> dict[str, Any]:
+        """Convert to checkpointer configuration - only if short_term.enabled"""
+        if not self.short_term.enabled:
+            return {}
+
+        config = {}
+        if self.short_term.connection_string or self.connection_string:
+            config["connection_string"] = (
+                self.short_term.connection_string or self.connection_string
+            )
+        return config
+
+    def to_storage_config(self) -> dict[str, Any]:
+        """Convert to storage configuration - only if long_term.enabled"""
+        if not self.long_term.enabled:
+            return {}
+
+        config = {}
+        if self.long_term.connection_string or self.connection_string:
+            config["connection_string"] = (
+                self.long_term.connection_string or self.connection_string
+            )
+        if self.long_term.index:
+            config["index"] = self.long_term.index.to_dict()
+        return config
+
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "MemoryConfig":
         """Create config from dictionary"""
