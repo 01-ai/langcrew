@@ -18,7 +18,10 @@
     "build": "rsbuild build",
     "preview": "rsbuild preview",
     "serve": "serve -s dist -l 8080",
-    "publish": "rslib build && rm -f agentx/NZsdk.min.2.8.1.js"
+    "publish": "rslib build && rm -f agentx/NZsdk.min.2.8.1.js",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
@@ -91,8 +94,10 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.2.0",
+    "jsdom": "^26.1.0",
     "postcss": "^8.5.5",
     "postcss-loader": "^8.1.1",
-    "typescript-eslint": "^8.34.1"
+    "typescript-eslint": "^8.34.1",
+    "vitest": "^3.2.4"
   }
 }

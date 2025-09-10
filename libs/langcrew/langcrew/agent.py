@@ -37,7 +37,7 @@ class Agent:
         tools: list[BaseTool] | None = None,
         llm: Any | None = None,
         verbose: bool = False,
-        debug: bool = True,
+        debug: bool = False,
         # Executor configuration
         executor_type: str = "react",
         prompt: str | SystemMessage | Callable | Runnable | None = None,
@@ -46,7 +46,7 @@ class Agent:
         mcp_servers: dict[str, dict[str, Any]] | None = None,
         mcp_tool_filter: list[str] | None = None,
         # Memory support
-        memory: bool | MemoryConfig | None = None,
+        memory_config: MemoryConfig | None = None,
         # Pre-model hook
         pre_model_hook: RunnableLike | None = None,
         # Post-model hook
@@ -79,7 +79,7 @@ class Agent:
             executor_kwargs: Additional kwargs for executor
             mcp_servers: MCP server configurations
             mcp_tool_filter: Filter for MCP tools
-            memory: Memory configuration (bool, MemoryConfig instance, or None to disable)
+            memory_config: Memory configuration (MemoryConfig instance or None to disable)
             pre_model_hook: Hook to run before model execution
             post_model_hook: Hook to run after model execution
 
@@ -163,17 +163,14 @@ class Agent:
         if self.mcp_servers:
             self._load_mcp_tools()
 
-        # Memory configuration
-        if memory is None:
-            self.memory_config = None
-        elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig() if memory else None
-        elif isinstance(memory, MemoryConfig):
-            self.memory_config = memory
-        else:
-            raise ValueError(f"Invalid memory parameter type: {type(memory)}")
+        # Memory system initialization
+        self.memory_config = memory_config
+        self.memory_tools = {}  # Internal memory tools dictionary
+        self._async_memory_initialized = False  # Track async memory initialization
 
-        self.memory = self.memory_config is not None
+        # Setup memory system if config is provided
+        if memory_config:
+            self._setup_memory(memory_config)
 
         # Create hooks based on context configuration
         if context_config:
@@ -279,18 +276,6 @@ class Agent:
         )
 
         self._setup_and_process_mcp_tools(tools)
-
-    def _create_default_store(self):
-        """Create default store based on config"""
-        from langcrew.memory.storage import get_storage
-
-        return get_storage(
-            provider=self.memory_config.provider,
-            config={
-                "connection": self.memory_config.connection,
-                "path": self.memory_config.path,
-            },
-        )
 
     def _setup_hitl(self):
         """Setup HITL tool wrapping for the agent"""
@@ -417,7 +402,7 @@ class Agent:
             executor_type=self.executor_type,
             llm=self.llm,
             task_spec=task_spec,
-            tools=self.tools,
+            tools=self.tools,  # Now all tools are in self.tools
             prompt=executor_prompt,  # Use the decided prompt
             checkpointer=self.checkpointer,
             store=self.store,
@@ -619,8 +604,100 @@ class Agent:
         Returns:
             Output dictionary for LangGraph
         """
+        # Initialize async memory if needed
+        if self.memory_config and not self._async_memory_initialized:
+            # Clear existing sync memory tools
+            self.memory_tools.clear()
+
+            # Reinitialize with async versions
+            self._setup_memory(self.memory_config, is_async=True)
+            self._async_memory_initialized = True
+
         # Prepare execution
         prepared_input = self._prepare_execution(input, **kwargs)
 
         # Call executor's ainvoke method with guardrails applied to prepared_input
         return await self._executor_ainvoke(prepared_input, config, **kwargs)
+
+    def get_memory_tools(self, scope: str = None) -> dict | list:
+        """Get memory tools by scope or all memory tools"""
+        if scope:
+            return self.memory_tools.get(scope, {})
+        return self.memory_tools
+
+    def _setup_memory(self, config: MemoryConfig, is_async: bool = False):
+        """Setup memory system - only handles long-term memory tools (checkpointer managed by Crew)"""
+        # Short-term memory (checkpointer) is managed at Crew level and auto-propagated by LangGraph
+        # Agent only needs to setup long-term memory tools
+        if config.long_term.enabled:
+            self._setup_long_term_memory(config, is_async)
+
+    def _setup_long_term_memory(self, config: MemoryConfig, is_async: bool = False):
+        """Setup long-term memory with sync/async support"""
+        from langmem import create_manage_memory_tool, create_search_memory_tool
+
+        ltm_config = config.long_term
+
+        # Use the store injected by Crew (self.store)
+        # This avoids duplicate store creation and ensures consistency
+        store = self.store
+        if store is None:
+            raise ValueError(
+                "Agent store is None. Ensure Crew._setup_memory() is called before Agent._setup_memory()"
+            )
+
+        # User memory tools
+        if ltm_config.user_memory.enabled:
+            user_namespace = ("user_memories", "{user_id}")
+
+            user_manage = create_manage_memory_tool(
+                namespace=user_namespace,
+                name="manage_user_memory",
+                instructions=ltm_config.user_memory.manage_instructions,
+                schema=ltm_config.user_memory.schema,
+                actions_permitted=ltm_config.user_memory.actions,
+                store=store,
+                **ltm_config.user_memory.langmem_tool_config,
+            )
+
+            user_search = create_search_memory_tool(
+                namespace=user_namespace,
+                name="search_user_memory",
+                instructions=ltm_config.user_memory.search_instructions,
+                response_format=ltm_config.search_response_format,
+                store=store,
+            )
+
+            # Add memory tools directly to agent.tools for unified access
+            self.tools.extend([user_manage, user_search])
+
+            # Store in internal memory_tools dictionary for debugging/querying
+            self.memory_tools["user"] = {"manage": user_manage, "search": user_search}
+
+        # App memory tools
+        if ltm_config.app_memory.enabled:
+            app_namespace = ("app_memories", ltm_config.app_id)
+
+            app_manage = create_manage_memory_tool(
+                namespace=app_namespace,
+                name="manage_app_memory",
+                instructions=ltm_config.app_memory.manage_instructions,
+                schema=ltm_config.app_memory.schema,
+                actions_permitted=ltm_config.app_memory.actions,
+                store=store,
+                **ltm_config.app_memory.langmem_tool_config,
+            )
+
+            app_search = create_search_memory_tool(
+                namespace=app_namespace,
+                name="search_app_memory",
+                instructions=ltm_config.app_memory.search_instructions,
+                response_format=ltm_config.search_response_format,
+                store=store,
+            )
+
+            # Add memory tools directly to agent.tools for unified access
+            self.tools.extend([app_manage, app_search])
+
+            # Store in internal memory_tools dictionary for debugging/querying
+            self.memory_tools["app"] = {"manage": app_manage, "search": app_search}
