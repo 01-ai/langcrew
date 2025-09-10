@@ -145,10 +145,10 @@ class WebChatCrew:
                     # provider="postgres",
                     # connection_string=DB_CONNECTION_STRING,
                     # Enable vector indexing for better memory search
-                    index=IndexConfig(
-                        dims=1536,  # OpenAI text-embedding-3-small dimensions
-                        embed="openai:text-embedding-3-small",  # Embedding model
-                    ),
+                    # index=IndexConfig(
+                    #     dims=1536,  # OpenAI text-embedding-3-small dimensions
+                    #     embed="openai:text-embedding-3-small",  # Embedding model
+                    # ),
                 ),
             ),  # Enable conversation memory and long-term memory
             # max_rpm=10,  # Rate limiting will be handled differently in langcrew

@@ -7,9 +7,26 @@ from typing import Any
 
 @dataclass
 class IndexConfig:
-    """Configuration for vector indexing in storage"""
+    """Configuration for vector indexing in storage
 
-    # Embedding configuration
+    Examples:
+        # Basic configuration without embedding (no vector search)
+        IndexConfig()
+
+        # With OpenAI embedding
+        IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small"
+        )
+
+        # With Anthropic/Claude embedding
+        IndexConfig(
+            dims=1024,
+            embed="anthropic:voyage-3"
+        )
+    """
+
+    # Embedding configuration - None by default to avoid external dependencies
     dims: int | None = None
     embed: str | Callable | None = None
 
@@ -77,19 +94,40 @@ class ShortTermMemoryConfig:
 
 @dataclass
 class LongTermMemoryConfig:
-    """Long-term memory configuration (cross-session learning)"""
+    """Long-term memory configuration (cross-session learning)
+
+    Examples:
+        # Basic long-term memory without vector search
+        LongTermMemoryConfig(enabled=True)
+
+        # With OpenAI embedding for vector search
+        LongTermMemoryConfig(
+            enabled=True,
+            index=IndexConfig(
+                dims=1536,
+                embed="openai:text-embedding-3-small",
+                fields=["content"]
+            )
+        )
+
+        # With Anthropic embedding for vector search
+        LongTermMemoryConfig(
+            enabled=True,
+            index=IndexConfig(
+                dims=1024,
+                embed="anthropic:voyage-3",
+                fields=["content"]
+            )
+        )
+    """
 
     enabled: bool = False
     model: str = "anthropic:claude-3-5-sonnet-latest"
     provider: str | None = None
     connection_string: str | None = None
 
-    # Index configuration with sensible defaults
-    index: IndexConfig | None = field(
-        default_factory=lambda: IndexConfig(
-            dims=1536, embed="openai:text-embedding-3-small"
-        )
-    )
+    # Index configuration - None by default to avoid external dependencies
+    index: IndexConfig | None = None
 
     # Memory scope configurations with default instructions
     user_memory: MemoryScopeConfig = field(
@@ -181,8 +219,8 @@ class MemoryConfig:
             )
         return config
 
-    def to_storage_config(self) -> dict[str, Any]:
-        """Convert to storage configuration - only if long_term.enabled"""
+    def to_store_config(self) -> dict[str, Any]:
+        """Convert to store configuration - only if long_term.enabled"""
         if not self.long_term.enabled:
             return {}
 

@@ -825,155 +825,28 @@ class Crew:
 
     async def _execute_with_memory_context_async(self, execution_func):
         """Execute function with proper async memory context management"""
-        from .memory.factory import get_storage, get_checkpointer
-
-        checkpointer_cm = None
-        store_cm = None
-
-        if self.memory_config:
-            if self.memory_config.short_term.enabled:
-                checkpointer_config = self.memory_config.to_checkpointer_config()
-                checkpointer_cm = get_checkpointer(
-                    self.memory_config.get_short_term_provider(),
-                    checkpointer_config,
-                    is_async=True,
-                )
-
-            if self.memory_config.long_term.enabled:
-                store_config = self.memory_config.to_storage_config()
-                store_cm = get_storage(
-                    self.memory_config.get_long_term_provider(),
-                    store_config,
-                    is_async=True,
-                )
-
-        # Use appropriate context manager combination
-        if checkpointer_cm and store_cm:
-            async with checkpointer_cm as checkpointer, store_cm as store:
-                return await execution_func(checkpointer, store)
-        elif checkpointer_cm:
-            async with checkpointer_cm as checkpointer:
-                return await execution_func(checkpointer, None)
-        elif store_cm:
-            async with store_cm as store:
-                return await execution_func(None, store)
-        else:
-            return await execution_func(None, None)
+        from .memory.context import MemoryContextManager
+        context_manager = MemoryContextManager(self.memory_config)
+        return await context_manager.execute_async(execution_func)
 
     async def _execute_with_memory_context_generator_async(self, execution_func):
         """Execute async generator function with proper memory context management"""
-        from .memory.factory import get_storage, get_checkpointer
-
-        checkpointer_cm = None
-        store_cm = None
-
-        if self.memory_config:
-            if self.memory_config.short_term.enabled:
-                checkpointer_config = self.memory_config.to_checkpointer_config()
-                checkpointer_cm = get_checkpointer(
-                    self.memory_config.get_short_term_provider(),
-                    checkpointer_config,
-                    is_async=True,
-                )
-
-            if self.memory_config.long_term.enabled:
-                store_config = self.memory_config.to_storage_config()
-                store_cm = get_storage(
-                    self.memory_config.get_long_term_provider(),
-                    store_config,
-                    is_async=True,
-                )
-
-        # Use appropriate context manager combination
-        if checkpointer_cm and store_cm:
-            async with checkpointer_cm as checkpointer, store_cm as store:
-                async for item in execution_func(checkpointer, store):
-                    yield item
-        elif checkpointer_cm:
-            async with checkpointer_cm as checkpointer:
-                async for item in execution_func(checkpointer, None):
-                    yield item
-        elif store_cm:
-            async with store_cm as store:
-                async for item in execution_func(None, store):
-                    yield item
-        else:
-            async for item in execution_func(None, None):
-                yield item
+        from .memory.context import MemoryContextManager
+        context_manager = MemoryContextManager(self.memory_config)
+        async for item in context_manager.execute_async_generator(execution_func):
+            yield item
 
     def _execute_with_memory_context(self, execution_func):
         """Execute function with proper sync memory context management"""
-        from .memory.factory import get_storage, get_checkpointer
-
-        checkpointer_cm = None
-        store_cm = None
-
-        if self.memory_config:
-            if self.memory_config.short_term.enabled:
-                checkpointer_config = self.memory_config.to_checkpointer_config()
-                checkpointer_cm = get_checkpointer(
-                    self.memory_config.get_short_term_provider(),
-                    checkpointer_config,
-                    is_async=False,
-                )
-
-            if self.memory_config.long_term.enabled:
-                store_config = self.memory_config.to_storage_config()
-                store_cm = get_storage(
-                    self.memory_config.get_long_term_provider(),
-                    store_config,
-                    is_async=False,
-                )
-
-        # Use appropriate context manager combination
-        if checkpointer_cm and store_cm:
-            with checkpointer_cm as checkpointer, store_cm as store:
-                return execution_func(checkpointer, store)
-        elif checkpointer_cm:
-            with checkpointer_cm as checkpointer:
-                return execution_func(checkpointer, None)
-        elif store_cm:
-            with store_cm as store:
-                return execution_func(None, store)
-        else:
-            return execution_func(None, None)
+        from .memory.context import MemoryContextManager
+        context_manager = MemoryContextManager(self.memory_config)
+        return context_manager.execute_sync(execution_func)
 
     def _execute_with_memory_context_generator(self, execution_func):
         """Execute sync generator function with proper memory context management"""
-        from .memory.factory import get_storage, get_checkpointer
-
-        checkpointer_cm = None
-        store_cm = None
-
-        if self.memory_config:
-            if self.memory_config.short_term.enabled:
-                checkpointer_config = self.memory_config.to_checkpointer_config()
-                checkpointer_cm = get_checkpointer(
-                    self.memory_config.get_short_term_provider(),
-                    checkpointer_config,
-                    is_async=False,
-                )
-
-            if self.memory_config.long_term.enabled:
-                store_config = self.memory_config.to_storage_config()
-                store_cm = get_storage(
-                    self.memory_config.get_long_term_provider(),
-                    store_config,
-                    is_async=False,
-                )
-
-        # Use appropriate context manager combination
-        if checkpointer_cm and store_cm:
-            with checkpointer_cm as checkpointer, store_cm as store:
-                yield from execution_func(checkpointer, store)
-        elif checkpointer_cm:
-            with checkpointer_cm as checkpointer:
-                yield from execution_func(checkpointer, None)
-        elif store_cm:
-            with store_cm as store:
-                yield from execution_func(None, store)
-        else:
-            yield from execution_func(None, None)
+        from .memory.context import MemoryContextManager
+        context_manager = MemoryContextManager(self.memory_config)
+        yield from context_manager.execute_sync_generator(execution_func)
 
     def _setup_agents_memory(self):
         """Setup memory configuration for agents"""

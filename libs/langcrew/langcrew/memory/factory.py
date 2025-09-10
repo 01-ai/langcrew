@@ -6,28 +6,34 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 
 
-def get_storage(
+def get_store(
     provider: str | None = None,
     config: dict[str, Any] | None = None,
     is_async: bool = False,
 ) -> BaseStore:
-    """Get storage instance for data persistence
-
-    Args:
-        provider: Storage provider type
-        config: Configuration dict that can contain:
-            - connection_string: Database connection string
-            - index: Index configuration dict with dims, embed, fields, etc.
-        is_async: Whether to return async or sync version
-    """
+    """Get store instance for data persistence"""
     config = config or {}
     conn_str = config.get("connection_string", "")
-    index = config.get("index")  # Extract index from config
+    index = config.get("index")
 
     if not provider or provider == "memory":
-        # InMemoryStore works for both sync/async
+        return None
         from langgraph.store.memory import InMemoryStore
-        return InMemoryStore(index=index) if index else InMemoryStore()
+
+        class InMemoryStoreWithContext(InMemoryStore):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        return InMemoryStoreWithContext(index=index)
 
     # PostgreSQL storage
     elif provider == "postgres":
@@ -36,9 +42,11 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.postgres.aio import AsyncPostgresStore
+
                 return AsyncPostgresStore.from_conn_string(conn_str, index=index)
             else:
                 from langgraph.store.postgres import PostgresStore
+
                 return PostgresStore.from_conn_string(conn_str, index=index)
         except ImportError:
             raise ImportError("PostgreSQL support requires additional package")
@@ -50,9 +58,11 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.redis.aio import AsyncRedisStore
+
                 return AsyncRedisStore.from_conn_string(conn_str, index=index)
             else:
                 from langgraph.store.redis import RedisStore
+
                 return RedisStore.from_conn_string(conn_str, index=index)
         except ImportError:
             raise ImportError("Redis support requires additional package")
@@ -64,9 +74,11 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.sqlite.aio import AsyncSqliteStore
+
                 return AsyncSqliteStore.from_conn_string(conn_str, index=index)
             else:
                 from langgraph.store.sqlite import SqliteStore
+
                 return SqliteStore.from_conn_string(conn_str, index=index)
         except ImportError:
             raise ImportError("SQLite support requires additional package")
@@ -77,6 +89,7 @@ def get_storage(
             raise ValueError("MongoDB storage requires connection_string in config")
         try:
             from langgraph.store.mongodb import MongoDBStore
+
             return MongoDBStore.from_conn_string(conn_str, index=index)
         except ImportError:
             raise ImportError("MongoDB support requires additional package")
@@ -95,9 +108,11 @@ def get_checkpointer(
     conn_str = config.get("connection_string", "")
 
     if not provider or provider == "memory":
-        # InMemorySaver works for both sync/async
+        # InMemorySaver works for both sync/async, wrap it for consistent interface
         from langgraph.checkpoint.memory import InMemorySaver
-        return InMemorySaver()
+
+        checkpointer = InMemorySaver()
+        return checkpointer  # InMemorySaver already supports context managers
 
     # PostgreSQL checkpointer
     elif provider == "postgres":
@@ -108,9 +123,11 @@ def get_checkpointer(
         try:
             if is_async:
                 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
                 return AsyncPostgresSaver.from_conn_string(conn_str)
             else:
                 from langgraph.checkpoint.postgres import PostgresSaver
+
                 return PostgresSaver.from_conn_string(conn_str)
         except ImportError:
             raise ImportError("PostgreSQL support requires additional package")
@@ -122,9 +139,11 @@ def get_checkpointer(
         try:
             if is_async:
                 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+
                 return AsyncRedisSaver.from_conn_string(conn_str)
             else:
                 from langgraph.checkpoint.redis import RedisSaver
+
                 return RedisSaver.from_conn_string(conn_str)
         except ImportError:
             raise ImportError("Redis support requires additional package")
@@ -138,9 +157,11 @@ def get_checkpointer(
         try:
             if is_async:
                 from langgraph.checkpoint.mongodb.aio import AsyncMongoDBSaver
+
                 return AsyncMongoDBSaver.from_conn_string(conn_str)
             else:
                 from langgraph.checkpoint.mongodb import MongoDBSaver
+
                 return MongoDBSaver.from_conn_string(conn_str)
         except ImportError:
             raise ImportError("MongoDB support requires additional package")
@@ -151,8 +172,10 @@ def get_checkpointer(
             raise ValueError("MySQL checkpointer requires connection_string in config")
         try:
             from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
+
             if is_async:
                 import logging
+
                 logging.warning(
                     "MySQL checkpointer does not have async version, using sync version"
                 )
