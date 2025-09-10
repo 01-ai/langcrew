@@ -647,8 +647,7 @@ class Agent:
                 name="manage_user_memory",
                 instructions=ltm_config.user_memory.manage_instructions,
                 schema=ltm_config.user_memory.schema,
-                actions_permitted=ltm_config.user_memory.actions,
-                **ltm_config.user_memory.langmem_tool_config,
+                actions_permitted=ltm_config.user_memory.actions_permitted,
             )
 
             user_search = create_search_memory_tool(
@@ -673,8 +672,7 @@ class Agent:
                 name="manage_app_memory",
                 instructions=ltm_config.app_memory.manage_instructions,
                 schema=ltm_config.app_memory.schema,
-                actions_permitted=ltm_config.app_memory.actions,
-                **ltm_config.app_memory.langmem_tool_config,
+                actions_permitted=ltm_config.app_memory.actions_permitted,
             )
 
             app_search = create_search_memory_tool(

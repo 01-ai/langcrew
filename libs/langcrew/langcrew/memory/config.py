@@ -9,6 +9,11 @@ from typing import Any
 class IndexConfig:
     """Configuration for vector indexing in storage
 
+    Args:
+        dims: Embedding dimensions (e.g., 1536 for OpenAI, 1024 for Anthropic)
+        embed: Embedding provider string or callable (e.g., "openai:text-embedding-3-small")
+        extra_config: Storage-specific configurations like fields, distance_strategy, etc.
+
     Examples:
         # Basic configuration without embedding (no vector search)
         IndexConfig()
@@ -19,10 +24,20 @@ class IndexConfig:
             embed="openai:text-embedding-3-small"
         )
 
-        # With Anthropic/Claude embedding
+        # With Anthropic embedding
         IndexConfig(
             dims=1024,
             embed="anthropic:voyage-3"
+        )
+
+        # With storage-specific configurations
+        IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small",
+            extra_config={
+                "fields": ["content"],
+                "distance_strategy": "euclidean"
+            }
         )
     """
 
@@ -30,21 +45,13 @@ class IndexConfig:
     dims: int | None = None
     embed: str | Callable | None = None
 
-    # Field configuration for indexing
-    fields: list[str] | None = None
-
-    # Additional index parameters
-    distance_strategy: str = "cosine"  # cosine, euclidean, dot_product
+    # Storage-specific configurations (e.g., fields, distance_strategy, etc.)
+    extra_config: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         # Validate dims
         if self.dims is not None and self.dims <= 0:
             raise ValueError("dims must be a positive integer")
-
-        # Validate distance strategy
-        valid_strategies = {"cosine", "euclidean", "dot_product"}
-        if self.distance_strategy not in valid_strategies:
-            raise ValueError(f"distance_strategy must be one of {valid_strategies}")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage initialization"""
@@ -53,39 +60,53 @@ class IndexConfig:
             config["dims"] = self.dims
         if self.embed is not None:
             config["embed"] = self.embed
-        if self.fields is not None:
-            config["fields"] = self.fields
-        if self.distance_strategy != "cosine":
-            config["distance_strategy"] = self.distance_strategy
+
+        # Merge storage-specific configurations
+        config.update(self.extra_config)
         return config
 
 
 @dataclass
 class MemoryScopeConfig:
-    """Memory scope configuration for user/app memory dimensions"""
+    """Memory scope configuration for user/app memory dimensions
+
+    Args:
+        enabled: Whether this memory scope is enabled
+        manage_instructions: Instructions for when to use the memory management tool
+        search_instructions: Instructions for when to use the memory search tool
+        schema: Data schema for memory content validation (default: str)
+        actions_permitted: Tuple of allowed actions ("create", "update", "delete")
+    """
 
     enabled: bool = True
     # Separate instructions for manage and search tools
     manage_instructions: str = ""
     search_instructions: str = ""
     schema: type = str
-    actions: tuple = ("create", "update", "delete")
-    langmem_tool_config: dict = field(default_factory=dict)
+    actions_permitted: tuple = ("create", "update", "delete")
 
     def __post_init__(self):
-        # Validate actions
+        # Validate actions_permitted
         valid_actions = {"create", "update", "delete"}
-        if not all(action in valid_actions for action in self.actions):
-            raise ValueError(f"Invalid actions. Must be subset of {valid_actions}")
+        if not all(action in valid_actions for action in self.actions_permitted):
+            raise ValueError(
+                f"Invalid actions_permitted. Must be subset of {valid_actions}"
+            )
 
-        # Validate actions tuple not empty
-        if not self.actions:
-            raise ValueError("Actions cannot be empty")
+        # Validate actions_permitted tuple not empty
+        if not self.actions_permitted:
+            raise ValueError("actions_permitted cannot be empty")
 
 
 @dataclass
 class ShortTermMemoryConfig:
-    """Short-term memory configuration (conversation state persistence)"""
+    """Short-term memory configuration (conversation state persistence)
+
+    Args:
+        enabled: Whether short-term memory is enabled
+        provider: Storage provider override (inherits from global if None)
+        connection_string: Database connection string override (inherits from global if None)
+    """
 
     enabled: bool = True
     provider: str | None = None
@@ -95,6 +116,16 @@ class ShortTermMemoryConfig:
 @dataclass
 class LongTermMemoryConfig:
     """Long-term memory configuration (cross-session learning)
+
+    Args:
+        enabled: Whether long-term memory is enabled
+        provider: Storage provider override (inherits from global if None)
+        connection_string: Database connection string override (inherits from global if None)
+        index: Vector indexing configuration for semantic search (None = no vector search)
+        user_memory: Configuration for user-specific memories
+        app_memory: Configuration for application-wide memories
+        app_id: Application identifier (required when app_memory.enabled=True)
+        search_response_format: Format for search tool responses ("content" or "content_and_artifact")
 
     Examples:
         # Basic long-term memory without vector search
@@ -106,23 +137,35 @@ class LongTermMemoryConfig:
             index=IndexConfig(
                 dims=1536,
                 embed="openai:text-embedding-3-small",
-                fields=["content"]
+                extra_config={"fields": ["content"]}
             )
         )
 
-        # With Anthropic embedding for vector search
+        # Multi-app setup with isolated memories
         LongTermMemoryConfig(
             enabled=True,
-            index=IndexConfig(
-                dims=1024,
-                embed="anthropic:voyage-3",
-                fields=["content"]
-            )
+            app_id="my-app-v1",  # Required for app_memory isolation
+            app_memory=MemoryScopeConfig(enabled=True)
         )
+
+    Namespace Design:
+        - User memories: ("user_memories", "{user_id}")
+          * Isolated per user across all applications
+          * user_id comes from LangGraph runtime config
+
+        - App memories: ("app_memories", app_id)
+          * Isolated per application
+          * app_id is static per application instance
+          * Multiple apps can share same database safely
+
+    Multi-Application Support:
+        - Same database can host multiple applications
+        - User memories are isolated by user_id (from runtime)
+        - App memories are isolated by app_id (from config)
+        - No cross-contamination between apps or users
     """
 
     enabled: bool = False
-    model: str = "anthropic:claude-3-5-sonnet-latest"
     provider: str | None = None
     connection_string: str | None = None
 
@@ -171,25 +214,74 @@ class LongTermMemoryConfig:
     def __post_init__(self):
         # Validate app_memory requires app_id
         if self.enabled and self.app_memory.enabled and not self.app_id:
-            raise ValueError("app_memory.enabled=True requires app_id")
+            raise ValueError(
+                "app_memory.enabled=True requires app_id. "
+                "app_id is used to isolate application-wide memories from different applications "
+                "in shared databases. Set app_id to a unique identifier for your application "
+                "(e.g., 'my-app-v1', 'chatbot-prod', etc.)"
+            )
 
         # Validate app_id format (basic validation)
         if self.app_id and not isinstance(self.app_id, str):
             raise ValueError("app_id must be a string")
+
+        # Validate app_id not empty if provided
+        if self.app_id is not None and not self.app_id.strip():
+            raise ValueError("app_id cannot be empty string")
 
         # Validate search_response_format
         valid_formats = {"content", "content_and_artifact"}
         if self.search_response_format not in valid_formats:
             raise ValueError(f"search_response_format must be one of {valid_formats}")
 
-        # Validate model string
-        if not isinstance(self.model, str) or not self.model.strip():
-            raise ValueError("model must be a non-empty string")
-
 
 @dataclass
 class MemoryConfig:
-    """Unified memory configuration for LangCrew"""
+    """Unified memory configuration for LangCrew
+
+    Args:
+        provider: Global storage provider ("memory", "sqlite", "postgres", "redis", "mongodb", "mysql")
+        connection_string: Global database connection string
+        short_term: Short-term memory configuration (conversation history)
+        long_term: Long-term memory configuration (persistent knowledge)
+
+    Examples:
+        # Basic in-memory configuration (development)
+        MemoryConfig()
+
+        # SQLite with long-term memory
+        MemoryConfig(
+            provider="sqlite",
+            connection_string="sqlite:///memory.db",
+            long_term=LongTermMemoryConfig(enabled=True)
+        )
+
+        # Multi-application shared database
+        MemoryConfig(
+            provider="postgres",
+            connection_string="postgresql://user:pass@localhost/db",
+            long_term=LongTermMemoryConfig(
+                enabled=True,
+                app_id="my-app-v1",  # Isolates this app's memories
+                app_memory=MemoryScopeConfig(enabled=True),
+                index=IndexConfig(
+                    dims=1536,
+                    embed="openai:text-embedding-3-small"
+                )
+            )
+        )
+
+        # Another app using same database (isolated)
+        MemoryConfig(
+            provider="postgres",
+            connection_string="postgresql://user:pass@localhost/db",
+            long_term=LongTermMemoryConfig(
+                enabled=True,
+                app_id="other-app-v2",  # Different app_id = isolated memories
+                app_memory=MemoryScopeConfig(enabled=True)
+            )
+        )
+    """
 
     # Global storage configuration
     provider: str = "memory"  # memory, sqlite, postgres, redis, mongodb, mysql
