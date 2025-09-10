@@ -324,7 +324,6 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
       if (useAgentStore.getState().senderSending) {
         useAgentStore.getState().setSenderLoading(true);
         try {
-          await sessionApi.addNewMessage(sessionIdRef.current, content);
           useAgentStore.getState().addChunk({
             id: Date.now().toString(),
             role: 'user',
@@ -333,6 +332,7 @@ const useChat = (basePath: string, agentId: string, sessionId: string): UseChatR
             loading: true,
             timestamp: Date.now(),
           });
+          await sessionApi.addNewMessage(sessionIdRef.current, content);
         } catch (error) {
           console.error('Failed to add new message:', error);
           useAgentStore.getState().setSenderLoading(false);

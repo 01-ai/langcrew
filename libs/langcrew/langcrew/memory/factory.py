@@ -219,15 +219,24 @@ def get_storage(
     config: dict[str, Any] | None = None,
     is_async: bool = False,
 ) -> BaseStore:
-    """Get storage instance for data persistence"""
+    """Get storage instance for data persistence
+    
+    Args:
+        provider: Storage provider type
+        config: Configuration dict that can contain:
+            - connection_string: Database connection string
+            - index: Index configuration dict with dims, embed, fields, etc.
+        is_async: Whether to return async-compatible wrapper
+    """
     config = config or {}
     conn_str = config.get("connection_string", "")
+    index = config.get("index")  # Extract index from config
 
     if not provider or provider == "memory":
         # InMemoryStore doesn't need connection management and works for both sync/async
         from langgraph.store.memory import InMemoryStore
 
-        return InMemoryStore()  # ✅ Returns the same instance for both sync and async
+        return InMemoryStore(index=index) if index else InMemoryStore()
 
     # PostgreSQL storage - needs connection management
     elif provider == "postgres":
@@ -236,13 +245,11 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.postgres.aio import AsyncPostgresStore
-
-                store_cm = AsyncPostgresStore.from_conn_string(conn_str)
+                store_cm = AsyncPostgresStore.from_conn_string(conn_str, index=index)
                 return AsyncStoreWrapper(store_cm)
             else:
                 from langgraph.store.postgres import PostgresStore
-
-                store_cm = PostgresStore.from_conn_string(conn_str)
+                store_cm = PostgresStore.from_conn_string(conn_str, index=index)
                 return StoreWrapper(store_cm)
         except ImportError:
             raise ImportError("PostgreSQL support requires additional package")
@@ -254,13 +261,11 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.redis.aio import AsyncRedisStore
-
-                store_cm = AsyncRedisStore.from_conn_string(conn_str)
+                store_cm = AsyncRedisStore.from_conn_string(conn_str, index=index)
                 return AsyncStoreWrapper(store_cm)
             else:
                 from langgraph.store.redis import RedisStore
-
-                store_cm = RedisStore.from_conn_string(conn_str)
+                store_cm = RedisStore.from_conn_string(conn_str, index=index)
                 return StoreWrapper(store_cm)
         except ImportError:
             raise ImportError("Redis support requires additional package")
@@ -272,13 +277,11 @@ def get_storage(
         try:
             if is_async:
                 from langgraph.store.sqlite.aio import AsyncSqliteStore
-
-                store_cm = AsyncSqliteStore.from_conn_string(conn_str)
+                store_cm = AsyncSqliteStore.from_conn_string(conn_str, index=index)
                 return AsyncStoreWrapper(store_cm)
             else:
                 from langgraph.store.sqlite import SqliteStore
-
-                store_cm = SqliteStore.from_conn_string(conn_str)
+                store_cm = SqliteStore.from_conn_string(conn_str, index=index)
                 return StoreWrapper(store_cm)
         except ImportError:
             raise ImportError("SQLite support requires additional package")
@@ -289,8 +292,8 @@ def get_storage(
             raise ValueError("MongoDB storage requires connection_string in config")
         try:
             from langgraph.store.mongodb import MongoDBStore
-
-            store_cm = MongoDBStore.from_conn_string(conn_str)
+            
+            store_cm = MongoDBStore.from_conn_string(conn_str, index=index)
             if is_async:
                 return AsyncStoreWrapper(store_cm)
             else:
