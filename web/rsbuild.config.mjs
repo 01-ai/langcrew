@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
 
   // first try process.env.AGENT_API_HOST from docker environment, then try env.parsed.AGENT_API_HOST from .env file
+  // finally use http://localhost:8000 as default
   const AGENT_API_HOST = process.env.AGENT_API_HOST || env.parsed.AGENT_API_HOST || 'http://localhost:8000';
 
   return {
