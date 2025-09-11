@@ -197,8 +197,8 @@ class Crew:
         interrupt_before, interrupt_after = self._collect_interrupt_config()
 
         compiled = builder.compile(
-            checkpointer=checkpointer or self.checkpointer,
-            store=store or self.store,
+            checkpointer=checkpointer,
+            store=store,
             interrupt_before=interrupt_before,
             interrupt_after=interrupt_after,
         )
@@ -311,8 +311,8 @@ class Crew:
         """Build a sequential graph from tasks with native interrupt support
 
         Args:
-            checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
-            store: Optional store to use. If not provided, uses self.store
+            checkpointer: Optional checkpointer to use for state persistence
+            store: Optional store to use for data persistence
             is_async: Whether to create async task nodes
         """
         builder = StateGraph(CrewState)
@@ -359,8 +359,8 @@ class Crew:
         """Build a sequential graph from agents with native interrupt support
 
         Args:
-            checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
-            store: Optional store to use. If not provided, uses self.store
+            checkpointer: Optional checkpointer to use for state persistence
+            store: Optional store to use for data persistence
             is_async: Whether to create async agent nodes
         """
         builder = StateGraph(CrewState)

@@ -117,52 +117,58 @@ class ShortTermMemoryConfig:
 class LongTermMemoryConfig:
     """Long-term memory configuration (cross-session learning)
 
-    Args:
-        enabled: Whether long-term memory is enabled
-        provider: Storage provider override (inherits from global if None)
-        connection_string: Database connection string override (inherits from global if None)
-        index: Vector indexing configuration for semantic search (None = no vector search)
-        user_memory: Configuration for user-specific memories
-        app_memory: Configuration for application-wide memories
-        app_id: Application identifier (required when app_memory.enabled=True)
-        search_response_format: Format for search tool responses ("content" or "content_and_artifact")
+    🚀 QUICK START - 3 Common Configurations:
 
-    Examples:
-        # Basic long-term memory without vector search
-        LongTermMemoryConfig(enabled=True)
-
-        # With OpenAI embedding for vector search
+    1. SIMPLE (User memory only):
         LongTermMemoryConfig(
             enabled=True,
+            app_id="my-app-dev"  # REQUIRED! Your app identifier, prevents data mixing
+        )
+
+    2. PRODUCTION (User memory with semantic search):
+        LongTermMemoryConfig(
+            enabled=True,
+            app_id="my-app-prod",  # REQUIRED! Your app identifier, prevents data mixing
             index=IndexConfig(
                 dims=1536,
-                embed="openai:text-embedding-3-small",
-                extra_config={"fields": ["content"]}
+                embed="openai:text-embedding-3-small"
             )
         )
 
-        # Multi-app setup with isolated memories
+    3. MULTI-TENANT (User memory with experimental app insights):
         LongTermMemoryConfig(
             enabled=True,
-            app_id="my-app-v1",  # Required for app_memory isolation
-            app_memory=MemoryScopeConfig(enabled=True)
+            app_id="saas-app-v1",  # REQUIRED! Your app identifier, prevents data mixing
+            app_memory=MemoryScopeConfig(enabled=True),  # ⚠️ EXPERIMENTAL: Shared insights
+            index=IndexConfig(
+                dims=1536,
+                embed="openai:text-embedding-3-small"
+            )
         )
 
-    Namespace Design:
-        - User memories: ("user_memories", "{user_id}")
-          * Isolated per user across all applications
-          * user_id comes from LangGraph runtime config
+    PARAMETERS:
+        enabled: Enable/disable long-term memory
+        app_id: Your application identifier (REQUIRED when enabled=True)
+        index: Vector search config (None = no semantic search)
+        user_memory: User-specific memories (enabled by default)
+        app_memory: Application-wide shared memories (disabled by default)
+        provider: Storage override (inherits from global if None)
+        connection_string: Database connection override (inherits from global if None)
+        search_response_format: Search result format ("content" or "content_and_artifact")
 
+    MEMORY TYPES:
+        - user_memory: Personal user preferences/info (enabled by default)
+        - app_memory: ⚠️ EXPERIMENTAL - Shared application insights across all users (disabled by default)
+
+    IMPORTANT:
+        - app_id is REQUIRED when long-term memory is enabled
+        - app_id prevents data mixing between different applications
+        - Use unique app_id like "my-app-v1", "chatbot-prod", etc.
+
+    DATA ISOLATION:
+        - User memories: ("user_memories", app_id, "{user_id}")
         - App memories: ("app_memories", app_id)
-          * Isolated per application
-          * app_id is static per application instance
-          * Multiple apps can share same database safely
-
-    Multi-Application Support:
-        - Same database can host multiple applications
-        - User memories are isolated by user_id (from runtime)
-        - App memories are isolated by app_id (from config)
-        - No cross-contamination between apps or users
+        - Complete isolation: App A's user "123" != App B's user "123"
     """
 
     enabled: bool = False
@@ -192,18 +198,33 @@ class LongTermMemoryConfig:
     app_memory: MemoryScopeConfig = field(
         default_factory=lambda: MemoryScopeConfig(
             enabled=False,
-            manage_instructions="Proactively call this tool when you:\n\n"
-            "1. Learn general knowledge, best practices, or patterns that benefit all users.\n"
-            "2. Receive explicit requests to remember application-wide information.\n"
-            "3. Identify outdated or incorrect general knowledge in existing memories.\n"
-            "4. Want to record important context that applies across different users.\n\n"
-            "IMPORTANT: NEVER store user personal information, preferences, or user-specific data here.",
-            search_instructions="Proactively call this tool when you:\n\n"
-            "1. Need to recall general knowledge, best practices, or patterns that benefit all users.\n"
-            "2. Want to check if you have learned something that applies to the current situation.\n"
-            "3. Need to verify or update your understanding of general concepts.\n"
-            "4. Are looking for application-wide information or context.\n\n"
-            "IMPORTANT: This searches application-wide memories only. NEVER search here for user personal information, preferences, or user-specific data.",
+            manage_instructions="⚠️  EXPERIMENTAL FEATURE - Use with caution ⚠️\n\n"
+            "This tool stores application-wide insights that benefit all users. "
+            "It learns from user interaction patterns to make the assistant smarter over time.\n\n"
+            "Proactively call this tool when you:\n\n"
+            "1. Discover user behavior patterns that could improve assistance (e.g., 'Users often need help with X after doing Y').\n"
+            "2. Learn effective assistance strategies that work well across different users.\n"
+            "3. Identify common user pain points, confusion areas, or workflow patterns.\n"
+            "4. Record successful problem-solving approaches that benefit multiple users.\n"
+            "5. Notice application feature usage trends or optimization opportunities.\n\n"
+            "STORE APPLICATION-LEVEL INSIGHTS LIKE:\n"
+            "- 'Most users struggle with feature A, explaining B first helps'\n"
+            "- 'When users ask about X, they usually also need guidance on Y'\n"
+            "- 'Common workflow pattern: users do step 1 → step 2 → step 3'\n\n"
+            "⚠️  CRITICAL BOUNDARIES (EXPERIMENTAL - Monitor carefully):\n"
+            "- NEVER store individual user data, preferences, or personal information\n"
+            "- ONLY store aggregated insights and patterns that benefit all users\n"
+            "- Focus on improving application-wide assistance effectiveness\n"
+            "- This feature is experimental and should be monitored for appropriate usage",
+            search_instructions="⚠️  EXPERIMENTAL FEATURE - Use with caution ⚠️\n\n"
+            "This searches application-wide insights to help you assist users more effectively.\n\n"
+            "Proactively call this tool when you:\n\n"
+            "1. Encountering a user situation that might have common patterns or proven solutions.\n"
+            "2. Looking for effective assistance strategies for similar scenarios.\n"
+            "3. Needing insights about typical user workflows or expectations.\n"
+            "4. Wanting to provide better help based on accumulated application knowledge.\n\n"
+            "⚠️  EXPERIMENTAL: This feature learns from user patterns to improve assistance. "
+            "Monitor usage to ensure it only accesses application-level insights, not personal data.",
         )
     )
     app_id: str | None = None
@@ -212,11 +233,21 @@ class LongTermMemoryConfig:
     search_response_format: str = "content"
 
     def __post_init__(self):
-        # Validate app_memory requires app_id
-        if self.enabled and self.app_memory.enabled and not self.app_id:
+        # Validate app_id requirements
+        if (
+            self.enabled
+            and (self.user_memory.enabled or self.app_memory.enabled)
+            and not self.app_id
+        ):
+            memory_types = []
+            if self.user_memory.enabled:
+                memory_types.append("user_memory")
+            if self.app_memory.enabled:
+                memory_types.append("app_memory")
+
             raise ValueError(
-                "app_memory.enabled=True requires app_id. "
-                "app_id is used to isolate application-wide memories from different applications "
+                f"{' and '.join(memory_types)}.enabled=True requires app_id. "
+                "app_id is used to isolate memories from different applications "
                 "in shared databases. Set app_id to a unique identifier for your application "
                 "(e.g., 'my-app-v1', 'chatbot-prod', etc.)"
             )
@@ -262,7 +293,7 @@ class MemoryConfig:
             connection_string="postgresql://user:pass@localhost/db",
             long_term=LongTermMemoryConfig(
                 enabled=True,
-                app_id="my-app-v1",  # Isolates this app's memories
+                app_id="my-app-v1",  # Isolates ALL memories (user + app)
                 app_memory=MemoryScopeConfig(enabled=True),
                 index=IndexConfig(
                     dims=1536,
@@ -271,14 +302,17 @@ class MemoryConfig:
             )
         )
 
-        # Another app using same database (isolated)
+        # Another app using same database (completely isolated)
         MemoryConfig(
             provider="postgres",
             connection_string="postgresql://user:pass@localhost/db",
             long_term=LongTermMemoryConfig(
                 enabled=True,
-                app_id="other-app-v2",  # Different app_id = isolated memories
+                app_id="other-app-v2",  # Different app_id = completely isolated
                 app_memory=MemoryScopeConfig(enabled=True)
+                # Even if both apps have user "alice", their memories are separate:
+                # App 1: ("user_memories", "my-app-v1", "alice")
+                # App 2: ("user_memories", "other-app-v2", "alice")
             )
         )
     """

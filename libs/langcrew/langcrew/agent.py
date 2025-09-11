@@ -640,7 +640,14 @@ class Agent:
 
         # User memory tools
         if ltm_config.user_memory.enabled:
-            user_namespace = ("user_memories", "{user_id}")
+            # Include app_id in user namespace to prevent cross-app contamination
+            # Format: ("user_memories", app_id, "{user_id}")
+            if not ltm_config.app_id:
+                raise ValueError(
+                    "app_id is required when user_memory is enabled. "
+                    "This ensures user memories are isolated between different applications."
+                )
+            user_namespace = ("user_memories", ltm_config.app_id, "{user_id}")
 
             user_manage = create_manage_memory_tool(
                 namespace=user_namespace,

@@ -142,6 +142,7 @@ class WebChatCrew:
                 connection_string=DB_CONNECTION_STRING,
                 long_term=LongTermMemoryConfig(
                     enabled=True,  # Enable long-term memory
+                    app_id="web-chat-v1",  # Your app identifier, prevents data mixing
                     # provider="postgres",
                     # connection_string=DB_CONNECTION_STRING,
                     # Enable vector indexing for better memory search
