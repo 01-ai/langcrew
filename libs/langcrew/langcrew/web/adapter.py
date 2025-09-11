@@ -154,7 +154,10 @@ class LangGraphAdapter:
     # ============ CORE EXECUTION LOGIC ============
 
     def _build_config(
-        self, session_id: str, user_id: str | None = None, config: RunnableConfig | None = None
+        self,
+        session_id: str,
+        user_id: str | None = None,
+        config: RunnableConfig | None = None,
     ) -> RunnableConfig:
         """Build RunnableConfig for LangGraph execution.
 
@@ -236,7 +239,9 @@ class LangGraphAdapter:
 
             # Prepare input data and configuration
             input_data = self._prepare_input(task_input)
-            config = self._build_config(task_input.session_id, task_input.user_id, config)
+            config = self._build_config(
+                task_input.session_id, task_input.user_id, config
+            )
 
             # ============ 2. EVENT PROCESSING LOOP ============
             async for event in self.executor.astream_events(
@@ -262,7 +267,11 @@ class LangGraphAdapter:
                 # -------- 2.2 High Priority: Interrupts & State Updates --------
 
                 # Handle LangGraph native node interrupts
-                if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
+                if (
+                    "chunk" in event_data
+                    and event_data["chunk"] is not None
+                    and "__interrupt__" in event_data["chunk"]
+                ):
                     chunk_data = event_data.get("chunk", {})
                     interrupt_obj = chunk_data.get("__interrupt__")
 
@@ -582,8 +591,16 @@ class LangGraphAdapter:
         if not tool_name:
             return None
 
-        # Skip special tools (business logic, not content judgment)
-        if tool_name in ["message_to_user", "user_input"]:
+        # Skip special tools (business logic, not content judgment) and memory tools
+        if tool_name in [
+            "message_to_user",
+            "user_input",
+            # Memory tools
+            "manage_user_memory",
+            "search_user_memory",
+            "manage_app_memory",
+            "search_app_memory",
+        ]:
             return None
 
         tool_input = event.get("data", {}).get("input", {})
@@ -619,7 +636,14 @@ class LangGraphAdapter:
     ) -> StreamMessage | None:
         """Handle tool completion events."""
         tool_name = event.get("name")
-        if not tool_name or tool_name in ["user_input"]:
+        if not tool_name or tool_name in [
+            "user_input",
+            # Memory tools
+            "manage_user_memory",
+            "search_user_memory",
+            "manage_app_memory",
+            "search_app_memory",
+        ]:
             return None
 
         tool_input = event.get("data", {}).get("input", {}) or {}
