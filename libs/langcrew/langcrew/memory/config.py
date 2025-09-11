@@ -117,28 +117,34 @@ class ShortTermMemoryConfig:
 class LongTermMemoryConfig:
     """Long-term memory configuration (cross-session learning)
 
-    🚀 QUICK START - 3 Common Configurations:
+    🚀 QUICK START - 4 Common Configurations:
 
-    1. SIMPLE (User memory only):
+    1. DEVELOPMENT (Basic user memory, no app isolation):
         LongTermMemoryConfig(
-            enabled=True,
-            app_id="my-app-dev"  # REQUIRED! Your app identifier, prevents data mixing
+            enabled=True
+            # app_id is optional but RECOMMENDED for production
         )
 
-    2. PRODUCTION (User memory with semantic search):
+    2. SIMPLE (User memory with app isolation):
         LongTermMemoryConfig(
             enabled=True,
-            app_id="my-app-prod",  # REQUIRED! Your app identifier, prevents data mixing
+            app_id="my-app-dev"  # RECOMMENDED! Your app identifier, prevents data mixing
+        )
+
+    3. PRODUCTION (User memory with semantic search):
+        LongTermMemoryConfig(
+            enabled=True,
+            app_id="my-app-prod",  # RECOMMENDED! Your app identifier, prevents data mixing
             index=IndexConfig(
                 dims=1536,
                 embed="openai:text-embedding-3-small"
             )
         )
 
-    3. MULTI-TENANT (User memory with experimental app insights):
+    4. MULTI-TENANT (User memory with experimental app insights):
         LongTermMemoryConfig(
             enabled=True,
-            app_id="saas-app-v1",  # REQUIRED! Your app identifier, prevents data mixing
+            app_id="saas-app-v1",  # RECOMMENDED! Your app identifier, prevents data mixing
             app_memory=MemoryScopeConfig(enabled=True),  # ⚠️ EXPERIMENTAL: Shared insights
             index=IndexConfig(
                 dims=1536,
@@ -148,7 +154,7 @@ class LongTermMemoryConfig:
 
     PARAMETERS:
         enabled: Enable/disable long-term memory
-        app_id: Your application identifier (REQUIRED when enabled=True)
+        app_id: Your application identifier (OPTIONAL but RECOMMENDED for production)
         index: Vector search config (None = no semantic search)
         user_memory: User-specific memories (enabled by default)
         app_memory: Application-wide shared memories (disabled by default)
@@ -161,14 +167,15 @@ class LongTermMemoryConfig:
         - app_memory: ⚠️ EXPERIMENTAL - Shared application insights across all users (disabled by default)
 
     IMPORTANT:
-        - app_id is REQUIRED when long-term memory is enabled
-        - app_id prevents data mixing between different applications
+        - app_id is OPTIONAL but STRONGLY RECOMMENDED for production use
+        - app_id prevents data mixing between different applications in shared databases
         - Use unique app_id like "my-app-v1", "chatbot-prod", etc.
+        - Without app_id, memories lack application-level namespace isolation
 
     DATA ISOLATION:
-        - User memories: ("user_memories", app_id, "{user_id}")
-        - App memories: ("app_memories", app_id)
-        - Complete isolation: App A's user "123" != App B's user "123"
+        - With app_id: User memories: ("user_memories", app_id, "{user_id}"), App memories: ("app_memories", app_id)
+        - Without app_id: User memories: ("user_memories", "{user_id}"), App memories: ("app_memories",)
+        - Complete isolation: App A's user "123" != App B's user "123" (only when app_id is set)
     """
 
     enabled: bool = False
@@ -177,6 +184,8 @@ class LongTermMemoryConfig:
 
     # Index configuration - None by default to avoid external dependencies
     index: IndexConfig | None = None
+
+    app_id: str | None = None
 
     # Memory scope configurations with default instructions
     user_memory: MemoryScopeConfig = field(
@@ -227,30 +236,13 @@ class LongTermMemoryConfig:
             "Monitor usage to ensure it only accesses application-level insights, not personal data.",
         )
     )
-    app_id: str | None = None
 
     # Search tool configuration
     search_response_format: str = "content"
 
     def __post_init__(self):
-        # Validate app_id requirements
-        if (
-            self.enabled
-            and (self.user_memory.enabled or self.app_memory.enabled)
-            and not self.app_id
-        ):
-            memory_types = []
-            if self.user_memory.enabled:
-                memory_types.append("user_memory")
-            if self.app_memory.enabled:
-                memory_types.append("app_memory")
-
-            raise ValueError(
-                f"{' and '.join(memory_types)}.enabled=True requires app_id. "
-                "app_id is used to isolate memories from different applications "
-                "in shared databases. Set app_id to a unique identifier for your application "
-                "(e.g., 'my-app-v1', 'chatbot-prod', etc.)"
-            )
+        # Note: app_id is now optional but recommended for production use
+        # When app_id is not provided, memories won't have app-level namespace isolation
 
         # Validate app_id format (basic validation)
         if self.app_id and not isinstance(self.app_id, str):
@@ -287,13 +279,21 @@ class MemoryConfig:
             long_term=LongTermMemoryConfig(enabled=True)
         )
 
-        # Multi-application shared database
+        # Development: Basic setup without app isolation
+        MemoryConfig(
+            provider="sqlite",
+            connection_string="sqlite:///memory.db",
+            long_term=LongTermMemoryConfig(enabled=True)
+            # No app_id: memories stored without app-level namespace
+        )
+
+        # Multi-application shared database with isolation
         MemoryConfig(
             provider="postgres",
             connection_string="postgresql://user:pass@localhost/db",
             long_term=LongTermMemoryConfig(
                 enabled=True,
-                app_id="my-app-v1",  # Isolates ALL memories (user + app)
+                app_id="my-app-v1",  # RECOMMENDED: Isolates ALL memories (user + app)
                 app_memory=MemoryScopeConfig(enabled=True),
                 index=IndexConfig(
                     dims=1536,
@@ -310,7 +310,7 @@ class MemoryConfig:
                 enabled=True,
                 app_id="other-app-v2",  # Different app_id = completely isolated
                 app_memory=MemoryScopeConfig(enabled=True)
-                # Even if both apps have user "alice", their memories are separate:
+                # With app_id, user "alice" memories are separate between apps:
                 # App 1: ("user_memories", "my-app-v1", "alice")
                 # App 2: ("user_memories", "other-app-v2", "alice")
             )

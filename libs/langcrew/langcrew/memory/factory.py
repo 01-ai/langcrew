@@ -6,98 +6,6 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 
 
-def get_store(
-    provider: str | None = None,
-    config: dict[str, Any] | None = None,
-    is_async: bool = False,
-) -> BaseStore:
-    """Get store instance for data persistence"""
-    config = config or {}
-    conn_str = config.get("connection_string", "")
-    index = config.get("index")
-
-    if not provider or provider == "memory":
-        return None
-        from langgraph.store.memory import InMemoryStore
-
-        class InMemoryStoreWithContext(InMemoryStore):
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-        return InMemoryStoreWithContext(index=index)
-
-    # PostgreSQL storage
-    elif provider == "postgres":
-        if not conn_str:
-            raise ValueError("PostgreSQL storage requires connection_string in config")
-        try:
-            if is_async:
-                from langgraph.store.postgres.aio import AsyncPostgresStore
-
-                return AsyncPostgresStore.from_conn_string(conn_str, index=index)
-            else:
-                from langgraph.store.postgres import PostgresStore
-
-                return PostgresStore.from_conn_string(conn_str, index=index)
-        except ImportError:
-            raise ImportError("PostgreSQL support requires additional package")
-
-    # Redis storage
-    elif provider == "redis":
-        if not conn_str:
-            raise ValueError("Redis storage requires connection_string in config")
-        try:
-            if is_async:
-                from langgraph.store.redis.aio import AsyncRedisStore
-
-                return AsyncRedisStore.from_conn_string(conn_str, index=index)
-            else:
-                from langgraph.store.redis import RedisStore
-
-                return RedisStore.from_conn_string(conn_str, index=index)
-        except ImportError:
-            raise ImportError("Redis support requires additional package")
-
-    # SQLite storage
-    elif provider == "sqlite":
-        if not conn_str:
-            raise ValueError("SQLite storage requires connection_string in config")
-        try:
-            if is_async:
-                from langgraph.store.sqlite.aio import AsyncSqliteStore
-
-                return AsyncSqliteStore.from_conn_string(conn_str, index=index)
-            else:
-                from langgraph.store.sqlite import SqliteStore
-
-                return SqliteStore.from_conn_string(conn_str, index=index)
-        except ImportError:
-            raise ImportError("SQLite support requires additional package")
-
-    # MongoDB storage
-    elif provider == "mongodb":
-        if not conn_str:
-            raise ValueError("MongoDB storage requires connection_string in config")
-        try:
-            from langgraph.store.mongodb import MongoDBStore
-
-            return MongoDBStore.from_conn_string(conn_str, index=index)
-        except ImportError:
-            raise ImportError("MongoDB support requires additional package")
-
-    else:
-        raise ValueError(f"Unsupported storage provider: {provider}")
-
-
 def get_checkpointer(
     provider: str | None = None,
     config: dict[str, Any] | None = None,
@@ -110,9 +18,10 @@ def get_checkpointer(
     if not provider or provider == "memory":
         # InMemorySaver works for both sync/async, wrap it for consistent interface
         from langgraph.checkpoint.memory import InMemorySaver
+        from contextlib import nullcontext
 
         checkpointer = InMemorySaver()
-        return checkpointer  # InMemorySaver already supports context managers
+        return nullcontext(checkpointer)
 
     # PostgreSQL checkpointer
     elif provider == "postgres":
@@ -185,3 +94,83 @@ def get_checkpointer(
 
     else:
         raise ValueError(f"Unsupported checkpointer provider: {provider}")
+
+
+def get_store(
+    provider: str | None = None,
+    config: dict[str, Any] | None = None,
+    is_async: bool = False,
+) -> BaseStore:
+    """Get store instance for data persistence"""
+    config = config or {}
+    conn_str = config.get("connection_string", "")
+    index = config.get("index")
+
+    if not provider or provider == "memory":
+        from langgraph.store.memory import InMemoryStore
+        from contextlib import nullcontext
+
+        store = InMemoryStore(index=index)
+        return nullcontext(store)
+
+    # PostgreSQL storage
+    elif provider == "postgres":
+        if not conn_str:
+            raise ValueError("PostgreSQL storage requires connection_string in config")
+        try:
+            if is_async:
+                from langgraph.store.postgres.aio import AsyncPostgresStore
+
+                return AsyncPostgresStore.from_conn_string(conn_str, index=index)
+            else:
+                from langgraph.store.postgres import PostgresStore
+
+                return PostgresStore.from_conn_string(conn_str, index=index)
+        except ImportError:
+            raise ImportError("PostgreSQL support requires additional package")
+
+    # Redis storage
+    elif provider == "redis":
+        if not conn_str:
+            raise ValueError("Redis storage requires connection_string in config")
+        try:
+            if is_async:
+                from langgraph.store.redis.aio import AsyncRedisStore
+
+                return AsyncRedisStore.from_conn_string(conn_str, index=index)
+            else:
+                from langgraph.store.redis import RedisStore
+
+                return RedisStore.from_conn_string(conn_str, index=index)
+        except ImportError:
+            raise ImportError("Redis support requires additional package")
+
+    # SQLite storage
+    elif provider == "sqlite":
+        if not conn_str:
+            raise ValueError("SQLite storage requires connection_string in config")
+        try:
+            if is_async:
+                from langgraph.store.sqlite.aio import AsyncSqliteStore
+
+                return AsyncSqliteStore.from_conn_string(conn_str, index=index)
+            else:
+                from langgraph.store.sqlite import SqliteStore
+
+                return SqliteStore.from_conn_string(conn_str, index=index)
+        except ImportError:
+            raise ImportError("SQLite support requires additional package")
+
+    # MongoDB storage
+    elif provider == "mongodb":
+        if not conn_str:
+            raise ValueError("MongoDB storage requires connection_string in config")
+        try:
+            from langgraph.store.mongodb import MongoDBStore
+
+            return MongoDBStore.from_conn_string(conn_str, index=index)
+        except ImportError:
+            raise ImportError("MongoDB support requires additional package")
+
+    else:
+        raise ValueError(f"Unsupported storage provider: {provider}")

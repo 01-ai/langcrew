@@ -826,12 +826,14 @@ class Crew:
     async def _execute_with_memory_context_async(self, execution_func):
         """Execute function with proper async memory context management"""
         from .memory.context import MemoryContextManager
+
         context_manager = MemoryContextManager(self.memory_config)
         return await context_manager.execute_async(execution_func)
 
     async def _execute_with_memory_context_generator_async(self, execution_func):
         """Execute async generator function with proper memory context management"""
         from .memory.context import MemoryContextManager
+
         context_manager = MemoryContextManager(self.memory_config)
         async for item in context_manager.execute_async_generator(execution_func):
             yield item
@@ -839,12 +841,14 @@ class Crew:
     def _execute_with_memory_context(self, execution_func):
         """Execute function with proper sync memory context management"""
         from .memory.context import MemoryContextManager
+
         context_manager = MemoryContextManager(self.memory_config)
         return context_manager.execute_sync(execution_func)
 
     def _execute_with_memory_context_generator(self, execution_func):
         """Execute sync generator function with proper memory context management"""
         from .memory.context import MemoryContextManager
+
         context_manager = MemoryContextManager(self.memory_config)
         yield from context_manager.execute_sync_generator(execution_func)
 
