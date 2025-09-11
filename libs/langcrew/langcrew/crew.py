@@ -19,6 +19,7 @@ from langgraph_supervisor.handoff import create_handoff_tool
 from .agent import Agent
 from .hitl import HITLConfig
 from .memory import MemoryConfig
+from .memory.context import MemoryContextManager
 
 from .task import Task
 from .types import CrewState
@@ -58,7 +59,10 @@ class Crew:
             # memory is MemoryConfig instance or None
             self.memory_config = memory
 
-        # Memory will be setup dynamically when needed
+        self._memory_manager = MemoryContextManager(self.memory_config)
+
+        # Setup agents memory configuration
+        self._setup_agents_memory()
 
         # HITL configuration
         if hitl is None:
@@ -76,9 +80,6 @@ class Crew:
 
         if self.graph is None and not self.tasks and not self.agents:
             raise ValueError("Either tasks, agents, or graph must be provided")
-
-        # Setup agents memory configuration
-        self._setup_agents_memory()
 
         # Setup handoff if needed (automatically detect based on agent configuration)
         self._setup_handoff_if_needed()
@@ -823,35 +824,6 @@ class Crew:
         else:
             raise ValueError("No tasks or agents provided to build graph")
 
-    async def _execute_with_memory_context_async(self, execution_func):
-        """Execute function with proper async memory context management"""
-        from .memory.context import MemoryContextManager
-
-        context_manager = MemoryContextManager(self.memory_config)
-        return await context_manager.execute_async(execution_func)
-
-    async def _execute_with_memory_context_generator_async(self, execution_func):
-        """Execute async generator function with proper memory context management"""
-        from .memory.context import MemoryContextManager
-
-        context_manager = MemoryContextManager(self.memory_config)
-        async for item in context_manager.execute_async_generator(execution_func):
-            yield item
-
-    def _execute_with_memory_context(self, execution_func):
-        """Execute function with proper sync memory context management"""
-        from .memory.context import MemoryContextManager
-
-        context_manager = MemoryContextManager(self.memory_config)
-        return context_manager.execute_sync(execution_func)
-
-    def _execute_with_memory_context_generator(self, execution_func):
-        """Execute sync generator function with proper memory context management"""
-        from .memory.context import MemoryContextManager
-
-        context_manager = MemoryContextManager(self.memory_config)
-        yield from context_manager.execute_sync_generator(execution_func)
-
     def _setup_agents_memory(self):
         """Setup memory configuration for agents"""
         if self.memory_config is None:
@@ -907,7 +879,7 @@ class Crew:
                 **kwargs,
             )
 
-        return self._execute_with_memory_context(execute_with_memory)
+        return self._memory_manager.execute_sync(execute_with_memory)
 
     async def ainvoke(
         self,
@@ -946,7 +918,7 @@ class Crew:
                 **kwargs,
             )
 
-        return await self._execute_with_memory_context_async(execute_with_memory)
+        return await self._memory_manager.execute_async(execute_with_memory)
 
     def stream(
         self,
@@ -997,7 +969,7 @@ class Crew:
                 **kwargs,
             )
 
-        yield from self._execute_with_memory_context_generator(execute_with_memory)
+        yield from self._memory_manager.execute_sync_generator(execute_with_memory)
 
     async def astream(
         self,
@@ -1049,7 +1021,7 @@ class Crew:
             ):
                 yield chunk
 
-        async for chunk in self._execute_with_memory_context_generator_async(
+        async for chunk in self._memory_manager.execute_async_generator(
             execute_with_memory
         ):
             yield chunk
@@ -1137,7 +1109,7 @@ class Crew:
             ):
                 yield event
 
-        async for event in self._execute_with_memory_context_generator_async(
+        async for event in self._memory_manager.execute_async_generator(
             execute_with_memory
         ):
             yield event

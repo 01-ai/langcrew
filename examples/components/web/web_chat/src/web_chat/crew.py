@@ -126,31 +126,24 @@ class WebChatCrew:
         """Create and configure the crew"""
         from urllib.parse import quote_plus
 
-        # Database configuration
-        DB_PASSWORD = "v%WSJc+9uzj5r_Z"
-        DB_PASSWORD_ENCODED = quote_plus(DB_PASSWORD)
-        DB_CONNECTION_STRING = f"postgresql://appdevhub_rw:{DB_PASSWORD_ENCODED}@pgm-uf6i95ox5p3utovu.pg.rds.aliyuncs.com:5432/appdevhub-dev"
-
         return Crew(
             agents=[self.chat_agent()],
             tasks=[self.chat_task()],
             # process=Process.sequential,  # Default in langcrew
             verbose=True,
             memory=MemoryConfig(
-                # provider="memory",  # Use in-memory provider
-                provider="postgres",
-                connection_string=DB_CONNECTION_STRING,
-                long_term=LongTermMemoryConfig(
-                    enabled=True,  # Enable long-term memory
-                    app_id="web-chat-v1",  # Your app identifier, prevents data mixing
-                    # provider="postgres",
-                    # connection_string=DB_CONNECTION_STRING,
-                    # Enable vector indexing for better memory search
-                    # index=IndexConfig(
-                    #     dims=1536,  # OpenAI text-embedding-3-small dimensions
-                    #     embed="openai:text-embedding-3-small",  # Embedding model
-                    # ),
-                ),
+                provider="memory",  # Use in-memory provider
+                # provider="postgres",
+                # connection_string="your_connection_string",
+                # long_term=LongTermMemoryConfig(
+                #     enabled=True,  # Enable long-term memory
+                #     app_id="web-chat-v1",  # Your app identifier, prevents data mixing
+                #     # Enable vector indexing for better memory search
+                #     index=IndexConfig(
+                #         dims=1536,  # OpenAI text-embedding-3-small dimensions
+                #         embed="openai:text-embedding-3-small",  # Embedding model
+                #     ),
+                # ),
             ),  # Enable conversation memory and long-term memory
             # max_rpm=10,  # Rate limiting will be handled differently in langcrew
         )

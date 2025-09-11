@@ -16,12 +16,10 @@ def get_checkpointer(
     conn_str = config.get("connection_string", "")
 
     if not provider or provider == "memory":
-        # InMemorySaver works for both sync/async, wrap it for consistent interface
+        # Memory provider: return instance directly for reuse
         from langgraph.checkpoint.memory import InMemorySaver
-        from contextlib import nullcontext
 
-        checkpointer = InMemorySaver()
-        return nullcontext(checkpointer)
+        return InMemorySaver()
 
     # PostgreSQL checkpointer
     elif provider == "postgres":
@@ -107,11 +105,10 @@ def get_store(
     index = config.get("index")
 
     if not provider or provider == "memory":
+        # Memory provider: return instance directly for reuse
         from langgraph.store.memory import InMemoryStore
-        from contextlib import nullcontext
 
-        store = InMemoryStore(index=index)
-        return nullcontext(store)
+        return InMemoryStore(index=index)
 
     # PostgreSQL storage
     elif provider == "postgres":
