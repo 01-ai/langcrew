@@ -119,11 +119,9 @@ class AdapterServer:
                         yield self.adapter._format_sse_message(init_message)
 
                     # Create task input
-                    # TEMPORARY: Use fixed user_id for testing long memory
-                    test_user_id = request.user_id or "test_user_123"
                     task_input = TaskInput(
                         session_id=session_id,
-                        user_id=test_user_id,  # Use test user_id if not provided
+                        user_id=request.user_id,
                         message=request.message,
                         language=request.language,
                         interrupt_data=request.interrupt_data,
