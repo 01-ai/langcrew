@@ -5,7 +5,8 @@ with direct integration of LangMem for long-term memory capabilities.
 """
 
 from .config import MemoryConfig, MemoryScopeConfig, ShortTermMemoryConfig, LongTermMemoryConfig, IndexConfig
-from .factory import get_checkpointer, get_storage
+from .factory import get_checkpointer, get_store
+from .context import MemoryContextManager
 
 __all__ = [
     "MemoryConfig",
@@ -13,6 +14,7 @@ __all__ = [
     "ShortTermMemoryConfig",
     "LongTermMemoryConfig",
     "IndexConfig",
-    "get_storage",
+    "get_store",
     "get_checkpointer",
+    "MemoryContextManager",
 ]

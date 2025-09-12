@@ -71,7 +71,6 @@ class TestAgent:
             memory=memory_config,
         )
 
-        assert agent.memory is True
         assert agent.memory_config is not None
 
     def test_agent_initialization_with_mcp(self, mock_llm):
