@@ -11,7 +11,7 @@ import mimetypes
 import os
 from typing import Any, Final
 
-from e2b import AsyncSandbox
+from agentbox import AsyncSandbox
 
 from ..s3 import AsyncS3Client
 

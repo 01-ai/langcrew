@@ -1,8 +1,8 @@
 import asyncio
 import re
 
+from agentbox import AsyncSandbox
 from bs4 import BeautifulSoup
-from e2b import AsyncSandbox
 
 from ..utils.s3.base_s3_client import AsyncS3Client
 from ..utils.sandbox import sandbox_s3_toolkit

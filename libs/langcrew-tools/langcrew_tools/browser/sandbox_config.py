@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from e2b import AsyncSandbox
+from agentbox import AsyncSandbox
 
 logger = logging.getLogger(__name__)
 

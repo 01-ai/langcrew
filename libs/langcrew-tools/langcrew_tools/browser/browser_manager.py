@@ -10,8 +10,8 @@ import logging
 import time
 
 import httpx
+from agentbox import AsyncSandbox
 from browser_use import BrowserProfile, BrowserSession
-from e2b import AsyncSandbox
 
 from .sandbox_config import SandboxConfig
 

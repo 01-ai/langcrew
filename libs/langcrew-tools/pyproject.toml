@@ -42,9 +42,6 @@ dependencies = [
     # Browser automation
     "browser-use==0.5.5",
     # Execution environments
-    "e2b==1.2.0b6",
-    "e2b-desktop==1.7.1b2",
-    # Agent frameworks
     "agentbox-python-sdk>=0.2.7",
     "playwright==1.54.0",
     "pytest-dotenv>=0.5.2",
