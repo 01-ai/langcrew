@@ -509,7 +509,7 @@ class LangGraphAdapter:
         full_content = ""
         tool_calls = []
         usage_metadata = {}
-        response_metadata = {}
+        # response_metadata = {}
 
         # Extract complete information if output exists
         if output:
@@ -520,8 +520,8 @@ class LangGraphAdapter:
             if hasattr(message, "usage_metadata") and message.usage_metadata:
                 usage_metadata = message.usage_metadata
 
-            if hasattr(message, "response_metadata") and message.response_metadata:
-                response_metadata = message.response_metadata
+            # if hasattr(message, "response_metadata") and message.response_metadata:
+            #     response_metadata = message.response_metadata
 
         # Build detail with essential information
         detail = {
@@ -536,8 +536,8 @@ class LangGraphAdapter:
         if usage_metadata:
             detail["usage"] = usage_metadata
 
-        if response_metadata:
-            detail["response_metadata"] = response_metadata
+        # if response_metadata:
+        #     detail["response_metadata"] = response_metadata
 
         detail = self._enhance_detail_with_metadata(event, detail)
 
