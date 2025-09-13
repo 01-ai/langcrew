@@ -153,7 +153,10 @@ class LangGraphAdapter:
     # ============ CORE EXECUTION LOGIC ============
 
     def _build_config(
-        self, session_id: str, user_id: str | None = None, config: RunnableConfig | None = None
+        self,
+        session_id: str,
+        user_id: str | None = None,
+        config: RunnableConfig | None = None,
     ) -> RunnableConfig:
         """Build RunnableConfig for LangGraph execution.
 
@@ -235,7 +238,9 @@ class LangGraphAdapter:
 
             # Prepare input data and configuration
             input_data = self._prepare_input(task_input)
-            config = self._build_config(task_input.session_id, task_input.user_id, config)
+            config = self._build_config(
+                task_input.session_id, task_input.user_id, config
+            )
 
             # ============ 2. EVENT PROCESSING LOOP ============
             async for event in self.executor.astream_events(
@@ -507,7 +512,7 @@ class LangGraphAdapter:
         full_content = ""
         tool_calls = []
         usage_metadata = {}
-        response_metadata = {}
+        # response_metadata = {}
 
         # Extract complete information if output exists
         if output:
@@ -518,8 +523,8 @@ class LangGraphAdapter:
             if hasattr(message, "usage_metadata") and message.usage_metadata:
                 usage_metadata = message.usage_metadata
 
-            if hasattr(message, "response_metadata") and message.response_metadata:
-                response_metadata = message.response_metadata
+            # if hasattr(message, "response_metadata") and message.response_metadata:
+            #     response_metadata = message.response_metadata
 
         # Build detail with essential information
         detail = {
@@ -534,8 +539,8 @@ class LangGraphAdapter:
         if usage_metadata:
             detail["usage"] = usage_metadata
 
-        if response_metadata:
-            detail["response_metadata"] = response_metadata
+        # if response_metadata:
+        #     detail["response_metadata"] = response_metadata
 
         detail = self._enhance_detail_with_metadata(event, detail)
 
@@ -589,8 +594,16 @@ class LangGraphAdapter:
         if not tool_name:
             return None
 
-        # Skip special tools (business logic, not content judgment)
-        if tool_name in ["message_to_user", "user_input"]:
+        # Skip special tools (business logic, not content judgment) and memory tools
+        if tool_name in [
+            "message_to_user",
+            "user_input",
+            # Memory tools
+            "manage_user_memory",
+            "search_user_memory",
+            "manage_app_memory",
+            "search_app_memory",
+        ]:
             return None
 
         tool_input = event.get("data", {}).get("input", {})
@@ -630,8 +643,15 @@ class LangGraphAdapter:
     ) -> StreamMessage | None:
         """Handle tool completion events."""
         tool_name = event.get("name")
-        # Skip user_input and plan tools
-        if not tool_name or tool_name in ["user_input", "plan"]:
+        if not tool_name or tool_name in [
+            "user_input",
+            "plan",
+            # Memory tools
+            "manage_user_memory",
+            "search_user_memory",
+            "manage_app_memory",
+            "search_app_memory",
+        ]:
             return None
 
         tool_input = event.get("data", {}).get("input", {}) or {}

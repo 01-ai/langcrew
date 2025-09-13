@@ -7,27 +7,51 @@ from typing import Any
 
 @dataclass
 class IndexConfig:
-    """Configuration for vector indexing in storage"""
+    """Configuration for vector indexing in storage
 
-    # Embedding configuration
+    Args:
+        dims: Embedding dimensions (e.g., 1536 for OpenAI, 1024 for Anthropic)
+        embed: Embedding provider string or callable (e.g., "openai:text-embedding-3-small")
+        extra_config: Storage-specific configurations like fields, distance_strategy, etc.
+
+    Examples:
+        # Basic configuration without embedding (no vector search)
+        IndexConfig()
+
+        # With OpenAI embedding
+        IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small"
+        )
+
+        # With Anthropic embedding
+        IndexConfig(
+            dims=1024,
+            embed="anthropic:voyage-3"
+        )
+
+        # With storage-specific configurations
+        IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small",
+            extra_config={
+                "fields": ["content"],
+                "distance_strategy": "euclidean"
+            }
+        )
+    """
+
+    # Embedding configuration - None by default to avoid external dependencies
     dims: int | None = None
     embed: str | Callable | None = None
 
-    # Field configuration for indexing
-    fields: list[str] | None = None
-
-    # Additional index parameters
-    distance_strategy: str = "cosine"  # cosine, euclidean, dot_product
+    # Storage-specific configurations (e.g., fields, distance_strategy, etc.)
+    extra_config: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         # Validate dims
         if self.dims is not None and self.dims <= 0:
             raise ValueError("dims must be a positive integer")
-
-        # Validate distance strategy
-        valid_strategies = {"cosine", "euclidean", "dot_product"}
-        if self.distance_strategy not in valid_strategies:
-            raise ValueError(f"distance_strategy must be one of {valid_strategies}")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage initialization"""
@@ -36,39 +60,53 @@ class IndexConfig:
             config["dims"] = self.dims
         if self.embed is not None:
             config["embed"] = self.embed
-        if self.fields is not None:
-            config["fields"] = self.fields
-        if self.distance_strategy != "cosine":
-            config["distance_strategy"] = self.distance_strategy
+
+        # Merge storage-specific configurations
+        config.update(self.extra_config)
         return config
 
 
 @dataclass
 class MemoryScopeConfig:
-    """Memory scope configuration for user/app memory dimensions"""
+    """Memory scope configuration for user/app memory dimensions
+
+    Args:
+        enabled: Whether this memory scope is enabled
+        manage_instructions: Instructions for when to use the memory management tool
+        search_instructions: Instructions for when to use the memory search tool
+        schema: Data schema for memory content validation (default: str)
+        actions_permitted: Tuple of allowed actions ("create", "update", "delete")
+    """
 
     enabled: bool = True
     # Separate instructions for manage and search tools
     manage_instructions: str = ""
     search_instructions: str = ""
     schema: type = str
-    actions: tuple = ("create", "update", "delete")
-    langmem_tool_config: dict = field(default_factory=dict)
+    actions_permitted: tuple = ("create", "update", "delete")
 
     def __post_init__(self):
-        # Validate actions
+        # Validate actions_permitted
         valid_actions = {"create", "update", "delete"}
-        if not all(action in valid_actions for action in self.actions):
-            raise ValueError(f"Invalid actions. Must be subset of {valid_actions}")
+        if not all(action in valid_actions for action in self.actions_permitted):
+            raise ValueError(
+                f"Invalid actions_permitted. Must be subset of {valid_actions}"
+            )
 
-        # Validate actions tuple not empty
-        if not self.actions:
-            raise ValueError("Actions cannot be empty")
+        # Validate actions_permitted tuple not empty
+        if not self.actions_permitted:
+            raise ValueError("actions_permitted cannot be empty")
 
 
 @dataclass
 class ShortTermMemoryConfig:
-    """Short-term memory configuration (conversation state persistence)"""
+    """Short-term memory configuration (conversation state persistence)
+
+    Args:
+        enabled: Whether short-term memory is enabled
+        provider: Storage provider override (inherits from global if None)
+        connection_string: Database connection string override (inherits from global if None)
+    """
 
     enabled: bool = True
     provider: str | None = None
@@ -77,23 +115,82 @@ class ShortTermMemoryConfig:
 
 @dataclass
 class LongTermMemoryConfig:
-    """Long-term memory configuration (cross-session learning)"""
+    """Long-term memory configuration (cross-session learning)
+
+    🚀 QUICK START - 4 Common Configurations:
+
+    1. DEVELOPMENT (Basic user memory, no app isolation):
+        LongTermMemoryConfig(
+            enabled=True
+            # app_id is optional but RECOMMENDED for production
+        )
+
+    2. SIMPLE (User memory with app isolation):
+        LongTermMemoryConfig(
+            enabled=True,
+            app_id="my-app-dev"  # RECOMMENDED! Your app identifier, prevents data mixing
+        )
+
+    3. PRODUCTION (User memory with semantic search):
+        LongTermMemoryConfig(
+            enabled=True,
+            app_id="my-app-prod",  # RECOMMENDED! Your app identifier, prevents data mixing
+            index=IndexConfig(
+                dims=1536,
+                embed="openai:text-embedding-3-small"
+            )
+        )
+
+    4. MULTI-TENANT (User memory with experimental app insights):
+        LongTermMemoryConfig(
+            enabled=True,
+            app_id="saas-app-v1",  # RECOMMENDED! Your app identifier, prevents data mixing
+            app_memory=MemoryScopeConfig(enabled=True),  # ⚠️ EXPERIMENTAL: Shared insights
+            index=IndexConfig(
+                dims=1536,
+                embed="openai:text-embedding-3-small"
+            )
+        )
+
+    PARAMETERS:
+        enabled: Enable/disable long-term memory
+        app_id: Your application identifier (OPTIONAL but RECOMMENDED for production)
+        index: Vector search config (None = no semantic search)
+        user_memory: User-specific memories (enabled by default)
+        app_memory: Application-wide shared memories (disabled by default)
+        provider: Storage override (inherits from global if None)
+        connection_string: Database connection override (inherits from global if None)
+        search_response_format: Search result format ("content" or "content_and_artifact")
+
+    MEMORY TYPES:
+        - user_memory: Personal user preferences/info (enabled by default)
+        - app_memory: ⚠️ EXPERIMENTAL - Shared application insights across all users (disabled by default)
+
+    IMPORTANT:
+        - app_id is OPTIONAL but STRONGLY RECOMMENDED for production use
+        - app_id prevents data mixing between different applications in shared databases
+        - Use unique app_id like "my-app-v1", "chatbot-prod", etc.
+        - Without app_id, memories lack application-level namespace isolation
+
+    DATA ISOLATION:
+        - With app_id: User memories: ("user_memories", app_id, "{user_id}"), App memories: ("app_memories", app_id)
+        - Without app_id: User memories: ("user_memories", "{user_id}"), App memories: ("app_memories",)
+        - Complete isolation: App A's user "123" != App B's user "123" (only when app_id is set)
+    """
 
     enabled: bool = False
-    model: str = "anthropic:claude-3-5-sonnet-latest"
     provider: str | None = None
     connection_string: str | None = None
 
-    # Index configuration with sensible defaults
-    index: IndexConfig | None = field(
-        default_factory=lambda: IndexConfig(
-            dims=1536, embed="openai:text-embedding-3-small"
-        )
-    )
+    # Index configuration - None by default to avoid external dependencies
+    index: IndexConfig | None = None
+
+    app_id: str | None = None
 
     # Memory scope configurations with default instructions
     user_memory: MemoryScopeConfig = field(
         default_factory=lambda: MemoryScopeConfig(
+            enabled=True,
             manage_instructions="Proactively call this tool when you:\n\n"
             "1. Identify a new USER preference, habit, or personal information.\n"
             "2. Receive an explicit USER request to remember something or otherwise alter your behavior.\n"
@@ -110,47 +207,115 @@ class LongTermMemoryConfig:
     app_memory: MemoryScopeConfig = field(
         default_factory=lambda: MemoryScopeConfig(
             enabled=False,
-            manage_instructions="Proactively call this tool when you:\n\n"
-            "1. Learn general knowledge, best practices, or patterns that benefit all users.\n"
-            "2. Receive explicit requests to remember application-wide information.\n"
-            "3. Identify outdated or incorrect general knowledge in existing memories.\n"
-            "4. Want to record important context that applies across different users.\n\n"
-            "IMPORTANT: NEVER store user personal information, preferences, or user-specific data here.",
-            search_instructions="Proactively call this tool when you:\n\n"
-            "1. Need to recall general knowledge, best practices, or patterns that benefit all users.\n"
-            "2. Want to check if you have learned something that applies to the current situation.\n"
-            "3. Need to verify or update your understanding of general concepts.\n"
-            "4. Are looking for application-wide information or context.\n\n"
-            "IMPORTANT: This searches application-wide memories only. NEVER search here for user personal information, preferences, or user-specific data.",
+            manage_instructions="⚠️  EXPERIMENTAL FEATURE - Use with caution ⚠️\n\n"
+            "This tool stores application-wide insights that benefit all users. "
+            "It learns from user interaction patterns to make the assistant smarter over time.\n\n"
+            "Proactively call this tool when you:\n\n"
+            "1. Discover user behavior patterns that could improve assistance (e.g., 'Users often need help with X after doing Y').\n"
+            "2. Learn effective assistance strategies that work well across different users.\n"
+            "3. Identify common user pain points, confusion areas, or workflow patterns.\n"
+            "4. Record successful problem-solving approaches that benefit multiple users.\n"
+            "5. Notice application feature usage trends or optimization opportunities.\n\n"
+            "STORE APPLICATION-LEVEL INSIGHTS LIKE:\n"
+            "- 'Most users struggle with feature A, explaining B first helps'\n"
+            "- 'When users ask about X, they usually also need guidance on Y'\n"
+            "- 'Common workflow pattern: users do step 1 → step 2 → step 3'\n\n"
+            "⚠️  CRITICAL BOUNDARIES (EXPERIMENTAL - Monitor carefully):\n"
+            "- NEVER store individual user data, preferences, or personal information\n"
+            "- ONLY store aggregated insights and patterns that benefit all users\n"
+            "- Focus on improving application-wide assistance effectiveness\n"
+            "- This feature is experimental and should be monitored for appropriate usage",
+            search_instructions="⚠️  EXPERIMENTAL FEATURE - Use with caution ⚠️\n\n"
+            "This searches application-wide insights to help you assist users more effectively.\n\n"
+            "Proactively call this tool when you:\n\n"
+            "1. Encountering a user situation that might have common patterns or proven solutions.\n"
+            "2. Looking for effective assistance strategies for similar scenarios.\n"
+            "3. Needing insights about typical user workflows or expectations.\n"
+            "4. Wanting to provide better help based on accumulated application knowledge.\n\n"
+            "⚠️  EXPERIMENTAL: This feature learns from user patterns to improve assistance. "
+            "Monitor usage to ensure it only accesses application-level insights, not personal data.",
         )
     )
-    app_id: str | None = None
 
     # Search tool configuration
     search_response_format: str = "content"
 
     def __post_init__(self):
-        # Validate app_memory requires app_id
-        if self.enabled and self.app_memory.enabled and not self.app_id:
-            raise ValueError("app_memory.enabled=True requires app_id")
+        # Note: app_id is now optional but recommended for production use
+        # When app_id is not provided, memories won't have app-level namespace isolation
 
         # Validate app_id format (basic validation)
         if self.app_id and not isinstance(self.app_id, str):
             raise ValueError("app_id must be a string")
+
+        # Validate app_id not empty if provided
+        if self.app_id is not None and not self.app_id.strip():
+            raise ValueError("app_id cannot be empty string")
 
         # Validate search_response_format
         valid_formats = {"content", "content_and_artifact"}
         if self.search_response_format not in valid_formats:
             raise ValueError(f"search_response_format must be one of {valid_formats}")
 
-        # Validate model string
-        if not isinstance(self.model, str) or not self.model.strip():
-            raise ValueError("model must be a non-empty string")
-
 
 @dataclass
 class MemoryConfig:
-    """Unified memory configuration for LangCrew"""
+    """Unified memory configuration for LangCrew
+
+    Args:
+        provider: Global storage provider ("memory", "sqlite", "postgres", "redis", "mongodb", "mysql")
+        connection_string: Global database connection string
+        short_term: Short-term memory configuration (conversation history)
+        long_term: Long-term memory configuration (persistent knowledge)
+
+    Examples:
+        # Basic in-memory configuration (development)
+        MemoryConfig()
+
+        # SQLite with long-term memory
+        MemoryConfig(
+            provider="sqlite",
+            connection_string="sqlite:///memory.db",
+            long_term=LongTermMemoryConfig(enabled=True)
+        )
+
+        # Development: Basic setup without app isolation
+        MemoryConfig(
+            provider="sqlite",
+            connection_string="sqlite:///memory.db",
+            long_term=LongTermMemoryConfig(enabled=True)
+            # No app_id: memories stored without app-level namespace
+        )
+
+        # Multi-application shared database with isolation
+        MemoryConfig(
+            provider="postgres",
+            connection_string="postgresql://user:pass@localhost/db",
+            long_term=LongTermMemoryConfig(
+                enabled=True,
+                app_id="my-app-v1",  # RECOMMENDED: Isolates ALL memories (user + app)
+                app_memory=MemoryScopeConfig(enabled=True),
+                index=IndexConfig(
+                    dims=1536,
+                    embed="openai:text-embedding-3-small"
+                )
+            )
+        )
+
+        # Another app using same database (completely isolated)
+        MemoryConfig(
+            provider="postgres",
+            connection_string="postgresql://user:pass@localhost/db",
+            long_term=LongTermMemoryConfig(
+                enabled=True,
+                app_id="other-app-v2",  # Different app_id = completely isolated
+                app_memory=MemoryScopeConfig(enabled=True)
+                # With app_id, user "alice" memories are separate between apps:
+                # App 1: ("user_memories", "my-app-v1", "alice")
+                # App 2: ("user_memories", "other-app-v2", "alice")
+            )
+        )
+    """
 
     # Global storage configuration
     provider: str = "memory"  # memory, sqlite, postgres, redis, mongodb, mysql
@@ -167,6 +332,32 @@ class MemoryConfig:
     def get_long_term_provider(self) -> str:
         """Get actual provider for long-term memory"""
         return self.long_term.provider or self.provider
+
+    def to_checkpointer_config(self) -> dict[str, Any]:
+        """Convert to checkpointer configuration - only if short_term.enabled"""
+        if not self.short_term.enabled:
+            return {}
+
+        config = {}
+        if self.short_term.connection_string or self.connection_string:
+            config["connection_string"] = (
+                self.short_term.connection_string or self.connection_string
+            )
+        return config
+
+    def to_store_config(self) -> dict[str, Any]:
+        """Convert to store configuration - only if long_term.enabled"""
+        if not self.long_term.enabled:
+            return {}
+
+        config = {}
+        if self.long_term.connection_string or self.connection_string:
+            config["connection_string"] = (
+                self.long_term.connection_string or self.connection_string
+            )
+        if self.long_term.index:
+            config["index"] = self.long_term.index.to_dict()
+        return config
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "MemoryConfig":

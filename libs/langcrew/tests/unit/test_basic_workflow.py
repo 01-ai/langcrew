@@ -350,7 +350,7 @@ class TestWorkflowConfiguration:
         assert len(crew.agents) == 1
         assert len(crew.tasks) == 1
         assert crew.verbose is True
-        assert crew.memory is False
+        assert crew.memory_config is None
 
 
 class TestWorkflowValidation:
