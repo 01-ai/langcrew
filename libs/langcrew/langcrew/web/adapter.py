@@ -10,12 +10,13 @@ Key Features:
 - Comprehensive event handling with proper cleanup
 """
 
+import json
 import logging
 import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
@@ -663,6 +664,15 @@ class LangGraphAdapter:
             "result": output,
             "status": ToolResult.SUCCESS,
         }
+
+        # Special handling for agent_result_delivery tool
+        if tool_name == "agent_result_delivery":
+            result_message = self._handle_agent_result_delivery(
+                detail, output, session_id, task_id
+            )
+            if result_message:
+                return result_message
+
         detail = self._enhance_detail_with_metadata(event, detail)
 
         return StreamMessage(
@@ -1098,3 +1108,80 @@ class LangGraphAdapter:
             session_id=session_id,
             task_id=task_id,
         )
+
+    def _handle_agent_result_delivery(
+        self, detail: dict[str, Any], output: Any, session_id: str, task_id: str
+    ) -> StreamMessage | None:
+        """Handle special processing for agent_result_delivery tool output.
+
+        Extracts attachments from result.content and moves them to the same level as result,
+        while removing the content field from result.
+
+        Args:
+            detail: The detail dictionary to modify
+            output: The tool output data
+            session_id: Current session identifier
+            task_id: Current task identifier
+
+        Returns:
+            A StreamMessage with processed agent result data or None if processing fails
+        """
+        try:
+            # Check if output has the expected structure
+            if not isinstance(output, ToolMessage) or not hasattr(output, "content"):
+                logger.info(
+                    "agent_result_delivery output missing expected structure, skipping special processing"
+                )
+                return None
+
+            content_str = output.content
+            if not isinstance(content_str, str):
+                logger.info(
+                    "agent_result_delivery content is not a string, skipping special processing"
+                )
+                return None
+
+            content_data = json.loads(content_str)
+
+            # Extract attachments if they exist
+            if "attachments" in content_data and isinstance(
+                content_data["attachments"], list
+            ):
+                # Move attachments to same level as result
+                detail["attachments"] = content_data["attachments"]
+                logger.info(
+                    f"Extracted {len(content_data['attachments'])} attachments from agent_result_delivery"
+                )
+
+                # Create new result without content
+                new_result = output.model_dump(exclude={"content"})
+                detail["result"] = new_result
+                logger.info("Removed content field from agent_result_delivery result")
+            else:
+                logger.info("No attachments found in agent_result_delivery content")
+
+            # Enhance detail with metadata
+            detail = self._enhance_detail_with_metadata({}, detail)
+
+            # Return StreamMessage with processed data
+            return StreamMessage(
+                id=generate_message_id(),
+                type=MessageType.TOOL_RESULT,
+                content="",  # Empty content as attachments are in detail
+                detail=detail,
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+                task_id=task_id,
+            )
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON content in agent_result_delivery: {e}")
+            logger.error(f"Invalid JSON content: {output.get('content', 'N/A')}")
+            return None
+        except Exception as e:
+            logger.error(
+                f"Unexpected error processing agent_result_delivery output: {e}",
+                exc_info=True,
+            )
+            return None

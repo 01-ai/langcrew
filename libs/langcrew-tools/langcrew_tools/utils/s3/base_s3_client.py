@@ -47,7 +47,7 @@ class S3ClientMixin(BaseModel):
 
     def __del__(self):
         if self._s3_client:
-            run_async_func_no_wait(self._s3_client.close())
+            run_async_func_no_wait(self._s3_client.close)
 
 
 async def none_s3_client():

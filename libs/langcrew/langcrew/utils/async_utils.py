@@ -202,9 +202,9 @@ class AstreamEventTaskWrapper:
                 except asyncio.CancelledError:
                     break
         finally:
-            logger.info(
-                f"session {self._thread_id} stream_event_result finally {final_result}"
-            )
+            # logger.info(
+            #     f"session {self._thread_id} stream_event_result finally {final_result}"
+            # )
             self._event_queue_task.done_use_future(False)
             # Clean up tasks
             if not self._external_completion_future.done():
@@ -331,7 +331,6 @@ class AsyncBridge:
         except Exception as e:
             logger.error(f"Failed to execute async task: {e}")
             return None
-
     def run_async_func_no_wait(
         self, async_func: Callable[..., Awaitable[Any]], *args, **kwargs
     ) -> None:
@@ -347,7 +346,7 @@ class AsyncBridge:
             coro = async_func(*args, **kwargs)
             self.run_async_no_wait(coro)
         except Exception as e:
-            logger.error(f"Failed to create coroutine: {e}")
+            logger.error(f"Failed to create coroutine: {e}", exc_info=True)
 
     def run_async_func_wait(
         self,
@@ -372,7 +371,7 @@ class AsyncBridge:
             coro = async_func(*args, **kwargs)
             return self.run_async_wait(coro, timeout)
         except Exception as e:
-            logger.error(f"Failed to create coroutine: {e}")
+            logger.error(f"Failed to create coroutine: {e}", exc_info=True)
             return None
 
     def shutdown(self):

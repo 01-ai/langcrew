@@ -531,7 +531,7 @@ class StreamingBaseTool(ToolCallback):
             raise e
 
         if final_event_data is not None:
-            logger.info(f"Stream completed with data: {final_event_data}")
+            # logger.info(f"Stream completed with data: {final_event_data}")
             return final_event_data
         else:
             return await self.none_result()
