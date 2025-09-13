@@ -36,17 +36,20 @@ class RunnableCrew(Crew):
     intelligent agent functionality.
     """
 
-    def __init__(self, session_id: str, **kwargs):
+    def __init__(self, session_id: str, async_checkpointer=None, **kwargs):
         """
         Initialize EnhancedCrew
 
         Args:
             session_id: Session id
+            async_checkpointer: Async checkpointer instance for state management
             tools: Tool list, optional
             **kwargs: Other parameters passed to parent Crew class
         """
         super().__init__(**kwargs)
         self.session_id = session_id
+        # Store the async checkpointer for use in callbacks
+        self._async_checkpointer = async_checkpointer
         # 当前任务取消后的回调，停止取消的功能都有新类实现
         self.trigger_external_completion_callback = []
         self.recursion_limit = 180

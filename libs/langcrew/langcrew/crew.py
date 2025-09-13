@@ -21,7 +21,6 @@ from .agent import Agent
 from .hitl import HITLConfig
 from .memory import MemoryConfig
 from .memory.context import MemoryContextManager
-
 from .task import Task
 from .tools import ToolCallback
 from .types import CrewState, OrderCallback
