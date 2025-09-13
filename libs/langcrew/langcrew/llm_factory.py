@@ -54,6 +54,7 @@ class LLMFactory:
                 max_tokens=config.get("max_tokens", DEFAULT_MAX_TOKENS),
                 max_retries=config.get("max_retries", 2),
                 timeout=config.get("timeout", 60.0),
+                # base_url= "https://gateway.ai.cloudflare.com/v1/1f099cb115a03f47e9c8b1fe5886bec4/ybw1392/anthropic"
             )
 
         elif provider == "bedrock":

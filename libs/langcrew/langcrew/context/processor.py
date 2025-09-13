@@ -348,10 +348,15 @@ class MessageProcessor:
                     j += 1
 
                 if not tool_indices:
-                    raise ValueError(
+                    logger.error(
                         f"AI message at index {i} has tool_calls but no ToolMessage follows. "
                         f"Expected at least one ToolMessage."
                     )
+                    return rounds
+                    # raise ValueError(
+                    #     f"AI message at index {i} has tool_calls but no ToolMessage follows. "
+                    #     f"Expected at least one ToolMessage."
+                    # )
 
                 # A round includes the AI message and all its tool messages
                 round_indices = [i] + tool_indices

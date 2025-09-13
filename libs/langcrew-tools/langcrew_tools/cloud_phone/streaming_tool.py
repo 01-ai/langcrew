@@ -8,7 +8,8 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
-from langcrew_tools.plan.langchain_tool import PlanTool
+from langcrew.tools.astream_tool import EventType
+from langcrew_tools.cloud_phone.context import summarize_history_messages
 
 try:
     from typing import override
@@ -20,6 +21,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langcrew.tools import GraphStreamingBaseTool
+from langcrew.utils.runnable_config_utils import RunnableStateManager
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
@@ -28,8 +30,6 @@ from pydantic import BaseModel, Field, PrivateAttr
 from langcrew_tools.cloud_phone.langchain_tools import get_cloudphone_tools
 
 from .virtual_phone_hook import CloudPhoneMessageHandler
-from langcrew.utils.runnable_config_utils import RunnableStateManager
-
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,9 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     args_schema: type[BaseModel] = CloudPhoneStreamingToolInput
     description: ClassVar[str] = (
         "Use this tool to interact with cloud phones. Input should be a natural language description of what you want to do with the cloud phone, such as 'Open WeChat and send a message', 'Take a screenshot of the home screen', or 'Navigate to a specific app and perform actions'."
+        "The sandbox environment cannot be operated in the cloud phone. You can first obtain a screenshot URL and then save it to the sandbox environment"
+        "Provide high-level, comprehensive task descriptions rather than breaking them into small steps"
+        "The tool can handle complex, multi-step operations within a single call"
     )
 
     sandbox_source: Callable[[], Awaitable[AsyncSandbox]] | None = Field(
@@ -180,7 +183,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         self, graph: CompiledStateGraph, instruction: str, **kwargs: Any
     ) -> AsyncIterator[dict[str, Any]]:
         """
-        Run the tool asynchronously and return the result.
+        Run the tool asynchronously and return the result/////
         """
         logger.info(f"run graph with instruction: {instruction}")
         messages = [HumanMessage(content=instruction)]
@@ -218,7 +221,7 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
 
     @override
     def configure_runnable(self, config: RunnableConfig):
-        self._session_id = config.get("configurable", {}).get("thread_id")
+        self._session_id = config.get("configurable", {}).get("thread_id") + "_cloudphone"
         final_config = {
             "configurable": {"thread_id": self.get_agent_session_id()},
             "recursion_limit": self.recursion_limit,
@@ -228,6 +231,16 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         self._cloudphone_handler_with_model = CloudPhoneMessageHandler(
             model_name=self.model_name
         )
+    # stop new_message 返回给模型的结果 
+    @override
+    async def tool_end_message(self, graph: CompiledStateGraph, event_type: EventType, message: str | None = None):
+        state =  await graph.aget_state(self.config)
+        retrieved_messages = state.values["messages"]
+        summary = await summarize_history_messages( self.base_model, retrieved_messages,)
+        print("===========")
+        print(summary)
+        print("===========")
+        return summary
 
     def get_agent_session_id(self) -> str:
         if self._session_id:

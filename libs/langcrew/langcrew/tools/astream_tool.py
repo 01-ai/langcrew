@@ -165,6 +165,7 @@ class EventType(str, Enum):
 
     NEW_MESSAGE = "new_message"
     STOP = "stop"
+    END = "end"
 
 
 class StreamEventType(str, Enum):
@@ -199,6 +200,7 @@ class StreamingBaseTool(ToolCallback):
     stream_event_timeout_seconds: int = Field(
         -1, description="Stream event timeout seconds"
     )
+    graph: CompiledStateGraph | None  = None  
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -230,11 +232,14 @@ class StreamingBaseTool(ToolCallback):
         """
         if event_type == EventType.STOP:
             result = "Agent stopped by user"
+            await self.tool_end_message(self.graph, EventType.STOP, None)
+            result = f"工具执行历史总结:\n {result}\n用户请求停止任务，任务结束"
         elif event_type == EventType.NEW_MESSAGE:
-            result = f"Agent add new task: {event_data}"
+            result = await self.tool_end_message(self.graph, EventType.NEW_MESSAGE, str(event_data))
+            result = f"工具执行历史总结:\n {result}\n 用户添加新指令: {event_data}"
         return {
             "is_complete": False,
-            "stop_reason": result,
+            "result": result,
         }
 
     async def get_handover_info(self) -> dict | None:
@@ -251,6 +256,7 @@ class StreamingBaseTool(ToolCallback):
             return
         result = None
         try:
+            # 这里得不到tool的message列表吧
             result = await self.handle_external_completion(event_type, event_data)
             if result:
                 self._external_completion_future.set_result(
@@ -442,6 +448,9 @@ class StreamingBaseTool(ToolCallback):
                 self.max_iterations = config.get("configurable", {}).get("max_iterations", 10)
         """
         pass
+    
+    async def tool_end_message(self, graph: CompiledStateGraph, event_type: EventType, message: str | None = None):
+        pass
 
     def handle_timeout_error(self, error: Exception) -> None:
         """
@@ -509,7 +518,7 @@ class StreamingBaseTool(ToolCallback):
             async for event_type, custom_event_data in self._astream_events(
                 *args, **kwargs
             ):
-                # Dispatch intermediate events (not the final one)
+                # Dispatch intermediate events (not the final one) ---
                 if event_type != StreamEventType.END:
                     await self._dispatch_or_log_event(
                         custom_event_name,
@@ -713,15 +722,15 @@ class StreamingBaseTool(ToolCallback):
         )
 
         try:
-            # Wait for any task to complete - use Future and Task directly
+            # Wait for any task to complete - use Future and Task directly -----
             done, pending = await asyncio.wait(
                 [stream_task, self._external_completion_future],
                 return_when=asyncio.FIRST_COMPLETED,
             )
-            # Check which task completed
+            # Check which task completed 返回工具的结果
             if self._external_completion_future in done:
                 logger.info("External completion won the race")
-                return await self._external_completion_future
+                return await self._external_completion_future 
             else:
                 logger.info("Stream processing completed normally")
                 return await stream_task
@@ -816,12 +825,14 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
     ) -> AsyncIterator[tuple[StreamEventType, StandardStreamEvent]]:
         # Stream events from the compiled graph
         graph = await self.init_graph()
+        self.graph = graph
         async for event in self._arun_graph_astream_events(graph, *args, **kwargs):
             pre_event = event
             yield StreamEventType.INTERMEDIATE, event
-        stream_event = self.get_last_event_content(pre_event)
-        logger.info(f"graph stream tool get last event content: {stream_event}")
-        yield StreamEventType.END, stream_event
+        # stream_event = self.get_last_event_content(pre_event)
+        # logger.info(f"graph stream tool get last event content: {stream_event}")
+        result = await self.tool_end_message(graph, EventType.END, None)
+        yield StreamEventType.END, self.end_standard_stream_event(result)
 
     def _extract_message_content(self, message) -> str | None:
         if isinstance(message, dict):
