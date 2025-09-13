@@ -536,6 +536,8 @@ class LangGraphAdapter:
         # Include tool_calls if they exist
         if tool_calls:
             detail["tool_calls"] = tool_calls
+            # FIXME(wangjia): not send
+            return None
 
         if usage_metadata:
             detail["usage"] = usage_metadata
