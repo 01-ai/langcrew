@@ -8,7 +8,8 @@ from langchain_core.runnables import ensure_config
 from langchain_openai import ChatOpenAI
 from langcrew.utils.runnable_config_utils import RunnableStateManager
 
-from langcrew_tools.cloud_phone.context import create_async_summary_pre_hook
+from langcrew_tools.cloud_phone.context import LangGraphSummaryHook
+from langchain_core.language_models import BaseChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -195,15 +196,14 @@ class CloudPhoneMessageHandler:
                             if isinstance(prev_message, ToolMessage):
                                 messages.remove(next_message)
 
-    async def pre_hook(self, state: dict[str, Any]) -> list[BaseMessage]:
+    async def pre_hook(self, base_model: BaseChatModel, state: dict[str, Any]) -> list[BaseMessage]:
         """Pre-model hook executed before the model."""
         messages = state.get("messages", [])
         if not messages:
             return messages
         try:
             # 摘要处理
-            llm = ChatOpenAI(model="gpt-4.1")
-            summary_hook = create_async_summary_pre_hook(llm, 40)
+            summary_hook = LangGraphSummaryHook(base_model, 40, 64000)
             await summary_hook.summary(state)
             # 处理CloudPhone消息
             await self._process_message(messages)

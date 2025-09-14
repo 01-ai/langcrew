@@ -6,10 +6,15 @@ from langchain_core.messages import (
     AIMessage,
     BaseMessage,
     HumanMessage,
+    RemoveMessage,
     SystemMessage,
     ToolMessage,
 )
+from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
+from langgraph.graph.state import CompiledStateGraph
 from langmem.short_term.summarization import asummarize_messages
 
 # Prompt templates configuration
@@ -86,6 +91,11 @@ SUMMARY_PROMPTS = {
 - 下一步行动计划
 """,
             ),
+        ],
+        "final": [
+            ("placeholder", "{system_message}"),
+            ("user", "Summary of the conversation so far: {summary}"),
+            ("placeholder", "{messages}"),
         ],
     },
     "english": {
@@ -175,6 +185,11 @@ Please follow the 8 structured sections to compress conversation history:
 """,
             ),
         ],
+        "final": [
+            ("placeholder", "{system_message}"),
+            ("user", "Summary of the conversation so far: {summary}"),
+            ("placeholder", "{messages}"),
+        ],
     },
 }
 
@@ -184,14 +199,16 @@ class LangGraphSummaryHook:
 
     def __init__(
         self,
-        llm,
+        base_model: BaseChatModel,
         max_messages: int = 30,  # Fixed trigger at 30 messages
+        max_tokens_before_summary: int = 20,
         max_tokens: int = 64000,  # Maximum token limit (optional check)
         language: str = "chinese",
     ):
-        self.llm = llm
+        self.base_model = base_model
         self.max_messages = max_messages
         self.max_tokens = max_tokens
+        self.max_tokens_before_summary = max_tokens_before_summary
         self.language = language
         self._init_prompts()
         self.logger = logging.getLogger(__name__)
@@ -202,173 +219,54 @@ class LangGraphSummaryHook:
 
         self.initial_prompt = ChatPromptTemplate.from_messages(prompts["initial"])
         self.update_prompt = ChatPromptTemplate.from_messages(prompts["update"])
-
-    def _estimate_tokens(
-        self, messages: list[BaseMessage], running_summary: str = None
-    ) -> int:
-        """More accurate token estimation"""
-        try:
-            import tiktoken
-
-            # Use tiktoken for more accurate calculation
-            encoding = tiktoken.get_encoding("cl100k_base")
-            total_tokens = 0
-
-            for msg in messages:
-                if hasattr(msg, "content") and msg.content:
-                    total_tokens += len(encoding.encode(str(msg.content)))
-
-            if running_summary:
-                total_tokens += len(encoding.encode(running_summary))
-
-            return total_tokens
-        except Exception:
-            # Fallback to simple estimation (multiply by 1.3 coefficient to get closer to actual token count)
-            total_tokens = sum(
-                len(msg.content.split()) * 1.3
-                for msg in messages
-                if hasattr(msg, "content")
-            )
-            if running_summary:
-                total_tokens += len(running_summary.split()) * 1.3
-            return int(total_tokens)
+        self.final_prompt = ChatPromptTemplate.from_messages(prompts["final"])
 
     async def summary(self, state: dict[str, Any]) -> dict[str, Any]:
         """Asynchronous version of the summary method"""
         try:
             messages = state.get("messages", [])
             running_summary = state.get("running_summary")
-
-            if not self._should_summarize(messages, running_summary):
+            if not self._should_summarize(messages):
                 return state
-
-            # Execute summary asynchronously
-            new_summary, trimmed_messages = await self._create_summary_async(
-                messages, running_summary
+            summarization_result = await asummarize_messages(
+                messages,
+                max_tokens=self.max_tokens,
+                max_tokens_before_summary=self.max_tokens_before_summary,  # Force trigger! Set to 1 to ensure summary always happens
+                max_summary_tokens=8192,
+                running_summary=running_summary,
+                model=self.base_model,
+                token_counter=count_tokens_approximately,
+                initial_summary_prompt=self.initial_prompt,
+                existing_summary_prompt=self.update_prompt,
+                final_prompt=self.final_prompt,
             )
-
-            if new_summary:
-                state["messages"] = new_summary
-
-                # Create summary system message
-                summary_prefix = (
-                    "[历史对话摘要]"
-                    if self.language == "chinese"
-                    else "[Historical Conversation Summary]"
-                )
-                summary_message = HumanMessage(
-                    content=f"{summary_prefix}\n{new_summary.summary}"
-                )
-
-                # Add summary message to the beginning of message list, followed by retained recent messages
-                new_messages = [summary_message] + trimmed_messages
-                messages = state["messages"]
-                messages.clear()
-                messages.extend(new_messages)
-                self.logger.info(
-                    f"Async summary update completed, reduced to {len(new_messages)} messages (including 1 summary message)"
-                )
+            if summarization_result.running_summary:
+                state["running_summary"] = summarization_result.running_summary
+                state["messages"] = [
+                    RemoveMessage(REMOVE_ALL_MESSAGES)
+                ] + summarization_result.messages
+            else:
                 return state
-
         except Exception as e:
             self.logger.error(f"Async summary processing failed: {e}")
 
         return state
 
-    def _should_summarize(
-        self, messages: list[BaseMessage], running_summary: str | None
-    ) -> bool:
+    def _should_summarize(self, messages: list[BaseMessage]) -> bool:
         """Determine whether summarization is needed - supports fixed message count mode"""
-        # Trigger when reaching a certain number of messages
+        total_tokens = count_tokens_approximately(messages)
         if self.max_messages > 0:
-            return len(messages) >= self.max_messages
-        # If message count not reached, trigger when token count reaches threshold
-        total_tokens = self._estimate_tokens(messages, running_summary)
+            if len(messages) >= self.max_messages and total_tokens < self.max_tokens:
+                self.max_tokens_before_summary = count_tokens_approximately(
+                    messages[: self.max_messages]
+                )
+                return True
         print(f"total_tokens: {total_tokens}, max_tokens: {self.max_tokens}")
         return total_tokens > self.max_tokens
 
-    async def _create_summary_async(
-        self, messages: list[BaseMessage], running_summary: str | None
-    ) -> tuple:
-        """Create summary asynchronously - forced trigger version"""
-        try:
-            # Check and skip existing summary messages
-            real_messages = messages
-            if (
-                messages
-                and isinstance(messages[0], HumanMessage)
-                and (
-                    messages[0].content.startswith("[Historical Conversation Summary]")
-                    or messages[0].content.startswith("[历史对话摘要]")
-                )
-            ):
-                # Skip the first summary message, only process real conversation messages
-                real_messages = messages[1:]
 
-            if not real_messages:
-                return None, messages
-
-            keep_count = max(4, len(real_messages) // 4)
-
-            # 确保起始消息是AI message，如果倒数第keep_count个不是，就往前找
-            start_index = len(real_messages) - keep_count
-            while start_index > 0 and not isinstance(
-                real_messages[start_index], AIMessage
-            ):
-                start_index -= 1
-
-            messages_to_summarize = real_messages[:start_index]
-            messages_to_keep = real_messages[start_index:]
-
-            # Force trigger summary: set a very small max_tokens_before_summary
-            # This ensures summary will be triggered regardless of actual token count
-            result = await asummarize_messages(
-                messages_to_summarize,
-                max_tokens=self.max_tokens,
-                max_tokens_before_summary=1,  # Force trigger! Set to 1 to ensure summary always happens
-                max_summary_tokens=8192,
-                running_summary=running_summary,
-                model=self.llm,
-                initial_summary_prompt=self.initial_prompt,
-                existing_summary_prompt=self.update_prompt,
-            )
-
-            if hasattr(result, "running_summary"):
-                new_summary = result.running_summary
-                return new_summary, messages_to_keep
-            else:
-                return None, messages
-
-        except Exception as e:
-            self.logger.error(f"Async summary creation failed: {e}")
-            return None, messages
-
-
-def create_async_summary_pre_hook(
-    llm,
-    max_messages: int = 30,  # Fixed trigger at 30 messages
-    language: str = "chinese",
-    **kwargs,
-) -> LangGraphSummaryHook:
-    """
-    Create a summary hook with fixed message count trigger
-
-    Args:
-        llm: Language model
-        max_messages: Fixed message count to trigger summary (default 30 messages)
-        language: Language setting
-        **kwargs: Other configuration parameters
-
-    Returns:
-        pre-hook instance
-    """
-    hook = LangGraphSummaryHook(
-        llm, max_messages=max_messages, language=language, **kwargs
-    )
-    return hook
-
-async def summarize_history_messages(
-    llm: BaseChatModel, messages: list[BaseMessage], strategy: str = "last"
+async def summarize_history_messages_direct(
+    base_model: BaseChatModel, messages: list[BaseMessage], strategy: str = "last"
 ) -> str:
     if strategy == "last":
         recent_count = 20
@@ -383,7 +281,7 @@ async def summarize_history_messages(
             elif isinstance(msg, ToolMessage):
                 result_parts.append(f"Tool Result: {msg.content}")
         return "\n\n".join(result_parts)
-    
+
     # strategy summary
     if isinstance(messages[-1], AIMessage) and len(messages[-1].tool_calls) > 0:
         messages.append(
@@ -392,7 +290,7 @@ async def summarize_history_messages(
                 tool_call_id=messages[-1].tool_calls[0]["id"],
             )
         )
-    
+
     real_messages = [
         SystemMessage(
             content="""## Role 角色
@@ -433,7 +331,7 @@ Please provide a summary based on the historical records, including:
    - Current task execution result information 当前任务的执行结果信息"""
         )
     )
-    result = await llm.ainvoke(messages)
+    result = await base_model.ainvoke(messages)
     return result.content
     # agent = create_react_agent(llm, tools=[])
 

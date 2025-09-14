@@ -5,10 +5,16 @@ This is the  version of BrowserStreamingTool that uses the improved streaming ar
 
 import datetime
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
+from langcrew.agent import Agent
+from langcrew.memory.config import MemoryConfig
+from langcrew.runnable_crew import RunnableCrew
 from langcrew.tools.astream_tool import EventType
+from langcrew.web import LangGraphAdapter
+
+from langcrew_tools.cloud_phone.context import summarize_history_messages_direct
 
 try:
     from typing import override
@@ -21,9 +27,7 @@ from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langcrew.tools import GraphStreamingBaseTool
 from langcrew.utils.runnable_config_utils import RunnableStateManager
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field, PrivateAttr
 
 from langcrew_tools.cloud_phone.langchain_tools import get_cloudphone_tools
@@ -164,6 +168,8 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         default=None
     )
     config: RunnableConfig | None = None
+    
+    adapter: LangGraphAdapter | None  = None
 
     def __init__(
         self,
@@ -176,53 +182,15 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         self.sandbox_source = sandbox_source
         self.base_model = base_model
         self.model_name = model_name
-
+        
     @override
-    async def _arun_graph_astream_events(
-        self, graph: CompiledStateGraph, instruction: str, **kwargs: Any
-    ) -> AsyncIterator[dict[str, Any]]:
-        """
-        Run the tool asynchronously and return the result/////
-        """
-        logger.info(f"run graph with instruction: {instruction}")
-        messages = [HumanMessage(content=instruction)]
-        inputs = {"messages": messages}
-        async for event in graph.astream_events(inputs, config=self.config):
-            yield event
-
-    @override
-    async def init_graph(self) -> CompiledStateGraph:
+    async def _arun_work(self, instruction: str, **kwargs: Any) -> Any:
         """
         Get the graph.
         """
-        system_prompt = SYSTEM_PROMPT.format(
-            current_time=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
-        )
-        tools = await self._initialize_tools()
-
-        checkpointer = InMemorySaver()
-
-        return create_react_agent(
-            model=self.base_model,
-            tools=tools,
-            prompt=system_prompt,
-            pre_model_hook=self.pre_model_hook,
-            post_model_hook=self.post_model_hook,
-            checkpointer=checkpointer,
-        )
-
-    async def pre_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
-        await self._cloudphone_handler_with_model.pre_hook(state)
-
-    async def post_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
-        messages = state.get("messages", [])
-        await self._cloudphone_handler_with_model.post_hook(messages)
-
-    @override
-    def configure_runnable(self, config: RunnableConfig):
-        self._session_id = config.get("configurable", {}).get("thread_id") + "_cloudphone"
+        self._session_id = "123456" + "_cloudphone"
         final_config = {
-            "configurable": {"thread_id": self.get_agent_session_id()},
+            "configurable": {"thread_id": self._session_id},
             "recursion_limit": self.recursion_limit,
         }
         self.config = final_config
@@ -230,12 +198,51 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         self._cloudphone_handler_with_model = CloudPhoneMessageHandler(
             model_name=self.model_name
         )
+        system_prompt = SYSTEM_PROMPT.format(
+            current_time=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
+        )
+        tools = await self._initialize_tools()
 
-    def get_agent_session_id(self) -> str:
-        if self._session_id:
-            return self._session_id
-        else:
-            raise ValueError("session_id is not set")
+        agent = Agent(
+            llm=self.base_model,
+            tools=tools,
+            prompt=system_prompt,
+            pre_model_hook=self.pre_model_hook,
+            post_model_hook=self.post_model_hook,
+            executor_type = "react",
+            memory=MemoryConfig(),
+        )
+        crew = RunnableCrew(
+            agents=[agent],
+            session_id=self._session_id,
+        )
+        logger.info(f"run graph with instruction: {instruction}")
+        messages = [HumanMessage(content=instruction)]
+        inputs = {"messages": messages}
+        self.adapter = LangGraphAdapter(crew=crew)
+        content = "EMPTY_CONTENT"
+        pre_event = None
+        async for event in self.adapter.executor.astream_events(inputs, config=self.config):
+           pre_event = event
+        if pre_event:
+            result = self.get_last_event_content(pre_event)
+            content = result.get("data", {}).get("output", "")
+        return content        
+        
+    async def pre_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
+        await self._cloudphone_handler_with_model.pre_hook(self.base_model, state)
+
+    async def post_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
+        messages = state.get("messages", [])
+        await self._cloudphone_handler_with_model.post_hook(messages)
+    
+    @override
+    async def tool_stop_result(self, event_type: EventType, message: str | None = None):
+        state =  await self.adapter.executor.agents[0].executor._get_compiled_graph(self.adapter.executor.agents[0].executor.checkpointer, self.adapter.executor.agents[0].executor.store).aget_state(self.config)
+        retrieved_messages = state.values["messages"]
+        summary = await summarize_history_messages_direct( self.base_model, retrieved_messages)
+        logger.info(f"summary: {summary}")
+        return summary
 
     async def _initialize_tools(self) -> list[Any]:
         tools = get_cloudphone_tools(self.sandbox_source, self.config)

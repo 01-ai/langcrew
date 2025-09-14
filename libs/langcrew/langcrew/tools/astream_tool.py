@@ -143,6 +143,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from enum import Enum
+import re
 from typing import Any
 
 try:
@@ -200,7 +201,6 @@ class StreamingBaseTool(ToolCallback):
     stream_event_timeout_seconds: int = Field(
         -1, description="Stream event timeout seconds"
     )
-    graph: CompiledStateGraph | None  = None  
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -232,14 +232,11 @@ class StreamingBaseTool(ToolCallback):
         """
         if event_type == EventType.STOP:
             result = "Agent stopped by user"
-            await self.tool_end_message(self.graph, EventType.STOP, None)
-            result = f"工具执行历史总结:\n {result}\n用户请求停止任务，任务结束"
         elif event_type == EventType.NEW_MESSAGE:
-            result = await self.tool_end_message(self.graph, EventType.NEW_MESSAGE, str(event_data))
-            result = f"工具执行历史总结:\n {result}\n 用户添加新指令: {event_data}"
+            result = f"Agent add new task: {event_data}"
         return {
             "is_complete": False,
-            "result": result,
+            "stop_reason": result,
         }
 
     async def get_handover_info(self) -> dict | None:
@@ -256,7 +253,6 @@ class StreamingBaseTool(ToolCallback):
             return
         result = None
         try:
-            # 这里得不到tool的message列表吧
             result = await self.handle_external_completion(event_type, event_data)
             if result:
                 self._external_completion_future.set_result(
@@ -448,9 +444,6 @@ class StreamingBaseTool(ToolCallback):
                 self.max_iterations = config.get("configurable", {}).get("max_iterations", 10)
         """
         pass
-    
-    async def tool_end_message(self, graph: CompiledStateGraph, event_type: EventType, message: str | None = None):
-        pass
 
     def handle_timeout_error(self, error: Exception) -> None:
         """
@@ -518,7 +511,7 @@ class StreamingBaseTool(ToolCallback):
             async for event_type, custom_event_data in self._astream_events(
                 *args, **kwargs
             ):
-                # Dispatch intermediate events (not the final one) ---
+                # Dispatch intermediate events (not the final one)
                 if event_type != StreamEventType.END:
                     await self._dispatch_or_log_event(
                         custom_event_name,
@@ -722,15 +715,15 @@ class StreamingBaseTool(ToolCallback):
         )
 
         try:
-            # Wait for any task to complete - use Future and Task directly -----
+            # Wait for any task to complete - use Future and Task directly
             done, pending = await asyncio.wait(
                 [stream_task, self._external_completion_future],
                 return_when=asyncio.FIRST_COMPLETED,
             )
-            # Check which task completed 返回工具的结果
+            # Check which task completed
             if self._external_completion_future in done:
                 logger.info("External completion won the race")
-                return await self._external_completion_future 
+                return await self._external_completion_future
             else:
                 logger.info("Stream processing completed normally")
                 return await stream_task
@@ -790,83 +783,157 @@ class ExternalCompletionBaseTool(StreamingBaseTool, ABC):
 class GraphStreamingBaseTool(StreamingBaseTool, ABC):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
+        self._stop_event: asyncio.Event = asyncio.Event()
+        self._new_message_event: asyncio.Event = asyncio.Event()
+        self._new_message_content: str | None = None
+        self._is_running: bool = False
+    
+    @override    
+    async def _arun(self, config: RunnableConfig, *args: Any, **kwargs: Any) -> Any:
+        self._is_running = True
+        main_task = asyncio.create_task(self._arun_work(*args, **kwargs))
+        
+        try:
+            # Wait for the main task to complete or the stop signal
+            done, pending = await asyncio.wait(
+                [main_task, asyncio.create_task(self._stop_event.wait()), asyncio.create_task(self._new_message_event.wait())],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            # Cancel unfinished tasks
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            
+            if self._stop_event.is_set():
+                logger.info("Stop signal received")
+                self._stop_event.clear()
+                return await self.tool_stop_result(EventType.STOP, "stop")
+                
+            if self._new_message_event.is_set():
+                logger.info("New message signal received")
+                message_content = self._new_message_content
+                self._new_message_event.clear()
+                self._new_message_content = None
+                return await self.tool_stop_result(EventType.NEW_MESSAGE, message_content)
+            
+            result = main_task.result()
+            logger.info(f"Main task completed: {result}")
+            return result  # Get the result of the main task
+            
+        except asyncio.CancelledError:
+            logger.info("Main task cancelled")
+            # Cancel main task
+            if not main_task.done():
+                main_task.cancel()
+            return None
+            
+        except BaseException as e:
+            logger.exception(f"Error in _arun: {e}")
+            # Cancel main task
+            if not main_task.done():
+                main_task.cancel()
+            raise e
+        finally:
+            self._is_running = False
+        
     @abstractmethod
-    async def _arun_graph_astream_events(
-        self, graph: CompiledStateGraph, *args: Any, **kwargs: Any
-    ) -> AsyncIterator[dict[str, Any]]:
-        """
-        Run the tool asynchronously and return the result.
-        """
-        pass
-
-    @abstractmethod
-    async def init_graph(self) -> CompiledStateGraph:
+    async def _arun_work(self, *args: Any, **kwargs: Any) -> Any:
         """
         Get the graph.
         """
         pass
+    
+    async def tool_stop_result(self, event_type: EventType, message: str | None = None):
+        """
+        can override method, return custom result of tool stop or new message
+        
+        Returns:
+            str: custom result of tool stop or new message
+        """
+        result = ""
+        if event_type == EventType.STOP:
+            result = "Agent stopped by user"
+        elif event_type == EventType.NEW_MESSAGE:
+            result = f"Agent add new task: {message}"
+        return result
 
-    # tool不用输出任何事件给外层调用(langgraph.astream_events),langgraph会将内部graph的event输出(无论什么时候初始化的内部graph)
 
+    # External callback function, used to trigger the tool execution process if it needs to stop or new message
     @override
-    async def handle_standard_stream_event(
-        self, standard_stream_event: dict
-    ) -> StandardStreamEvent:
-        pass
-
-    @override
-    async def handle_custom_event(self, custom_event: dict) -> StandardStreamEvent:
-        pass
-
+    async def trigger_external_completion(
+        self, event_type: EventType, event_data: Any
+    ) -> Any:  
+        result = None
+        if not self._is_running:
+            return result
+        try:
+            if event_type == EventType.STOP:
+                self._stop_event.set()
+                await self.tool_stop_result(EventType.STOP, None)
+                result = f"Tool execution history summary:\n {result}\n User requested to stop the task, task ended"
+            elif event_type == EventType.NEW_MESSAGE:
+                self._new_message_event.set()
+                self._new_message_content = str(event_data)
+                result = await self.tool_stop_result(EventType.NEW_MESSAGE, str(event_data))
+                result = f"Tool execution history summary:\n {result}\n User added new instruction: {event_data}"
+        except BaseException as e:
+            result = f"Error occurred during tool execution: {e}"
+        return result
+        
+    # Get the last message content as the result
+    def get_last_event_content(self, event_data: dict) -> StandardStreamEvent:
+        """
+        Get the last valid AI message content from the event data
+        """
+        try:
+            if not isinstance(event_data, dict):
+                return event_data
+            
+            messages = event_data.get("data", {}).get("output", {}).get("messages", [])
+            if not messages:
+                return event_data
+            
+            # Traverse messages in reverse order, find the last valid AI message
+            for message in reversed(messages):
+                if isinstance(message, dict):
+                    content = message.get("content")
+                else:
+                    content = getattr(message, "content", None)
+                
+                if not content:
+                    continue
+                
+                # Check if the message is a valid AI message
+                # Check if there is a tool_call_id (if so, skip)
+                has_tool_call_id = (
+                    hasattr(message, "tool_call_id") or 
+                    (isinstance(message, dict) and "tool_call_id" in message)
+                )
+                if has_tool_call_id:
+                    continue
+                
+                # Check if the message type is valid
+                if isinstance(message, dict):
+                    is_valid = message.get("type") != "tool"
+                else:
+                    is_valid = type(message).__name__ == "AIMessage"
+                
+                if is_valid:
+                    return self.end_standard_stream_event(content)
+            
+            return event_data
+            
+        except BaseException as e:
+            logging.exception(f"Error in get_last_event_content: {e}")
+            return event_data
+        
+    # Deprecated
     @override
     async def _astream_events(
         self, *args: Any, **kwargs: Any
     ) -> AsyncIterator[tuple[StreamEventType, StandardStreamEvent]]:
-        # Stream events from the compiled graph
-        graph = await self.init_graph()
-        self.graph = graph
-        async for event in self._arun_graph_astream_events(graph, *args, **kwargs):
-            pre_event = event
-            yield StreamEventType.INTERMEDIATE, event
-        # stream_event = self.get_last_event_content(pre_event)
-        # logger.info(f"graph stream tool get last event content: {stream_event}")
-        result = await self.tool_end_message(graph, EventType.END, None)
-        yield StreamEventType.END, self.end_standard_stream_event(result)
-
-    def _extract_message_content(self, message) -> str | None:
-        if isinstance(message, dict):
-            return message.get("content")
-        return getattr(message, "content", None)
-
-    def _is_valid_ai_message(self, message) -> bool:
-        has_tool_call_id = hasattr(message, "tool_call_id") or (
-            isinstance(message, dict) and "tool_call_id" in message
-        )
-
-        if has_tool_call_id:
-            return False
-
-        if isinstance(message, dict):
-            return message.get("type") != "tool"
-        else:
-            return type(message).__name__ == "AIMessage"
-
-    def get_last_event_content(self, event_data: dict) -> StandardStreamEvent:
-        try:
-            if not isinstance(event_data, dict):
-                return event_data
-
-            messages = event_data.get("data", {}).get("output", {}).get("messages", [])
-            if not messages:
-                return event_data
-
-            for message in reversed(messages):
-                content = self._extract_message_content(message)
-                if content and self._is_valid_ai_message(message):
-                    return self.end_standard_stream_event(content)
-
-            return event_data
-        except BaseException as e:
-            logging.exception(f"Error in get_last_event_content: {e}")
-            return event_data
+        pass
