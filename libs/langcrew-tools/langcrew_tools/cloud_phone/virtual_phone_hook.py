@@ -55,7 +55,7 @@ class CloudPhoneMessageHandler:
                 "think": """1、请先使用视觉分析，再做决策, 不要盲目操作
                 2、请先分析当前页面和上一页面的可点击元素，再做决策
                 3、如果要点击坐标，请精确计算坐标(x,y) = ((left+right)/2, (top+bottom)/2)，不要估计坐标，估计的坐标不准确
-                4、我以提供了当前页面（最新）的可点击元素和当前屏幕截图，不要再使用phone_task_screenshot和 phone_get_clickable_elements重复获取了，重复获取和我们的简洁高效原则不符
+                4、我以提供了当前页面（最新）的可点击元素和当前屏幕截图，不要再使用phone_take_screenshot和 phone_get_clickable_elements重复获取了，重复获取和我们的简洁高效原则不符
                 """,
             }
 
@@ -202,18 +202,25 @@ class CloudPhoneMessageHandler:
         if not messages:
             return messages
         try:
-            # 摘要处理
-            summary_hook = LangGraphSummaryHook(base_model, 40, 64000)
+            # summary
+            summary_hook = LangGraphSummaryHook(base_model, 50, 10, 150000)
+            running_summary = RunnableStateManager.get_value(
+                    ensure_config(), "running_summary"
+                )
+            if running_summary:
+              state["running_summary"] = running_summary
             await summary_hook.summary(state)
-            # 处理CloudPhone消息
+            if "running_summary" in state:
+                RunnableStateManager.set_value(
+                    ensure_config(), "running_summary", state["running_summary"]
+                )
+            # process_message
             await self._process_message(messages)
-            print(len(messages))
-
         except (json.JSONDecodeError, KeyError, AttributeError) as e:
             logger.warning(f"Failed to process CloudPhone message: {e}")
         except Exception as e:
             logger.error(f"Unexpected error occurred in pre-model hook: {e}")
-        return {}
+        return state
 
     async def post_hook(self, messages: list[BaseMessage]) -> list[BaseMessage]:
         """Post-model hook executed after the model."""

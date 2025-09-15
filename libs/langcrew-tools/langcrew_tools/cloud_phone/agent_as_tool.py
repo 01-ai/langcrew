@@ -15,6 +15,8 @@ from langcrew.tools.astream_tool import EventType
 from langcrew.web import LangGraphAdapter
 
 from langcrew_tools.cloud_phone.context import summarize_history_messages_direct
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import InMemorySaver
 
 try:
     from typing import override
@@ -56,7 +58,7 @@ You receive screenshots and clickable elements list before each operation. Use t
 - DO NOT switch the working language midway unless explicitly requested by the user
 
 ## Core Principles
-- **Auto-Provided Data**: Screenshots and clickable elements are provided automatically. Only call `phone_task_screenshot()` and `phone_get_clickables()` if not received in current request
+- **Auto-Provided Data**: Screenshots and clickable elements are provided automatically. Only call `phone_take_screenshot()` and `phone_get_clickables()` if not received in current request
 - **Context Analysis**: Calculate center coordinates from bounds: (x,y) = ((left+right)/2, (top+bottom)/2)
 - If user requests to stop the task immediately, please use agent_end_task to end the task
 - **Visual Information Utilization**: Make full use of visual information, carefully analyze all elements on the screen, especially obvious close buttons or other operable elements.
@@ -170,6 +172,8 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     config: RunnableConfig | None = None
     
     adapter: LangGraphAdapter | None  = None
+    
+    graph: CompiledStateGraph | None  = None 
 
     def __init__(
         self,
@@ -202,32 +206,56 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
             current_time=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
         )
         tools = await self._initialize_tools()
-
-        agent = Agent(
-            llm=self.base_model,
+        # =====langgraph beign======
+        checkpointer = InMemorySaver()
+        graph = create_react_agent(
+            model=self.base_model,
             tools=tools,
             prompt=system_prompt,
             pre_model_hook=self.pre_model_hook,
             post_model_hook=self.post_model_hook,
-            executor_type = "react",
-            memory=MemoryConfig(),
-        )
-        crew = RunnableCrew(
-            agents=[agent],
-            session_id=self._session_id,
-        )
+            checkpointer=checkpointer,
+        ) 
+        self.graph = graph
         logger.info(f"run graph with instruction: {instruction}")
         messages = [HumanMessage(content=instruction)]
         inputs = {"messages": messages}
-        self.adapter = LangGraphAdapter(crew=crew)
         content = "EMPTY_CONTENT"
         pre_event = None
-        async for event in self.adapter.executor.astream_events(inputs, config=self.config):
+        async for event in graph.astream_events(inputs, config=self.config):
            pre_event = event
         if pre_event:
             result = self.get_last_event_content(pre_event)
             content = result.get("data", {}).get("output", "")
-        return content        
+        return content 
+        # =====langgraph end=====
+        
+        #  TODO crew tool_stop_result方法中无法获取历史消息，等支持后打开
+        # agent = Agent(
+        #     llm=self.base_model,
+        #     tools=tools,
+        #     prompt=system_prompt,
+        #     pre_model_hook=self.pre_model_hook,
+        #     post_model_hook=self.post_model_hook,
+        #     executor_type = "react",
+        #     memory=MemoryConfig(),
+        # )
+        # crew = RunnableCrew(
+        #     agents=[agent],
+        #     session_id=self._session_id,
+        # )
+        # logger.info(f"run graph with instruction: {instruction}")
+        # messages = [HumanMessage(content=instruction)]
+        # inputs = {"messages": messages}
+        # self.adapter = LangGraphAdapter(crew=crew)
+        # content = "EMPTY_CONTENT"
+        # pre_event = None
+        # async for event in self.adapter.executor.astream_events(inputs, config=self.config):
+        #    pre_event = event
+        # if pre_event:
+        #     result = self.get_last_event_content(pre_event)
+        #     content = result.get("data", {}).get("output", "")
+        # return content           
         
     async def pre_model_hook(self, state: dict[str, Any]) -> dict[str, Any]:
         await self._cloudphone_handler_with_model.pre_hook(self.base_model, state)
@@ -238,11 +266,15 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     
     @override
     async def tool_stop_result(self, event_type: EventType, message: str | None = None):
-        state =  await self.adapter.executor.agents[0].executor._get_compiled_graph(self.adapter.executor.agents[0].executor.checkpointer, self.adapter.executor.agents[0].executor.store).aget_state(self.config)
-        retrieved_messages = state.values["messages"]
-        summary = await summarize_history_messages_direct( self.base_model, retrieved_messages)
-        logger.info(f"summary: {summary}")
-        return summary
+        # state =  await self.adapter.executor.agents[0].executor.graph.aget_state(self.config)
+        state =  await self.graph.aget_state(self.config)
+        if "messages" in state.values:
+            retrieved_messages = state.values["messages"]
+            summary = await summarize_history_messages_direct( self.base_model, retrieved_messages)
+            logger.info(f"summary: {summary}")
+            return summary
+        else:
+            return message
 
     async def _initialize_tools(self) -> list[Any]:
         tools = get_cloudphone_tools(self.sandbox_source, self.config)

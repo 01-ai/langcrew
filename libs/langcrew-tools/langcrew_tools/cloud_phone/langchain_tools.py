@@ -480,13 +480,13 @@ class ClearTextTool(CloudPhoneMixin):
         raise NotImplementedError("ClearTextTool only supports async execution.")
 
 
-class TaskScreenShotToolInput(BaseToolInput):
-    """Input for TaskScreenShotTool."""
+class TakeScreenShotToolInput(BaseToolInput):
+    """Input for TakeScreenShotTool."""
 
 
-class TaskScreenShotTool(CloudPhoneMixin):
-    name: ClassVar[str] = "phone_task_screenshot"
-    args_schema: ClassVar[type[BaseModel]] = TaskScreenShotToolInput
+class TakeScreenShotTool(CloudPhoneMixin):
+    name: ClassVar[str] = "phone_take_screenshot"
+    args_schema: ClassVar[type[BaseModel]] = TakeScreenShotToolInput
     description: ClassVar[str] = (
         "Take a screenshot of the current screen. No arguments. Returns base64 encoded image."
     )
@@ -500,7 +500,7 @@ class TaskScreenShotTool(CloudPhoneMixin):
         }
 
     def _run(self, *args, **kwargs) -> Any:
-        raise NotImplementedError("TaskScreenShotTool only supports async execution.")
+        raise NotImplementedError("TakeScreenShotTool only supports async execution.")
 
 
 class GetClickablesToolInput(BaseToolInput):
@@ -541,7 +541,7 @@ ALL_PHONE_TOOLS = [
     HomeTool,
     TapInputAndEnterTool,
     WaitTool,
-    TaskScreenShotTool,
+    TakeScreenShotTool,
     GetClickablesTool,
 ]
 
@@ -568,7 +568,6 @@ def get_cloudphone_tools(
         tool.__class__.description = (
             f"This is a mobile phone automation tool. {original_description}"
         )
-        tool.config = config
         tools.append(tool)
 
     return tools

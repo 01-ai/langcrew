@@ -200,16 +200,18 @@ class LangGraphSummaryHook:
     def __init__(
         self,
         base_model: BaseChatModel,
-        max_messages: int = 30,  # Fixed trigger at 30 messages
-        max_tokens_before_summary: int = 20,
-        max_tokens: int = 64000,  # Maximum token limit (optional check)
+        max_messages_count_before_summary: int = 50, # Fixed trigger at 50 messages
+        keep_messages_count: int = 10, # Keep 10, summary（40）+ 10 messages, max_messages_count_before_summary and keep_messages_count  Used to calculate the value of x_tokens_fronte_summary
+        max_tokens_before_summary: int = 64000, # max_tokens_before_summary(messages) +  messages + remaining messages <  max_tokens
+        max_tokens: int = 180000,  #summary(8192)+ remaining messages < max_tokens
         language: str = "chinese",
     ):
         self.base_model = base_model
-        self.max_messages = max_messages
         self.max_tokens = max_tokens
         self.max_tokens_before_summary = max_tokens_before_summary
         self.language = language
+        self.max_messages_count_before_summary = max_messages_count_before_summary
+        self.keep_messages_count = keep_messages_count
         self._init_prompts()
         self.logger = logging.getLogger(__name__)
 
@@ -255,16 +257,16 @@ class LangGraphSummaryHook:
     def _should_summarize(self, messages: list[BaseMessage]) -> bool:
         """Determine whether summarization is needed - supports fixed message count mode"""
         total_tokens = count_tokens_approximately(messages)
-        if self.max_messages > 0:
-            if len(messages) >= self.max_messages and total_tokens < self.max_tokens:
+        if self.max_messages_count_before_summary > 0:
+            if len(messages) >= self.max_messages_count_before_summary and total_tokens < self.max_tokens:
                 self.max_tokens_before_summary = count_tokens_approximately(
-                    messages[: self.max_messages]
-                )
+                    messages[: (self.max_messages_count_before_summary - self.keep_messages_count)]
+                ) - 5 
                 return True
         print(f"total_tokens: {total_tokens}, max_tokens: {self.max_tokens}")
         return total_tokens > self.max_tokens
 
-
+# direct summary
 async def summarize_history_messages_direct(
     base_model: BaseChatModel, messages: list[BaseMessage], strategy: str = "last"
 ) -> str:

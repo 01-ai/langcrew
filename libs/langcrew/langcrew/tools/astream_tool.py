@@ -143,7 +143,6 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from enum import Enum
-import re
 from typing import Any
 
 try:
@@ -155,7 +154,6 @@ from langchain_core.callbacks import adispatch_custom_event
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import StandardStreamEvent
 from langchain_core.tools.base import BaseTool
-from langgraph.graph.state import CompiledStateGraph
 from pydantic import Field
 
 logger = logging.getLogger(__name__)
@@ -787,19 +785,23 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
         self._new_message_event: asyncio.Event = asyncio.Event()
         self._new_message_content: str | None = None
         self._is_running: bool = False
-    
-    @override    
+
+    @override
     async def _arun(self, config: RunnableConfig, *args: Any, **kwargs: Any) -> Any:
         self._is_running = True
         main_task = asyncio.create_task(self._arun_work(*args, **kwargs))
-        
+
         try:
             # Wait for the main task to complete or the stop signal
             done, pending = await asyncio.wait(
-                [main_task, asyncio.create_task(self._stop_event.wait()), asyncio.create_task(self._new_message_event.wait())],
-                return_when=asyncio.FIRST_COMPLETED
+                [
+                    main_task,
+                    asyncio.create_task(self._stop_event.wait()),
+                    asyncio.create_task(self._new_message_event.wait()),
+                ],
+                return_when=asyncio.FIRST_COMPLETED,
             )
-            
+
             # Cancel unfinished tasks
             for task in pending:
                 task.cancel()
@@ -807,50 +809,52 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
                     await task
                 except asyncio.CancelledError:
                     pass
-            
+
             if self._stop_event.is_set():
                 logger.info("Stop signal received")
                 self._stop_event.clear()
                 return await self.tool_stop_result(EventType.STOP, "stop")
-                
+
             if self._new_message_event.is_set():
                 logger.info("New message signal received")
                 message_content = self._new_message_content
                 self._new_message_event.clear()
                 self._new_message_content = None
-                return await self.tool_stop_result(EventType.NEW_MESSAGE, message_content)
-            
+                return await self.tool_stop_result(
+                    EventType.NEW_MESSAGE, message_content
+                )
+
             result = main_task.result()
             logger.info(f"Main task completed: {result}")
             return result  # Get the result of the main task
-            
+
         except asyncio.CancelledError:
             logger.info("Main task cancelled")
             # Cancel main task
             if not main_task.done():
                 main_task.cancel()
-            return None
-            
+            return "tool execution cancelled"
+
         except BaseException as e:
             logger.exception(f"Error in _arun: {e}")
             # Cancel main task
             if not main_task.done():
                 main_task.cancel()
-            raise e
+            return f"Error in tool execution: {e}"
         finally:
             self._is_running = False
-        
+
     @abstractmethod
     async def _arun_work(self, *args: Any, **kwargs: Any) -> Any:
         """
         Get the graph.
         """
         pass
-    
+
     async def tool_stop_result(self, event_type: EventType, message: str | None = None):
         """
         can override method, return custom result of tool stop or new message
-        
+
         Returns:
             str: custom result of tool stop or new message
         """
@@ -861,12 +865,11 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
             result = f"Agent add new task: {message}"
         return result
 
-
     # External callback function, used to trigger the tool execution process if it needs to stop or new message
     @override
     async def trigger_external_completion(
         self, event_type: EventType, event_data: Any
-    ) -> Any:  
+    ) -> Any:
         result = None
         if not self._is_running:
             return result
@@ -878,12 +881,14 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
             elif event_type == EventType.NEW_MESSAGE:
                 self._new_message_event.set()
                 self._new_message_content = str(event_data)
-                result = await self.tool_stop_result(EventType.NEW_MESSAGE, str(event_data))
+                result = await self.tool_stop_result(
+                    EventType.NEW_MESSAGE, str(event_data)
+                )
                 result = f"Tool execution history summary:\n {result}\n User added new instruction: {event_data}"
         except BaseException as e:
             result = f"Error occurred during tool execution: {e}"
         return result
-        
+
     # Get the last message content as the result
     def get_last_event_content(self, event_data: dict) -> StandardStreamEvent:
         """
@@ -892,45 +897,44 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
         try:
             if not isinstance(event_data, dict):
                 return event_data
-            
+
             messages = event_data.get("data", {}).get("output", {}).get("messages", [])
             if not messages:
                 return event_data
-            
+
             # Traverse messages in reverse order, find the last valid AI message
             for message in reversed(messages):
                 if isinstance(message, dict):
                     content = message.get("content")
                 else:
                     content = getattr(message, "content", None)
-                
+
                 if not content:
                     continue
-                
+
                 # Check if the message is a valid AI message
                 # Check if there is a tool_call_id (if so, skip)
-                has_tool_call_id = (
-                    hasattr(message, "tool_call_id") or 
-                    (isinstance(message, dict) and "tool_call_id" in message)
+                has_tool_call_id = hasattr(message, "tool_call_id") or (
+                    isinstance(message, dict) and "tool_call_id" in message
                 )
                 if has_tool_call_id:
                     continue
-                
+
                 # Check if the message type is valid
                 if isinstance(message, dict):
                     is_valid = message.get("type") != "tool"
                 else:
                     is_valid = type(message).__name__ == "AIMessage"
-                
+
                 if is_valid:
                     return self.end_standard_stream_event(content)
-            
+
             return event_data
-            
+
         except BaseException as e:
             logging.exception(f"Error in get_last_event_content: {e}")
             return event_data
-        
+
     # Deprecated
     @override
     async def _astream_events(

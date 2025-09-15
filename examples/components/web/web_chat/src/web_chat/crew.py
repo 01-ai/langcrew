@@ -318,7 +318,7 @@ class WebChatCrew:
                 "display_content_param": "text",
             },
             {
-                "name": "phone_task_screenshot",
+                "name": "phone_take_screenshot",
                 "display_names": {"zh": "截图", "en": "Taking screenshot"},
             },
             {
