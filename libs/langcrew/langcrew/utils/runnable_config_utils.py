@@ -1,7 +1,7 @@
 import logging
 from typing import Any, ClassVar
 
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, ensure_config
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,10 @@ class RunnableStateManager:
         return config[cls.METADATA_KEY][cls.RUNNABLE_CONFIG_STATE_KEY]
 
     @classmethod
-    def _get_internal_state(cls, config: RunnableConfig) -> dict[str, Any]:
+    def _get_internal_state(
+        cls, config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        config = cls._context_ensure_config(config)
         """Get the metadata for specified session."""
         metadata = config.get(cls.METADATA_KEY, {})
         state = metadata.get(cls.RUNNABLE_CONFIG_STATE_KEY, None)
@@ -41,13 +44,17 @@ class RunnableStateManager:
         return state
 
     @classmethod
-    def get_state(cls, config: RunnableConfig) -> dict[str, Any]:
+    def get_state(cls, config: RunnableConfig | None = None) -> dict[str, Any]:
+        config = cls._context_ensure_config(config)
         """Get the current state for specified session."""
         state = cls._get_internal_state(config)
         return state.copy() if state else None
 
     @classmethod
-    def update_state(cls, config: RunnableConfig, updates: dict[str, Any]) -> None:
+    def update_state(
+        cls, updates: dict[str, Any], config: RunnableConfig | None = None
+    ) -> None:
+        config = cls._context_ensure_config(config)
         """Update the state with new values for specified session."""
         state = cls._get_internal_state(config)
         if state is None:
@@ -55,7 +62,10 @@ class RunnableStateManager:
         state.update(updates)
 
     @classmethod
-    def get_value(cls, config: RunnableConfig, key: str, default: Any = None) -> Any:
+    def get_value(
+        cls, key: str, default: Any = None, config: RunnableConfig | None = None
+    ) -> Any:
+        config = cls._context_ensure_config(config)
         """Get a specific value from state for specified session."""
         state = cls._get_internal_state(config)
         if state is None:
@@ -63,7 +73,10 @@ class RunnableStateManager:
         return state.get(key, default)
 
     @classmethod
-    def set_value(cls, config: RunnableConfig, key: str, value: Any) -> None:
+    def set_value(
+        cls, key: str, value: Any, config: RunnableConfig | None = None
+    ) -> None:
+        config = cls._context_ensure_config(config)
         """Set a specific value in state for specified session."""
         state = cls._get_internal_state(config)
         if state is None:
@@ -71,7 +84,8 @@ class RunnableStateManager:
         state[key] = value
 
     @classmethod
-    def del_key(cls, config: RunnableConfig, key: str) -> None:
+    def del_key(cls, key: str, config: RunnableConfig | None = None) -> None:
+        config = cls._context_ensure_config(config)
         """Delete a specific key from state for specified session."""
         state = cls._get_internal_state(config)
         if state is None:
@@ -80,9 +94,15 @@ class RunnableStateManager:
             del state[key]
 
     @classmethod
-    def has_key(cls, config: RunnableConfig, key: str) -> bool:
+    def has_key(cls, key: str, config: RunnableConfig | None = None) -> bool:
         """Check if a key exists in state for specified session."""
+        config = cls._context_ensure_config(config)
         state = cls._get_internal_state(config)
         if state is None:
             return False
         return key in state
+
+    @classmethod
+    def _context_ensure_config(cls, config: RunnableConfig | None) -> RunnableConfig:
+        """Ensure the config is not None."""
+        return config or ensure_config()

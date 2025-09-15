@@ -27,7 +27,20 @@ def async_timer(func):
 
 
 class EventQueueTask:
-    _END_EVENT: Final[object] = object()
+    """
+    Manages the lifecycle of a single event queue task
+
+    This class encapsulates the queue, producer task, and synchronization
+    primitives needed to manage a streaming event task. It provides methods
+    to get events from the queue and signal task completion.
+
+    Attributes:
+        queue: asyncio.Queue for buffering events
+        stream_producer_task: asyncio.Task running the stream producer
+        use_future: Future to signal whether task is being used
+    """
+
+    _END_EVENT: Final[object] = object()  # Sentinel object to signal stream end
 
     def __init__(
         self,
@@ -62,6 +75,17 @@ class AstreamEventTaskWrapper:
     """
     Generic streaming task wrapper that can execute any _astream_events method in asyncio.create_task
     and retrieve streaming results in the main thread
+
+    This class serves as a proxy for crew's astream_events method, wrapping the original astream_events
+    as one information source and internally encapsulating asyncio.Future as another source for custom
+    cancellation protocols. The crew's astream_events method simultaneously monitors both information
+    sources, and if asyncio.Future has results, it immediately ends the Agent task.
+
+    Key Features:
+    - Dual information source monitoring (LangGraph events + custom cancellation protocols)
+    - Task switching and event source replacement during runtime
+    - Graceful task cancellation with proper resource cleanup
+    - Queue-based event buffering to prevent memory overflow
     """
 
     def __init__(
@@ -85,6 +109,33 @@ class AstreamEventTaskWrapper:
         self._thread_id = None
 
     async def astream_event_task(self, *args, **kwargs) -> asyncio.Future[Any]:
+        """
+        Create and manage streaming event tasks with support for task switching
+
+        This method handles task creation, cancellation of previous tasks, and switching
+        between different event sources. It supports both initial task creation and
+        task updates (when send_new_message is called).
+
+        Process:
+        1. Check for existing task and cancel if present (for task updates)
+        2. Create new event queue with specified max size
+        3. Start producer task to execute stream_method
+        4. Return Future object indicating task usage status
+
+        Args:
+            *args: Positional arguments passed to stream_method
+            **kwargs: Keyword arguments, including:
+                - input: Input data for the stream method
+                - config: Configuration with thread_id
+                - current_result: Result from cancelled task (for updates)
+                - update_task_event: Custom event to send immediately
+
+        Returns:
+            asyncio.Future[Any]: Future indicating whether task is being used
+
+        Raises:
+            RuntimeError: If task is already completed
+        """
         if self._external_completion_future.done():
             raise RuntimeError(
                 f"astream_event_task is already done stream_producer_{self._thread_id}"
@@ -118,7 +169,20 @@ class AstreamEventTaskWrapper:
             await current_queue.put(update_task_event)
 
         async def stream_producer():
-            """Producer task: execute streaming processing and put events into queue"""
+            """
+            Producer task: execute streaming processing and put events into queue
+
+            This internal coroutine runs the actual stream_method and feeds events
+            into the queue for consumption by astream_event_result(). It handles
+            both normal completion and cancellation scenarios.
+
+            Process:
+            1. Execute stream_method and iterate over events
+            2. Put each event into the queue (blocks if queue is full)
+            3. Send END_EVENT when stream completes normally
+            4. Handle cancellation by not sending END_EVENT (handled by canceller)
+            5. Send exceptions as events if they occur
+            """
             try:
                 async for event in self.stream_method(*args, **kwargs):
                     # Put event into queue, will wait if queue is full
@@ -146,17 +210,27 @@ class AstreamEventTaskWrapper:
 
     async def astream_event_result(self) -> AsyncIterator[Any]:
         """
-        Use create_task to wrap streaming processing, get streaming results in main thread
+        Main event stream consumer that monitors dual information sources
 
-        Args:
-            *args: Positional arguments passed to stream_method
-            **kwargs: Keyword arguments passed to stream_method
+        This method implements the core functionality of monitoring both LangGraph's
+        astream_event stream and custom cancellation protocols simultaneously. It uses
+        asyncio.wait with FIRST_COMPLETED to respond immediately to either source.
+
+        Information Sources:
+        1. LangGraph astream_events: Normal streaming events from the graph execution
+        2. External completion future: Custom cancellation/update events from user
+
+        When external completion future completes, it immediately cancels the current
+        task, executes cancellation callbacks, and yields the final result.
 
         Yields:
-            Any: Any data returned by streaming processing
+            Any: Events from either LangGraph stream or external completion
 
-        Raises:
-            Exception: Any exception that occurs in stream_method
+        Process:
+        - Continuously wait for events from either source
+        - If external completion occurs: cancel task, run callbacks, yield result
+        - If queue event occurs: yield event and continue
+        - Handle task updates by continuing after END_EVENT
         """
         final_result = None
         try:
@@ -211,6 +285,17 @@ class AstreamEventTaskWrapper:
                 self._external_completion_future.cancel()
 
     def done_fetch_task(self, done_result: Any) -> None:
+        """
+        Signal external completion to terminate current streaming task
+
+        This method is called by RunnableCrew.stop_agent() to signal that the
+        current task should be terminated. It sets the external completion future
+        which causes astream_event_result() to immediately yield the final result
+        and terminate the stream.
+
+        Args:
+            done_result: Final result to return when task completes
+        """
         self._external_completion_future.set_result(done_result)
 
     @async_timer
@@ -220,6 +305,23 @@ class AstreamEventTaskWrapper:
         cancel_reason: str,
         cancel_result: Any,
     ) -> None:
+        """
+        Cancel the specified producer task and execute cancellation callbacks
+
+        This method ensures proper task cancellation and context preservation.
+        It cancels the asyncio task, waits for clean termination, and executes
+        the callback_on_cancel to maintain conversation context correctness.
+
+        This is critical for:
+        - Ensuring LangGraph parent-child graph context is properly stored
+        - Maintaining checkpoint conversation context integrity
+        - Proper resource cleanup during task cancellation
+
+        Args:
+            current_stream_producer_task: The asyncio task to cancel
+            cancel_reason: Reason for cancellation (for logging/context)
+            cancel_result: Result data from the cancellation
+        """
         if current_stream_producer_task and not current_stream_producer_task.done():
             current_stream_producer_task.cancel()
             try:
@@ -331,6 +433,7 @@ class AsyncBridge:
         except Exception as e:
             logger.error(f"Failed to execute async task: {e}")
             return None
+
     def run_async_func_no_wait(
         self, async_func: Callable[..., Awaitable[Any]], *args, **kwargs
     ) -> None:

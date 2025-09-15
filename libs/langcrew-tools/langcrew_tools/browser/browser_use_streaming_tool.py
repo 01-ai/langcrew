@@ -19,6 +19,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import StandardStreamEvent
 from langcrew.tools import (
     EventType,
+    HitlGetHandoverInfoTool,
     StreamEventType,
     StreamingBaseTool,
 )
@@ -75,7 +76,9 @@ class BrowserCompletionEvent(BaseModel):
     intervention_info: dict[str, Any] | None = None
 
 
-class BrowserStreamingTool(StreamingBaseTool, SandboxMixin, S3ClientMixin):
+class BrowserStreamingTool(
+    StreamingBaseTool, SandboxMixin, S3ClientMixin, HitlGetHandoverInfoTool
+):
     """Browser tool  for web interaction based on StreamingBaseTool."""
 
     DESKTOP_RESOLUTION: Final[tuple[int, int]] = (1280, 1020)
