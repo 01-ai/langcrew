@@ -84,13 +84,28 @@ class RunnableCrew(Crew):
         cancel_reason: str,
         final_result: Any,
     ):
+        """
+        Handle cancellation callback to maintain conversation context correctness
+
+        This method ensures proper context storage in LangGraph checkpoints when tasks
+        are cancelled. It merges all messages from the checkpointer, fixes message
+        structure in the cancellation context, and saves them to the root namespace
+        to maintain conversation context integrity.
+
+        This is critical for:
+        - Maintaining checkpoint conversation context correctness
+        - Ensuring cancelled tools properly maintain context via fix_llm_context_messages
+        - Preserving conversation history across task cancellations
+
+        Args:
+            cancel_reason (str): The reason for the cancellation
+            final_result (Any): The final result of the cancellation
+        """
         merger = CheckpointerMessageManager(self._async_checkpointer)
         messages = await merger.merge_all_messages(self.session_id)
-        # 修复取消上下文中的消息，确保tool_calls有对应的ToolMessage
         fixed_messages = CheckpointerMessageManager.fix_llm_context_messages(
             messages, cancel_reason, final_result
         )
-        # 保存到 self._async_checkpointer的 root 命名空中
         await merger.save_messages_to_root_namespace(self.session_id, fixed_messages)
 
     async def astream_events(
@@ -177,10 +192,21 @@ class RunnableCrew(Crew):
         """
         Stop the intelligent agent for the current session
 
-        Stop agent execution by setting a stop flag in the session state.
+        This method rapidly cancels the running LangGraph task and returns a business-defined
+        cancellation protocol through astream_event. It ensures proper context storage in
+        checkpoints and maintains conversation context correctness.
+
+        Process:
+        1. Notify all cancellation-supporting tools (StreamingBaseTool)
+        2. Tools return their current execution state to upper-level Agent via trigger_external_completion
+        3. Send cancellation event through AstreamEventTaskWrapper
+        4. Ensure LangGraph parent-child graph context is properly stored
+
+        Args:
+            final_result: Final result data for cancellation, optional
 
         Returns:
-            Whether the operation was successful
+            bool: Whether the stop operation was successful
         """
         logger.info(f"Received request to stop session: {self.session_id}")
         try:
@@ -200,13 +226,23 @@ class RunnableCrew(Crew):
         """
         Send new message to running intelligent agent
 
-        Send a new message to the running agent through session state.
+        This method implements task update functionality by first canceling the current task,
+        then creating a new task and returning a business-defined new task execution protocol.
+        It ensures the new task executes correctly before returning processed status to frontend.
+
+        Process:
+        1. Cancel current running task
+        2. Notify cancellation-supporting tools via trigger_external_completion
+        3. Switch crew's astream_events information source through AstreamEventTaskWrapper
+        4. Create new HumanMessage and start new task
+        5. Wait for new task to be properly initialized
+        6. Return processing status (True if successful)
 
         Args:
-            message: New message content
+            message: New message content to send to the agent
 
         Returns:
-            Whether the operation was successful
+            bool: Whether the new message was successfully processed and new task started
         """
         try:
             result = await self.execute_trigger_external_completion_callback(
@@ -246,7 +282,20 @@ class RunnableCrew(Crew):
     async def execute_trigger_external_completion_callback(
         self, event, value
     ) -> list[Any]:
-        """Execute all event callbacks"""
+        """
+        Execute all external completion callbacks for registered tools
+
+        This method notifies all StreamingBaseTool instances that support cancellation
+        about external events (STOP, NEW_MESSAGE). Tools can respond by returning their
+        current execution state, which helps maintain context during cancellation.
+
+        Args:
+            event: Event type (EventType.STOP or EventType.NEW_MESSAGE)
+            value: Event data/value to pass to callbacks
+
+        Returns:
+            list[Any]: List of results from all callback executions
+        """
         result = []
         for callback in self.trigger_external_completion_callback:
             try:

@@ -41,7 +41,7 @@ class CloudPhoneMessageHandler:
         if screenshot_url:
             current_clickable_elements = clickable_elements
             previous_clickable_elements = RunnableStateManager.get_value(
-                self.runnable_config, "previous_clickable_elements"
+                "previous_clickable_elements", self.runnable_config
             )
             if not previous_clickable_elements:
                 previous_clickable_elements = []
@@ -64,9 +64,9 @@ class CloudPhoneMessageHandler:
 
             text = json.dumps(text)
             RunnableStateManager.set_value(
-                self.runnable_config,
                 "previous_clickable_elements",
                 current_clickable_elements,
+                self.runnable_config
             )
             messages[-1].content = content
             if self.model_name.startswith("claude"):
@@ -83,7 +83,7 @@ class CloudPhoneMessageHandler:
                 )
             elif self.model_name.startswith("us.anthropic.claude"):
                 base_64 = RunnableStateManager.get_value(
-                    self.runnable_config, screenshot_url
+                    screenshot_url, self.runnable_config
                 )
                 if base_64:
                     messages.append(
@@ -101,7 +101,7 @@ class CloudPhoneMessageHandler:
                             ]
                         )
                     )
-                RunnableStateManager.del_key(self.runnable_config, screenshot_url)
+                RunnableStateManager.del_key(screenshot_url, self.runnable_config)
             else:
                 messages.append(
                     HumanMessage(
@@ -153,7 +153,7 @@ class CloudPhoneMessageHandler:
                 if await self._is_cloudphone_tool_message(current_message):
                     # Mark as phone scene
                     RunnableStateManager.update_state(
-                        self.runnable_config, {"scene": "phone"}
+                        {"scene": "phone"}, self.runnable_config
                     )
                     phone_tool_found = True
 
@@ -167,7 +167,7 @@ class CloudPhoneMessageHandler:
             if not phone_tool_found:
                 # Mark as not phone scene
                 RunnableStateManager.update_state(
-                    self.runnable_config, {"scene": "not_phone"}
+                    {"scene": "not_phone"}, self.runnable_config
                 )
 
     async def pre_hook(self, messages: list[BaseMessage]) -> list[BaseMessage]:

@@ -74,7 +74,6 @@ class CloudPhoneMixin(BaseTool, S3ClientMixin):
                         sandbox_id=self._sandbox.sandbox_id,
                     )                         
                     RunnableStateManager.set_value(
-                        ensure_config(),
                         image_url,
                         image_base_64,
                     )

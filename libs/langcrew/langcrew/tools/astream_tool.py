@@ -143,7 +143,6 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from enum import Enum
-import re
 from typing import Any
 
 try:
@@ -155,7 +154,6 @@ from langchain_core.callbacks import adispatch_custom_event
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import StandardStreamEvent
 from langchain_core.tools.base import BaseTool
-from langgraph.graph.state import CompiledStateGraph
 from pydantic import Field
 
 logger = logging.getLogger(__name__)
@@ -191,15 +189,48 @@ class StreamTimeoutError(Exception):
             super().__init__(f"Stream event timeout after {timeout_seconds}s")
 
 
-class ToolCallback(BaseTool):
+class ToolCallback(BaseTool, ABC):
+    """
+    Tool interface that contains ordered callback methods
+
+    Tools of this type will be registered in the crew and executed in order
+    after the langgraph astream method returns. The execution results will
+    ultimately be output in Langcrew's astream.
+
+    This interface enables tools to participate in post-processing workflows
+    and contribute to the final output stream in a controlled, ordered manner.
+    """
+
     @abstractmethod
-    def tool_order_callback(self) -> tuple[int | None, Callable]:
-        pass
+    def tool_order_callback(self) -> tuple[int | None, Callable]: ...
+
+
+class HitlGetHandoverInfoTool(ABC):
+    """
+    Interface for tools that provide handover information when HITL is triggered
+
+    When an Agent triggers HITL (Human In The Loop) - either through tool/agent
+    self-determination of needing handover or user actively inputting handover intent -
+    tools need to provide supplementary information to the frontend, such as:
+    - Sandbox handover address links
+    - Session information
+    - Access credentials
+    - Instructions for human operators
+
+    This interface ensures consistent handover information provision across all
+    tools that support human intervention scenarios.
+    """
+
+    @abstractmethod
+    async def get_handover_info(self) -> dict | None: ...
 
 
 class StreamingBaseTool(ToolCallback):
     stream_event_timeout_seconds: int = Field(
-        -1, description="Stream event timeout seconds"
+        -1,
+        description="Stream event timeout in seconds. Set to -1 for no timeout. "
+        "Prevents streaming tasks from blocking indefinitely by throwing "
+        "StreamTimeoutError if interval between _astream_events exceeds this value.",
     )
 
     def __init__(self, **kwargs):
@@ -211,21 +242,33 @@ class StreamingBaseTool(ToolCallback):
         self, event_type: EventType, event_data: Any
     ) -> Any:
         """
-        Handle external completion events and return context data to the agent.
+        Handle external completion events and return context data to the agent
 
-        Subclasses should implement this method to customize external event handling.
+        This method processes external completion events (STOP, NEW_MESSAGE) and returns
+        context data that will be sent to the upper-level Agent via _astream_events as
+        an END type event. This enables proper context preservation during cancellation.
+
+        Best Practice: Return current tool execution state to help Agent save context.
+        Performance Requirement: Avoid long-running tasks to ensure interruption and
+        task change events can be responded to promptly.
+
+        Supported EventTypes:
+        1. STOP: Cancel task event - tool should return current execution state
+        2. NEW_MESSAGE: Update task event - tool should handle task transition
 
         Args:
             event_type: External event type (STOP, NEW_MESSAGE)
             event_data: Data carried by the event
 
         Returns:
-            Context data to return to the stream processing caller
+            Context data to return to the stream processing caller, will be sent
+            to upper-level Agent as END event through _astream_events
 
         Example:
             async def handle_external_completion(self, event_type: EventType, event_data: Any):
                 if event_type == EventType.STOP:
-                    return {"interrupted": True, "reason": "User stopped execution"}
+                    return {"interrupted": True, "reason": "User stopped execution",
+                           "current_state": self.get_execution_state()}
                 elif event_type == EventType.NEW_MESSAGE:
                     return {"new_task": event_data, "continue": True}
                 return await super().handle_external_completion(event_type, event_data)
@@ -239,12 +282,30 @@ class StreamingBaseTool(ToolCallback):
             "stop_reason": result,
         }
 
-    async def get_handover_info(self) -> dict | None:
-        pass
-
     async def trigger_external_completion(
         self, event_type: EventType, event_data: Any
     ) -> Any:  # type: ignore
+        """
+        Method for tools to accept cancellation events
+
+        Generally registered at the Agent layer (RunnableCrew) to receive cancellation
+        events. Uses _external_completion_future to determine if the current object is
+        already executing/finished. For tools currently in progress, calls
+        handle_external_completion to implement the actual cancellation logic.
+
+        Workflow:
+        1. Check if tool is currently executing via _external_completion_future
+        2. If executing, call handle_external_completion for actual cancellation logic
+        3. Set result in _external_completion_future to notify waiting stream processor
+        4. Return result from handle_external_completion
+
+        Args:
+            event_type: Type of external event (STOP or NEW_MESSAGE)
+            event_data: Event data to pass to cancellation handler
+
+        Returns:
+            Result from handle_external_completion, or None if tool not executing
+        """
         if (
             not self._external_completion_future
             or self._external_completion_future.done()
@@ -278,20 +339,33 @@ class StreamingBaseTool(ToolCallback):
         self, *args: Any, **kwargs: Any
     ) -> AsyncIterator[tuple[StreamEventType, StandardStreamEvent]]:
         """
-        Stream events from the tool execution.
+        Core method that business logic needs to implement for streaming event generation
 
-        This method should be implemented by subclasses to provide streaming
-        functionality. It should yield tuples of (StreamEventType, custom_event_data)
-        as the tool processes.
+        This method outputs LangGraph standard events (StreamEventType, StandardStreamEvent).
+        StreamEventType indicates current event progress, where END represents completion
+        event. The END event output content will be returned to the upper-level agent,
+        with agent processing logic consistent with langchain tool return results.
+
+        START and INTERMEDIATE events will be returned through langgraph's astream method
+        as custom events (CustomStreamEvent) via adispatch_custom_event.
+
+        Event Flow:
+        - START: Tool initialization and input parameters
+        - INTERMEDIATE: Progress updates and partial results
+        - END: Final result that gets returned to the agent
+
+        Helper Methods Available:
+        - start_standard_stream_event(): Build StandardStreamEvent for START
+        - end_standard_stream_event(): Build StandardStreamEvent for END
 
         Args:
             *args: Positional arguments passed to the tool
             **kwargs: Keyword arguments passed to the tool
 
         Yields:
-            Tuple[StreamEventType, Any]: A tuple containing:
+            Tuple[StreamEventType, StandardStreamEvent]: A tuple containing:
                 - StreamEventType: The type of event (START, INTERMEDIATE, END)
-                - Any: The custom event data
+                - StandardStreamEvent: LangGraph standard event object
 
         Note:
             Add run_manager: Optional[AsyncCallbackManagerForToolRun] = None
@@ -390,10 +464,23 @@ class StreamingBaseTool(ToolCallback):
 
     async def custom_event_hook(self, custom_event: dict) -> Any:
         """
-        Crew callback custom event hook for processing stream events.
+        Crew callback custom event hook for processing stream events
 
-        This method is called by the crew system to handle custom events
-        generated during tool execution.
+        This method implements the generic logic for tool_order_callback. It filters
+        events by tool name to ensure only current tool's events are processed, and
+        categorizes current tool's events into:
+        1. Standard protocol processing (handle_standard_stream_event)
+        2. Custom protocol processing (handle_custom_event)
+
+        To ensure Langcrew can output standard protocol StandardStreamEvent after
+        Streamtool internal custom event output (adispatch_custom_event-CustomStreamEvent),
+        all astream_tools need to implement ToolCallback's callback method to convert
+        langgraph output (CustomStreamEvent) to StandardStreamEvent.
+
+        Return Behavior:
+        - Returns None: Discard current result
+        - Returns list: Support multiple results
+        - Returns object: Single processed result
 
         Args:
             custom_event: Dictionary containing event information with structure:
@@ -402,7 +489,8 @@ class StreamingBaseTool(ToolCallback):
                 - data: Any - event data that will be converted to StandardStreamEvent
 
         Returns:
-            Any: Processed event data or original event if not handled
+            Any: Processed event data, original event if not handled, None to discard,
+                 or list for multiple results
 
         Example:
             custom_event = {
@@ -447,18 +535,30 @@ class StreamingBaseTool(ToolCallback):
 
     def handle_timeout_error(self, error: Exception) -> None:
         """
-        Hook method for handling stream processing timeout errors.
+        Hook method for handling stream processing timeout errors
 
-        Subclasses can override this method to implement custom timeout handling logic.
+        Called when stream_event_timeout_seconds is exceeded between _astream_events
+        returns. This prevents streaming tasks from blocking indefinitely and causing
+        complete system deadlock.
+
+        Subclasses can override this method to implement custom timeout handling logic
+        such as resource cleanup, state synchronization, and user notification.
+
+        Use Cases:
+        - Clean up partial results or temporary resources
+        - Synchronize tool state after timeout
+        - Send timeout notifications to users
+        - Log detailed timeout information for debugging
 
         Args:
-            error: Timeout exception object
+            error: StreamTimeoutError object containing timeout details
 
         Example:
             def handle_timeout_error(self, error: Exception) -> None:
-                logger.error(f"Tool {self.name} timed out: {error}")
-                self.cleanup_resources()
+                logger.error(f"Tool {self.name} timed out after {error.timeout_seconds}s")
+                self.cleanup_partial_results()
                 self.notify_timeout_to_user()
+                self.reset_tool_state()
         """
         pass
 
@@ -549,6 +649,35 @@ class StreamingBaseTool(ToolCallback):
         *args,
         **kwargs,
     ) -> Any:
+        """
+        Timeout version implementation that supports dual information sources
+
+        This method handles streaming with timeout support by monitoring two information sources:
+        1. Tool's _astream_events: Normal business processing events
+        2. Custom cancellation protocol: External completion events
+
+        Implementation mechanism:
+        - Stores information from both message sources in asyncio.Event()
+        - Uses asyncio.wait_for to set maximum time for information retrieval
+        - Throws StreamTimeoutError if timeout occurs
+        - Allows handle_timeout_error to synchronize class state
+
+        The timeout mechanism prevents streaming tasks from blocking indefinitely,
+        ensuring system responsiveness even when tools become unresponsive.
+
+        Args:
+            custom_event_name: Name for custom events
+            config: Optional runtime configuration
+            can_dispatch_events: Whether custom event dispatch is available
+            *args: Arguments passed to _astream_events
+            **kwargs: Keyword arguments passed to _astream_events
+
+        Returns:
+            Final result from either stream completion or external completion
+
+        Raises:
+            StreamTimeoutError: If no events received within timeout period
+        """
         self._reset_external_completion()
         timeout_seconds = self.stream_event_timeout_seconds
 
@@ -763,6 +892,24 @@ class StreamingBaseTool(ToolCallback):
 
 
 class ExternalCompletionBaseTool(StreamingBaseTool, ABC):
+    """
+    Tool base class that supports fast return - for tools that primarily rely on external completion
+
+    Usage:
+    - Inherit and implement _arun_custom_event method
+    - Use _arun_custom_event instead of langchain's _arun
+
+    When to use:
+    - Tools that primarily wait for external events (user input, external APIs)
+    - Tools that need fast response to external completion signals
+    - Simple tools that don't require complex streaming progress updates
+
+    When NOT to use:
+    - If using RunnableCrew to cancel tasks and don't need to implement
+      trigger_external_completion and handle_external_completion to return
+      tool current state, then this class is not needed
+    """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -770,13 +917,25 @@ class ExternalCompletionBaseTool(StreamingBaseTool, ABC):
     async def _astream_events(
         self, *args: Any, **kwargs: Any
     ) -> AsyncIterator[tuple[StreamEventType, StandardStreamEvent]]:
+        """Default implementation that wraps _arun_custom_event as a simple END event"""
         result = await self._arun_custom_event(*args, **kwargs)
         yield StreamEventType.END, self.end_standard_stream_event(result)
 
     @abstractmethod
     async def _arun_custom_event(self, *args: Any, **kwargs: Any) -> Any:
         """
-        Run the tool asynchronously and return the result.
+        Run the tool asynchronously and return the result
+
+        This method replaces langchain's _arun for tools that primarily depend on
+        external completion. The result will be automatically wrapped as an END
+        event in the default _astream_events implementation.
+
+        Args:
+            *args: Positional arguments for tool execution
+            **kwargs: Keyword arguments for tool execution
+
+        Returns:
+            Tool execution result that will be sent as END event to agent
         """
 
 
@@ -787,19 +946,23 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
         self._new_message_event: asyncio.Event = asyncio.Event()
         self._new_message_content: str | None = None
         self._is_running: bool = False
-    
-    @override    
+
+    @override
     async def _arun(self, config: RunnableConfig, *args: Any, **kwargs: Any) -> Any:
         self._is_running = True
         main_task = asyncio.create_task(self._arun_work(*args, **kwargs))
-        
+
         try:
             # Wait for the main task to complete or the stop signal
             done, pending = await asyncio.wait(
-                [main_task, asyncio.create_task(self._stop_event.wait()), asyncio.create_task(self._new_message_event.wait())],
-                return_when=asyncio.FIRST_COMPLETED
+                [
+                    main_task,
+                    asyncio.create_task(self._stop_event.wait()),
+                    asyncio.create_task(self._new_message_event.wait()),
+                ],
+                return_when=asyncio.FIRST_COMPLETED,
             )
-            
+
             # Cancel unfinished tasks
             for task in pending:
                 task.cancel()
@@ -807,30 +970,32 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
                     await task
                 except asyncio.CancelledError:
                     pass
-            
+
             if self._stop_event.is_set():
                 logger.info("Stop signal received")
                 self._stop_event.clear()
                 return await self.tool_stop_result(EventType.STOP, "stop")
-                
+
             if self._new_message_event.is_set():
                 logger.info("New message signal received")
                 message_content = self._new_message_content
                 self._new_message_event.clear()
                 self._new_message_content = None
-                return await self.tool_stop_result(EventType.NEW_MESSAGE, message_content)
-            
+                return await self.tool_stop_result(
+                    EventType.NEW_MESSAGE, message_content
+                )
+
             result = main_task.result()
             logger.info(f"Main task completed: {result}")
             return result  # Get the result of the main task
-            
+
         except asyncio.CancelledError:
             logger.info("Main task cancelled")
             # Cancel main task
             if not main_task.done():
                 main_task.cancel()
             return None
-            
+
         except BaseException as e:
             logger.exception(f"Error in _arun: {e}")
             # Cancel main task
@@ -839,18 +1004,18 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
             raise e
         finally:
             self._is_running = False
-        
+
     @abstractmethod
     async def _arun_work(self, *args: Any, **kwargs: Any) -> Any:
         """
         Get the graph.
         """
         pass
-    
+
     async def tool_stop_result(self, event_type: EventType, message: str | None = None):
         """
         can override method, return custom result of tool stop or new message
-        
+
         Returns:
             str: custom result of tool stop or new message
         """
@@ -861,12 +1026,11 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
             result = f"Agent add new task: {message}"
         return result
 
-
     # External callback function, used to trigger the tool execution process if it needs to stop or new message
     @override
     async def trigger_external_completion(
         self, event_type: EventType, event_data: Any
-    ) -> Any:  
+    ) -> Any:
         result = None
         if not self._is_running:
             return result
@@ -878,12 +1042,14 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
             elif event_type == EventType.NEW_MESSAGE:
                 self._new_message_event.set()
                 self._new_message_content = str(event_data)
-                result = await self.tool_stop_result(EventType.NEW_MESSAGE, str(event_data))
+                result = await self.tool_stop_result(
+                    EventType.NEW_MESSAGE, str(event_data)
+                )
                 result = f"Tool execution history summary:\n {result}\n User added new instruction: {event_data}"
         except BaseException as e:
             result = f"Error occurred during tool execution: {e}"
         return result
-        
+
     # Get the last message content as the result
     def get_last_event_content(self, event_data: dict) -> StandardStreamEvent:
         """
@@ -892,45 +1058,44 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
         try:
             if not isinstance(event_data, dict):
                 return event_data
-            
+
             messages = event_data.get("data", {}).get("output", {}).get("messages", [])
             if not messages:
                 return event_data
-            
+
             # Traverse messages in reverse order, find the last valid AI message
             for message in reversed(messages):
                 if isinstance(message, dict):
                     content = message.get("content")
                 else:
                     content = getattr(message, "content", None)
-                
+
                 if not content:
                     continue
-                
+
                 # Check if the message is a valid AI message
                 # Check if there is a tool_call_id (if so, skip)
-                has_tool_call_id = (
-                    hasattr(message, "tool_call_id") or 
-                    (isinstance(message, dict) and "tool_call_id" in message)
+                has_tool_call_id = hasattr(message, "tool_call_id") or (
+                    isinstance(message, dict) and "tool_call_id" in message
                 )
                 if has_tool_call_id:
                     continue
-                
+
                 # Check if the message type is valid
                 if isinstance(message, dict):
                     is_valid = message.get("type") != "tool"
                 else:
                     is_valid = type(message).__name__ == "AIMessage"
-                
+
                 if is_valid:
                     return self.end_standard_stream_event(content)
-            
+
             return event_data
-            
+
         except BaseException as e:
             logging.exception(f"Error in get_last_event_content: {e}")
             return event_data
-        
+
     # Deprecated
     @override
     async def _astream_events(

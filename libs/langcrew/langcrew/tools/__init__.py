@@ -2,6 +2,7 @@ from .astream_tool import (
     EventType,
     ExternalCompletionBaseTool,
     GraphStreamingBaseTool,
+    HitlGetHandoverInfoTool,
     StreamEventType,
     StreamingBaseTool,
     ToolCallback,
@@ -19,4 +20,5 @@ __all__ = [
     "GraphStreamingBaseTool",
     "EventType",
     "StreamEventType",
+    "HitlGetHandoverInfoTool",
 ]

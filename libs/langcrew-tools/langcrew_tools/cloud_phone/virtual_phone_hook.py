@@ -44,7 +44,7 @@ class CloudPhoneMessageHandler:
         if screenshot_url:
             current_clickable_elements = clickable_elements
             previous_clickable_elements = RunnableStateManager.get_value(
-                ensure_config(), "previous_clickable_elements"
+                "previous_clickable_elements"
             )
             if not previous_clickable_elements:
                 previous_clickable_elements = []
@@ -97,7 +97,6 @@ class CloudPhoneMessageHandler:
 
             text = json.dumps(text)
             RunnableStateManager.set_value(
-                ensure_config(),
                 "previous_clickable_elements",
                 current_clickable_elements,
             )
@@ -140,7 +139,7 @@ class CloudPhoneMessageHandler:
                             ]
                         )
                     )
-                RunnableStateManager.del_key(ensure_config(), screenshot_url)
+                RunnableStateManager.del_key(screenshot_url)
             else:
                 messages.append(
                     HumanMessage(
