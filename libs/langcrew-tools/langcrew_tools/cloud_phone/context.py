@@ -12,9 +12,7 @@ from langchain_core.messages import (
 )
 from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
-from langgraph.graph.state import CompiledStateGraph
 from langmem.short_term.summarization import asummarize_messages
 
 # Prompt templates configuration
@@ -203,7 +201,7 @@ class LangGraphSummaryHook:
         max_messages_count_before_summary: int = 50, # Fixed trigger at 50 messages
         keep_messages_count: int = 10, # Keep 10, summary（40）+ 10 messages, max_messages_count_before_summary and keep_messages_count  Used to calculate the value of x_tokens_fronte_summary
         max_tokens_before_summary: int = 64000, # max_tokens_before_summary(messages) +  messages + remaining messages <  max_tokens
-        max_tokens: int = 180000,  #summary(8192)+ remaining messages < max_tokens
+        max_tokens: int = 120000,  #summary(8192)+ remaining messages < max_tokens
         language: str = "chinese",
     ):
         self.base_model = base_model
@@ -242,6 +240,7 @@ class LangGraphSummaryHook:
                 existing_summary_prompt=self.update_prompt,
                 final_prompt=self.final_prompt,
             )
+            self.logger.info(f"summarization_result: {summarization_result}")
             if summarization_result.running_summary:
                 state["running_summary"] = summarization_result.running_summary
                 state["messages"] = [

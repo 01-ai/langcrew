@@ -5,18 +5,17 @@ from typing import Any, Final, Union
 
 from agentbox import AsyncSandbox
 from agentbox.api.client.models import InstanceAuthInfo
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, ensure_config
 from langchain_core.tools import BaseTool
 from langcrew.utils import CheckpointerSessionStateManager
 from langcrew.utils.runnable_config_utils import RunnableStateManager
-
 from pydantic import ConfigDict, Field, PrivateAttr
 
 from ..env_config import env_config
 from ..s3 import S3ClientMixin
 from ..sandbox.s3_integration import SandboxS3Toolkit
 from .actions import enable_a11y, get_clickables, take_screenshot
-from langchain_core.runnables import RunnableConfig, ensure_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +62,7 @@ class CloudPhoneMixin(BaseTool, S3ClientMixin):
             clickable_elements = await get_clickables(self._sandbox)
             if clickable_elements:
                 clickable_elements = clickable_elements.get("clickable_elements", [])
+            RunnableStateManager.set_value(ensure_config(), "clickable_elements", clickable_elements)
             _, image_bytes = await take_screenshot(self._sandbox)
             image_base_64 = base64.b64encode(image_bytes).decode("utf-8")
             if image_base_64:
@@ -78,10 +78,7 @@ class CloudPhoneMixin(BaseTool, S3ClientMixin):
                         image_url,
                         image_base_64,
                     )
-            return {
-                "clickable_elements": clickable_elements,
-                "screenshot_url": image_url,
-            }
+            return {"screenshot_url": image_url}
         except Exception as e:
             logging.error(f"Error getting current state: {e}")
             return {"error": str(e), "clickable_elements": None, "screenshot_url": None}

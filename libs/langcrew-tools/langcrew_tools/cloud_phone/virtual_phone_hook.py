@@ -3,13 +3,12 @@ import json
 import logging
 from typing import Any
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import ensure_config
-from langchain_openai import ChatOpenAI
 from langcrew.utils.runnable_config_utils import RunnableStateManager
 
 from langcrew_tools.cloud_phone.context import LangGraphSummaryHook
-from langchain_core.language_models import BaseChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -169,51 +168,32 @@ class CloudPhoneMessageHandler:
         if not current_state:
             return
 
-        clickable_elements = current_state.get("clickable_elements")
         screenshot_url = current_state.get("screenshot_url")
-        result = content.get("result")
-
+        clickable_elements = RunnableStateManager.get_value(ensure_config(), "clickable_elements")
         if clickable_elements or screenshot_url:
             await self._update_message_content(
-                result, clickable_elements, screenshot_url, messages=messages
+                content.get("result"), clickable_elements, screenshot_url, messages=messages
             )
 
     async def _restore_format(self, messages: list[BaseMessage]):
         """Restore messages to original format."""
         # Find the first CloudPhone tool message from the end, checking at most 6 messages
-        max_search = min(6, len(messages))
-        for i in range(1, max_search + 1):
-            if i > 1:  # Make sure there's a message after this one
-                next_message = messages[-(i - 1)]
-                if isinstance(next_message, HumanMessage):
-                    if isinstance(next_message.content, list):
-                        # Check if the previous message is a ToolMessage
-                        prev_message_index = (
-                            -(i - 1) - 1
-                        )  # Index of the message before next_message
-                        if abs(prev_message_index) <= len(messages):
-                            prev_message = messages[prev_message_index]
-                            if isinstance(prev_message, ToolMessage):
-                                messages.remove(next_message)
+        for i in range(1, min(6, len(messages))):
+            if (isinstance(messages[-i], HumanMessage) and 
+                isinstance(messages[-i].content, list) and 
+                isinstance(messages[-(i+1)], ToolMessage)):
+                messages.remove(messages[-i])
+                return
 
-    async def pre_hook(self, base_model: BaseChatModel, state: dict[str, Any]) -> list[BaseMessage]:
+    async def pre_hook(
+        self, base_model: BaseChatModel, state: dict[str, Any]
+    ) -> list[BaseMessage]:
         """Pre-model hook executed before the model."""
         messages = state.get("messages", [])
         if not messages:
             return messages
         try:
-            # summary
-            summary_hook = LangGraphSummaryHook(base_model, 50, 10, 150000)
-            running_summary = RunnableStateManager.get_value(
-                    ensure_config(), "running_summary"
-                )
-            if running_summary:
-              state["running_summary"] = running_summary
-            await summary_hook.summary(state)
-            if "running_summary" in state:
-                RunnableStateManager.set_value(
-                    ensure_config(), "running_summary", state["running_summary"]
-                )
+            await self._summary(base_model, state)
             # process_message
             await self._process_message(messages)
         except (json.JSONDecodeError, KeyError, AttributeError) as e:
@@ -227,3 +207,20 @@ class CloudPhoneMessageHandler:
         if messages:
             await self._restore_format(messages)
         return messages
+
+    async def _summary(self, base_model: BaseChatModel, state: dict[str, Any]):
+        summary_hook = LangGraphSummaryHook(
+            base_model=base_model,
+            max_messages_count_before_summary=50,
+            keep_messages_count=10,
+        )
+        running_summary = RunnableStateManager.get_value(
+            ensure_config(), "running_summary"
+        )
+        if running_summary:
+            state["running_summary"] = running_summary
+        await summary_hook.summary(state)
+        if "running_summary" in state:
+            RunnableStateManager.set_value(
+                ensure_config(), "running_summary", state["running_summary"]
+            )
