@@ -4,6 +4,7 @@ This is the  version of BrowserStreamingTool that uses the improved streaming ar
 """
 
 import datetime
+import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
@@ -164,15 +165,13 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
     base_model: BaseChatModel | None = Field(default=None, description="Base model")
     recursion_limit: int = Field(default=120, description="Recursion limit")
     model_name: str | None = Field(default=None, description="Model name")
+    session_id: str = Field(default="", description="Session id")
 
-    _session_id: str | None = PrivateAttr(default=None)
     _cloudphone_handler_with_model: CloudPhoneMessageHandler | None = PrivateAttr(
         default=None
     )
-    config: RunnableConfig | None = None
-    
+    config: RunnableConfig | None = None 
     adapter: LangGraphAdapter | None  = None
-    
     graph: CompiledStateGraph | None  = None 
 
     def __init__(
@@ -180,21 +179,22 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         model_name: str,
         base_model: BaseChatModel,
         sandbox_source: Callable[[], Awaitable[AsyncSandbox]],
+        session_id: str,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.sandbox_source = sandbox_source
         self.base_model = base_model
         self.model_name = model_name
+        self.session_id = session_id
         
     @override
     async def _arun_work(self, instruction: str, **kwargs: Any) -> Any:
         """
-        Get the graph.
+         work for _arun
         """
-        self._session_id = "123456" + "_cloudphone"
         final_config = {
-            "configurable": {"thread_id": self._session_id},
+            "configurable": {"thread_id": self.session_id + "_cloudphone"},
             "recursion_limit": self.recursion_limit,
         }
         self.config = final_config
@@ -227,7 +227,9 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
         if pre_event:
             result = self.get_last_event_content(pre_event)
             content = result.get("data", {}).get("output", "")
-        return content 
+        if isinstance(content, dict) or isinstance(content, list):
+            content = json.dumps(content, ensure_ascii=False)
+        return content
         # =====langgraph end=====
         
         #  TODO crew tool_stop_result方法中无法获取历史消息，等支持后打开
@@ -272,7 +274,10 @@ class CloudPhoneStreamingTool(GraphStreamingBaseTool):
             retrieved_messages = state.values["messages"]
             summary = await summarize_history_messages_direct( self.base_model, retrieved_messages)
             logger.info(f"summary: {summary}")
-            return summary
+            if event_type == EventType.STOP:
+                return f"Tool execution history summary:\n {summary}\n User requested to stop the task, task ended"
+            elif event_type == EventType.NEW_MESSAGE:
+                return f"Tool execution history summary:\n {summary}\n User added new instruction: {message}"
         else:
             return message
 

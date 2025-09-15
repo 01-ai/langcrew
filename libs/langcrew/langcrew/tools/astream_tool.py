@@ -783,8 +783,8 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
         super().__init__(**kwargs)
         self._stop_event: asyncio.Event = asyncio.Event()
         self._new_message_event: asyncio.Event = asyncio.Event()
-        self._new_message_content: str | None = None
         self._is_running: bool = False
+        self._stop_result: str | None = None
 
     @override
     async def _arun(self, config: RunnableConfig, *args: Any, **kwargs: Any) -> Any:
@@ -813,16 +813,12 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
             if self._stop_event.is_set():
                 logger.info("Stop signal received")
                 self._stop_event.clear()
-                return await self.tool_stop_result(EventType.STOP, "stop")
-
+                return self._stop_result
+            
             if self._new_message_event.is_set():
                 logger.info("New message signal received")
-                message_content = self._new_message_content
                 self._new_message_event.clear()
-                self._new_message_content = None
-                return await self.tool_stop_result(
-                    EventType.NEW_MESSAGE, message_content
-                )
+                return self._stop_result
 
             result = main_task.result()
             logger.info(f"Main task completed: {result}")
@@ -875,16 +871,13 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
             return result
         try:
             if event_type == EventType.STOP:
+                result = await self.tool_stop_result(EventType.STOP, None)
+                self._stop_result = result
                 self._stop_event.set()
-                await self.tool_stop_result(EventType.STOP, None)
-                result = f"Tool execution history summary:\n {result}\n User requested to stop the task, task ended"
             elif event_type == EventType.NEW_MESSAGE:
+                result = await self.tool_stop_result(EventType.NEW_MESSAGE, str(event_data))
+                self._stop_result = result
                 self._new_message_event.set()
-                self._new_message_content = str(event_data)
-                result = await self.tool_stop_result(
-                    EventType.NEW_MESSAGE, str(event_data)
-                )
-                result = f"Tool execution history summary:\n {result}\n User added new instruction: {event_data}"
         except BaseException as e:
             result = f"Error occurred during tool execution: {e}"
         return result
