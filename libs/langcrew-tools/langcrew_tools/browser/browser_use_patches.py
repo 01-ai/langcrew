@@ -1,12 +1,29 @@
 # Use (Monkey Patching) to modify browser_use code to make it more suitable for business requirements
 
+import sys
 import logging
 from typing import Any, Final
 
-from browser_use.agent.service import Agent
-from browser_use.agent.views import ActionResult
-from browser_use.controller.views import DoneAction
-from browser_use.filesystem.file_system import FileSystem
+# This module depends on browser-use and only supports Python 3.11+
+if sys.version_info < (3, 11):
+    raise ImportError(
+        "langcrew_tools.browser requires Python >= 3.11. "
+        f"Detected {sys.version_info.major}.{sys.version_info.minor}. "
+        "Upgrade Python to use browser tools, or avoid importing this subpackage."
+    )
+
+try:
+    from browser_use.agent.service import Agent  # type: ignore[import-not-found]
+    from browser_use.agent.views import ActionResult  # type: ignore[import-not-found]
+    from browser_use.controller.views import DoneAction  # type: ignore[import-not-found]
+    from browser_use.filesystem.file_system import FileSystem  # type: ignore[import-not-found]
+except Exception as exc:
+    # Provide clear guidance when optional dependency is missing
+    raise ImportError(
+        "Browser tools require the optional dependency 'browser-use'. "
+        "Install it on Python >=3.11, e.g.: pip install 'browser-use==0.5.5'."
+    ) from exc
+
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)

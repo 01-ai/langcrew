@@ -7,7 +7,7 @@ name = "langcrew-tools"
 version = "0.1.0"
 description = "Tool collection for LangCrew - Building multi-agent applications"
 readme = "README.md"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.10,<3.13"
 license = "MIT"
 license-files = ['LICENSE']
 authors = [
@@ -19,6 +19,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
@@ -30,7 +31,7 @@ dependencies = [
     "langchain-core>=0.3.72",
     "langchain-text-splitters>=0.3.9",
     "langcrew>=0.1.0",
-    "langgraph>=0.6.3",
+    "langgraph>=0.6.0",
     # HTTP and API clients
     "aiohttp>=3.12.15",
     "httpx>=0.28.1",
@@ -40,14 +41,14 @@ dependencies = [
     # Database and storage
     "sqlalchemy>=2.0.42",
     # Browser automation
-    "browser-use==0.5.5",
+    "browser-use==0.5.5; python_version >= '3.11'",
     # Execution environments
-    "e2b==1.2.0b6",
-    "e2b-desktop==1.7.1b2",
-    # Agent frameworks
-    "agentbox-python-sdk>=0.2.1",
+    "agentbox-python-sdk>=0.2.9",
     "playwright==1.54.0",
     "pytest-dotenv>=0.5.2",
+    "langmem",
+    "volcengine-python-sdk[ark]>=4.0.11",
+    "beautifulsoup4>=4.13.5",
 ]
 
 
@@ -103,6 +104,7 @@ dev-dependencies = [
     "ruff>=0.1.0",
     "codespell",
     "types-requests>=2.31.0",
+    "langmem"
 ]
 
 [tool.ruff]
@@ -111,7 +113,7 @@ lint.ignore = ["E501"]
 line-length = 88
 indent-width = 4
 extend-include = ["*.ipynb"]
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["UP006", "UP007"]
@@ -129,7 +131,7 @@ docstring-code-line-length = "dynamic"
 "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

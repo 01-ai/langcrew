@@ -2,6 +2,8 @@ import logging
 import os
 from typing import Any
 
+from .llm import apply_bedrock_decorator, create_cache_modifier
+
 logger = logging.getLogger(__name__)
 
 # Default parameters
@@ -45,7 +47,6 @@ class LLMFactory:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
                 raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
-
             llm = ChatAnthropic(
                 model=model_name,
                 api_key=api_key,
@@ -53,6 +54,7 @@ class LLMFactory:
                 max_tokens=config.get("max_tokens", DEFAULT_MAX_TOKENS),
                 max_retries=config.get("max_retries", 2),
                 timeout=config.get("timeout", 60.0),
+                # base_url= "https://gateway.ai.cloudflare.com/v1/1f099cb115a03f47e9c8b1fe5886bec4/ybw1392/anthropic"
             )
 
         elif provider == "bedrock":
@@ -75,7 +77,7 @@ class LLMFactory:
                 )
 
             # Create ChatBedrockConverse with the configured settings
-            return ChatBedrockConverse(
+            llm = ChatBedrockConverse(
                 model_id=model_name,
                 temperature=temperature,
                 max_tokens=config.get("max_tokens", DEFAULT_MAX_TOKENS),
@@ -83,6 +85,17 @@ class LLMFactory:
                 provider=config.get("provider_id", "amazon"),
                 config=proxy_config,
             )
+            if config.get("cache", True):
+                system_modifier, message_modifier, tools_modifier = (
+                    create_cache_modifier(model_name)
+                )
+                llm = apply_bedrock_decorator(
+                    llm,
+                    system_modifier=system_modifier,
+                    tools_modifier=tools_modifier,
+                    message_modifier=message_modifier,
+                )
+            return llm
 
         elif provider == "dashscope":
             from langchain_openai import ChatOpenAI
@@ -112,6 +125,23 @@ class LLMFactory:
 
             llm = ChatDeepSeek(
                 model=model_name,
+                api_key=api_key,
+                temperature=temperature,
+                max_tokens=config.get("max_tokens", DEFAULT_MAX_TOKENS),
+                max_retries=config.get("max_retries", 3),
+                request_timeout=config.get("request_timeout", 60.0),
+            )
+
+        elif provider == "vertex":
+            from .llm import VertexAIChat
+
+            logger.info(f"Creating Vertex AI client for {model_name}")
+            api_key = os.getenv("VERTEX_AI_API_KEY")
+            if not api_key:
+                raise ValueError("VERTEX_AI_API_KEY environment variable is not set")
+
+            llm = VertexAIChat(
+                name=model_name,
                 api_key=api_key,
                 temperature=temperature,
                 max_tokens=config.get("max_tokens", DEFAULT_MAX_TOKENS),

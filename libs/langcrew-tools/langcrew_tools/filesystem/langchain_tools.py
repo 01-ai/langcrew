@@ -1,11 +1,12 @@
 from typing import ClassVar
 
 from langchain_core.tools import BaseTool
-from langcrew.utils.file_detect import is_binary_file
 from pydantic import BaseModel, Field
 
 from ..base import BaseToolInput
+from ..utils.s3 import S3ClientMixin
 from ..utils.sandbox import SandboxMixin
+from .file_validators import fix_content, is_binary_file
 
 
 class WriteFileInput(BaseToolInput):
@@ -102,20 +103,23 @@ class FileAppendTextInput(BaseToolInput):
     append_newline: bool = Field(default=True, description="Add newline at the end")
 
 
-class WriteFileTool(BaseTool, SandboxMixin):
+class WriteFileTool(BaseTool, SandboxMixin, S3ClientMixin):
     """Tool for writing content to a file in the sandbox."""
 
     name: ClassVar[str] = "write_file"
     args_schema: type[BaseModel] = WriteFileInput
     description: ClassVar[str] = (
-        "Write content to a file in the sandbox. "
-        "Provide the file path and content to write."
+        "Write text content to a file in the sandbox; this will create a new file or completely replace existing content. "
+        "Provide the file path and the content to write. "
+        "Note: If you have a file URL, using a shell command like 'wget -O file_path url' is preferred."
     )
 
     async def _arun(self, path: str, content: str, **kwargs) -> dict:
         """Write content to a file synchronously."""
         try:
             async_sandbox = await self.get_sandbox()
+            s3 = await self.get_s3_client()
+            content = await fix_content(async_sandbox, s3, path, content)
             await async_sandbox.files.write(path, content)
             return {
                 "message": f"Successfully wrote to file: {path}",
@@ -135,7 +139,8 @@ class ReadFileTool(BaseTool, SandboxMixin):
     name: ClassVar[str] = "read_file"
     args_schema: type[BaseModel] = ReadFileInput
     description: ClassVar[str] = (
-        "Read only text content from a file in the sandbox. Provide the file path."
+        "Read only text content from a file in the sandbox. Provide the file path. "
+        "This tool is for text files only and will return an error for binary files."
     )
 
     async def _arun(self, path: str, **kwargs) -> dict:
@@ -206,7 +211,7 @@ class DeleteFileTool(BaseTool, SandboxMixin):
         raise NotImplementedError("delete_file only supports async execution.")
 
 
-class FileReplaceTextTool(BaseTool, SandboxMixin):
+class FileReplaceTextTool(BaseTool, SandboxMixin, S3ClientMixin):
     """Tool for replacing a specific text in a file in the sandbox."""
 
     name: ClassVar[str] = "file_replace_text"
@@ -228,6 +233,10 @@ class FileReplaceTextTool(BaseTool, SandboxMixin):
                 }
 
             updated_content = file_content.replace(old_str, new_str)
+            s3 = await self.get_s3_client()
+            updated_content = await fix_content(
+                async_sandbox, s3, path, updated_content
+            )
             await async_sandbox.files.write(path, updated_content)
 
             return {
@@ -242,13 +251,13 @@ class FileReplaceTextTool(BaseTool, SandboxMixin):
         raise NotImplementedError("file_replace_text only supports async execution.")
 
 
-class FileAppendTextTool(BaseTool, SandboxMixin):
+class FileAppendTextTool(BaseTool, SandboxMixin, S3ClientMixin):
     """Tool for appending text content to a file in the sandbox."""
 
     name: ClassVar[str] = "file_append_text"
     args_schema: type[BaseModel] = FileAppendTextInput
     description: ClassVar[str] = (
-        "Append text to file end. Used for logs, document building, data collection etc."
+        "Append text to the end of a file, adding content incrementally. Used for logs, document building, data collection etc."
     )
 
     async def _arun(
@@ -271,7 +280,10 @@ class FileAppendTextTool(BaseTool, SandboxMixin):
             else:
                 # Create new file with the content
                 updated_content = final_content
-
+            s3 = await self.get_s3_client()
+            updated_content = await fix_content(
+                async_sandbox, s3, path, updated_content
+            )
             # Write the updated content
             await async_sandbox.files.write(path, updated_content)
 

@@ -7,18 +7,16 @@ authors = [
 ]
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    # Local packages
-    "langcrew",
     "langcrew-tools",
     # LangChain ecosystem
     "langchain-core>=0.3.0",
     "langchain-community>=0.3.0",
     "langchain-openai>=0.2.0",
     "langchain-anthropic>=0.1.0",
+    "langchain-deepseek>=0.1.0",
     "langgraph>=0.2.0",
     # Multi-agent framework
     "crewai>=0.30.0",
-    "crewai-tools>=0.4.0",
     # Web framework
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
@@ -29,6 +27,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.24.0",
     "tenacity>=8.2.0",
+    "langgraph-checkpoint-postgres>=2.0.23",
+    "agentops>=0.4.22",
+    "langcrew>=0.1.6",
 ]
 
 [project.scripts]
@@ -38,9 +39,21 @@ web_chat_server = "web_chat.server:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[[tool.uv.index]]
+url = "http://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"
+
+[[tool.uv.index]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
+
+[[tool.uv.index]]
+name = "01ai"
+url = "https://nexus.lingyiwanwu.net/repository/pypi-hosted/simple"
+explicit = true
+
 [tool.uv.sources]
-langcrew = { path = "../../../../libs/langcrew", editable = true }
-langcrew-tools = { path = "../../../../libs/langcrew-tools", editable = true }
+langcrew-tools = { index = "01ai" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/web_chat"]

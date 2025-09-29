@@ -25,11 +25,13 @@ class MessageType(str, Enum):
     VIDEO = "video"
     MARKDOWN = "markdown"
 
+    MESSAGE_STREAM = "message_stream"
+    MESSAGE_RESULT = "message_result"
+
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
 
     PLAN = "plan"
-    PLAN_UPDATE = "plan_update"
 
     MESSAGE_TO_USER = "message_to_user"
 
@@ -50,6 +52,7 @@ class StreamMessage(BaseModel):
     timestamp: int
     session_id: str | None = None
     task_id: str | None = None  # Task identifier for precise control and tracking
+    trace_id: str | None = None
 
 
 class TaskExecutionStatus(str, Enum):
@@ -70,14 +73,6 @@ class StepStatus(str, Enum):
     FAILED = "failed"
 
 
-class PlanAction(str, Enum):
-    """Plan action type"""
-
-    ADD = "add"
-    UPDATE = "update"
-    REMOVE = "remove"
-
-
 class ToolResult(str, Enum):
     """Tool execution result"""
 
@@ -92,10 +87,12 @@ class TaskInput(BaseModel):
 
     ID descriptions:
     - session_id: Session identifier for maintaining multi-turn conversation context, also used as LangGraph's thread_id
+    - user_id: User identifier for personalization (optional)
     """
 
-    session_id: str  # Required for multi-turn conversations and context continuity
     message: str
+    session_id: str  # Required for multi-turn conversations and context continuity
+    user_id: str | None = None  # User identifier for personalization (optional)
     language: str | None = None  # Language field for tool display
     interrupt_data: dict[str, Any] | None = None  # Interrupt data for resume scenarios
 
@@ -117,6 +114,7 @@ class ChatRequest(BaseModel):
 
     message: str
     session_id: str | None = None
+    user_id: str | None = None  # User identifier for personalization (optional)
     language: str | None = None  # Language preference for tool display and responses
     interrupt_data: dict[str, Any] | None = None  # For resume scenarios
 

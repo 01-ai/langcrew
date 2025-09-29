@@ -39,7 +39,24 @@ def _to_litellm_format(messages: list[BaseMessage]) -> list[dict[str, Any]]:
             }
             # Include tool_calls if present for accurate token counting
             if hasattr(msg, "tool_calls") and msg.tool_calls:
-                message_dict["tool_calls"] = msg.tool_calls
+                # Format tool_calls properly for litellm
+                formatted_tool_calls = []
+                for tool_call in msg.tool_calls:
+                    # Each tool_call must have a 'function' key for litellm
+                    if isinstance(tool_call, dict):
+                        formatted_tool_call = {
+                            "id": tool_call.get("id", ""),
+                            "type": "function",  # Ensure type is specified as function
+                            "function": {
+                                "name": tool_call.get("name", ""),
+                                "arguments": tool_call.get("args", {}),
+                            },
+                        }
+                        formatted_tool_calls.append(formatted_tool_call)
+
+                if formatted_tool_calls:
+                    message_dict["tool_calls"] = formatted_tool_calls
+
             litellm_messages.append(message_dict)
         elif isinstance(msg, ToolMessage):
             # Keep tool role and tool_call_id for accurate token counting
@@ -67,10 +84,19 @@ def count_message_tokens(
     Count tokens in messages using litellm.token_counter.
     Falls back to approximate counting if litellm fails.
     """
-    # Get model name from llm
-    if not llm or not hasattr(llm, "model_name"):
-        raise ValueError("LLM must have model_name attribute")
-    effective_model_name = llm.model_name
+    # Get model name from llm, supporting both model_name and model_id attributes
+    if not llm:
+        raise ValueError("LLM must be provided")
+
+    # Handle both model_name (standard) and model_id (Bedrock) attributes
+    if hasattr(llm, "model_name"):
+        effective_model_name = llm.model_name
+    elif hasattr(llm, "model"):
+        effective_model_name = llm.model
+    elif hasattr(llm, "model_id"):
+        effective_model_name = llm.model_id
+    else:
+        raise ValueError("LLM must have either model_name or model_id attribute")
 
     # Convert messages to litellm format
     litellm_messages = _to_litellm_format(messages)
@@ -85,7 +111,9 @@ def count_message_tokens(
         return token_count
     except Exception as e:
         logger.warning(
-            f"litellm token calculation failed for model {effective_model_name}: {e}"
+            f"litellm token calculation failed for model {effective_model_name}: {e}",
+            exc_info=True,
+            stack_info=True,
         )
         # Use LangChain's approximate token counting as fallback
         fallback_count = count_tokens_approximately(messages)

@@ -3,29 +3,47 @@ Browser streaming tool  based on StreamingBaseTool
 This is the  version of BrowserStreamingTool that uses the improved streaming architecture.
 """
 
+import sys
 import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar, Final, Literal, TypeVar
 
-from browser_use import BrowserProfile, BrowserSession, Controller
-from browser_use.agent.service import Agent
-from browser_use.agent.views import AgentHistoryList, AgentOutput
-from browser_use.browser.types import Geolocation
-from browser_use.browser.views import BrowserStateSummary
-from browser_use.llm.base import BaseChatModel as BrowserBaseChatModel
+# This module only supports Python 3.11+ and depends on browser-use
+if sys.version_info < (3, 11):
+    raise ImportError(
+        "langcrew_tools.browser requires Python >= 3.11. "
+        f"Detected {sys.version_info.major}.{sys.version_info.minor}. "
+        "Upgrade Python to use browser tools, or avoid importing this subpackage."
+    )
+
+try:
+    from browser_use import BrowserProfile, BrowserSession, Controller  # type: ignore[import-not-found]
+    from browser_use.agent.service import Agent  # type: ignore[import-not-found]
+    from browser_use.agent.views import AgentHistoryList, AgentOutput  # type: ignore[import-not-found]
+    from browser_use.browser.types import Geolocation  # type: ignore[import-not-found]
+    from browser_use.browser.views import BrowserStateSummary  # type: ignore[import-not-found]
+    from browser_use.llm.base import BaseChatModel as BrowserBaseChatModel  # type: ignore[import-not-found]
+except Exception as exc:
+    # Provide explicit error if optional dependency is missing or incompatible
+    raise ImportError(
+        "Browser tools require the optional dependency 'browser-use'. "
+        "Install it on Python >=3.11, e.g.: pip install 'browser-use==0.5.5'."
+    ) from exc
+
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import StandardStreamEvent
-from pydantic import BaseModel, Field, PrivateAttr
-from typing_extensions import override
-
-from ..astream_tool import (
+from langcrew.tools import (
     EventType,
+    HitlGetHandoverInfoTool,
     StreamEventType,
     StreamingBaseTool,
 )
-from ..utils.s3 import AsyncS3Client
+from pydantic import BaseModel, Field, PrivateAttr
+from typing_extensions import override
+
+from ..utils.s3 import S3ClientMixin
 from ..utils.sandbox import SandboxMixin
 from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 from .browser_manager import browser_registry
@@ -75,7 +93,9 @@ class BrowserCompletionEvent(BaseModel):
     intervention_info: dict[str, Any] | None = None
 
 
-class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
+class BrowserStreamingTool(
+    StreamingBaseTool, SandboxMixin, S3ClientMixin, HitlGetHandoverInfoTool
+):
     """Browser tool  for web interaction based on StreamingBaseTool."""
 
     DESKTOP_RESOLUTION: Final[tuple[int, int]] = (1280, 1020)
@@ -105,10 +125,6 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
     desktop_resolution: tuple[int, int] = Field(
         default=..., description="Desktop resolution"
     )
-    async_s3_client: AsyncS3Client | None = Field(
-        default=None, description="Async S3 client"
-    )
-
     # Private attributes
     _event_queue: asyncio.Queue | None = PrivateAttr(default=None)
     _agent_finished: asyncio.Event | None = PrivateAttr(default=None)
@@ -131,7 +147,6 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         request_language: str = "en",
         browser_profile: BrowserProfile | None = None,
         desktop_resolution: tuple[int, int] = DESKTOP_RESOLUTION,
-        async_s3_client: AsyncS3Client | None = None,
         **kwargs,
     ):
         """Initialize BrowserStreamingTool
@@ -157,7 +172,6 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
             request_language=request_language,
             browser_profile=browser_profile,
             desktop_resolution=desktop_resolution,
-            async_s3_client=async_s3_client,
             **kwargs,
         )
 
@@ -440,7 +454,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                 "view_only=true", "view_only=false"
             )
             return {
-                "type": "take_over_browser",
+                "suggested_user_action": "take_over_browser",
                 "intervention_info": {"intervention_url": intervention_url},
             }
         return None
@@ -683,7 +697,8 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
         try:
             event_data = custom_event.get("data", {}).get("data", {}).get("input", {})
             data_content = event_data.get("data", {})
-            if self.async_s3_client:
+            async_s3_client = await self.get_s3_client()
+            if async_s3_client:
                 # Check if screenshot field is included
                 if "screenshot" in data_content and data_content["screenshot"]:
                     try:
@@ -696,7 +711,7 @@ class BrowserStreamingTool(StreamingBaseTool, SandboxMixin):
                         else:
                             # Use SandboxS3Toolkit's upload_base64_image method to asynchronously convert image to url
                             screenshot_url = await SandboxS3Toolkit.upload_base64_image(
-                                async_s3_client=self.async_s3_client,
+                                async_s3_client=async_s3_client,
                                 base64_data=data_content["screenshot"],
                                 sandbox_id=sandbox_id,
                             )

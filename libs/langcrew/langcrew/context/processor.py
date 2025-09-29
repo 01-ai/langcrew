@@ -63,28 +63,10 @@ class MessageProcessor:
         if not messages:
             return messages
 
-        # Simple approach: fit as many recent messages as possible within budget
-        selected = []
-        current_tokens = 0
-
-        # Start from most recent and work backwards
-        for msg in reversed(messages):
-            msg_tokens = count_message_tokens([msg], llm)
-
-            if current_tokens + msg_tokens <= window_size:
-                selected.insert(
-                    0, msg
-                )  # Insert at beginning to maintain chronological order
-                current_tokens += msg_tokens
-            else:
-                # Would exceed budget, stop here
-                break
-
-        # Validate message integrity (AI+Tool pairs)
-        self._validate_chat_history(selected)
-
-        # Generate RemoveMessage operations for deleted messages (like keep_last_n)
-        messages_to_remove = [msg for msg in messages if msg not in selected]
+        # Use safe method to find messages that fit in the window while preserving tool call integrity
+        messages_to_remove, selected = self._find_safe_recent_messages_by_tokens(
+            messages, window_size, llm
+        )
 
         # Build delete operations for messages with IDs
         delete_messages = [
@@ -93,6 +75,9 @@ class MessageProcessor:
 
         # Combine delete operations with selected messages
         final_messages = delete_messages + selected
+
+        # Calculate token usage for logging
+        current_tokens = sum(count_message_tokens([msg], llm) for msg in selected)
 
         logger.info(
             f"Adaptive window trim: {len(messages)} -> {len(selected)} messages "
@@ -237,9 +222,9 @@ class MessageProcessor:
     ) -> dict | None:
         """Prepare data for summarization. Returns None if no messages to summarize."""
 
-        # Find recent messages based on token budget
-        messages_to_summarize, recent_messages = self._find_recent_messages_by_tokens(
-            messages, keep_recent_tokens, llm
+        # Find recent messages based on token budget while preserving tool call integrity
+        messages_to_summarize, recent_messages = (
+            self._find_safe_recent_messages_by_tokens(messages, keep_recent_tokens, llm)
         )
 
         # Only prepare if there are messages to process
@@ -295,14 +280,23 @@ class MessageProcessor:
         # Return the summary string directly
         updated_running_summary = summary_content
 
-        # Build final message list
-        delete_messages = [
-            RemoveMessage(id=m.id)
-            for m in prep_data["messages_to_summarize"]
-            if m.id is not None
-        ]
+        # Get messages to be removed
+        messages_to_summarize = prep_data["messages_to_summarize"]
 
-        # Create summary message inline
+        # Find the last message with an ID to reuse
+        last_message_with_id = None
+        for m in reversed(messages_to_summarize):
+            if m.id is not None:
+                last_message_with_id = m
+                break
+
+        # Create delete operations for all messages except the last one with ID
+        delete_messages = []
+        for m in messages_to_summarize:
+            if m.id is not None and m != last_message_with_id:
+                delete_messages.append(RemoveMessage(id=m.id))
+
+        # Create summary message content
         formatted_content = (
             f"[System Message: This is an auto-generated conversation summary. "
             f"Please inform the user that 'Due to the conversation length exceeding context limits, "
@@ -310,9 +304,20 @@ class MessageProcessor:
             f"Then continue with the task]\n\n"
             f"Previous conversation summary:\n{summary_content}"
         )
-        summary_message = HumanMessage(content=formatted_content)
 
-        # Put summary before recent messages to maintain chronological order
+        # Reuse ID if available, otherwise create new message
+        if last_message_with_id:
+            summary_message = HumanMessage(
+                content=formatted_content, id=last_message_with_id.id
+            )
+            logger.info(
+                f"Reusing message ID {last_message_with_id.id} for summary message"
+            )
+        else:
+            summary_message = HumanMessage(content=formatted_content)
+            logger.info("Creating new ID for summary message (no reusable ID found)")
+
+        # Keep delete operations first, summary message in the middle, recent messages at the end
         final_messages = (
             delete_messages + [summary_message] + prep_data["recent_messages"]
         )
@@ -343,10 +348,15 @@ class MessageProcessor:
                     j += 1
 
                 if not tool_indices:
-                    raise ValueError(
+                    logger.error(
                         f"AI message at index {i} has tool_calls but no ToolMessage follows. "
                         f"Expected at least one ToolMessage."
                     )
+                    return rounds
+                    # raise ValueError(
+                    #     f"AI message at index {i} has tool_calls but no ToolMessage follows. "
+                    #     f"Expected at least one ToolMessage."
+                    # )
 
                 # A round includes the AI message and all its tool messages
                 round_indices = [i] + tool_indices
@@ -456,3 +466,124 @@ class MessageProcessor:
             self._validate_chat_history(to_keep)
 
         return to_summarize, to_keep
+
+    def _find_safe_recent_messages_by_tokens(
+        self,
+        messages: list[BaseMessage],
+        token_budget: int,
+        llm: BaseLanguageModel | None = None,
+    ) -> tuple[list[BaseMessage], list[BaseMessage]]:
+        """
+        Split messages by token budget while preserving tool call integrity.
+        Returns (to_summarize, to_keep) with valid message sequences.
+        """
+        if not messages:
+            return [], []
+
+        # Step 1: Collect recent messages based on token budget
+        # -------------------------------------------------
+        selected = []
+        remaining_budget = token_budget
+
+        # Collect messages from newest to oldest until budget is reached
+        for msg in reversed(messages):
+            msg_tokens = count_message_tokens([msg], llm)
+            if msg_tokens <= remaining_budget:
+                selected.insert(0, msg)
+                remaining_budget -= msg_tokens
+            else:
+                break  # Stop adding when budget is exceeded
+
+        # Ensure at least the most recent message is kept
+        if not selected and messages:
+            selected = [messages[-1]]
+
+        # Step 2: Ensure tool call integrity
+        # -------------------------------------------------
+        # Create tool ID mappings
+        tool_call_map = {}  # Tool ID -> AI message
+        tool_response_map = {}  # Tool ID -> Tool response message
+
+        # Collect all tool calls and responses from messages
+        for msg in messages:
+            if isinstance(msg, AIMessage) and msg.tool_calls:
+                for tool_call in msg.tool_calls:
+                    tool_id = tool_call.get("id")
+                    if tool_id:
+                        tool_call_map[tool_id] = msg
+            elif isinstance(msg, ToolMessage) and msg.tool_call_id:
+                tool_response_map[msg.tool_call_id] = msg
+
+        # Find tool IDs in selected messages
+        selected_call_ids = {
+            tool_call.get("id")
+            for msg in selected
+            if isinstance(msg, AIMessage) and msg.tool_calls
+            for tool_call in msg.tool_calls
+            if tool_call.get("id")
+        }
+
+        selected_response_ids = {
+            msg.tool_call_id
+            for msg in selected
+            if isinstance(msg, ToolMessage) and msg.tool_call_id
+        }
+
+        # Prepare additional messages to add
+        messages_to_add = []
+
+        # Handle AI messages with multiple tool calls
+        multi_tool_messages = [
+            msg
+            for msg in messages
+            if isinstance(msg, AIMessage) and msg.tool_calls and len(msg.tool_calls) > 1
+        ]
+
+        for ai_msg in multi_tool_messages:
+            # Get all tool IDs in this AI message
+            tool_ids = [tc.get("id") for tc in ai_msg.tool_calls if tc.get("id")]
+
+            # Check if any tool ID is already in selected set
+            has_selected_tool = any(
+                tid in selected_call_ids or tid in selected_response_ids
+                for tid in tool_ids
+            )
+
+            # If this multi-tool AI message needs to be included
+            if has_selected_tool:
+                # Add the AI message itself
+                if ai_msg not in selected:
+                    messages_to_add.append(ai_msg)
+
+                # Add all corresponding tool responses
+                for tool_id in tool_ids:
+                    if tool_id in tool_response_map:
+                        response = tool_response_map[tool_id]
+                        if response not in selected:
+                            messages_to_add.append(response)
+
+        # Add missing tool responses
+        for call_id in selected_call_ids:
+            if call_id not in selected_response_ids and call_id in tool_response_map:
+                messages_to_add.append(tool_response_map[call_id])
+
+        # Add missing tool calls
+        for response_id in selected_response_ids:
+            if response_id not in selected_call_ids and response_id in tool_call_map:
+                messages_to_add.append(tool_call_map[response_id])
+
+        # Log number of added messages
+        if messages_to_add:
+            logger.info(
+                f"Added {len(messages_to_add)} messages to ensure tool call integrity"
+            )
+
+        # Integrate and sort
+        final_messages = list(selected) + list(messages_to_add)
+        final_messages.sort(key=lambda m: messages.index(m))  # Maintain original order
+
+        # Validate message sequence integrity
+        self._validate_chat_history(final_messages)
+
+        # Return messages to keep and to summarize
+        return [m for m in messages if m not in final_messages], final_messages

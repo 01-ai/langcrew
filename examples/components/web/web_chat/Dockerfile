@@ -1,4 +1,27 @@
-FROM python:3.12-slim-bookworm
+# Multi-stage build for unified frontend + backend application
+FROM 01ai-registry.cn-shanghai.cr.aliyuncs.com/public/node:22-alpine3.20 AS frontend-build
+
+# Install pnpm globally
+RUN npm set registry https://registry.npmmirror.com/ && npm install -g pnpm
+
+# Set working directory for frontend
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY web/package.json web/pnpm-lock.yaml ./
+
+# Install frontend dependencies
+RUN pnpm install --frozen-lockfile --registry=https://registry.npmmirror.com
+
+# Copy frontend source code
+COPY web/ ./
+
+# Build the frontend application
+ENV NODE_ENV=production
+RUN pnpm build
+
+# Backend build stage
+FROM 01ai-registry.cn-shanghai.cr.aliyuncs.com/public/uv:python3.11-bookworm-slim
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,55 +33,44 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 
 # System dependencies with security updates
-RUN apt-get update \
- && apt-get upgrade -y \
- && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Install uv using official installer
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:${PATH}"
+RUN echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    rm -rf /etc/apt/sources.list.d/* && \
+    apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+    curl ca-certificates nginx\
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Create app directory
 WORKDIR /app
-
-# Stage 1: Copy local libraries first (for dependency resolution)
-COPY libs/langcrew/ ./libs/langcrew/
-COPY libs/langcrew-tools/ ./libs/langcrew-tools/
-
-# Stage 2: Copy project configuration files for dependency installation
-COPY examples/components/web/web_chat/pyproject.toml ./examples/components/web/web_chat/
-
-# Set working directory to web_chat example
-WORKDIR /app/examples/components/web/web_chat
-
-# Set UV project environment variable to point to the virtual environment
-ENV UV_PROJECT_ENVIRONMENT=/opt/venv
-
-# Create virtual environment and install dependencies using uv sync
-# Note: --prerelease allow is needed for some dependencies (e.g., OpenTelemetry)
-RUN uv venv /opt/venv && \
-    uv sync --no-dev --prerelease allow
-
-# Set virtual environment as default
-ENV PATH="/opt/venv/bin:${PATH}" \
-    VIRTUAL_ENV="/opt/venv" \
-    PYTHONPATH="/app/libs/langcrew:/app/libs/langcrew-tools:/app/examples/components/web/web_chat/src:${PYTHONPATH}"
+ENV PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV PYTHONPATH="/app/src:$PYTHONPATH"
+# 安装项目依赖
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=/app/uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=/app/pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
 
 # Stage 3: Copy application source code (after dependencies are installed)
-COPY examples/components/web/web_chat/src/ ./src/
-COPY examples/components/web/web_chat/run_server.py ./
+COPY src/ ./src/
+COPY run_server.py ./
+COPY .env ./
+COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash app \
- && chown -R app:app /app
-USER app
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# Expose API port
-EXPOSE 8000
+# Copy startup script
+COPY start-services.sh /start-services.sh
+RUN chmod +x /start-services.sh
 
-# Start server
-# Note: pass API keys via env (OPENAI_API_KEY / ANTHROPIC_API_KEY / DASHSCOPE_API_KEY)
-CMD ["python", "run_server.py", "--host", "0.0.0.0", "--port", "8000"]
+# Expose ports
+EXPOSE 80
+
+# Start both services (nginx as root, backend as app user)
+CMD ["/start-services.sh"]

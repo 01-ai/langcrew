@@ -9,7 +9,12 @@ import re
 from datetime import datetime
 from typing import List
 from langchain_core.tools import BaseTool
-from langcrew_tools.hitl import UserInputTool
+from langcrew_tools.hitl import (
+    UserInputTool,
+    DynamicFormUserInputTool,
+    FormSchema,
+    FormFieldSchema,
+)
 
 
 class CalculatorTool(BaseTool):
@@ -340,4 +345,5 @@ def get_chat_tools() -> List[BaseTool]:
         WeatherTool(),
         TimezoneTool(),
         UserInputTool(),
+        DynamicFormUserInputTool(),
     ]

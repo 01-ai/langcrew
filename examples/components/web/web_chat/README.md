@@ -63,7 +63,7 @@ docker run --rm -it \
 
 Notes:
 - The Dockerfile uses `uv` to install dependencies and supports editable local libs in this monorepo.
-- Provide only one of OPENAI_API_KEY / ANTHROPIC_API_KEY / DASHSCOPE_API_KEY. If multiple are set, the app chooses in the order OpenAI → Anthropic → DashScope. 
+- Provide only one of OPENAI_API_KEY / ANTHROPIC_API_KEY / DASHSCOPE_API_KEY / DEEPSEEK_API_KEY. If multiple are set, the app chooses in the order OpenAI → Anthropic → DashScope → DeepSeek. 
 
 ### Code Quick Start
 
@@ -84,6 +84,7 @@ cp .env.example .env
 # OPENAI_API_KEY=your-openai-api-key
 # ANTHROPIC_API_KEY=your-anthropic-api-key  
 # DASHSCOPE_API_KEY=your-dashscope-api-key
+# DEEPSEEK_API_KEY=your-deepseek-api-key
 ```
 
 #### 3. Run the Server

@@ -13,7 +13,7 @@ name = "langcrew"
 version = "0.1.0"
 description = "A LangChain-based crew management system"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 authors = [
     {name = "BTM Team", email = "btm@langcrew.ai"},
 ]
@@ -23,6 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
@@ -34,12 +35,15 @@ dependencies = [
     "langchain>=0.1.0",
     "langchain-core>=0.3.72",
     "langchain-anthropic>=0.1.0",
-    "langchain-openai>=0.2.1,<0.3.0",
+    "langchain-openai>=0.2.1",
     "langchain-community>=0.3.24",
+    "google-genai>=1.39.0",
     # LangGraph for workflow management
     "langgraph>=0.6.0",
     "langgraph-supervisor>=0.0.27",
     "langgraph-checkpoint-sqlite>=2.0.10",
+    # Memory management
+    "langmem",
     # Multi-agent communication protocol
     "mcp>=0.1.0",
     "langchain-mcp-adapters>=0.1.7",
@@ -50,10 +54,9 @@ dependencies = [
     "uvicorn>=0.24.0",
     "httpx>=0.25.0",
     # AWS
-    "langchain-aws>=0.2.30",
-    "boto3>=1.39.7,<2.0.0",
+    "langchain-aws>=0.2.28",
+    "boto3>=1.39.6,<2.0.0",
     "aiobotocore>=2.23.1",
-    "litellm>=1.72.6",
 ]
 
 [project.urls]
@@ -68,12 +71,12 @@ mongodb = [
     "langgraph-checkpoint-mongodb>=0.1.4",
     "langgraph-store-mongodb>=0.0.1",
 ]
-mysql = ["langgraph-checkpoint-mysql>=2.0.15"]
+mysql = ["langgraph-checkpoint-mysql[pymysql, aiomysql]>=2.0.17"]
 postgres = ["langgraph-checkpoint-postgres>=2.0.23"]
 all-backends = [
     "langgraph-checkpoint-redis>=0.0.8",
     "langgraph-checkpoint-mongodb>=0.1.4",
-    "langgraph-checkpoint-mysql>=2.0.15",
+    "langgraph-checkpoint-mysql[pymysql, aiomysql, asyncmy]>=2.0.17",
     "langgraph-checkpoint-postgres>=2.0.23",
     "langgraph-store-mongodb>=0.0.1",
 ]
@@ -92,7 +95,7 @@ dev-dependencies = [
 ]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -117,7 +120,7 @@ filterwarnings = [
 lint.select = ["E", "F", "I", "TID251", "UP"]
 lint.ignore = ["E501"]
 line-length = 88
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["UP006", "UP007"]

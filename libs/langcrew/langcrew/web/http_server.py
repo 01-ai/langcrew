@@ -121,6 +121,7 @@ class AdapterServer:
                     # Create task input
                     task_input = TaskInput(
                         session_id=session_id,
+                        user_id=request.user_id,
                         message=request.message,
                         language=request.language,
                         interrupt_data=request.interrupt_data,

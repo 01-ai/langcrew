@@ -10,8 +10,8 @@ import logging
 import time
 
 import httpx
+from agentbox import AsyncSandbox
 from browser_use import BrowserProfile, BrowserSession
-from e2b import AsyncSandbox
 
 from .sandbox_config import SandboxConfig
 
@@ -129,7 +129,9 @@ class SandboxBrowserSessionManager:
 
         try:
             self._browser_wss_url = await async_sandbox_playwright_wss(async_sandbox)
-            self._browser_vnc_url = get_browser_use_vnc_url(async_sandbox)
+            self._browser_vnc_url = get_browser_use_vnc_url(
+                async_sandbox, view_only=True
+            )
 
         except Exception as e:
             logger.error(

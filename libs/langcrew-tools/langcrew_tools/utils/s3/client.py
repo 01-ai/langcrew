@@ -316,8 +316,7 @@ class AsyncS3Client:
                 "Bucket": bucket_name,
                 "Key": object_key,
                 "Body": content,
-                "ContentType": content_type,
-                "ContentDisposition": "inline",
+                "ContentType": content_type
             }
 
             if metadata:

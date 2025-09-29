@@ -22,19 +22,26 @@ import time
 import uuid
 
 import uvicorn
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from super_agent.agent.crew import SuperAgentCrew
-from langcrew.web import LangGraphAdapter
+from langcrew.web import LangGraphAdapter, generate_message_id
 from langcrew.web.protocol import (
     ChatRequest,
-    StreamMessage,
-    StopRequest,
-    TaskInput,
     MessageType,
+    StopRequest,
+    StreamMessage,
+    TaskInput,
 )
-from langcrew.web import generate_message_id
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
+
+from super_agent.agent.crew import SuperAgentCrew
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +51,8 @@ logger = logging.getLogger(__name__)
 
 # Global session management - using original crew_adapter_manager
 crew_adapter_manager: dict[str, LangGraphAdapter] = {}
+
+CHECKPOINTER: BaseCheckpointSaver = InMemorySaver()
 
 
 def create_app() -> FastAPI:
@@ -125,8 +134,9 @@ def create_app() -> FastAPI:
         )
 
         async def generate():
-            crew = SuperAgentCrew(session_id).crew()
+            crew = SuperAgentCrew(session_id, checkpointer=CHECKPOINTER).crew()
             adapter = LangGraphAdapter(crew)
+            # clear stop flag
             crew_adapter_manager[session_id] = adapter
             try:
                 # Send session init for new sessions
@@ -142,8 +152,8 @@ def create_app() -> FastAPI:
                     )
                     yield adapter._format_sse_message(init_message)
 
-                # Create task input
-                task_input = TaskInput(
+                # Create execution input
+                execution_input = TaskInput(
                     session_id=session_id,
                     message=request.message,
                     language=request.language,
@@ -151,7 +161,7 @@ def create_app() -> FastAPI:
                 )
 
                 # Stream execution results
-                async for chunk in adapter.execute(task_input):
+                async for chunk in adapter.execute(execution_input):
                     yield chunk
 
             except asyncio.CancelledError:
@@ -161,7 +171,7 @@ def create_app() -> FastAPI:
                 return  # Exit generator cleanly
 
             except Exception as e:
-                logger.error(f"Execution failed for session {session_id}: {e}")
+                logger.exception(f"Execution failed for session {session_id}: {e}")
                 error_message = StreamMessage(
                     id=generate_message_id(),
                     role="assistant",

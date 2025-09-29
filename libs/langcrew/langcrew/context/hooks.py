@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, RemoveMessage, ToolMessage
 from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 from langgraph.utils.runnable import RunnableLike
 
@@ -77,16 +77,8 @@ class ContextManagementHook(Runnable):
         self._inject_context(state)
 
         # Check token count and apply compression if needed
-        compression_applied = False
         if self._should_compress(state):
             state["messages"] = self._compress(state)
-            compression_applied = True
-
-        final_message_count = len(state["messages"])
-        logger.info(
-            f"ContextManagementHook.invoke completed: messages={initial_message_count}->{final_message_count}, "
-            f"compression_applied={compression_applied}"
-        )
 
         return state
 
@@ -110,16 +102,8 @@ class ContextManagementHook(Runnable):
         self._inject_context(state)
 
         # Check token count and apply compression if needed
-        compression_applied = False
         if self._should_compress(state):
             state["messages"] = await self._acompress(state)
-            compression_applied = True
-
-        final_message_count = len(state["messages"])
-        logger.info(
-            f"ContextManagementHook.ainvoke completed: messages={initial_message_count}->{final_message_count}, "
-            f"compression_applied={compression_applied}"
-        )
 
         return state
 
@@ -334,7 +318,7 @@ class ContextManagementHook(Runnable):
             logger.error(f"Configuration error: {error_msg}")
             raise ValueError(error_msg)
 
-        final_count = len(result)
+        final_count = sum(1 for msg in messages if not isinstance(msg, RemoveMessage))
         logger.info(f"Compression completed: {initial_count} -> {final_count} messages")
         return result
 
@@ -357,7 +341,7 @@ class ContextManagementHook(Runnable):
             logger.error(f"Configuration error: {error_msg}")
             raise ValueError(error_msg)
 
-        final_count = len(result)
+        final_count = sum(1 for msg in messages if not isinstance(msg, RemoveMessage))
         logger.info(f"Compression completed: {initial_count} -> {final_count} messages")
         return result
 

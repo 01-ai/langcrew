@@ -11,12 +11,12 @@ import mimetypes
 import os
 from typing import Any, Final
 
-from e2b import AsyncSandbox
+from agentbox import AsyncSandbox
 
 from ..s3 import AsyncS3Client
 
 # S3 Default Address
-SANDBOX_S3_ADDRESS: Final[str] = "sandbox/{sandbox_id}/"
+SANDBOX_S3_ADDRESS: Final[str] = "sandbox/"
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -29,16 +29,14 @@ class SandboxS3Toolkit:
         """Generate S3 path"""
         if not s3_path:
             raise ValueError("s3_path is required")
-        return SANDBOX_S3_ADDRESS.format(
-            sandbox_id=sandbox.sandbox_id
-        ) + s3_path.lstrip("/")
+        return f"{SANDBOX_S3_ADDRESS}{sandbox.sandbox_id}/{s3_path.lstrip('/')}"
 
     @staticmethod
     async def upload_base64_image(
         async_s3_client: AsyncS3Client, base64_data: str, sandbox_id: str = "empty"
     ) -> str:
         """Upload base64 image to S3"""
-        s3_path = SANDBOX_S3_ADDRESS.format(sandbox_id=sandbox_id) + "images"
+        s3_path = f"{SANDBOX_S3_ADDRESS}{sandbox_id}/images"
         data: bytes = base64.b64decode(base64_data)
         md5 = hashlib.md5(base64_data.encode()).hexdigest()
         if await async_s3_client.object_exists(object_key=f"{s3_path}/{md5}.png"):
@@ -55,7 +53,7 @@ class SandboxS3Toolkit:
 
     @staticmethod
     async def upload_file_to_s3(
-        async_sandbox: AsyncSandbox,
+        sandbox: AsyncSandbox,
         async_s3_client: AsyncS3Client,
         file_path: str | None = None,
         s3_path: str | None = None,
@@ -82,9 +80,9 @@ class SandboxS3Toolkit:
         if not s3_path:
             raise ValueError("s3_path is required")
         result = await SandboxS3Toolkit._internal_upload_file_to_s3(
-            async_s3_client,
+            sandbox,
             file_path,
-            SandboxS3Toolkit._get_s3_path(async_s3_client, s3_path),
+            SandboxS3Toolkit._get_s3_path(sandbox, s3_path),
             async_s3_client,
             expires_in,
         )
@@ -92,7 +90,7 @@ class SandboxS3Toolkit:
 
     @staticmethod
     async def _internal_upload_file_to_s3(
-        async_sandbox: AsyncSandbox,
+        sandbox: AsyncSandbox,
         file_path: str,
         s3_path: str,
         async_s3_client: AsyncS3Client,
@@ -103,20 +101,23 @@ class SandboxS3Toolkit:
             logger.info(f"Uploading file from sandbox: {file_path} -> S3: {s3_path}")
 
             # Check if file exists in sandbox
-            file_exists = await async_sandbox.files.exists(file_path)
+            file_exists = await sandbox.files.exists(file_path)
             if not file_exists:
                 logger.error(f"File not found in sandbox: {file_path}")
                 return None
 
             # Get file size
-            result = await async_sandbox.commands.run(f"stat -c %s {file_path}")
+            result = await sandbox.commands.run(f"stat -c %s {file_path}")
             file_size = int(result.stdout.strip()) if result.exit_code == 0 else 0
 
             # Read file content from sandbox as bytes
-            file_content = await async_sandbox.files.read(file_path, format="bytes")
+            file_content = await sandbox.files.read(file_path, format="bytes")
 
             # Guess MIME type by file extension
             content_type, _ = mimetypes.guess_type(file_path)
+            if content_type in ["text/plain", "text/html"]:
+                content_type = f"{content_type};charset=utf-8"
+                
             if not content_type:
                 logger.warning(f"{file_path} content type guess wrong -> {s3_path}")
                 content_type = "application/octet-stream"  # Default binary type
@@ -378,7 +379,7 @@ class SandboxS3Toolkit:
         """
         async with client:
             for f in files:
-                key, filename = f["file_md5"], f["filename"]
+                key = f["file_md5"]
                 try:
                     # Check if object exists in S3
                     if not await client.object_exists(object_key=key):
@@ -393,7 +394,7 @@ class SandboxS3Toolkit:
                         continue
 
                     # Write file to sandbox using sync sandbox write method
-                    path = f"{dir_path.rstrip('/')}/{filename}"
+                    path = f"{dir_path.rstrip('/')}/{key}"
                     await async_sandbox.files.write(path, content)
 
                     # Verify file was written successfully

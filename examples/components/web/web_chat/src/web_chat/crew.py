@@ -5,9 +5,13 @@ This module defines the chat agent and tasks for the web chat API.
 """
 
 import os
-from langcrew import Agent, Crew, Task
+
 from langcrew.llm_factory import LLMFactory
+
+from langcrew import Agent, Crew, Task
+from langcrew.memory import IndexConfig, LongTermMemoryConfig, MemoryConfig
 from langcrew.web import ToolDisplayManager
+
 from .tools import get_chat_tools
 
 
@@ -25,7 +29,7 @@ class WebChatCrew:
         if os.getenv("OPENAI_API_KEY"):
             config = {
                 "provider": "openai",
-                "model": "gpt-4o-mini",
+                "model": "gpt-5",
                 "max_tokens": 4096,
             }
         elif os.getenv("ANTHROPIC_API_KEY"):
@@ -40,10 +44,16 @@ class WebChatCrew:
                 "model": "qwen-plus",
                 "max_tokens": 4096,
             }
+        elif os.getenv("DEEPSEEK_API_KEY"):
+            config = {
+                "provider": "deepseek",
+                "model": "deepseek-chat",
+                "max_tokens": 4096,
+            }
         else:
             raise ValueError(
                 "No API keys found in environment. Please set one of: "
-                "OPENAI_API_KEY, ANTHROPIC_API_KEY, or DASHSCOPE_API_KEY"
+                "OPENAI_API_KEY, ANTHROPIC_API_KEY, DASHSCOPE_API_KEY, or DEEPSEEK_API_KEY"
             )
 
         return LLMFactory.create_llm(config)
@@ -62,6 +72,7 @@ class WebChatCrew:
             • Providing weather information for any city
             • Getting time and timezone information for different locations
             • Requesting additional information from users when needed (user_input tool)
+            • Creating dynamic forms for complex data collection (dynamic_form_user_input tool)
             • Having natural, engaging conversations
             
             Tool Usage Guidelines:
@@ -69,12 +80,20 @@ class WebChatCrew:
             • web_search: For current events, news, or information you might not have
             • weather_info: For weather queries (ask for city if not provided)
             • current_time: For time and timezone information
-            • user_input: When you genuinely need clarification or additional information from the user
+            • user_input: When you need simple clarification or additional information from the user
+            • dynamic_form_user_input: When you need to collect structured data with multiple fields (use form_schema parameter)
             
             When to use user_input tool:
             - When a request is genuinely ambiguous and you cannot provide a helpful response
             - When you need specific details that are critical for accurate results
             - When confirming potentially sensitive or important actions
+            
+            When to use dynamic_form_user_input tool:
+            - When you need to collect multiple pieces of structured information
+            - When creating surveys, questionnaires, or data collection forms
+            - When you need validation for specific data types (email, phone, etc.)
+            - When you want to provide a better user experience for complex data entry
+            - Use the 'required' property to indicate mandatory fields, not asterisks in titles
             
             Guidelines:
             - Always be helpful, clear, and concise in your responses
@@ -88,6 +107,7 @@ class WebChatCrew:
             tools=self.tools,
             llm=self.llm,  # Add LLM configuration
             verbose=True,
+            debug=True,
             # allow_delegation=False,  # Not supported in langcrew
             # max_iter=5,  # Will be handled by executor configuration
             # max_execution_time=30,  # Will be handled by executor configuration
@@ -108,6 +128,7 @@ class WebChatCrew:
                - Use weather tool for weather-related queries
                - Use timezone tool for time-related queries about specific locations
                - Use user_input tool when you need clarification, additional information, or confirmation from the user
+               - Use dynamic_form_user_input tool when you need to collect structured data with multiple fields
             3. **Provide clear responses**: Give helpful, accurate, and well-structured answers
             4. **Be conversational**: Maintain a friendly and engaging tone
             5. **Explain tool usage**: When using tools, briefly explain what you're doing
@@ -122,12 +143,31 @@ class WebChatCrew:
 
     def crew(self) -> Crew:
         """Create and configure the crew"""
+        from urllib.parse import quote_plus
+
         return Crew(
             agents=[self.chat_agent()],
             tasks=[self.chat_task()],
             # process=Process.sequential,  # Default in langcrew
             verbose=True,
-            memory=True,  # Enable conversation memory for context
+            memory=MemoryConfig(
+                provider="memory",  # Use in-memory provider
+                # provider="postgres",
+                # connection_string="your_connection_string",
+                long_term=LongTermMemoryConfig(
+                    enabled=True,  # Enable long-term memory
+                    app_id="web-chat-v1",  # Your app identifier, prevents data mixing
+                    # Enable vector indexing for better memory search only if OpenAI API key is available
+                    index=(
+                        IndexConfig(
+                            dims=1536,  # OpenAI text-embedding-3-small dimensions
+                            embed="openai:text-embedding-3-small",  # Embedding model
+                        )
+                        if os.getenv("OPENAI_API_KEY")
+                        else None
+                    ),
+                ),
+            ),  # Enable conversation memory and long-term memory
             # max_rpm=10,  # Rate limiting will be handled differently in langcrew
         )
 
@@ -301,7 +341,7 @@ class WebChatCrew:
                 "display_content_param": "text",
             },
             {
-                "name": "phone_task_screenshot",
+                "name": "phone_take_screenshot",
                 "display_names": {"zh": "截图", "en": "Taking screenshot"},
             },
             {
@@ -315,6 +355,10 @@ class WebChatCrew:
             {
                 "name": "user_input",
                 "display_names": {"zh": "等待用户输入", "en": "Waiting for user input"},
+            },
+            {
+                "name": "dynamic_form_user_input",
+                "display_names": {"zh": "动态表单输入", "en": "Dynamic form input"},
             },
             {
                 "name": "request_approval",

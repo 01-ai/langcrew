@@ -4,13 +4,20 @@
 **/ENV/
 **/env/
 
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
 # Exclude all examples except current one
 /examples/*
 !/examples/components/web/web_chat/
 
 # Exclude documentation and non-essential files
+*.log
 /docs/
-/web/
 *.md
 !README.md
 .git/
@@ -35,7 +42,6 @@ htmlcov/
 venv/
 ENV/
 env/
-.env
 .vscode/
 .idea/
 *.swp

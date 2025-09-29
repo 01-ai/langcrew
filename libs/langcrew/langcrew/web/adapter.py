@@ -10,27 +10,28 @@ Key Features:
 - Comprehensive event handling with proper cleanup
 """
 
+import json
 import logging
 import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
+from opentelemetry import trace
 
 from ..crew import Crew
 from ..utils.language import detect_language
 from ..utils.message_utils import generate_message_id
 from .protocol import (
-    TaskInput,
     MessageType,
-    PlanAction,
     StepStatus,
     StreamMessage,
     TaskExecutionStatus,
+    TaskInput,
     ToolResult,
 )
 from .tool_display import ToolDisplayManager
@@ -68,9 +69,9 @@ class LangGraphAdapter:
         self.crew = crew
         self.compiled_graph = compiled_graph
 
-        self._session_stop_flags: dict[
-            str, dict[str, Any]
-        ] = {}  # session_id -> stop_info
+        self._session_stop_flags: dict[str, dict[str, Any]] = (
+            {}
+        )  # session_id -> stop_info
 
     # ============ PROPERTIES ============
 
@@ -80,16 +81,6 @@ class LangGraphAdapter:
         if self.crew:
             return self.crew
         return self.compiled_graph
-
-    @property
-    def checkpointer(self) -> Any:
-        """Get checkpointer from executor with proper handling for both types."""
-        if self.crew and hasattr(self.crew, "checkpointer"):
-            return self.crew.checkpointer
-        elif self.compiled_graph:
-            # CompiledStateGraph stores checkpointer differently
-            return getattr(self.compiled_graph, "checkpointer", None)
-        return None
 
     # ============ TASK EXECUTION CONTROL ============
 
@@ -154,27 +145,36 @@ class LangGraphAdapter:
     # ============ CORE EXECUTION LOGIC ============
 
     def _build_config(
-        self, session_id: str, config: RunnableConfig | None = None
+        self,
+        session_id: str,
+        user_id: str | None = None,
+        config: RunnableConfig | None = None,
     ) -> RunnableConfig:
         """Build RunnableConfig for LangGraph execution.
 
         Args:
             session_id: Session identifier used as thread_id
+            user_id: User identifier for long-term memory (None disables user-specific memory)
             config: Optional RunnableConfig for advanced users
 
         Returns:
-            RunnableConfig with session_id properly set as thread_id
+            RunnableConfig with session_id and user_id properly set
         """
         if config:
-            # Advanced users provide RunnableConfig, ensure session_id is set
+            # Advanced users provide RunnableConfig, ensure session_id and user_id are set
             result_config = config.copy() if hasattr(config, "copy") else dict(config)
             if "configurable" not in result_config:
                 result_config["configurable"] = {}
             result_config["configurable"]["thread_id"] = session_id
+            if user_id:  # Only set if user_id is not None and not empty
+                result_config["configurable"]["user_id"] = user_id
             return result_config
 
         # Default configuration for normal users
-        return {"configurable": {"thread_id": session_id}}
+        config_dict = {"configurable": {"thread_id": session_id}}
+        if user_id:  # Only set if user_id is not None and not empty
+            config_dict["configurable"]["user_id"] = user_id
+        return config_dict
 
     def _prepare_input(self, task_input: TaskInput):
         """Prepare input data for execution based on execution mode."""
@@ -196,215 +196,236 @@ class LangGraphAdapter:
         """Unified execution method for both new conversations and resume scenarios."""
 
         try:
-            # ============ 1. INITIALIZATION ============
-            # Local execution state (no instance state)
-            executing_tools: set[str] = set()  # Tool internal event filtering
-            task_ended = False
-            need_user_input = False
-            should_send_messages = True
+            tracer = trace.get_tracer(__name__)
+            with tracer.start_as_current_span("super_agent_start") as span:
+                # ============ 1. INITIALIZATION ============
+                # Local execution state (no instance state)
+                executing_tools: set[str] = set()  # Tool internal event filtering
+                task_ended = False
+                need_user_input = False
+                should_send_messages = True
 
-            # Generate unique task ID for this execution
-            task_id = self._get_task_id(task_input)
+                # Generate unique task ID for this execution
+                task_id = self._get_task_id(task_input)
+                span.set_attribute("agentops.tags", [task_input.session_id, task_id])
 
-            # Log task start with context
-            logger.info(
-                f"Starting execution for session {task_input.session_id}, task {task_id}"
-            )
-
-            # Get display language (stateless)
-            display_language = self._get_display_language(
-                task_input.message,
-                task_input.language,
-            )
-
-            # Configure message sending behavior for resume mode
-            if task_input.is_resume:
-                interrupt_type = (
-                    task_input.interrupt_data.get("type", "")
-                    if task_input.interrupt_data
-                    else ""
+                # Log task start with context
+                logger.info(
+                    f"Starting execution for session {task_input.session_id}, task {task_id}"
                 )
-                # Only generic interrupts can send messages immediately
-                # Tool and user_input interrupts need to wait for completion events to avoid duplicate messages
-                should_send_messages = interrupt_type == "generic_interrupt"
 
-            # Prepare input data and configuration
-            input_data = self._prepare_input(task_input)
-            config = self._build_config(task_input.session_id, config)
+                # Get display language (stateless)
+                display_language = self._get_display_language(
+                    task_input.message,
+                    task_input.language,
+                )
 
-            # ============ 2. EVENT PROCESSING LOOP ============
-            async for event in self.executor.astream_events(
-                input=input_data, config=config
-            ):
-                # -------- 2.1 Stop Flag Check --------
-                # Check stop signal at the beginning of each event processing
-                control_data = self._get_stop_flag(task_input.session_id)
-                if control_data:
-                    task_ended = True
-                    stop_reason = control_data.get("stop_reason", "User requested")
-                    yield self._handle_finish_signal(
-                        task_input.session_id,
-                        task_id,
-                        stop_reason,
-                        TaskExecutionStatus.CANCELLED,
+                # Configure message sending behavior for resume mode
+                if task_input.is_resume:
+                    interrupt_type = (
+                        task_input.interrupt_data.get("type", "")
+                        if task_input.interrupt_data
+                        else ""
                     )
-                    break
+                    # Only generic interrupts can send messages immediately
+                    # Tool and user_input interrupts need to wait for completion events to avoid duplicate messages
+                    should_send_messages = interrupt_type == "generic_interrupt"
 
-                event_type = event.get("event")
-                event_data = event.get("data", {})
+                # Prepare input data and configuration
+                input_data = self._prepare_input(task_input)
+                config = self._build_config(
+                    task_input.session_id, task_input.user_id, config
+                )
 
-                # -------- 2.2 High Priority: Interrupts & State Updates --------
-
-                # Handle LangGraph native node interrupts
-                if "chunk" in event_data and "__interrupt__" in event_data["chunk"]:
-                    chunk_data = event_data.get("chunk", {})
-                    interrupt_obj = chunk_data.get("__interrupt__")
-
-                    # Skip tool interrupts and user_input interrupts
-                    if interrupt_obj:
-                        interrupt_type = None
-
-                        # Extract interrupt type from various possible structures
-                        if isinstance(interrupt_obj, tuple) and len(interrupt_obj) > 0:
-                            # LangGraph Interrupt objects in tuple
-                            first_interrupt = interrupt_obj[0]
-                            if hasattr(first_interrupt, "value") and isinstance(
-                                first_interrupt.value, dict
-                            ):
-                                interrupt_type = first_interrupt.value.get("type")
-                        elif isinstance(interrupt_obj, dict):
-                            # Direct dict format
-                            interrupt_type = interrupt_obj.get("type")
-
-                        if interrupt_type in [
-                            "tool_interrupt_before",
-                            "tool_interrupt_after",
-                            "user_input",
-                        ]:
-                            continue  # Don't send generic interrupt message
-
-                    interrupt_message = self._handle_node_interrupt(
-                        event_data, task_input.session_id, task_id
-                    )
-                    yield self._format_sse_message(interrupt_message)
-
-                # Resume mode: enable messages after tool completion events
-                if (
-                    task_input.is_resume
-                    and not should_send_messages
-                    and event_type == "on_custom_event"
+                # ============ 2. EVENT PROCESSING LOOP ============
+                async for event in self.executor.astream_events(
+                    input=input_data, config=config
                 ):
-                    event_name = event.get("name")
-                    if event_name in [
-                        "on_langcrew_user_input_completed",
-                        "on_langcrew_tool_interrupt_before_completed",
-                        "on_langcrew_tool_interrupt_after_completed",
-                    ]:
-                        logger.info(
-                            f"{event_name} for session {task_input.session_id}. "
-                            f"Resuming execution with response: {event.get('data', {})}"
-                        )
-                        should_send_messages = True
-
-                # -------- 2.3 Termination Conditions --------
-
-                # Check task end conditions - ROOT EVENTS ONLY
-                is_root_event = len(event.get("parent_ids", [])) == 0
-                if is_root_event:
-                    if event_type == "on_chain_end":
+                    event_type = event.get("event")
+                    # -------- 2.1 Stop Flag Check --------
+                    # Check stop signal at the beginning of each event processing
+                    control_data = self._get_stop_flag(task_input.session_id)
+                    if control_data or event_type == TaskExecutionStatus.CANCELLED:
                         task_ended = True
-                        status = (
-                            TaskExecutionStatus.USER_INPUT
-                            if need_user_input
-                            else TaskExecutionStatus.COMPLETED
+                        stop_reason = (
+                            control_data.get("stop_reason", "User requested")
+                            if control_data
+                            else "User requested"
                         )
-                        reason = (
-                            "Waiting for user input"
-                            if need_user_input
-                            else "Task completed"
-                        )
-                        yield self._handle_finish_signal(
-                            task_input.session_id, task_id, reason, status
-                        )
-                        break
-                    elif event_type == "on_chain_error":
-                        task_ended = True
-                        error_msg = event.get("data", {}).get("error", "Unknown error")
                         yield self._handle_finish_signal(
                             task_input.session_id,
                             task_id,
-                            f"Task failed: {error_msg}",
-                            TaskExecutionStatus.FAILED,
+                            stop_reason,
+                            TaskExecutionStatus.CANCELLED,
                         )
                         break
 
-                # -------- 2.4 Tool Internal Event Filtering --------
+                    event_data = event.get("data", {})
 
-                # Extract event metadata for filtering
-                run_id = event.get("run_id")
-                parent_ids = event.get("parent_ids", [])
+                    # -------- 2.2 High Priority: Interrupts & State Updates --------
 
-                # Track tool execution state
-                if event_type == "on_tool_start":
-                    executing_tools.add(run_id)
-                    logger.debug(
-                        f"Tool execution started: {event.get('name')} "
-                        f"(session: {task_input.session_id}, task: {task_id}, run_id: {run_id})"
-                    )
-                elif event_type == "on_tool_end":
-                    executing_tools.discard(run_id)
-                    logger.debug(
-                        f"Tool execution ended: {event.get('name')} "
-                        f"(session: {task_input.session_id}, task: {task_id}, run_id: {run_id})"
-                    )
-                elif any(parent_id in executing_tools for parent_id in parent_ids):
-                    # Filter tool internal events
-                    logger.debug(
-                        f"Filtered tool internal event: {event_type} {event.get('name', '')} "
-                        f"(session: {task_input.session_id}, task: {task_id}, "
-                        f"parent_ids: {parent_ids}, executing_tools: {executing_tools})"
-                    )
-                    continue
+                    # Handle LangGraph native node interrupts
+                    if (
+                        "chunk" in event_data
+                        and event_data["chunk"]
+                        and "__interrupt__" in event_data["chunk"]
+                    ):
+                        chunk_data = event_data.get("chunk", {})
+                        interrupt_obj = chunk_data.get("__interrupt__")
 
-                # -------- 2.5 Regular Event Processing --------
+                        # Skip tool interrupts and user_input interrupts
+                        if interrupt_obj:
+                            interrupt_type = None
 
-                # Process tracked event types - only send if enabled
-                if event_type in self.TRACKED_EVENTS and should_send_messages:
-                    message = await self._convert_langgraph_event(
-                        event, task_input.session_id, display_language, task_id
-                    )
-                    if message:
-                        # Update user input requirement flags
-                        if message.type == MessageType.USER_INPUT:
-                            need_user_input = True
-                            logger.debug("User input needed due to USER_INPUT message")
-                        elif message.type == MessageType.TOOL_APPROVAL_REQUEST:
-                            need_user_input = True
-                            logger.debug(
-                                "Tool approval needed due to TOOL_APPROVAL_REQUEST message"
+                            # Extract interrupt type from various possible structures
+                            if (
+                                isinstance(interrupt_obj, tuple)
+                                and len(interrupt_obj) > 0
+                            ):
+                                # LangGraph Interrupt objects in tuple
+                                first_interrupt = interrupt_obj[0]
+                                if hasattr(first_interrupt, "value") and isinstance(
+                                    first_interrupt.value, dict
+                                ):
+                                    interrupt_type = first_interrupt.value.get("type")
+                            elif isinstance(interrupt_obj, dict):
+                                # Direct dict format
+                                interrupt_type = interrupt_obj.get("type")
+
+                            if interrupt_type in [
+                                "tool_interrupt_before",
+                                "tool_interrupt_after",
+                                "user_input",
+                                "dynamic_form",
+                            ]:
+                                continue  # Don't send generic interrupt message
+
+                        interrupt_message = self._handle_node_interrupt(
+                            event_data, task_input.session_id, task_id
+                        )
+                        yield self._format_sse_message(interrupt_message)
+
+                    # Resume mode: enable messages after tool completion events
+                    if (
+                        task_input.is_resume
+                        and not should_send_messages
+                        and event_type == "on_custom_event"
+                    ):
+                        event_name = event.get("name")
+                        if event_name in [
+                            "on_langcrew_user_input_completed",
+                            "on_langcrew_tool_interrupt_before_completed",
+                            "on_langcrew_tool_interrupt_after_completed",
+                        ]:
+                            logger.info(
+                                f"{event_name} for session {task_input.session_id}. "
+                                f"Resuming execution with response: {event.get('data', {})}"
                             )
-                        elif (
-                            message.type == MessageType.MESSAGE_TO_USER
-                            and message.detail.get("intent_type") == "asking_user"
-                        ):
-                            need_user_input = True
+                            should_send_messages = True
 
-                        yield self._format_sse_message(message)
+                    # -------- 2.3 Termination Conditions --------
 
-            # ============ 3. COMPLETION HANDLING ============
+                    # Check task end conditions - ROOT EVENTS ONLY
+                    is_root_event = len(event.get("parent_ids", [])) == 0
+                    if is_root_event:
+                        if event_type == "on_chain_end":
+                            task_ended = True
+                            status = (
+                                TaskExecutionStatus.USER_INPUT
+                                if need_user_input
+                                else TaskExecutionStatus.COMPLETED
+                            )
+                            reason = (
+                                "Waiting for user input"
+                                if need_user_input
+                                else "Task completed"
+                            )
+                            yield self._handle_finish_signal(
+                                task_input.session_id, task_id, reason, status
+                            )
+                            break
+                        elif event_type == "on_chain_error":
+                            task_ended = True
+                            error_msg = event.get("data", {}).get(
+                                "error", "Unknown error"
+                            )
+                            yield self._handle_finish_signal(
+                                task_input.session_id,
+                                task_id,
+                                f"Task failed: {error_msg}",
+                                TaskExecutionStatus.FAILED,
+                            )
+                            break
 
-            # Handle abnormal completion
-            if not task_ended:
-                yield self._handle_finish_signal(
-                    task_input.session_id,
-                    task_id,
-                    "Task completed: abnormal end",
-                    TaskExecutionStatus.FAILED,
-                )
+                    # -------- 2.4 Tool Internal Event Filtering --------
+
+                    # Extract event metadata for filtering
+                    run_id = event.get("run_id")
+                    parent_ids = event.get("parent_ids", [])
+
+                    # Track tool execution state
+                    if event_type == "on_tool_start":
+                        executing_tools.add(run_id)
+                        logger.debug(
+                            f"Tool execution started: {event.get('name')} "
+                            f"(session: {task_input.session_id}, task: {task_id}, run_id: {run_id})"
+                        )
+                    elif event_type == "on_tool_end":
+                        executing_tools.discard(run_id)
+                        logger.debug(
+                            f"Tool execution ended: {event.get('name')} "
+                            f"(session: {task_input.session_id}, task: {task_id}, run_id: {run_id})"
+                        )
+                    elif any(parent_id in executing_tools for parent_id in parent_ids):
+                        # Filter tool internal events
+                        logger.debug(
+                            f"Filtered tool internal event: {event_type} {event.get('name', '')} "
+                            f"(session: {task_input.session_id}, task: {task_id}, "
+                            f"parent_ids: {parent_ids}, executing_tools: {executing_tools})"
+                        )
+                        continue
+
+                    # -------- 2.5 Regular Event Processing --------
+
+                    # Process tracked event types - only send if enabled
+                    if event_type in self.TRACKED_EVENTS and should_send_messages:
+                        message = await self._convert_langgraph_event(
+                            event, task_input.session_id, display_language, task_id
+                        )
+                        if message:
+                            # Update user input requirement flags
+                            if message.type == MessageType.USER_INPUT:
+                                need_user_input = True
+                                logger.debug(
+                                    "User input needed due to USER_INPUT message"
+                                )
+                            elif message.type == MessageType.TOOL_APPROVAL_REQUEST:
+                                need_user_input = True
+                                logger.debug(
+                                    "Tool approval needed due to TOOL_APPROVAL_REQUEST message"
+                                )
+                            elif (
+                                message.type == MessageType.MESSAGE_TO_USER
+                                and message.detail.get("intent_type") == "asking_user"
+                            ):
+                                need_user_input = True
+                            message.trace_id = f"{span.get_span_context().trace_id:x}"
+                            yield self._format_sse_message(message)
+
+                # ============ 3. COMPLETION HANDLING ============
+
+                # Handle abnormal completion
+                if not task_ended:
+                    yield self._handle_finish_signal(
+                        task_input.session_id,
+                        task_id,
+                        "Task completed: abnormal end",
+                        TaskExecutionStatus.FAILED,
+                    )
 
         except Exception as e:
             # ============ 4. ERROR HANDLING ============
-            logger.error(f"Execution failed: {e}")
+            logger.exception(f"Execution failed: {e}")
             yield self._handle_finish_signal(
                 task_input.session_id, task_id, str(e), TaskExecutionStatus.FAILED
             )
@@ -437,7 +458,7 @@ class LangGraphAdapter:
             return self._handle_model_stream(event, session_id, task_id)
         elif event_type == "on_chat_model_end":
             return self._handle_model_end(event, session_id, task_id)
-        elif event_type in ["on_chat_model_error", "on_llm_error"]:
+        elif event_type == "on_chat_model_error":
             return self._handle_model_error(event, session_id, task_id)
         elif event_type == "on_tool_start":
             return self._handle_tool_start(event, session_id, task_id, display_language)
@@ -494,7 +515,7 @@ class LangGraphAdapter:
         full_content = ""
         tool_calls = []
         usage_metadata = {}
-        response_metadata = {}
+        # response_metadata = {}
 
         # Extract complete information if output exists
         if output:
@@ -505,8 +526,15 @@ class LangGraphAdapter:
             if hasattr(message, "usage_metadata") and message.usage_metadata:
                 usage_metadata = message.usage_metadata
 
-            if hasattr(message, "response_metadata") and message.response_metadata:
-                response_metadata = message.response_metadata
+            # if hasattr(message, "response_metadata") and message.response_metadata:
+            #     response_metadata = message.response_metadata
+
+        if not message.content:
+            if not message.tool_calls:
+                message.content = "END"
+                logger.info("AI message content is empty, set to END")
+
+            return None
 
         # Build detail with essential information
         detail = {
@@ -521,8 +549,8 @@ class LangGraphAdapter:
         if usage_metadata:
             detail["usage"] = usage_metadata
 
-        if response_metadata:
-            detail["response_metadata"] = response_metadata
+        # if response_metadata:
+        #     detail["response_metadata"] = response_metadata
 
         detail = self._enhance_detail_with_metadata(event, detail)
 
@@ -547,9 +575,9 @@ class LangGraphAdapter:
         detail = {
             "run_id": event.get("run_id"),
             "error": str(error),
-            "error_type": type(error).__name__
-            if hasattr(error, "__class__")
-            else "Unknown",
+            "error_type": (
+                type(error).__name__ if hasattr(error, "__class__") else "Unknown"
+            ),
         }
         detail = self._enhance_detail_with_metadata(event, detail)
 
@@ -576,11 +604,24 @@ class LangGraphAdapter:
         if not tool_name:
             return None
 
-        # Skip special tools (business logic, not content judgment)
-        if tool_name in ["message_to_user", "user_input"]:
+        # Skip special tools (business logic, not content judgment) and memory tools
+        if tool_name in [
+            "message_to_user",
+            "user_input",
+            "dynamic_form_user_input",
+            # Memory tools
+            "manage_user_memory",
+            "search_user_memory",
+            "manage_app_memory",
+            "search_app_memory",
+        ]:
             return None
 
         tool_input = event.get("data", {}).get("input", {})
+
+        # Special handling for plan tool
+        if tool_name == "plan":
+            return self._handle_plan_tool(event, session_id, task_id)
 
         # Get display information using passed language
         display_fields = ToolDisplayManager.get_display(
@@ -613,7 +654,16 @@ class LangGraphAdapter:
     ) -> StreamMessage | None:
         """Handle tool completion events."""
         tool_name = event.get("name")
-        if not tool_name or tool_name in ["user_input"]:
+        if not tool_name or tool_name in [
+            "user_input",
+            "dynamic_form_user_input",
+            "plan",
+            # Memory tools
+            "manage_user_memory",
+            "search_user_memory",
+            "manage_app_memory",
+            "search_app_memory",
+        ]:
             return None
 
         tool_input = event.get("data", {}).get("input", {}) or {}
@@ -625,6 +675,15 @@ class LangGraphAdapter:
             "result": output,
             "status": ToolResult.SUCCESS,
         }
+
+        # Special handling for agent_result_delivery tool
+        if tool_name == "agent_result_delivery":
+            result_message = self._handle_agent_result_delivery(
+                detail, output, session_id, task_id
+            )
+            if result_message:
+                return result_message
+
         detail = self._enhance_detail_with_metadata(event, detail)
 
         return StreamMessage(
@@ -652,9 +711,9 @@ class LangGraphAdapter:
             "status": ToolResult.FAILED,
             "output": error_message,
             "error": error_message,
-            "error_type": type(error).__name__
-            if hasattr(error, "__class__")
-            else "Unknown",
+            "error_type": (
+                type(error).__name__ if hasattr(error, "__class__") else "Unknown"
+            ),
         }
         detail = self._enhance_detail_with_metadata(event, detail)
 
@@ -681,167 +740,7 @@ class LangGraphAdapter:
         event_name = event.get("name")
         message_id = generate_message_id()
 
-        if event_name == "on_langcrew_plan_start":
-            # Plan creation event from Plan-and-Execute executor
-            plan_data = data
-            # Convert phases to steps format for frontend compatibility
-            steps = []
-            current_phase_id = plan_data.get("current_phase_id", 1)
-
-            for phase in plan_data.get("phases", []):
-                phase_id = phase.get("id")
-
-                # Determine status based on phase_id and current_phase_id
-                status = StepStatus.PENDING
-                if phase_id == current_phase_id:
-                    status = StepStatus.RUNNING
-                elif phase_id < current_phase_id:
-                    status = StepStatus.SUCCESS
-
-                steps.append({
-                    "id": str(phase_id),
-                    "title": phase["title"],
-                    "description": phase.get("expected_output", ""),
-                    "status": status,
-                    "started_at": int(time.time() * 1000),
-                })
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN,
-                content=plan_data.get("goal", "Planning execution"),
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif event_name == "on_langcrew_step_start":
-            # Step start event from Plan-and-Execute executor
-            step_data = data
-            step_id = step_data.get("step_id", "")
-
-            # Create steps array with current step marked as running
-            # and previous step (if any) marked as success
-            steps = []
-
-            # If this isn't the first step, add the previous step as completed
-            if step_id > 1:
-                steps.append({
-                    "id": f"{step_id - 1}",
-                    "status": StepStatus.SUCCESS,
-                    "started_at": int(time.time() * 1000),
-                })
-
-            # Add current step as running
-            steps.append({
-                "id": f"{step_id}",
-                "status": StepStatus.RUNNING,
-                "started_at": int(time.time() * 1000),
-            })
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN_UPDATE,
-                content=f"开始执行步骤 {step_id}: {step_data.get('step_description', '')}",
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-        elif event_name == "on_langcrew_step_end":
-            # Step end event from Plan-and-Execute executor
-            step_data = data
-            steps = []
-            steps.append({
-                "id": f"{step_data.get('step_id', '')}",
-                "status": StepStatus.SUCCESS,
-                "started_at": int(time.time() * 1000),
-            })
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN_UPDATE,
-                content=f"步骤 {step_data.get('step_id', '')} 完成",
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "action": PlanAction.UPDATE,
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif event_name == "on_langcrew_plan_created":
-            # Plan creation event from Plan-and-Execute executor
-            plan_data = data
-            task_type = plan_data.get("task_type", "")
-
-            # For simple tasks, return a text message with the direct response
-            if task_type == "simple":
-                direct_response = plan_data.get("direct_response", "")
-                return StreamMessage(
-                    id=message_id,
-                    type=MessageType.TEXT,
-                    content=direct_response,
-                    detail=self._enhance_detail_with_metadata(
-                        event,
-                        {
-                            "streaming": False,
-                            "final": True,
-                        },
-                    ),
-                    role="assistant",
-                    timestamp=int(time.time() * 1000),
-                    session_id=session_id,
-                    task_id=task_id,
-                )
-
-            steps = []
-            if "plan" in plan_data:
-                plan = plan_data.get("plan", {})
-                steps_data = plan.get("steps", [])
-                for i, step in enumerate(steps_data):
-                    steps.append({
-                        "id": str(i + 1),
-                        "title": step.get("description", "Step"),
-                        "status": StepStatus.PENDING if i > 0 else StepStatus.RUNNING,
-                        "started_at": int(time.time() * 1000),
-                    })
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN,
-                content=plan_data.get("task_type", "Planning execution"),
-                detail=self._enhance_detail_with_metadata(
-                    event,
-                    {
-                        "steps": steps,
-                    },
-                ),
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif event_name == "on_langcrew_sandbox_created":
+        if event_name == "on_langcrew_sandbox_created":
             # Sandbox creation event from E2B tools
             sandbox_data = data
             return StreamMessage(
@@ -854,6 +753,30 @@ class LangGraphAdapter:
                         "session_id": sandbox_data.get("session_id"),
                         "sandbox_id": sandbox_data.get("sandbox_id"),
                         "sandbox_url": sandbox_data.get("sandbox_url"),
+                    },
+                ),
+                role="inner_message",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+                task_id=task_id,
+            )
+        elif event_name == "on_langcrew_agentbox_created":
+            # Agentbox creation event from cloud phone tools
+            agentbox_data = data
+            return StreamMessage(
+                id=message_id,
+                type=MessageType.CONFIG,
+                content="update_session",
+                detail=self._enhance_detail_with_metadata(
+                    event,
+                    {
+                        "session_id": agentbox_data.get("session_id"),
+                        "sandbox_id": agentbox_data.get("sandbox_id"),
+                        "instance_no": agentbox_data.get("instance_no"),
+                        "access_key": agentbox_data.get("access_key"),
+                        "access_secret_key": agentbox_data.get("access_secret_key"),
+                        "expire_time": agentbox_data.get("expire_time"),
+                        "user_id": agentbox_data.get("user_id"),
                     },
                 ),
                 role="inner_message",
@@ -916,9 +839,9 @@ class LangGraphAdapter:
                         "interrupt_data": approval_data,
                         "supports_modification": True,
                         "modification_hint": "You can approve/deny or provide modified parameters",
-                        "options": ["批准", "拒绝"]
-                        if is_chinese
-                        else ["Approve", "Deny"],
+                        "options": (
+                            ["批准", "拒绝"] if is_chinese else ["Approve", "Deny"]
+                        ),
                     },
                 ),
                 role="assistant",
@@ -954,9 +877,9 @@ class LangGraphAdapter:
                         "interrupt_data": review_data,
                         "supports_modification": True,
                         "modification_hint": "You can approve/deny or provide modified result",
-                        "options": ["确认", "拒绝"]
-                        if is_chinese
-                        else ["Confirm", "Deny"],
+                        "options": (
+                            ["确认", "拒绝"] if is_chinese else ["Confirm", "Deny"]
+                        ),
                     },
                 ),
                 role="assistant",
@@ -989,112 +912,6 @@ class LangGraphAdapter:
             logger.debug(f"Unhandled custom event: {event_name}")
 
         return None
-
-    # ============ SPECIAL EVENT HANDLERS ============
-
-    async def _handle_special_tool_events(
-        self,
-        event: dict[str, Any],
-        session_id: str,
-        task_id: str,
-        original_msg: StreamMessage | None = None,
-        display_language: str = "en",
-    ) -> StreamMessage | None:
-        """Handle special tool events for agent_update_plan and agent_advance_phase."""
-        event_type = event.get("event", "unknown")
-        tool_name = event.get("name", "unknown_tool")
-
-        if event_type == "on_tool_start" and tool_name in ["agent_advance_phase"]:
-            return None
-
-        if tool_name not in [
-            "agent_update_plan",
-            "agent_advance_phase",
-        ]:
-            return original_msg
-
-        message_id = generate_message_id()
-
-        if event_type == "on_tool_start" and tool_name == "agent_update_plan":
-            tool_input = event.get("data", {}).get("input", {})
-            phases = tool_input.get("phases", [])
-            # Validate phases type
-            if not isinstance(phases, list):
-                logger.error(
-                    f"Invalid phases type: {type(phases)}, expected list, got {phases}"
-                )
-                return None
-            # Use display language for content
-            is_chinese = display_language == "zh"
-            if is_chinese:
-                goal_lines = ["我将按照下列计划进行工作：\n"]
-            else:
-                goal_lines = ["I will work according to the following plan:\n"]
-            steps = []
-            for phase in phases:
-                phase_id = (
-                    phase.get("id")
-                    if isinstance(phase, dict)
-                    else getattr(phase, "id", None)
-                )
-                phase_title = (
-                    phase.get("title")
-                    if isinstance(phase, dict)
-                    else getattr(phase, "title", "")
-                )
-                goal_lines.append(f"{phase_id}. {phase_title}")
-            if is_chinese:
-                goal_lines.append(
-                    "\n在我的工作过程中，你可以随时打断我，告诉我新的信息或者调整计划。"
-                )
-            else:
-                goal_lines.append(
-                    "\nDuring my work, you can interrupt me at any time to provide new information or adjust the plan."
-                )
-            content = "\n".join(goal_lines)
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.MESSAGE_TO_USER,
-                content=content,
-                detail={},
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        elif tool_name == "agent_advance_phase":
-            tool_input = event.get("data", {}).get("input", {})
-            from_phase_id = tool_input.get("from_phase_id", 1)
-            to_phase_id = tool_input.get("to_phase_id", 2)
-            steps = [
-                {
-                    "id": f"{from_phase_id}",
-                    "status": StepStatus.SUCCESS,
-                    "started_at": int(time.time() * 1000),
-                },
-                {
-                    "id": f"{to_phase_id}",
-                    "status": StepStatus.RUNNING,
-                    "started_at": int(time.time() * 1000),
-                },
-            ]
-
-            return StreamMessage(
-                id=message_id,
-                type=MessageType.PLAN_UPDATE,
-                content="计划推进说明",
-                detail={
-                    "action": PlanAction.UPDATE.value,
-                    "steps": steps,
-                },
-                role="assistant",
-                timestamp=int(time.time() * 1000),
-                session_id=session_id,
-                task_id=task_id,
-            )
-
-        return original_msg
 
     def _handle_finish_signal(
         self,
@@ -1222,3 +1039,162 @@ class LangGraphAdapter:
             return str(error.args[0])
         else:
             return str(error)
+
+    def _handle_plan_tool(
+        self,
+        event: dict[str, Any],
+        session_id: str,
+        task_id: str,
+    ) -> StreamMessage | None:
+        """Handle plan tool start events.
+
+        This method processes plan tool events from the PlanTool defined in langchain_tool.py,
+        converting them to the appropriate StreamMessage format for the frontend.
+
+        Args:
+            event: The LangGraph event containing plan data
+            session_id: Current session identifier
+            task_id: Current task identifier
+            display_language: Display language (zh or en)
+
+        Returns:
+            A StreamMessage with plan data formatted for frontend rendering
+        """
+        # We only handle on_tool_start events for plan tool
+        if event.get("event") != "on_tool_start":
+            return None
+
+        # Extract data from event
+        tool_input = event.get("data", {}).get("input", {})
+        plans = tool_input.get("plans", [])
+
+        if not plans or not isinstance(plans, list):
+            logger.error(f"Invalid plans data: {plans}")
+            return None
+
+        # Convert plan items to steps for frontend
+        steps = []
+        timestamp = int(time.time() * 1000)
+
+        # Process each plan item
+        for plan in plans:
+            # Extract plan data, handling both dict and object formats
+            plan_id = str(
+                plan.get("id") if isinstance(plan, dict) else getattr(plan, "id", "")
+            )
+            plan_content = (
+                plan.get("content")
+                if isinstance(plan, dict)
+                else getattr(plan, "content", "")
+            )
+            plan_status = (
+                plan.get("status")
+                if isinstance(plan, dict)
+                else getattr(plan, "status", "pending")
+            )
+
+            # Map status from PlanItem format to StepStatus format
+            if plan_status == "running":
+                status = StepStatus.RUNNING
+            elif plan_status == "done":
+                status = StepStatus.SUCCESS
+            else:  # "pending" or any other value
+                status = StepStatus.PENDING
+
+            # Create step object for frontend matching the required format
+            steps.append(
+                {
+                    "id": plan_id,
+                    "title": plan_content,
+                    "status": status,
+                    "started_at": timestamp,
+                }
+            )
+
+        return StreamMessage(
+            id=generate_message_id(),
+            type=MessageType.PLAN,
+            content="",
+            detail={"steps": steps},
+            role="assistant",
+            timestamp=timestamp,
+            session_id=session_id,
+            task_id=task_id,
+        )
+
+    def _handle_agent_result_delivery(
+        self, detail: dict[str, Any], output: Any, session_id: str, task_id: str
+    ) -> StreamMessage | None:
+        """Handle special processing for agent_result_delivery tool output.
+
+        Extracts attachments from result.content and moves them to the same level as result,
+        while removing the content field from result.
+
+        Args:
+            detail: The detail dictionary to modify
+            output: The tool output data
+            session_id: Current session identifier
+            task_id: Current task identifier
+
+        Returns:
+            A StreamMessage with processed agent result data or None if processing fails
+        """
+        try:
+            # Check if output has the expected structure
+            if not isinstance(output, ToolMessage) or not hasattr(output, "content"):
+                logger.info(
+                    "agent_result_delivery output missing expected structure, skipping special processing"
+                )
+                return None
+
+            content_str = output.content
+            if not isinstance(content_str, str):
+                logger.info(
+                    "agent_result_delivery content is not a string, skipping special processing"
+                )
+                return None
+
+            content_data = json.loads(content_str)
+
+            # Extract attachments if they exist
+            if "attachments" in content_data and isinstance(
+                content_data["attachments"], list
+            ):
+                # Move attachments to same level as result
+                detail["attachments"] = content_data["attachments"]
+                logger.info(
+                    f"Extracted {len(content_data['attachments'])} attachments from agent_result_delivery"
+                )
+
+                # Create new result without content
+                new_result = output.model_dump(exclude={"content"})
+                detail["result"] = new_result
+                logger.info("Removed content field from agent_result_delivery result")
+            else:
+                logger.info("No attachments found in agent_result_delivery content")
+
+            # Enhance detail with metadata
+            detail = self._enhance_detail_with_metadata({}, detail)
+
+            # Return StreamMessage with processed data
+            return StreamMessage(
+                id=generate_message_id(),
+                type=MessageType.TOOL_RESULT,
+                content="",  # Empty content as attachments are in detail
+                detail=detail,
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+                task_id=task_id,
+            )
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON content in agent_result_delivery: {e}")
+            logger.error(f"Invalid JSON content: {output.get('content', 'N/A')}")
+            return None
+        except Exception as e:
+            logger.error(
+                f"Unexpected error processing agent_result_delivery output: {e}",
+                exc_info=True,
+            )
+            return None

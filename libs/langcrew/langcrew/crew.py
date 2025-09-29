@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import asyncio
+import inspect
 import logging
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from contextlib import asynccontextmanager, contextmanager
 from typing import (
     Any,
     Literal,
 )
 
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, ensure_config
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END, START
@@ -21,76 +22,107 @@ from langgraph_supervisor.handoff import create_handoff_tool
 
 from .agent import Agent
 from .hitl import HITLConfig
-from .memory import EntityMemory, LongTermMemory, MemoryConfig, ShortTermMemory
-from .memory.storage import get_checkpointer, get_storage
-
+from .memory import MemoryConfig
+from .memory.context import MemoryContextManager
 from .task import Task
-from .types import CrewState
+from .tools import ToolCallback
+from .types import CrewState, OrderCallback
 
 logger = logging.getLogger(__name__)
 
 
 class Crew:
+    """LangCrew main orchestration class.
+
+    Args:
+        # Core configuration (most users only need these)
+        agents: List of agents to execute tasks
+        tasks: List of tasks to be executed
+
+        # Memory & persistence (choose one approach)
+        memory: Simple memory setup - use True for defaults, MemoryConfig for advanced setup
+        checkpointer: Advanced - provide your own checkpointer (you manage lifecycle)
+        store: Advanced - provide your own store (you manage lifecycle)
+        async_checkpointer: Advanced - async version of checkpointer for better performance
+        async_store: Advanced - async version of store for better performance
+
+        # Advanced configuration (for experts)
+        graph: Custom LangGraph StateGraph (overrides agents/tasks)
+        hitl: Human-in-the-loop configuration
+        verbose: Enable detailed logging and debug output
+
+    Usage patterns:
+        # Beginner: Just use memory=True
+        crew = Crew(agents=[agent], tasks=[task], memory=True)
+
+        # Intermediate: Configure memory details
+        crew = Crew(agents=[agent], tasks=[task],
+                   memory=MemoryConfig(provider="postgres", connection_string="..."))
+
+        # Advanced: Provide your own checkpointer (you manage it)
+        crew = Crew(agents=[agent], tasks=[task], checkpointer=my_checkpointer)
+    """
+
     def __init__(
         self,
+        # Core configuration - most commonly used
         agents: list[Agent] | None = None,
         tasks: list[Task] | None = None,
-        verbose: bool = False,
-        graph: StateGraph | None = None,
-        # Memory configuration - CrewAI compatible
-        memory: bool | MemoryConfig | None = None,
-        embedder: dict[str, Any] | None = None,
-        # LangGraph enhancements
+        # Memory & persistence - unified configuration
+        memory: MemoryConfig | bool | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
         store: BaseStore | None = None,
-        # Async components - for advanced users
         async_checkpointer: BaseCheckpointSaver | None = None,
         async_store: BaseStore | None = None,
-        # HITL configuration
+        # Advanced configuration - less commonly used
+        graph: StateGraph | None = None,
         hitl: HITLConfig | None = None,
+        verbose: bool = False,
     ):
         self.agents = agents or []
         self.tasks = tasks or []
         self.verbose = verbose
         self.graph = graph
+        self._is_registered_tools = False
 
         # Memory configuration
-        if memory is None:
-            self.memory_config = None
-        elif isinstance(memory, bool):
-            self.memory_config = MemoryConfig() if memory else None
-        elif isinstance(memory, MemoryConfig):
-            self.memory_config = memory
+        # Handle memory parameter conversion
+        if isinstance(memory, bool):
+            if memory:
+                # memory=True: use default MemoryConfig
+                from .memory import MemoryConfig
+
+                self.memory_config = MemoryConfig()
+            else:
+                # memory=False: disable memory
+                self.memory_config = None
         else:
-            raise ValueError(f"Invalid memory parameter type: {type(memory)}")
-        self.embedder = embedder
+            # memory is MemoryConfig instance or None
+            self.memory_config = memory
 
-        self.checkpointer = checkpointer
-        self.store = store
-        self._compiled_graph = None
+        # User-provided instances (user manages lifecycle)
+        self._user_checkpointer = checkpointer
+        self._user_store = store
+        self._user_async_checkpointer = async_checkpointer
+        self._user_async_store = async_store
 
-        # Memory instances
-        self._short_term_memory = None
-        self._long_term_memory = None
-        self._entity_memory = None
+        # Validate user-provided instances
+        self._validate_user_providers()
 
-        self._thread_id = None
+        self._memory_manager = MemoryContextManager(
+            self.memory_config,
+            user_checkpointer=self._user_checkpointer,
+            user_store=self._user_store,
+            user_async_checkpointer=self._user_async_checkpointer,
+            user_async_store=self._user_async_store,
+        )
 
-        # Async components for async methods
-        self._async_store = async_store
-        self._async_checkpointer = async_checkpointer
-        self._async_compiled_graph = None
+        # Setup agents memory configuration
+        self._setup_agents_memory()
 
-        # Async memory instances
-        self._async_short_term_memory = None
-        self._async_long_term_memory = None
-        self._async_entity_memory = None
-
-        self._async_components_initialized = False
-
-        # Context managers for async components
-        self._async_store_cm = None
-        self._async_checkpointer_cm = None
+        # tools for crew
+        self._tools: list[BaseTool] = []
+        self.register_after_execute_callback: list[OrderCallback] = []
 
         # HITL configuration
         if hitl is None:
@@ -106,34 +138,108 @@ class Crew:
         if self.hitl_config is not None:
             self._setup_hitl()
 
-        # Setup memory if enabled (check final config, not original parameter)
-        if self.memory_config is not None:
-            self._setup_crew_memory()
-
         if self.graph is None and not self.tasks and not self.agents:
             raise ValueError("Either tasks, agents, or graph must be provided")
 
         # Setup handoff if needed (automatically detect based on agent configuration)
         self._setup_handoff_if_needed()
 
-        # Inject checkpointer and store into all agents for executor creation
-        for agent in self.agents:
-            agent.checkpointer = self.checkpointer
-            agent.store = self.store
+    def _validate_user_providers(self):
+        """Validate user-provided checkpointer and store instances"""
+        # Check if any user instances are provided
+        has_user_instances = (
+            self._user_checkpointer is not None
+            or self._user_store is not None
+            or self._user_async_checkpointer is not None
+            or self._user_async_store is not None
+        )
 
-    def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
-        """Prepare tools for execution.
+        if has_user_instances:
+            import warnings
 
-        This method can be extended to inject dependencies or modify tools
-        before they are used by agents or tasks.
+            # Check if both memory config and user instances are configured
+            if self.memory_config is not None:
+                warnings.warn(
+                    "Using both memory config and custom checkpointer/store. "
+                    "Custom instances take precedence. Consider using one approach.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+
+            # Warn user about resource management responsibility
+            warnings.warn(
+                "Custom checkpointer/store detected. You are responsible for managing their lifecycle (setup/teardown).",
+                UserWarning,
+                stacklevel=3,
+            )
+
+    def add_after_execute_callbacks(self, callbacks: list[Callable | OrderCallback]):
+        """Add after execute callbacks to the crew"""
+        register_callback = self.register_after_execute_callback.copy()
+        for callback in callbacks:
+            if isinstance(callback, OrderCallback):
+                register_callback.append(callback)
+            else:
+                register_callback.append(
+                    OrderCallback(order_id=len(register_callback), callback=callback)
+                )
+
+        register_callback.sort(key=lambda x: x.order_id)
+        self.register_after_execute_callback = register_callback
+
+    async def _aprocess_output(self, output: Any) -> Any:
+        """
+        Asynchronously process output data through callback functions
+
+        This method processes any output data through registered callback functions.
+        It can handle both final results and streaming data.
 
         Args:
-            tools: List of tools to prepare
+            output: Output data to be processed
 
         Returns:
-            List of prepared tools
+            Processed output data
         """
-        return tools
+        if not isinstance(output, dict):
+            return output
+
+        result = output
+        prev_result = result
+        callbacks = [c.callback for c in self.register_after_execute_callback]
+        # Execute function callbacks
+        for callback_fn in callbacks:
+            try:
+                if prev_result:
+                    # Handle the case where prev_result might be a list
+                    if isinstance(prev_result, list):
+                        # Process each item in the list through the callback
+                        processed_items = []
+                        for item in prev_result:
+                            if inspect.iscoroutinefunction(callback_fn):
+                                processed_item = await callback_fn(item)
+                            else:
+                                processed_item = callback_fn(item)
+                            if processed_item:
+                                # If processed_item is also a list, extend instead of append
+                                if isinstance(processed_item, list):
+                                    processed_items.extend(processed_item)
+                                else:
+                                    processed_items.append(processed_item)
+                        prev_result = processed_items
+                    else:
+                        # Original logic for dict input
+                        if inspect.iscoroutinefunction(callback_fn):
+                            prev_result = await callback_fn(prev_result)
+                        else:
+                            prev_result = callback_fn(prev_result)
+                    if not prev_result:
+                        logger.info(
+                            f"Prev result is None, callback: {callback_fn.__self__.__class__.__name__}"
+                        )
+            except Exception as e:
+                logger.error(f"Error in output processing callback: {e}")
+
+        return prev_result
 
     def _sync_subgraph_message_deletions(
         self, state: CrewState, result: dict[str, Any]
@@ -228,14 +334,18 @@ class Crew:
 
         return interrupt_before, interrupt_after
 
-    def _compile_graph_with_checkpointer(
-        self, builder: StateGraph, checkpointer=None
+    def _compile_graph(
+        self, builder: StateGraph, checkpointer=None, store=None
     ) -> CompiledStateGraph:
-        """Compile graph with checkpointer and interrupt configuration applied"""
+        """Compile graph with memory components and interrupt configuration applied"""
         interrupt_before, interrupt_after = self._collect_interrupt_config()
+        if not self._is_registered_tools:
+            self._register_tools()
+        self._is_registered_tools = True
 
         compiled = builder.compile(
-            checkpointer=checkpointer or self.checkpointer,
+            checkpointer=checkpointer,
+            store=store,
             interrupt_before=interrupt_before,
             interrupt_after=interrupt_after,
         )
@@ -246,6 +356,21 @@ class Crew:
             )
 
         return compiled
+
+    def _register_tools(self):
+        """Register tools to the crew"""
+        after_execute_callbacks = []
+        for tool in self._tools:
+            if isinstance(tool, ToolCallback):
+                order_id, callback = tool.tool_order_callback()
+                if order_id:
+                    after_execute_callbacks.append(
+                        OrderCallback(order_id=order_id, callback=callback)
+                    )
+                else:
+                    after_execute_callbacks.append(callback)
+        # order by order_id
+        self.add_after_execute_callbacks(after_execute_callbacks)
 
     def _create_generic_node_factory(
         self,
@@ -315,14 +440,15 @@ class Crew:
             # Basic validation - task must have an agent
             if not hasattr(task, "agent") or task.agent is None:
                 raise ValueError("Task must have an agent to create executor")
-
+            config = ensure_config()
             # Create config with langcrew metadata
-            config = RunnableConfig(
-                metadata={
-                    "langcrew_agent": task.agent.name,
-                    "langcrew_task": task.name or f"task_{self.tasks.index(task)}",
-                }
+            if "metadata" not in config:
+                config["metadata"] = {}
+            config["metadata"]["langcrew_agent"] = task.agent.name
+            config["metadata"]["langcrew_task"] = (
+                task.name or f"task_{self.tasks.index(task)}"
             )
+
             return (state, config)
 
         def process_result_fn(state: CrewState, result: dict[str, Any], task: Task):
@@ -343,12 +469,13 @@ class Crew:
         )
 
     def _build_task_sequential_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a sequential graph from tasks with native interrupt support
 
         Args:
-            checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
+            checkpointer: Optional checkpointer to use for state persistence
+            store: Optional store to use for data persistence
             is_async: Whether to create async task nodes
         """
         builder = StateGraph(CrewState)
@@ -365,8 +492,8 @@ class Crew:
             prev_node = node_name
 
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_checkpointer(
-            builder, checkpointer
+        return self._compile_graph(
+            builder, checkpointer, store
         )  # Use interrupt-aware compilation
 
     def _create_agent_node_factory(self, is_async: bool = False):
@@ -374,8 +501,11 @@ class Crew:
 
         def get_agent_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for agent"""
+            config = ensure_config()
             # Create config with langcrew metadata
-            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
+            if "metadata" not in config:
+                config["metadata"] = {}
+            config["metadata"]["langcrew_agent"] = agent.name
             return (state, config)
 
         def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
@@ -390,12 +520,13 @@ class Crew:
         )
 
     def _build_agent_sequential_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a sequential graph from agents with native interrupt support
 
         Args:
-            checkpointer: Optional checkpointer to use. If not provided, uses self.checkpointer
+            checkpointer: Optional checkpointer to use for state persistence
+            store: Optional store to use for data persistence
             is_async: Whether to create async agent nodes
         """
         builder = StateGraph(CrewState)
@@ -429,8 +560,8 @@ class Crew:
 
         # Last agent connects to END
         builder.add_edge(prev_node, END)
-        return self._compile_graph_with_checkpointer(
-            builder, checkpointer
+        return self._compile_graph(
+            builder, checkpointer, store
         )  # Use interrupt-aware compilation
 
     def _has_agent_handoffs(self) -> bool:
@@ -635,7 +766,11 @@ class Crew:
         def get_handoff_invoke_args(agent: Agent, state: CrewState, is_async: bool):
             """Get invoke arguments for handoff agent"""
             # Create config with langcrew metadata
-            config = RunnableConfig(metadata={"langcrew_agent": agent.name})
+            config = ensure_config()
+            # Create config with langcrew metadata
+            if "metadata" not in config:
+                config["metadata"] = {}
+            config["metadata"]["langcrew_agent"] = agent.name
             return (state, config)
 
         def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
@@ -649,13 +784,22 @@ class Crew:
             process_result_fn=process_result_fn,
         )(agent)
 
+    def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
+        """Prepare tools for execution"""
+        if tools:
+            for tool in tools:
+                if tool not in self._tools:
+                    self._tools.append(tool)
+        return tools
+
     def _build_agent_handoff_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a graph that supports handoff with dynamic routing
 
         Args:
             checkpointer: Optional checkpointer to use
+            store: Optional store to use
             is_async: Whether to create async nodes
         """
         builder = StateGraph(CrewState)
@@ -697,10 +841,10 @@ class Crew:
         # No conditional edges needed - LangGraph's Command mechanism handles routing
         # The handoff tools return Command(goto=agent_name) which LangGraph processes automatically
 
-        return self._compile_graph_with_checkpointer(builder, checkpointer)
+        return self._compile_graph(builder, checkpointer, store)
 
     def _build_task_handoff_graph(
-        self, checkpointer=None, is_async=False
+        self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
         """Build a graph that supports task-to-task handoff with backbone+router architecture
 
@@ -711,6 +855,7 @@ class Crew:
 
         Args:
             checkpointer: Optional checkpointer to use
+            store: Optional store to use
             is_async: Whether to create async nodes
         """
         builder = StateGraph(CrewState)
@@ -821,207 +966,58 @@ class Crew:
                 f"Task handoff graph built: {len(backbone_tasks)} backbone + {len(handoff_subgraph_tasks)} handoff + 1 router"
             )
 
-        return self._compile_graph_with_checkpointer(builder, checkpointer)
+        return self._compile_graph(builder, checkpointer, store)
 
-    def _get_compiled_graph(self) -> CompiledStateGraph:
-        """Get the compiled graph for execution with caching"""
+    def _get_compiled_graph(
+        self, checkpointer=None, store=None, is_async=False
+    ) -> CompiledStateGraph:
+        """Get the compiled graph for execution (unified sync/async version)"""
         # Handle custom graph if provided
         if self.graph is not None:
-            # User provided StateGraph, compile it with crew's checkpointer
-            return self._compile_graph_with_checkpointer(self.graph)
+            # User provided StateGraph, compile it with passed checkpointer and store
+            return self._compile_graph(self.graph, checkpointer, store)
 
-        # Use cached compiled graph if available
-        if self._compiled_graph is not None:
-            return self._compiled_graph
-
-        # Check if handoff is needed and build appropriate graph
+        # Build graph based on configuration
         if any(task.handoff_to for task in self.tasks):
-            # Build task-based handoff graph with mixed sequential and dynamic routing
-            self._compiled_graph = self._build_task_handoff_graph()
+            # Build task-based handoff graph
+            return self._build_task_handoff_graph(
+                checkpointer, store, is_async=is_async
+            )
         elif any(agent.handoff_to for agent in self.agents):
-            # Build handoff-aware graph with dynamic routing
-            self._compiled_graph = self._build_agent_handoff_graph()
+            # Build handoff-aware graph
+            return self._build_agent_handoff_graph(
+                checkpointer, store, is_async=is_async
+            )
         elif self.tasks:
             # Build task-based sequential graph
-            self._compiled_graph = self._build_task_sequential_graph(is_async=False)
+            return self._build_task_sequential_graph(
+                checkpointer, store, is_async=is_async
+            )
         elif self.agents:
             # Build agent-based sequential graph
-            self._compiled_graph = self._build_agent_sequential_graph(is_async=False)
-        else:
-            raise ValueError("No tasks or agents provided to build graph")
-
-        return self._compiled_graph
-
-    async def _get_async_compiled_graph(self) -> CompiledStateGraph:
-        """Get the async compiled graph with async components"""
-        # Handle custom graph if provided
-        if self.graph is not None:
-            # User provided StateGraph, compile it with async checkpointer
-            return self._compile_graph_with_checkpointer(
-                self.graph, self._async_checkpointer
-            )
-
-        # Use cached async compiled graph if available
-        if self._async_compiled_graph is not None:
-            return self._async_compiled_graph
-
-        # Ensure async components are set up
-        await self._setup_async_components()
-
-        # Build graph with async checkpointer
-        # Check if handoff is needed and build appropriate graph
-        if any(task.handoff_to for task in self.tasks):
-            # Build task-based handoff graph with mixed sequential and dynamic routing
-            self._async_compiled_graph = self._build_task_handoff_graph(
-                checkpointer=self._async_checkpointer, is_async=True
-            )
-        elif any(agent.handoff_to for agent in self.agents):
-            # Build handoff-aware graph with dynamic routing
-            self._async_compiled_graph = self._build_agent_handoff_graph(
-                checkpointer=self._async_checkpointer, is_async=True
-            )
-        elif self.tasks:
-            # Build task-based sequential graph with async support
-            self._async_compiled_graph = self._build_task_sequential_graph(
-                checkpointer=self._async_checkpointer, is_async=True
-            )
-        elif self.agents:
-            # Build agent-based sequential graph with async support
-            self._async_compiled_graph = self._build_agent_sequential_graph(
-                checkpointer=self._async_checkpointer, is_async=True
+            return self._build_agent_sequential_graph(
+                checkpointer, store, is_async=is_async
             )
         else:
             raise ValueError("No tasks or agents provided to build graph")
 
-        return self._async_compiled_graph
-
-    def _setup_crew_memory(self):
-        """Setup crew-level memory system"""
-        # Unified config with connection_string
-        config = {"connection_string": self.memory_config.connection_string}
-
-        # Create checkpointer if not provided
-        if not self.checkpointer:
-            self.checkpointer = get_checkpointer(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=False,  # Sync version for sync methods
-            )
-
-        # Create store if not provided
-        if not self.store:
-            self.store = get_storage(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=False,  # Sync version for sync methods
-            )
-
-        # Initialize memory instances
-        if self.memory_config.short_term_enabled:
-            self._short_term_memory = ShortTermMemory(
-                checkpointer=self.checkpointer, config=self.memory_config
-            )
-
-        if self.memory_config.long_term_enabled:
-            self._long_term_memory = LongTermMemory(
-                store=self.store, config=self.memory_config
-            )
-
-        if self.memory_config.entity_enabled:
-            self._entity_memory = EntityMemory(
-                store=self.store, config=self.memory_config
-            )
-
-        if self.verbose:
-            logger.info(
-                f"Memory system initialized with provider: {self.memory_config.provider}"
-            )
-
-    async def _setup_async_components(self):
-        """Setup async components for async methods"""
+    def _setup_agents_memory(self):
+        """Setup memory configuration for agents"""
         if self.memory_config is None:
             return
 
-        # Skip if already initialized
-        if self._async_components_initialized:
-            return
+        # Setup agents memory configuration
+        for agent in self.agents:
+            if not hasattr(agent, "memory_config") or agent.memory_config is None:
+                agent.memory_config = self.memory_config
+                # Only setup memory if agent hasn't been initialized yet
+                if not agent.memory_tools:
+                    agent._setup_memory(self.memory_config)
 
-        config = {"connection_string": self.memory_config.connection_string}
-
-        # Create async checkpointer if not already created
-        if not self._async_checkpointer:
-            checkpointer_or_cm = get_checkpointer(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=True,
+        if self.verbose:
+            logger.info(
+                f"Memory configuration applied to agents with provider: {self.memory_config.provider}"
             )
-
-            # Special handling for InMemorySaver: it's already a usable instance, not a context manager
-            if (
-                self.memory_config.provider == "memory"
-                or checkpointer_or_cm.__class__.__name__ == "InMemorySaver"
-            ):
-                self._async_checkpointer = checkpointer_or_cm
-                self._async_checkpointer_cm = None
-            else:
-                # Other checkpointers are context managers returned by wrappers
-                self._async_checkpointer_cm = checkpointer_or_cm
-                self._async_checkpointer = (
-                    await self._async_checkpointer_cm.__aenter__()
-                )
-
-            # Setup if needed
-            if hasattr(self._async_checkpointer, "setup"):
-                if asyncio.iscoroutinefunction(self._async_checkpointer.setup):
-                    await self._async_checkpointer.setup()
-                else:
-                    self._async_checkpointer.setup()
-
-        # Create async store if not already created
-        if not self._async_store:
-            store_or_cm = get_storage(
-                provider=self.memory_config.provider,
-                config=config,
-                is_async=True,
-            )
-
-            # Special handling for InMemoryStore: it's already a usable instance, not a context manager
-            if (
-                self.memory_config.provider == "memory"
-                or store_or_cm.__class__.__name__ == "InMemoryStore"
-            ):
-                self._async_store = store_or_cm
-                self._async_store_cm = None
-            else:
-                # Other storage are context managers returned by wrappers
-                self._async_store_cm = store_or_cm
-                self._async_store = await self._async_store_cm.__aenter__()
-
-            # Setup if needed
-            if hasattr(self._async_store, "setup"):
-                if asyncio.iscoroutinefunction(self._async_store.setup):
-                    await self._async_store.setup()
-                else:
-                    self._async_store.setup()
-
-        # Create async memory instances using async components (only if not already created)
-        if self.memory_config.short_term_enabled and not self._async_short_term_memory:
-            self._async_short_term_memory = ShortTermMemory(
-                checkpointer=self._async_checkpointer, config=self.memory_config
-            )
-
-        if self.memory_config.long_term_enabled and not self._async_long_term_memory:
-            self._async_long_term_memory = LongTermMemory(
-                store=self._async_store, config=self.memory_config
-            )
-
-        if self.memory_config.entity_enabled and not self._async_entity_memory:
-            self._async_entity_memory = EntityMemory(
-                store=self._async_store, config=self.memory_config
-            )
-
-        # Mark async components as initialized
-        self._async_components_initialized = True
 
     def invoke(
         self,
@@ -1047,22 +1043,20 @@ class Crew:
             The output of the graph run
         """
 
-        # Enhance config with crew-level settings if needed
-        if config is None and (self.memory_config or self.checkpointer):
-            config = RunnableConfig()
+        def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=False
+            )
+            return compiled_graph.invoke(
+                input,
+                config=config,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                **kwargs,
+            )
 
-        # Get compiled graph and execute
-        compiled_graph = self._get_compiled_graph()
-        result = compiled_graph.invoke(
-            input,
-            config=config,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            **kwargs,
-        )
-
-        return result
+        return self._memory_manager.execute_sync(execute_with_memory)
 
     async def ainvoke(
         self,
@@ -1088,22 +1082,20 @@ class Crew:
             Output from graph execution
         """
 
-        # Enhance config as needed
-        if config is None and (self.memory_config or self.checkpointer):
-            config = RunnableConfig()
+        async def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=True
+            )
+            return await compiled_graph.ainvoke(
+                input,
+                config=config,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                **kwargs,
+            )
 
-        # Get compiled graph and execute asynchronously
-        compiled_graph = await self._get_async_compiled_graph()
-        result = await compiled_graph.ainvoke(
-            input,
-            config=config,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            **kwargs,
-        )
-
-        return result
+        return await self._memory_manager.execute_async(execute_with_memory)
 
     def stream(
         self,
@@ -1139,20 +1131,22 @@ class Crew:
             The output of each step in the graph
         """
 
-        # Get compiled graph
-        compiled_graph = self._get_compiled_graph()
+        def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=False
+            )
+            yield from compiled_graph.stream(
+                input,
+                config=config,
+                stream_mode=stream_mode,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                subgraphs=subgraphs,
+                **kwargs,
+            )
 
-        # Stream from the compiled graph
-        yield from compiled_graph.stream(
-            input,
-            config=config,
-            stream_mode=stream_mode,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            subgraphs=subgraphs,
-            **kwargs,
-        )
+        yield from self._memory_manager.execute_sync_generator(execute_with_memory)
 
     async def astream(
         self,
@@ -1188,21 +1182,32 @@ class Crew:
             The output of each step in the graph
         """
 
-        # Get async compiled graph with async components
-        compiled_graph = await self._get_async_compiled_graph()
+        async def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=True
+            )
+            async for chunk in compiled_graph.astream(
+                input,
+                config=config,
+                stream_mode=stream_mode,
+                output_keys=output_keys,
+                interrupt_before=interrupt_before,
+                interrupt_after=interrupt_after,
+                subgraphs=subgraphs,
+                **kwargs,
+            ):
+                yield chunk
 
-        # Stream from the compiled graph
-        async for chunk in compiled_graph.astream(
-            input,
-            config=config,
-            stream_mode=stream_mode,
-            output_keys=output_keys,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
-            subgraphs=subgraphs,
-            **kwargs,
+        async for chunk in self._memory_manager.execute_async_generator(
+            execute_with_memory
         ):
-            yield chunk
+            processed_event = await self._aprocess_output(chunk)
+            if processed_event:
+                if isinstance(processed_event, list):
+                    for item in processed_event:
+                        yield item
+                else:
+                    yield processed_event
 
     async def astream_events(
         self,
@@ -1268,23 +1273,35 @@ class Crew:
                 if event["event"] == "on_crew_task_start":
                     print(f"Starting task: {event['data']['task_name']}")
         """
-        # Get async compiled graph with async components
-        compiled_graph = await self._get_async_compiled_graph()
 
-        # Stream events from the compiled graph
-        async for event in compiled_graph.astream_events(
-            input,
-            config=config,
-            version=version,
-            include_names=include_names,
-            include_types=include_types,
-            include_tags=include_tags,
-            exclude_names=exclude_names,
-            exclude_types=exclude_types,
-            exclude_tags=exclude_tags,
-            **kwargs,
+        async def execute_with_memory(checkpointer, store):
+            compiled_graph = self._get_compiled_graph(
+                checkpointer, store, is_async=True
+            )
+            async for event in compiled_graph.astream_events(
+                input,
+                config=config,
+                version=version,
+                include_names=include_names,
+                include_types=include_types,
+                include_tags=include_tags,
+                exclude_names=exclude_names,
+                exclude_types=exclude_types,
+                exclude_tags=exclude_tags,
+                **kwargs,
+            ):
+                yield event
+
+        async for event in self._memory_manager.execute_async_generator(
+            execute_with_memory
         ):
-            yield event
+            processed_event = await self._aprocess_output(event)
+            if processed_event:
+                if isinstance(processed_event, list):
+                    for item in processed_event:
+                        yield item
+                else:
+                    yield processed_event
 
     # CrewAI compatibility methods
     def kickoff(
@@ -1303,21 +1320,21 @@ class Crew:
         if inputs:
             self._replace_all_placeholders(inputs)
 
-        # Use provided thread_id or generate new one
-        self._thread_id = thread_id or str(uuid.uuid4())
+        # Use provided thread_id or generate new one (local variable)
+        current_thread_id = thread_id or str(uuid.uuid4())
 
         # Create config with thread_id
-        config = RunnableConfig(configurable={"thread_id": self._thread_id})
+        config = RunnableConfig(configurable={"thread_id": current_thread_id})
 
         # Execute with empty state (task_outputs initialized by CrewState default)
         result = self.invoke({}, config)
 
         # Add thread_id to result for continuity
         if isinstance(result, dict):
-            result["thread_id"] = self._thread_id
+            result["thread_id"] = current_thread_id
         else:
             # Create a wrapper if result is not dict
-            result = {"output": result, "thread_id": self._thread_id}
+            result = {"output": result, "thread_id": current_thread_id}
 
         return result
 
@@ -1337,25 +1354,21 @@ class Crew:
         if inputs:
             self._replace_all_placeholders(inputs)
 
-        # Use provided thread_id or generate new one
-        self._thread_id = thread_id or str(uuid.uuid4())
-
-        # Ensure async components are set up
-        if self.memory_config:
-            await self._setup_async_components()
+        # Use provided thread_id or generate new one (local variable)
+        current_thread_id = thread_id or str(uuid.uuid4())
 
         # Create config with thread_id
-        config = RunnableConfig(configurable={"thread_id": self._thread_id})
+        config = RunnableConfig(configurable={"thread_id": current_thread_id})
 
         # Execute with empty state (task_outputs initialized by CrewState default)
         result = await self.ainvoke({}, config)
 
         # Add thread_id to result for continuity
         if isinstance(result, dict):
-            result["thread_id"] = self._thread_id
+            result["thread_id"] = current_thread_id
         else:
             # Create a wrapper if result is not dict
-            result = {"output": result, "thread_id": self._thread_id}
+            result = {"output": result, "thread_id": current_thread_id}
 
         return result
 
@@ -1407,80 +1420,6 @@ class Crew:
 
         return result
 
-    def search_memory(
-        self,
-        query: str,
-        memory_type: str = "all",
-        limit: int = 5,
-        is_async: bool = False,
-    ) -> list[dict[str, Any]]:
-        """Search through crew memories
-
-        Args:
-            query: Search query
-            memory_type: Type of memory to search ("short_term", "long_term", "entity", "all")
-            limit: Maximum number of results
-            is_async: Whether to use async memory instances (for internal use)
-
-        Returns:
-            List of memory items
-        """
-        results = []
-
-        # Select memory instances based on execution mode
-        if is_async:
-            stm = self.async_short_term_memory
-            ltm = self.async_long_term_memory
-            em = self.async_entity_memory
-        else:
-            stm = self._short_term_memory
-            ltm = self._long_term_memory
-            em = self._entity_memory
-
-        if memory_type in ["short_term", "all"] and stm:
-            short_term_results = stm.search(query, self._thread_id, limit)
-            for item in short_term_results:
-                item["memory_type"] = "short_term"
-                results.append(item)
-
-        if memory_type in ["long_term", "all"] and ltm:
-            long_term_results = ltm.search(query, limit)
-            for item in long_term_results:
-                item["memory_type"] = "long_term"
-                results.append(item)
-
-        if memory_type in ["entity", "all"] and em:
-            entity_results = em.search(query, limit=limit)
-            for item in entity_results:
-                item["memory_type"] = "entity"
-                results.append(item)
-
-        # Sort by relevance if searching all
-        if memory_type == "all":
-            results = results[:limit]
-
-        return results
-
-    async def asearch_memory(
-        self, query: str, memory_type: str = "all", limit: int = 5
-    ) -> list[dict[str, Any]]:
-        """Async version of search_memory
-
-        Args:
-            query: Search query
-            memory_type: Type of memory to search ("short_term", "long_term", "entity", "all")
-            limit: Maximum number of results
-
-        Returns:
-            List of memory items
-        """
-        # Ensure async components are set up
-        if self.memory_config:
-            await self._setup_async_components()
-
-        # Use the unified search_memory with async flag
-        return self.search_memory(query, memory_type, limit, is_async=True)
-
     def _setup_hitl(self):
         """Setup HITL (Human-in-the-Loop) for all agents with configuration validation"""
         if self.verbose:
@@ -1520,69 +1459,7 @@ class Crew:
                 "Cannot determine execution mode: no tasks or agents provided"
             )
 
-    # Memory access properties (CrewAI compatibility)
-    @property
-    def memory(self):
-        """Access memory configuration status"""
-        return self.memory_config is not None
-
-    @property
-    def short_term_memory(self):
-        """Access short-term memory instance"""
-        return self._short_term_memory
-
-    @property
-    def long_term_memory(self):
-        """Access long-term memory instance"""
-        return self._long_term_memory
-
-    @property
-    def entity_memory(self):
-        """Access entity memory instance"""
-        return self._entity_memory
-
-    # Async memory access properties
-    @property
-    def async_short_term_memory(self):
-        """Access async short-term memory instance
-
-        Returns:
-            ShortTermMemory instance if async components are initialized, None otherwise.
-
-        Note:
-            This property returns None if async components haven't been initialized.
-            Use async methods like akickoff() or asearch_memory() to trigger initialization,
-            or manually call await crew._setup_async_components().
-        """
-        return self._async_short_term_memory
-
-    @property
-    def async_long_term_memory(self):
-        """Access async long-term memory instance
-
-        Returns:
-            LongTermMemory instance if async components are initialized, None otherwise.
-
-        Note:
-            This property returns None if async components haven't been initialized.
-            Use async methods like akickoff() or asearch_memory() to trigger initialization,
-            or manually call await crew._setup_async_components().
-        """
-        return self._async_long_term_memory
-
-    @property
-    def async_entity_memory(self):
-        """Access async entity memory instance
-
-        Returns:
-            EntityMemory instance if async components are initialized, None otherwise.
-
-        Note:
-            This property returns None if async components haven't been initialized.
-            Use async methods like akickoff() or asearch_memory() to trigger initialization,
-            or manually call await crew._setup_async_components().
-        """
-        return self._async_entity_memory
+    # Agent and task lookup methods
 
     def get_agent_by_name(self, name: str) -> Agent:
         """Get an agent by name
@@ -1619,3 +1496,43 @@ class Crew:
                 return task
 
         raise ValueError(f"Task with name '{name}' not found")
+
+    @contextmanager
+    def get_sync_compiled_graph(self):
+        """
+        Get synchronous compiled graph.
+
+        Returns:
+            ContextManager: Synchronous context manager
+
+        Example:
+            with crew.get_sync_compiled_graph() as graph:
+                result = graph.invoke({"messages": [{"role": "user", "content": "Hello"}]})
+
+                # Multiple operations supported
+                for chunk in graph.stream({"messages": [{"role": "user", "content": "World"}]}):
+                    print(chunk)
+        """
+        with self._memory_manager._get_sync_context() as (checkpointer, store):
+            compiled = self._get_compiled_graph(checkpointer, store, is_async=False)
+            yield compiled
+
+    @asynccontextmanager
+    async def get_async_compiled_graph(self):
+        """
+        Get asynchronous compiled graph.
+
+        Returns:
+            AsyncContextManager: Asynchronous context manager
+
+        Example:
+            async with crew.get_async_compiled_graph() as graph:
+                result = await graph.ainvoke({"messages": [{"role": "user", "content": "Hello"}]})
+
+                # Async streaming
+                async for chunk in graph.astream({"messages": [{"role": "user", "content": "World"}]}):
+                    print(chunk)
+        """
+        async with self._memory_manager._get_async_context() as (checkpointer, store):
+            compiled = self._get_compiled_graph(checkpointer, store, is_async=True)
+            yield compiled

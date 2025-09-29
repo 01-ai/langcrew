@@ -7,6 +7,7 @@ This package provides S3 client functionality including:
 - Factory functions for creating S3 clients
 """
 
+from .base_s3_client import S3ClientMixin
 from .client import AsyncS3Client, S3Config
 from .factory import ClientFactory, create_s3_client
 
@@ -15,4 +16,5 @@ __all__ = [
     "create_s3_client",
     "AsyncS3Client",
     "S3Config",
+    "S3ClientMixin",
 ]

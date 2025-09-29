@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -8,6 +9,11 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from langcrew.task import Task
+
+
+class OrderCallback(BaseModel):
+    order_id: int
+    callback: Callable
 
 
 # File type definitions

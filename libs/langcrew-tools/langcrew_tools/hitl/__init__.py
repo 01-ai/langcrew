@@ -13,8 +13,16 @@ Usage example:
     )
 """
 
-from .langchain_tools import UserInputTool
+from .langchain_tools import (
+    UserInputTool,
+    DynamicFormUserInputTool,
+    FormSchema,
+    FormFieldSchema,
+)
 
 __all__ = [
     "UserInputTool",
+    "DynamicFormUserInputTool",
+    "FormSchema",
+    "FormFieldSchema",
 ]

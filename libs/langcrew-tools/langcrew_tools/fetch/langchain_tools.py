@@ -8,7 +8,7 @@ import time
 from typing import Any, ClassVar, Literal
 
 import aiohttp
-from langchain_core.tools import BaseTool
+from langcrew.tools import ExternalCompletionBaseTool
 from pydantic import BaseModel, Field
 
 from ..base import BaseToolInput
@@ -26,7 +26,7 @@ class WebFetchInput(BaseToolInput):
     )
 
 
-class WebFetchTool(BaseTool):
+class WebFetchTool(ExternalCompletionBaseTool):
     """Tool for crawling web pages and extracting content in markdown format.
 
     This tool uses crawl4ai HTTP service to extract content from web pages
@@ -126,7 +126,7 @@ class WebFetchTool(BaseTool):
             )
             self.filter_type = "pruning"
 
-    async def _arun(
+    async def _arun_custom_event(
         self,
         url: str,
         filter_type: Literal["llm", "pruning"] | None = None,
@@ -287,18 +287,3 @@ class WebFetchTool(BaseTool):
                     error_text = await response.text()
                     logger.error(f"HTTP error {response.status}: {error_text}")
                     return f"HTTP error {response.status}: Failed to connect to crawl4ai service"
-
-    def _run(
-        self,
-        url: str,
-        filter_type: Literal["llm", "pruning"] | None = None,
-        **kwargs,
-    ) -> dict[str, Any]:
-        """Crawl web page synchronously."""
-        return asyncio.run(
-            self._arun(
-                url=url,
-                filter_type=filter_type,
-                **kwargs,
-            )
-        )
