@@ -6,40 +6,40 @@ import phoneBgTopUrl from '@/assets/svg/phone-bg-top.svg';
 import phoneBgBottomUrl from '@/assets/svg/phone-bg-bottom.svg';
 import phoneHighlightUrl from '@/assets/png/phone-highlight.png';
 
-// 动态加载 NzCp SDK
+// dynamically load NzCp SDK
 const loadNzCpSDK = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // 检查 NzCp 是否已经存在
+    // check if NzCp already exists
     if (typeof window !== 'undefined' && (window as any).NzCp) {
       resolve();
       return;
     }
 
-    // 检查脚本是否已经加载
+    // check if the script already exists
     const existingScript = document.querySelector('script[src*="NZsdk.min.2.8.1.js"]');
     if (existingScript) {
-      // 如果脚本已存在，等待加载完成
+      // if the script already exists, wait for it to load
       existingScript.addEventListener('load', () => resolve());
       existingScript.addEventListener('error', reject);
       return;
     }
 
-    // 动态创建脚本标签
+    // dynamically create script tag
     const script = document.createElement('script');
     script.src = '/NZsdk.min.2.8.1.js';
     script.async = true;
 
     script.onload = () => {
-      // 检查 NzCp 是否成功加载
+      // check if NzCp successfully loads
       if (typeof window !== 'undefined' && (window as any).NzCp) {
         resolve();
       } else {
-        reject(new Error('NzCp SDK 加载失败'));
+        reject(new Error('NzCp SDK load failed'));
       }
     };
 
     script.onerror = () => {
-      reject(new Error('NzCp SDK 脚本加载失败'));
+      reject(new Error('NzCp SDK script load failed'));
     };
 
     document.head.appendChild(script);
@@ -73,7 +73,7 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
 
   const handlePhoneStart = useCallback(async () => {
     try {
-      // 动态加载 NzCp SDK
+      // dynamically load NzCp SDK
       try {
         await loadNzCpSDK();
       } catch (error) {
@@ -82,7 +82,7 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
         return;
       }
 
-      // 检查 NzCp 是否存在
+      // check if NzCp exists
       if (typeof window === 'undefined' || !(window as any).NzCp) {
         console.error('NzCp not found');
         message.error('SDK not found');
@@ -98,10 +98,10 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
       };
       const callbacks = {
         onInitFail: (code) => {
-          console.info('云手机初始化失败:' + code);
+          console.info('Cloud phone initialization failed:' + code);
         },
         onStartFail: (code) => {
-          console.info('云手机链接失败:' + code);
+          console.info('Cloud phone link failed:' + code);
         },
         // onStartSuccess: () => {
         //   // 链接成功
@@ -109,12 +109,12 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
         // },
         onError: (code) => {
           setPhoneErrorCode(code);
-          console.info('云手机报错了:' + code);
+          console.info('Cloud phone error:' + code);
         },
       };
       const initRet = sdkIns.current.init(param, callbacks);
       if (!initRet) {
-        console.info('云手机初始化失败');
+        console.info('Cloud phone initialization failed');
         return;
       }
       sdkIns.current.start(accessKey, accessSecretKey);
@@ -171,7 +171,7 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
       }`}
     >
       {disabled && <div className="absolute top-0 left-0 z-10 w-full h-full"></div>}
-      {/* 高亮 */}
+      {/* highlight */}
       {needHighlight && (
         <div
           className={`absolute top-0 left-0 z-2 w-full h-[548px] max-2xl:h-[414px] bg-top bg-no-repeat bg-[length:100%_100%] animate-fade-in-out`}
@@ -179,12 +179,12 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
           onMouseEnter={() => setNeedHighlight(false)}
         ></div>
       )}
-      {/* 顶部背景 */}
+      {/* top background */}
       <div
         className="absolute top-0 left-0 z-0 w-full h-full bg-top bg-no-repeat bg-[length:100%_auto]"
         style={{ backgroundImage: `url(${phoneBgTopUrl})` }}
       ></div>
-      {/* 底部背景 */}
+      {/* bottom background */}
       <div
         className="absolute bottom-0 left-0 z-0 flex items-end w-full h-full pb-[20px] max-2xl:pb-[18px] bg-bottom bg-no-repeat bg-[length:100%_auto]"
         style={{ backgroundImage: `url(${phoneBgBottomUrl})` }}
@@ -216,7 +216,7 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
           </div>
         </div>
       </div>
-      {/* 云手机 */}
+      {/* cloud phone */}
       <div className="relative flex justify-center items-center w-[292px] max-2xl:w-[219px] h-[520px] max-2xl:h-[390px] overflow-hidden rounded-[36px] max-2xl:rounded-[28px] bg-[#fff]">
         {isFunction(phoneRender) ? (
           phoneRender()

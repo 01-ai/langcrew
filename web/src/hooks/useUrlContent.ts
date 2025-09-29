@@ -8,9 +8,9 @@ export interface UrlContentState {
   error: string | null;
 }
 
-// 文件类型检测配置
+// file type detection configuration
 const FILE_SIGNATURES = {
-  // Office文档
+  // Office documents
   docx: [0x50, 0x4b, 0x03, 0x04], // DOCX (ZIP based)
   xlsx: [0x50, 0x4b, 0x03, 0x04], // XLSX (ZIP based)
   pptx: [0x50, 0x4b, 0x03, 0x04], // PPTX (ZIP based)
@@ -18,23 +18,23 @@ const FILE_SIGNATURES = {
   // PDF
   pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
 
-  // 压缩文件
+  // compressed files
   zip: [0x50, 0x4b, 0x03, 0x04], // ZIP
   rar: [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07], // RAR
   gz: [0x1f, 0x8b], // GZIP
 };
 
 /**
- * 检测ArrayBuffer的文件类型
+ * detect the file type of ArrayBuffer
  * @param buffer ArrayBuffer
- * @returns 文件类型字符串
+ * @returns file type string
  */
 const detectFileType = (buffer: ArrayBuffer): string => {
   const uint8Array = new Uint8Array(buffer);
 
-  // 对于ZIP格式的文件（docx、xlsx、pptx），需要进一步区分
+  // for ZIP files (docx, xlsx, pptx), further differentiation is needed
   if (matchesSignature(uint8Array, FILE_SIGNATURES.zip)) {
-    // 检查ZIP文件内容来区分Office文档类型
+    // check the content of the ZIP file to differentiate the Office document type
     const zipContent = new TextDecoder().decode(uint8Array);
     if (zipContent.includes('ppt/presentation.xml')) return 'pptx';
     if (zipContent.includes('word/document.xml')) return 'docx';
@@ -50,10 +50,10 @@ const detectFileType = (buffer: ArrayBuffer): string => {
 };
 
 /**
- * 检查字节数组是否匹配文件签名
- * @param uint8Array 字节数组
- * @param signature 文件签名
- * @returns 是否匹配
+ * check if the byte array matches the file signature
+ * @param uint8Array byte array
+ * @param signature file signature
+ * @returns whether it matches
  */
 const matchesSignature = (uint8Array: Uint8Array, signature: number[]): boolean => {
   if (signature.length === 0) return false;
@@ -68,45 +68,45 @@ const matchesSignature = (uint8Array: Uint8Array, signature: number[]): boolean 
 };
 
 /**
- * 缓存URL内容
+ * cache URL content
  */
 const cache = new Map<string, string>();
 
 /**
- * 缓存URL文件类型
+ * cache URL file type
  */
 const cacheFileType = new Map<string, string>();
 
 /**
- * 缓存blobUrl
+ * cache blobUrl
  */
 const cacheBlobUrl = new Map<string, string>();
 
 /**
- * 检查文本是否包含乱码
+ * check if the text contains garbled text
  */
 const hasGarbledText = (text: string): boolean => {
-  // 检查是否包含常见的乱码字符
+  // check if it contains common garbled characters
   const garbledPatterns = [
-    /[\uFFFD]/g, // Unicode替换字符
-    /[\u007F-\u009F]/g, // 控制字符
-    /[\uFFFE\uFFFF]/g, // Unicode BOM相关
+    /[\uFFFD]/g, // Unicode replacement character
+    /[\u007F-\u009F]/g, // control characters
+    /[\uFFFE\uFFFF]/g, // Unicode BOM related
   ];
 
   return garbledPatterns.some((pattern) => pattern.test(text));
 };
 
 /**
- * 检查文本是否包含有效的中文字符
+ * check if the text contains valid Chinese characters
  */
 const hasValidChineseText = (text: string): boolean => {
-  // 检查是否包含中文字符
+  // check if it contains Chinese characters
   const chinesePattern = /[\u4e00-\u9fa5]/;
   return chinesePattern.test(text);
 };
 
 /**
- * 尝试不同的编码格式解码文本
+ * try different encoding formats to decode the text
  */
 const tryDecodeWithDifferentEncodings = async (arrayBuffer: ArrayBuffer): Promise<string> => {
   const encodings = ['utf-8', 'gbk', 'gb2312', 'big5', 'shift-jis'];
@@ -118,28 +118,28 @@ const tryDecodeWithDifferentEncodings = async (arrayBuffer: ArrayBuffer): Promis
       const decoder = new TextDecoder(encoding);
       const text = decoder.decode(arrayBuffer);
 
-      // 检查解码是否成功
+      // check if the decoding is successful
       if (text.length > 0 && !hasGarbledText(text)) {
         let score = 0;
 
-        // 如果包含中文，计算中文质量分数
+        // if it contains Chinese, calculate the Chinese quality score
         if (hasValidChineseText(text)) {
           const chineseChars = text.match(/[\u4e00-\u9fa5]/g);
           if (chineseChars) {
-            score += chineseChars.length * 10; // 中文字符越多，分数越高
+            score += chineseChars.length * 10; // the more Chinese characters, the higher the score
           }
         }
 
-        // 检查是否包含常见的CSV分隔符和换行符
+        // check if it contains common CSV separators and line breaks
         if (text.includes(',') || text.includes('\n')) {
           score += 5;
         }
 
-        // 检查是否包含常见的CSV内容（数字、字母等）
+        // check if it contains common CSV content (numbers, letters, etc.)
         const alphanumericCount = (text.match(/[a-zA-Z0-9]/g) || []).length;
         score += alphanumericCount;
 
-        // 如果这个编码的分数更高，更新最佳结果
+        // if the score of this encoding is higher, update the best result
         if (score > bestScore) {
           bestScore = score;
           bestResult = text;
@@ -151,21 +151,21 @@ const tryDecodeWithDifferentEncodings = async (arrayBuffer: ArrayBuffer): Promis
     }
   }
 
-  // 如果找到了好的结果，返回它
+  // if a good result is found, return it
   if (bestResult) {
     return bestResult;
   }
 
-  // 如果所有编码都失败，使用UTF-8作为后备
+  // if all encodings fail, use UTF-8 as a backup
   const decoder = new TextDecoder('utf-8');
   return decoder.decode(arrayBuffer);
 };
 
 /**
- * 从URL获取内容的hook
- * @param url 要获取内容的URL
- * @param options 配置选项
- * @returns 包含数据、加载状态和错误信息的对象，以及手动获取内容的方法
+ * hook to get content from URL
+ * @param url URL to get content
+ * @param options configuration options
+ * @returns object containing data, loading status, and error information, as well as a method to manually get content
  */
 export const useUrlContent = ({ url, contentType }: { url: string | null; contentType?: string }) => {
   // state
@@ -177,10 +177,10 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
     error: null,
   });
 
-  // 获取内容
+  // get content
   const fetchContent = useCallback(
     async (targetUrl?: string) => {
-      // 如果缓存中存在，直接返回缓存内容
+      // if the cache exists, return the cached content
       if (cache.has(targetUrl)) {
         setState({
           data: cache.get(targetUrl),
@@ -199,21 +199,21 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
         loading: true,
         error: null,
       });
-      // 如果缓存中不存在，则请求URL内容
+      // if the cache does not exist, request the URL content
       const response = await fetch(targetUrl);
       if (response.ok) {
-        // 获取响应的编码信息
+        // get the encoding information of the response
         const contentTypeHeader = contentType || response.headers.get('content-type') || '';
         const arrayBuffer = await response.arrayBuffer();
 
-        // 通过ArrayBuffer检测文件类型
+        // detect the file type through ArrayBuffer
         const detectedType = detectFileType(arrayBuffer);
         console.log('Detected file type:', detectedType);
 
-        // 对于CSV文件，使用更智能的编码处理
+        // for CSV files, use more intelligent encoding processing
         let text: string;
         if (contentTypeHeader.includes('text/csv') || targetUrl?.endsWith('.csv')) {
-          // 使用ArrayBuffer来处理编码
+          // use ArrayBuffer to process encoding
           // const arrayBuffer = await response.arrayBuffer();
           text = await tryDecodeWithDifferentEncodings(arrayBuffer);
         } else {
@@ -226,16 +226,16 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
         if (detectedType === 'pdf') {
           const blob = new Blob([arrayBuffer], { type: contentType || '' });
           blobUrl = URL.createObjectURL(blob);
-          // 缓存blobUrl
+          // cache blobUrl
           cacheBlobUrl.set(targetUrl, blobUrl);
         }
 
-        // 缓存内容
+        // cache content
         cache.set(targetUrl, text);
-        // 缓存文件类型
+        // cache file type
         cacheFileType.set(targetUrl, detectedType);
 
-        // 设置状态
+        // set state
         setState({
           data: text,
           fileType: detectedType,
@@ -244,7 +244,7 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
           error: null,
         });
       } else {
-        // 设置状态
+        // set state
         setState({
           data: null,
           fileType: '',
@@ -257,10 +257,10 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
     [contentType],
   );
 
-  // 自动获取内容
+  // automatically get content
   useEffect(() => {
     if (url) {
-      fetchContent(url);
+      fetchContent(encodeURI(url));
     }
   }, [url, fetchContent]);
 

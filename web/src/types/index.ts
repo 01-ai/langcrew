@@ -27,6 +27,7 @@ export interface MessageItem {
   id?: string;
   role: 'user' | 'assistant';
   messages: MessageChunk[];
+  trace_id?: string;
 }
 
 export interface MessageChunk {
@@ -37,15 +38,15 @@ export interface MessageChunk {
   step_id?: string;
   timestamp?: number;
   /**
-   * 后面有用户输入，或者finish_reason，标识这批chunk是完整的
+   * Indicates this batch of chunks is complete when followed by user input or finish_reason
    */
   isFinish?: boolean;
   /**
-   * 再往后，没有用户输入
+   * No more user input after this point
    */
   isLast?: boolean;
   /**
-   * 假消息，发出去还没回来，显示loading
+   * Fake message sent but not yet returned, showing loading state
    */
   loading?: boolean;
   detail?: {
@@ -57,6 +58,8 @@ export interface MessageChunk {
   is_llm_message?: boolean;
   session_id?: string;
   task_id?: string;
+
+  trace_id?: string;
 }
 
 export interface TaskCreateChunk extends MessageChunk {
@@ -65,7 +68,7 @@ export interface TaskCreateChunk extends MessageChunk {
   result: any;
 }
 
-// 处理前的plan
+// Plan before processing
 export interface EventPlanChunk extends MessageChunk {
   type: 'plan';
   content: string;
@@ -73,7 +76,7 @@ export interface EventPlanChunk extends MessageChunk {
     steps: PlanStep[];
   };
 }
-// 处理后的plan
+// Plan after processing
 export interface MessagePlanChunk extends MessageChunk {
   type: 'plan';
   content: string;
@@ -97,7 +100,7 @@ export interface PlanUpdateChunk extends MessageChunk {
   };
 }
 
-// 文件上传
+// File upload
 export interface FileItem {
   uid: string;
   status: 'done' | 'uploading' | 'error';
@@ -108,24 +111,24 @@ export interface FileItem {
   type?: string;
 }
 
-// 处理前后的工具调用
+// Tool calls before and after processing
 export interface MessageToolChunk extends MessageChunk {
   type: string;
   content: string;
   title?: string;
-  // 工具的在页面上的显示名称，如果没有，就显示tool
+  // Display name of the tool on the page, defaults to "tool" if not provided
   display_name?: string;
   detail?: {
     tool?: string;
     action?: string;
     action_content?: string;
     // detail_content?: string;
-    // 工具参数
+    // Tool parameters
     param?: any;
-    // 工具输出
+    // Tool output
     result?: {
       content?: string;
-      content_type?: string; // 内容类型，如 'text/plain', 'text/markdown', 'application/json' 等
+      content_type?: string; // Content type, such as 'text/plain', 'text/markdown', 'application/json', etc.
       image_url?: string;
       sandbox_url?: string;
     };
@@ -134,7 +137,7 @@ export interface MessageToolChunk extends MessageChunk {
   };
 }
 
-// FileReader类型
+// FileReader type
 export interface FileReaderChunk extends MessageChunk {
   detail: {
     uid: string;
@@ -149,7 +152,7 @@ export interface FileDetailProps extends MessageChunk {
   message: MessageToolChunk;
 }
 
-// 知识库
+// Knowledge base
 export interface KnowledgeBaseItem {
   instance_id: string;
   app_id: string;
@@ -193,7 +196,7 @@ export interface MCPToolItem {
   // icon?: string;
   // details?: string;
 
-  // // 下面是安全沙箱的属性
+  // // Below are security sandbox properties
   // agent_tool_id?: string;
   // tool_type?: 'SANDBOX';
   // tool_name?: string;
@@ -237,9 +240,9 @@ export interface SessionInfo {
   session_id: string;
   title: string;
   /**
-   * ACTIVE: 正常
-   * ARCHIVED: 不能继续对话
-   * INEXECUTIVE: 正在执行中
+   * ACTIVE: Normal
+   * ARCHIVED: Cannot continue conversation
+   * INEXECUTIVE: Currently executing
    */
   status: 'ACTIVE' | 'ARCHIVED' | 'INEXECUTIVE';
   kb_info: KbInfo;
@@ -280,11 +283,50 @@ export interface EventErrorChunk {
   message?: string;
 }
 
+export interface SessionInitChunk extends MessageChunk {
+  type: 'session_init';
+  detail: {
+    session_id: string;
+    title: string;
+  };
+}
+
 export interface AntdUploadFile {
   uid: string;
   name: string;
   size: number;
   type: string;
+}
+
+export interface FormFieldSchema {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'multiselect';
+  title: string;
+  description?: string;
+  enum?: string[];
+  required?: boolean;
+  format?: 'email' | 'url' | 'date' | 'date-time' | 'phone' | 'color' | 'time';
+  pattern?: string; // Regular expression pattern
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  default?: any;
+  items?: {
+    type: 'string' | 'number' | 'boolean';
+    enum?: string[];
+  };
+  // Multi-select related fields
+  multiselect?: boolean;
+  minSelections?: number;
+  maxSelections?: number;
+}
+
+export interface FormSchema {
+  type: 'object';
+  properties: Record<string, FormFieldSchema>;
+  required?: string[];
+  title?: string;
+  description?: string;
 }
 
 export interface UserInputChunk extends MessageChunk {
@@ -293,9 +335,10 @@ export interface UserInputChunk extends MessageChunk {
   detail?: {
     options?: string[];
     interrupt_data: {
-      type: 'user_input' | 'take_over_browser' | 'take_over_phone';
-      suggested_user_action?: 'take_over_browser' | 'take_over_phone';
+      type: 'user_input' | 'take_over_browser' | 'take_over_phone' | 'dynamic_form';
+      suggested_user_action?: 'take_over_browser' | 'take_over_phone' | 'fill_form';
       question: string;
+      form_schema?: FormSchema;
       intervention_info?: {
         intervention_url?: string;
       };

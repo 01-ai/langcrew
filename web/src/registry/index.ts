@@ -1,7 +1,7 @@
-// 消息类型注册机制
-// 支持为每种消息类型注册左侧简要渲染组件（briefRenderer）和右侧详情渲染组件（detailRenderer）
-// 若未注册则使用默认渲染组件
-// 容器组件可通过 type 获取对应渲染组件
+// message type registration mechanism
+// support to register the left brief renderer (briefRenderer) and the right detail renderer (detailRenderer) for each message type
+// if not registered, use the default renderer
+// the container component can get the corresponding rendering component through type
 
 import { MessageChunk, MessageToolChunk } from '@/types';
 import DefaultBriefRenderer from './default/DefaultBriefRenderer';
@@ -9,13 +9,13 @@ import DefaultDetailRenderer from './default/DefaultDetailRenderer';
 import { ToolIconDefault } from './common/icons';
 import { CustomIconComponentProps } from '@ant-design/icons/lib/components/Icon';
 
-// ===================== 接口定义 =====================
+// ===================== interface definition =====================
 
 /**
- * 左侧消息列表渲染组件 props 类型
- * @property message 消息数据
- * @property withIcon 是否显示图标
- * @property hasUserInput 是否有用户输入
+ * the props type of the left message list rendering component
+ * @property message message data
+ * @property withIcon whether to show the icon
+ * @property hasUserInput whether there is user input
  */
 export interface BriefRendererProps {
   message: MessageChunk;
@@ -24,32 +24,32 @@ export interface BriefRendererProps {
 }
 
 /**
- * 工具类型消息的简要渲染组件 props 类型
- * 继承自 BriefRendererProps，但 message 类型更具体
+ * the props type of the brief renderer for tool type message
+ * inherit from BriefRendererProps, but the message type is more specific
  */
 export interface ToolBriefRendererProps extends BriefRendererProps {
   message: MessageToolChunk;
 }
 
 /**
- * 右侧详情区域渲染组件 props 类型
- * @property message 消息数据
- * @property isRealTime 是否为实时更新
+ * the props type of the detail renderer for the right detail area
+ * @property message message data
+ * @property isRealTime whether it is real-time update
  */
 export interface DetailRendererProps {
   message: MessageChunk;
   isRealTime?: boolean;
 }
 
-// 消息类型匹配器 - 支持字符串、数组和正则表达式
+// message type matcher - support string, array and regular expression
 export type MessageTypeMatcher = string | string[] | RegExp;
 
 /**
- * 单个消息类型的注册配置
- * @property type 消息类型唯一标识，支持字符串、字符串数组或正则表达式
- * @property briefRenderer 左侧消息列表渲染组件（可选）
- * @property detailRenderer 右侧详情区域渲染组件（可选）
- * @property icon 消息类型对应的图标组件（可选）
+ * the registration configuration for a single message type
+ * @property type the unique identifier for the message type, support string, string array or regular expression
+ * @property briefRenderer the left message list rendering component (optional)
+ * @property detailRenderer the right detail area rendering component (optional)
+ * @property icon the icon component for the message type (optional)
  */
 export interface MessageTypeConfig {
   type: MessageTypeMatcher;
@@ -58,69 +58,69 @@ export interface MessageTypeConfig {
   icon?: React.ComponentType<CustomIconComponentProps>;
 }
 
-// ===================== 注册表实现 =====================
+// ===================== implementation of the registration table =====================
 
 /**
- * 消息类型注册表，支持注册和获取渲染组件以及图标
+ * the message type registration table, support registration and get rendering component and icon
  *
- * 功能特性：
- * - 支持字符串、数组和正则表达式三种类型匹配方式
- * - 自动回退到默认渲染组件
- * - 单例模式，全局共享
- * - 类型安全的组件注册和获取
+ * features:
+ * - support three types of matching: string, array and regular expression
+ * - automatically fallback to the default rendering component
+ * - singleton mode, global shared
+ * - type-safe component registration and get
  */
 class MessageTypeRegistry {
   private stringTypes: Map<string, MessageTypeConfig> = new Map();
   private patternTypes: Array<{ pattern: RegExp; config: MessageTypeConfig }> = [];
   private arrayTypes: Array<{ types: string[]; config: MessageTypeConfig }> = [];
 
-  // 默认渲染组件
+  // default rendering component
   private defaultBriefRenderer: React.ComponentType<BriefRendererProps> = DefaultBriefRenderer;
   private defaultDetailRenderer: React.ComponentType<DetailRendererProps> = DefaultDetailRenderer;
   private defaultIcon: React.ComponentType<CustomIconComponentProps> = ToolIconDefault;
 
   /**
-   * 注册一个消息类型
-   * @param config 消息类型配置
+   * register a message type
+   * @param config the message type configuration
    */
   public registerMessageType(config: MessageTypeConfig): void {
     const { type } = config;
 
     if (typeof type === 'string') {
-      // 字符串类型：直接注册到 Map 中
+      // string type: directly register to Map
       if (this.stringTypes.has(type)) {
-        console.warn(`[MessageTypeRegistry] type '${type}' 已注册，将被覆盖`);
+        console.warn(`[MessageTypeRegistry] type '${type}' is already registered, will be overridden`);
       }
       this.stringTypes.set(type, config);
     } else if (Array.isArray(type)) {
-      // 数组类型：注册到数组配置中
+      // array type: register to array configuration
       this.arrayTypes.push({ types: type, config });
     } else if (type instanceof RegExp) {
-      // 正则表达式类型：注册到模式配置中
+      // regular expression type: register to pattern configuration
       this.patternTypes.push({ pattern: type, config });
     }
   }
 
   /**
-   * 获取消息类型配置
-   * @param type 消息类型
-   * @returns 匹配的配置或 undefined
+   * get the message type configuration
+   * @param type the message type
+   * @returns the matching configuration or undefined
    */
   public getMessageType(type: string): MessageTypeConfig | undefined {
-    // 1. 先检查精确匹配
+    // 1. first check the exact match
     const exactMatch = this.stringTypes.get(type);
     if (exactMatch) {
       return exactMatch;
     }
 
-    // 2. 检查数组匹配
+    // 2. check the array match
     for (const { types, config } of this.arrayTypes) {
       if (types.includes(type)) {
         return config;
       }
     }
 
-    // 3. 检查正则匹配
+    // 3. check the regular expression match
     for (const { pattern, config } of this.patternTypes) {
       if (pattern.test(type)) {
         return config;
@@ -131,9 +131,9 @@ class MessageTypeRegistry {
   }
 
   /**
-   * 获取左侧消息列表渲染组件
-   * @param type 消息类型
-   * @returns 对应的渲染组件或默认组件
+   * get the left message list rendering component
+   * @param type the message type
+   * @returns the corresponding rendering component or the default component
    */
   public getBriefRenderer(type: string): React.ComponentType<BriefRendererProps> {
     const config = this.getMessageType(type);
@@ -141,9 +141,9 @@ class MessageTypeRegistry {
   }
 
   /**
-   * 获取右侧详情区域渲染组件
-   * @param type 消息类型
-   * @returns 对应的渲染组件或默认组件
+   * get the right detail area rendering component
+   * @param type the message type
+   * @returns the corresponding rendering component or the default component
    */
   public getDetailRenderer(type: string): React.ComponentType<DetailRendererProps> {
     const config = this.getMessageType(type);
@@ -151,9 +151,9 @@ class MessageTypeRegistry {
   }
 
   /**
-   * 获取消息类型对应的图标组件
-   * @param type 消息类型
-   * @returns 对应的图标组件或默认图标
+   * get the icon component for the message type
+   * @param type the message type
+   * @returns the corresponding icon component or the default icon
    */
   public getToolIcon(type: string): React.ComponentType<CustomIconComponentProps> {
     const config = this.getMessageType(type);
@@ -161,33 +161,33 @@ class MessageTypeRegistry {
   }
 }
 
-// 单例导出
+// singleton export
 const registry = new MessageTypeRegistry();
 
-// 组件库最后要导出这个单例，这样其他组件就可以通过 import 导入这个单例，然后使用这个单例的 registerMessageType 方法来注册消息类型
+// the component library finally needs to export this singleton, so that other components can import this singleton, and then use the registerMessageType method of this singleton to register message types
 export default registry;
 
-// ===================== 使用示例 =====================
+// ===================== usage example =====================
 /**
- * 消息类型注册机制使用指南
+ * message type registration mechanism usage guide
  * 
- * 1. 基本用法 - 注册简单的消息类型
+ * 1. basic usage - register simple message types
  * ```typescript
- * // 定义自定义渲染组件
+ * // define custom rendering component
  * const SearchBrief: React.FC<BriefRendererProps> = ({ message }) => (
  *   <div className="search-brief">
- *     <span>🔍 搜索: {message.content}</span>
+ *     <span>🔍 search: {message.content}</span>
  *   </div>
  * );
  * 
  * const SearchDetail: React.FC<DetailRendererProps> = ({ message }) => (
  *   <div className="search-detail">
- *     <h3>搜索结果</h3>
+ *     <h3>search result</h3>
  *     <pre>{JSON.stringify(message.detail, null, 2)}</pre>
  *   </div>
  * );
  * 
- * // 注册消息类型
+ * // register message type
  * import registry from './registry';
  * registry.registerMessageType({
  *   type: 'web_search',
@@ -196,16 +196,16 @@ export default registry;
  * });
  * ```
  * 
- * 2. 高级用法 - 支持多种匹配方式
+ * 2. advanced usage - support multiple matching ways
  * ```typescript
- * // 字符串数组匹配 - 多个类型使用同一套渲染组件
+ * // string array matching - multiple types use the same rendering component
  * registry.registerMessageType({
  *   type: ['file_read', 'file_write', 'file_delete'],
  *   briefRenderer: FileOperationBrief,
  *   detailRenderer: FileOperationDetail,
  * });
  * 
- * // 正则表达式匹配 - 动态类型匹配
+ * // regular expression matching - dynamic type matching
  * registry.registerMessageType({
  *   type: /^browser_/,
  *   briefRenderer: BrowserToolBrief,
@@ -214,9 +214,9 @@ export default registry;
  * });
  * ```
  * 
- * 3. 在容器组件中使用
+ * 3. use in container component
  * ```typescript
- * // 左侧消息列表渲染
+ * // left message list rendering
  * const MessageList: React.FC<{ messages: MessageChunk[] }> = ({ messages }) => {
  *   return (
  *     <div className="message-list">
@@ -234,7 +234,7 @@ export default registry;
  *   );
  * };
  * 
- * // 右侧详情区域渲染
+ * // right detail area rendering
  * const MessageDetail: React.FC<{ message?: MessageChunk }> = ({ message }) => {
  *   if (!message) return null;
  *   
@@ -247,9 +247,9 @@ export default registry;
  * };
  * ```
  * 
- * 4. 工具类型特殊处理
+ * 4. special handling for tool type
  * ```typescript
- * // 工具类型消息需要特殊处理
+ * // tool type message needs special handling
  * const ToolMessage: React.FC<{ message: MessageToolChunk }> = ({ message }) => {
  *   const ToolBriefRenderer = registry.getBriefRenderer(message.type);
  *   const ToolIcon = registry.getToolIcon(message.type);
@@ -263,47 +263,47 @@ export default registry;
  * };
  * ```
  * 
- * 5. 文件组织建议
+ * 5. file organization suggestion
  * ```
  * src/registry/
- * ├── index.ts                    # 主注册表
- * ├── default/                    # 默认渲染组件
- * ├── text/                       # 文本类型
- * │   ├── index.ts               # 注册逻辑
- * │   ├── TextBriefRenderer.tsx  # 简要渲染
- * │   └── TextDetailRenderer.tsx # 详情渲染
- * ├── web_search/                # 搜索类型
+ * ├── index.ts                    # main registration table
+ * ├── default/                    # default rendering component
+ * ├── text/                       # text type
+ * │   ├── index.ts               # registration logic
+ * │   ├── TextBriefRenderer.tsx  # brief rendering
+ * │   └── TextDetailRenderer.tsx # detail rendering
+ * ├── web_search/                # search type
  * │   ├── index.ts
  * │   ├── WebSearchBriefRenderer.tsx
  * │   └── WebSearchDetailRenderer.tsx
- * └── common/                    # 公共组件
+ * └── common/                    # common component
  *     ├── icons.tsx
  *     └── MessageBrief.tsx
  * ```
  * 
- * 6. 类型安全的最佳实践
+ * 6. best practices for type safety
  * ```typescript
- * // 为特定工具类型定义专门的 props 接口
+ * // define specific props interface for specific tool type
  * interface WebSearchBriefProps extends BriefRendererProps {
  *   message: MessageChunk & { type: 'web_search' };
  * }
  * 
  * const WebSearchBrief: React.FC<WebSearchBriefProps> = ({ message }) => {
- *   // 这里 message 的类型是安全的
+ *   // the type of message is safe here
  *   return <div>搜索: {message.query}</div>;
  * };
  * ```
  * 
- * 7. 错误处理和调试
+ * 7. error handling and debugging
  * ```typescript
- * // 检查消息类型是否已注册
+ * // check if the message type is registered
  * const isRegistered = (type: string): boolean => {
  *   return !!registry.getMessageType(type);
  * };
  * 
- * // 获取所有已注册的类型
+ * // get all registered types
  * const getRegisteredTypes = (): string[] => {
- *   // 注意：这里需要扩展 registry 来支持此功能
+ *   // note: here we need to extend registry to support this feature
  *   return Array.from(registry.stringTypes.keys());
  * };
  * ```

@@ -9,7 +9,7 @@ interface CodeProps {
   code?: string;
   isDiff?: boolean;
   /**
-   * Monaco Editor 支持的所有语言
+   * all languages supported by Monaco Editor
    */
   language?:
   | 'abap'
@@ -90,7 +90,7 @@ interface CodeProps {
 }
 
 /**
- * 代码展示组件,只读模式
+ * code display component, read-only mode
  */
 const Code = ({ originalCode = '', code = '', language = 'plaintext', isDiff = true }: CodeProps) => {
   const [mode, setMode] = useState<'diff' | 'old' | 'new'>('new');

@@ -4,16 +4,13 @@ import { MessageToolChunk } from '@/types';
 import { DetailRendererProps } from '..';
 import { Markdown } from '@/components/Infra';
 import { isJsonString } from '@/utils/json';
-import { devLog } from '@/utils';
+
 import { useTranslation } from '@/hooks/useTranslation';
 
 const MilvusDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
-  devLog('message', message);
   const { t } = useTranslation();
   const { content } = useToolContent(message as unknown as MessageToolChunk);
   const list = content?.split('\n\n');
-
-  devLog('list', list);
 
   // const markdown = list?.reduce((acc, cur) => {
   //   if (isJsonString(cur)) {
@@ -30,7 +27,6 @@ const MilvusDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
   const markdown = list?.reduce((acc, cur) => {
     if (isJsonString(cur)) {
       const json = JSON.parse(cur);
-      devLog('json', json);
       if (json.question && json.answer) {
         acc += `## ${json.question}\n\n${json.answer}\n\n`;
       }
@@ -61,8 +57,6 @@ const MilvusDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
     }
     return acc;
   }, '');
-
-  devLog('markdown', markdown);
 
   return (
     <div className="w-full h-full overflow-y-auto p-2">

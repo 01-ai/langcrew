@@ -4,17 +4,17 @@ import { EyeOutlined } from '@ant-design/icons';
 import classNames from 'classnames';
 import { E2BFile, FileItem } from '@/types';
 
-// 常量定义
+// constant definition
 const ACTIVE_ICON_COLOR = 'rgb(0, 129, 242)';
 
-// 类型定义
+// type definition
 interface AttachmentCardProps {
-  attachment: E2BFile | FileItem; // 根据实际类型调整
+  attachment: E2BFile | FileItem; // adjust according to actual type
   isActive: boolean;
   onSelect: (attachment: any) => void;
 }
 
-// 工具函数
+// utility function
 const transformAttachmentToFileCard = (attachment: E2BFile | FileItem) => ({
   uid: (attachment as E2BFile).filename || (attachment as FileItem).name,
   name: (attachment as E2BFile).filename || (attachment as FileItem).name,
@@ -24,7 +24,7 @@ const transformAttachmentToFileCard = (attachment: E2BFile | FileItem) => ({
   url: attachment.url,
 });
 
-// 子组件：附件覆盖层（眼睛图标）
+// subcomponent: attachment overlay (eye icon)
 const AttachmentOverlay: React.FC<{ isActive: boolean }> = ({ isActive }) => (
   <div
     className={classNames(
@@ -45,7 +45,7 @@ const AttachmentOverlay: React.FC<{ isActive: boolean }> = ({ isActive }) => (
   </div>
 );
 
-// 附件卡片组件
+// attachment card component
 const AttachmentCard: React.FC<AttachmentCardProps> = ({ attachment, isActive, onSelect }) => {
   const handleClick = () => onSelect(attachment);
 

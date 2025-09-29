@@ -8,11 +8,13 @@ import eventBus from '@/utils/eventBus';
 import { ToolIconCircle } from '../common/icons';
 import PhoneHIL from '../common/PhoneHIL';
 import useHumanInTheLoop from '../common/useHumanInTheLoop';
+import { DynamicFormRenderer } from '@/components/Infra/DynamicForm';
 
 const UserInputBriefRenderer: React.FC<ToolBriefRendererProps> = ({ message }) => {
   const { t } = useTranslation();
 
   const userInputMessage = message as UserInputChunk;
+  const [formLoading, setFormLoading] = React.useState(false);
 
   const { showTakeOverBrowser, showTakeOverPhone, showOptionContainer, userInputable } =
     useHumanInTheLoop(userInputMessage);
@@ -23,8 +25,43 @@ const UserInputBriefRenderer: React.FC<ToolBriefRendererProps> = ({ message }) =
     }
   };
 
+  const handleFormSubmit = async (data: any) => {
+    if (!userInputable) return;
+
+    setFormLoading(true);
+    try {
+      // Send form data as user input
+      eventBus.emit('user_input_click', JSON.stringify(data));
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // Get dynamic form schema from the new data structure
+  const getFormSchema = () => {
+    return userInputMessage.detail?.interrupt_data?.form_schema;
+  };
+
   const renderUserInput = () => {
-    // 如果需要接管浏览器，则显示接管浏览器按钮
+    // Dynamic form mode
+    const formSchema = getFormSchema();
+    if (formSchema) {
+      return (
+        <div className="flex gap-2 items-start justify-between p-2 pl-4 rounded-xl border border-[#ededed]">
+          <div className="flex-1">
+            <Markdown content={userInputMessage.content} />
+            <DynamicFormRenderer
+              schema={formSchema}
+              onSubmit={handleFormSubmit}
+              loading={formLoading}
+              disabled={!userInputable}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // if it needs to take over the browser, show the take over browser button
     if (showTakeOverBrowser) {
       return (
         <div className="flex gap-2 items-center justify-between p-2 pl-4 rounded-xl border border-[#ededed]">
@@ -50,11 +87,11 @@ const UserInputBriefRenderer: React.FC<ToolBriefRendererProps> = ({ message }) =
         </div>
       );
     }
-    // 如果需要接管手机，则显示接管手机按钮
+    // if it needs to take over the phone, show the take over phone button
     if (showTakeOverPhone) {
       return <PhoneHIL userInputable={userInputable} />;
     }
-    // 如果有选项，则显示选项
+    // if there are options, show the option container
     if (showOptionContainer) {
       return (
         <div className="flex gap-2 items-center justify-between p-2 pl-4 rounded-xl border border-[#ededed]">
@@ -78,7 +115,7 @@ const UserInputBriefRenderer: React.FC<ToolBriefRendererProps> = ({ message }) =
         </div>
       );
     }
-    // 否则显示内容
+    // otherwise show the content
     return <Markdown content={message.content} />;
   };
 

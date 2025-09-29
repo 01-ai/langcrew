@@ -2,9 +2,9 @@ import { useAgentStore } from '@/store';
 import { MessageChunk, UserInputChunk } from '@/types';
 
 /**
- * 判断消息是否是云手机HIL消息
- * @param message 消息
- * @returns 是否是云手机HIL消息
+ * check if the message is a phone HIL message
+ * @param message message
+ * @returns whether the message is a phone HIL message
  */
 export const isPhoneHIL = (message: MessageChunk) =>
   (message.type === 'message_to_user' &&
@@ -14,9 +14,9 @@ export const isPhoneHIL = (message: MessageChunk) =>
     (message as UserInputChunk).detail?.interrupt_data?.suggested_user_action === 'take_over_phone');
 
 /**
- * 判断消息是否是接管浏览器HIL消息
- * @param message 消息
- * @returns 是否是接管浏览器HIL消息
+ * check if the message is a browser HIL message
+ * @param message message
+ * @returns whether the message is a browser HIL message
  */
 export const isBrowserHIL = (message: MessageChunk) =>
   (message.detail?.interrupt_data?.type === 'take_over_browser' ||
@@ -26,53 +26,53 @@ export const isBrowserHIL = (message: MessageChunk) =>
 const useHumanInTheLoop = (message: MessageChunk) => {
   const { sessionInfo } = useAgentStore();
 
-  // 会话是否有效
+  // whether the session is active
   const sessionActive = sessionInfo.status !== 'ARCHIVED';
 
-  // 用户是否可操作
+  // whether the user can operate
   const userInputable = sessionActive && message.isLast;
 
-  // 接管浏览器的消息
+  // the message to take over the browser
   const isTakeOverBrowserMessage = isBrowserHIL(message);
 
-  // 是否显示接管浏览器（最后一坨消息）
+  // whether to show the take over browser (the last message)
   const showTakeOverBrowser = isTakeOverBrowserMessage && message.isLast;
 
-  // 接管手机的消息
+  // the message to take over the phone
   const isTakeOverPhoneMessage = isPhoneHIL(message);
 
-  // 是否显示接管手机（最后一条）
+  // whether to show the take over phone (the last message)
   const showTakeOverPhone = isTakeOverPhoneMessage && message.isLast;
 
-  // 有选项的消息
+  // the message with options
   const isOptionMessage = message?.detail?.options?.length > 0;
-  // 是否显示选项（不是接管浏览器和接管手机的消息）
+  // whether to show the option container (not the message to take over the browser and the message to take over the phone)
   const showOptionContainer = !isTakeOverBrowserMessage && !isTakeOverPhoneMessage && isOptionMessage;
 
   return {
     /**
-     * 是否显示接管浏览器
-     * 1. 是接管浏览器消息
-     * 2. 是最后一坨消息
+     * whether to show the take over browser
+     * 1. the message to take over the browser
+     * 2. the last message
      */
     showTakeOverBrowser,
     /**
-     * 是否显示接管手机
-     * 1. 是接管手机消息
-     * 2. 是最后一坨消息
+     * whether to show the take over phone
+     * 1. the message to take over the phone
+     * 2. the last message
      */
     showTakeOverPhone,
     /**
-     * 是否显示选项
-     * 1. 不是接管浏览器和接管手机的消息
-     * 2. 有选项
-     * 3. 是不是最后一坨消息都显示，但是非最后一坨消息的不能点击
+     * whether to show the option container
+     * 1. not the message to take over the browser and the message to take over the phone
+     * 2. has options
+     * 3. whether to show the option container (the last message)
      */
     showOptionContainer,
     /**
-     * 用户是否可操作
-     * 1. 会话未失效
-     * 2. 是最后一坨消息
+     * whether the user can operate
+     * 1. the session is active
+     * 2. the last message
      */
     userInputable,
   };

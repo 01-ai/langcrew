@@ -52,7 +52,7 @@ pnpm install
 pnpm dev
 
 # Open Browser
-http://localhost:3000/chat
+http://localhost:3600/chat
 ```
 
 ---
@@ -79,12 +79,8 @@ pnpm add ./agentx
 import AgentX from 'agentx';
 
 <AgentX
-  agentId="your-agent-id"
-  sessionId=""
   shareId=""
   sharePassword=""
-  basePath=""
-  backPath=""
   headerNode={<></>}
   footerNode={<></>}
   shareButtonNode={<></>}
@@ -100,20 +96,14 @@ import AgentX from 'agentx';
 />;
 ```
 
-> ⚠ **Note:**`agentId` is **required** and must be obtained from the **LangCrew Admin Panel**.
-
 ---
 
 ## 📚 API Reference
 
 | Prop Name              | Type          | Description                  | Required |
 | ---------------------- | ------------- | ---------------------------- | -------- |
-| agentId                | `string`      | Agent ID                     | ✅       |
-| sessionId              | `string`      | Session ID                   | ❌       |
 | shareId                | `string`      | Share ID                     | ❌       |
 | sharePassword          | `string`      | Share password               | ❌       |
-| basePath               | `string`(URL) | Route prefix                 | ❌       |
-| backPath               | `string`(URL) | Return path                  | ❌       |
 | headerNode             | `ReactNode`   | Custom header                | ❌       |
 | footerNode             | `ReactNode`   | Custom footer                | ❌       |
 | shareButtonNode        | `ReactNode`   | Custom share button          | ❌       |

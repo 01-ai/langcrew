@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Slider } from 'antd';
-import { CaretRightOutlined } from '@ant-design/icons';
+
 
 import { CustomIcon } from '@/components/Agent/Chatbot/Sender/components';
 import { useAgentStore } from '@/store';
@@ -8,16 +8,16 @@ import { useTranslation } from '@/hooks/useTranslation';
 import './index.less';
 
 const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> = ({ onRealTimeChange }) => {
-  // 当前显示的
+  // current displayed step
   const [step, setStep] = useState(0);
   const { t } = useTranslation();
 
   const { senderSending, workspaceMessages, pipelineTargetMessage, setPipelineTargetMessage } = useAgentStore();
 
-  // 总步数
+  // total steps
   const totalSteps = useMemo(() => workspaceMessages.length, [workspaceMessages]);
 
-  // 如果pipelineTargetMessage为空 或者 发送中步数与总步数一致，则认为是实时
+  // if pipelineTargetMessage is empty or the number of steps in sending is equal to the total number of steps, it is considered to be real-time
   const isRealTime = useMemo(
     () => !pipelineTargetMessage || (senderSending && step === totalSteps),
     [pipelineTargetMessage, senderSending, step, totalSteps],
@@ -31,7 +31,7 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     onRealTimeChange(!showRealTime);
   }, [showRealTime, onRealTimeChange]);
 
-  // 手动跳转到指定步骤，这时候需要设置pipelineTargetMessage
+  // manually jump to the specified step, at this time, pipelineTargetMessage needs to be set
   const manualToStep = useCallback(
     (step: number) => {
       setStep(step);
@@ -40,7 +40,7 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     [setPipelineTargetMessage, workspaceMessages],
   );
 
-  // 处理上一步
+  // handle the previous step
   const handlePreStep = useCallback(() => {
     const currentStep = step - 1;
     if (currentStep > 0) {
@@ -48,12 +48,12 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     }
   }, [manualToStep, step]);
 
-  // 处理下一步
+  // handle the next step
   const handleNextStep = useCallback(() => {
     manualToStep(step + 1 < totalSteps ? step + 1 : totalSteps);
   }, [manualToStep, step, totalSteps]);
 
-  // 处理步骤变化
+  // handle step change
   const handleStepChange = useCallback(
     (value) => {
       if (value !== 0) {
@@ -63,20 +63,20 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     [manualToStep],
   );
 
-  // 返回实时
+  // return to real-time
   const returnToRealTime = useCallback(() => {
     setStep(totalSteps);
     setPipelineTargetMessage(null);
   }, [setPipelineTargetMessage, totalSteps]);
 
-  // 如果当前是实时，在步数变化时，则跳转到总步数
+  // if the current is real-time, when the number of steps changes, jump to the total number of steps
   useEffect(() => {
     if (isRealTime) {
       setStep(totalSteps);
     }
   }, [isRealTime, totalSteps]);
 
-  // 如果pipelineTargetMessage发生变化，则跳转到对应步骤
+  // if pipelineTargetMessage changes, jump to the corresponding step
   useEffect(() => {
     if (pipelineTargetMessage) {
       setStep(workspaceMessages.findIndex((message) => message.id === pipelineTargetMessage.id) + 1);

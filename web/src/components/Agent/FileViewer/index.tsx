@@ -11,7 +11,7 @@ const FileViewer = () => {
   const fileViewerRenderer = () => {
     return (
       <FileReader
-        key={fileViewerFile.url} // 避免URL变化时，content更新慢
+        key={fileViewerFile.url} // avoid content update slow when URL changes
         url={fileViewerFile.url}
         contentType={(fileViewerFile as E2BFile).content_type || (fileViewerFile as FileItem).type}
         filename={(fileViewerFile as E2BFile)?.filename || (fileViewerFile as FileItem)?.name}
@@ -32,12 +32,12 @@ const FileViewer = () => {
     const filename = (fileViewerFile as E2BFile)?.filename || (fileViewerFile as FileItem)?.name;
     const contentType = (fileViewerFile as E2BFile).content_type || (fileViewerFile as FileItem).type;
 
-    // 检查是否为图片类型
+    // check if it is an image type
     const isImage = contentType && contentType.startsWith('image/');
 
     if (isImage) {
       try {
-        // 对于图片，先获取blob数据再下载
+        // for image, first get blob data then download
         const response = await fetch(url);
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -49,18 +49,18 @@ const FileViewer = () => {
         a.click();
         document.body.removeChild(a);
 
-        // 清理blob URL
+        // clean blob URL
         URL.revokeObjectURL(blobUrl);
       } catch (error) {
         console.error('Failed to download the image:', error);
-        // 如果fetch失败，回退到原始方法
+        // if fetch fails, fallback to the original method
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
         a.click();
       }
     } else {
-      // 对于非图片文件，使用原始方法
+      // for non-image files, use the original method
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;

@@ -7,34 +7,34 @@ import CSVViewer from '../CSVViewer';
 
 interface FileContentRenderProps {
   /**
-   * 文件扩展名
+   * file extension
    */
   fileExtension?: string;
 
   /**
-   * 内容类型 (MIME type)
+   * content type (MIME type)
    */
   contentType?: string;
 
   /**
-   * 文件内容
+   * file content
    */
   fileContent?: string;
   /**
-   * 旧文件内容
+   * old file content
    */
   oldFileContent?: string;
 
   /**
-   * 是否是差异文件
+   * whether it is a difference file
    */
   isDiff?: boolean;
 }
 
-// 支持的文件类型（基于扩展名）
+// supported file types (based on extension)
 export const fileContentSupportFileTypes = ['html', 'md', 'csv'];
 
-// 支持的内容类型（基于 MIME type）
+// supported content types (based on MIME type)
 export const fileContentSupportContentTypes = ['text/html', 'text/markdown', 'text/csv'];
 
 const fileTypeToLanguage = {
@@ -67,7 +67,7 @@ const FileContentRender: React.FC<FileContentRenderProps> = ({
   const [previewType, setPreviewType] = useState<'preview' | 'raw'>('preview');
   const { t } = useTranslation();
 
-  // 从 contentType 中提取文件类型
+  // extract file type from contentType
   const getTypeFromContentType = (ct: string) => {
     if (ct.includes('text/markdown') || ct.includes('markdown')) return 'md';
     if (ct.includes('text/html') || ct.includes('html')) return 'html';
@@ -93,7 +93,7 @@ const FileContentRender: React.FC<FileContentRenderProps> = ({
     }
   };
 
-  // 检查是否支持预览模式（基于检测到的类型）
+  // check if supported preview mode (based on detected type)
   const supportsPreview =
     fileContentSupportFileTypes.includes(detectedType) || fileContentSupportContentTypes.includes(contentType);
 

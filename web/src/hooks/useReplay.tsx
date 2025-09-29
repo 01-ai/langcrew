@@ -8,38 +8,37 @@ import { shareApi } from '@/services/api';
 import { SessionInfo } from '@/types';
 import { XStream } from '@ant-design/x';
 import { isJsonString } from '@/utils/json';
-import { devLog } from '@/utils';
 
 const REPLAY_INTERVAL = 300;
 
 const useReplay = (replayId: string, needPassword: boolean, defaultPassword: string = '') => {
   const { t } = useTranslation();
 
-  // 没数据的时候显示loading
+  // display loading when there is no data
   const [loading, setLoading] = useState<boolean>(true);
 
-  // 是否加载完成
+  // whether the loading is complete
   const [loaded, setLoaded] = useState<boolean>(false);
 
-  // 是否正在播放
+  // whether it is playing
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
-  // 错误信息
+  // error information
   const [error, setError] = useState<string>('');
 
-  // 密码输入框的值
+  // value of the password input box
   const passwordRef = useRef<string>(defaultPassword);
 
-  // 密码输入框的ref，用来autoFocus
+  // password input box's ref, used to autoFocus
   const inputRef = useRef<InputRef>(null);
 
-  // 原始chunks
+  // original chunks
   const [originalChunks, setOriginalChunks] = useState<any[]>([]);
 
-  // 新增状态：是否需要重新输入密码
+  // new status: whether to re-enter the password
   const [needRetryPassword, setNeedRetryPassword] = useState<boolean>(false);
 
-  // 使用全局 store 中的 chunks
+  // use chunks in the global store
   const { chunks } = useAgentStore();
   useChunksProcessor(chunks);
 
@@ -78,10 +77,10 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
     };
   }, [originalChunks]);
 
-  // 获取分享详情 - 移除对 askPassword 的依赖
+  // get share details - remove the dependency on askPassword
   const getShareChatDetail = useCallback(async () => {
     const params: any = {};
-    // 如果需要密码，则添加密码
+    // if password is needed, add password
     if (needPassword) {
       params.encrypt = true;
       params.password = passwordRef.current;
@@ -115,7 +114,6 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
         })) {
           const chunkData = isJsonString(chunk.data) ? JSON.parse(chunk.data) : null;
           if (chunkData) {
-            devLog('chunkData', chunkData);
             if (chunkData.type === 'replay_session') {
               useAgentStore
                 .getState()
@@ -124,7 +122,7 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
             }
             if (chunkData.type === 'password_error') {
               message.error(getTranslation('error.password.incorrect'));
-              // 设置需要重新输入密码的状态，而不是直接调用 askPassword
+              // set the status of needing to re-enter the password, instead of directly calling askPassword
               setNeedRetryPassword(true);
               setLoading(false);
               return;
@@ -138,12 +136,12 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
         setLoaded(true);
         setIsPlaying(false);
       } catch (error) {
-        // 如果是 AbortError，说明用户主动中断了请求，不需要显示错误
+        // if AbortError, it means the user interrupted the request
         if (error.name === 'AbortError') {
           console.error('Request was aborted by user');
           return;
         }
-        // 其他错误正常处理
+        // other errors are handled normally
         useAgentStore.getState().addChunk({
           id: Date.now().toString(),
           role: 'assistant',
@@ -154,7 +152,7 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
       return;
     } catch (error) {
       setLoading(false);
-      setError('获取分享详情失败');
+      setError('Failed to get share detail');
       console.error('Failed to get share detail:', error);
     }
   }, [needPassword, replayId]);
@@ -196,7 +194,7 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
     });
   }, [getShareChatDetail, t]);
 
-  // 监听需要重新输入密码的状态
+  // listen to the status of needing to re-enter the password
   useEffect(() => {
     if (needRetryPassword) {
       askPassword();

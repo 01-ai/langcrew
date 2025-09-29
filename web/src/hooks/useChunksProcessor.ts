@@ -5,33 +5,35 @@ import { MessageChunk, MessagePlanChunk, MessageToolChunk } from '@/types';
 import { getPlan, ignoreToolChunks, isToolMessage, transformChunksToMessages } from './useChat/utils';
 
 /**
- * 处理 chunks 数据的公共 hook
- * 用于更新左侧消息列表、整体 plan 和右侧工具列表
+ * handle chunks data common hook
+ * used to update the left message list, overall plan and right tool list
  */
 export const useChunksProcessor = (chunks: MessageChunk[]) => {
   const { setPipelineMessages, setTaskPlan, setWorkspaceMessages } = useAgentStore();
 
-  // 更新左侧消息列表和整体plan
-  useEffect(() => {
-    const newMessages = transformChunksToMessages(cloneDeep(chunks));
-    setPipelineMessages(newMessages);
-  }, [chunks, setPipelineMessages]);
+  // update the left message list and overall plan
+  // useEffect(() => {
+  //   const newMessages = transformChunksToMessages(cloneDeep(chunks));
+  //   requestAnimationFrame(() => {
+  //     setPipelineMessages(newMessages);
+  //   });
+  // }, [chunks, setPipelineMessages]);
 
-  // 更新右下角plan
+  // update the bottom right plan
   useEffect(() => {
     const plan = getPlan(cloneDeep(chunks));
-    if (!isEqual(useAgentStore.getState().taskPlan, plan?.children)) {
+    if (plan && !isEqual(useAgentStore.getState().taskPlan, plan?.children)) {
       setTaskPlan(plan?.children || []);
     }
   }, [chunks, setTaskPlan]);
 
-  // 右侧显示的列表处理
+  // handle the list displayed on the right
   useEffect(() => {
     const chunksCopy = cloneDeep(chunks);
     const detailList = chunksCopy
       .filter((chunk, index) => {
         const toolChunk = chunk as MessageToolChunk;
-        // 有tool的，就认为是工具调用
+        // if there is tool, it is considered as tool call
         if (
           !isToolMessage(toolChunk) ||
           ignoreToolChunks.includes(toolChunk.detail?.tool) ||
@@ -40,8 +42,8 @@ export const useChunksProcessor = (chunks: MessageChunk[]) => {
           return false;
         }
 
-        // 如果有一条tool_result的run_id和tool_call的run_id相同，则跳过tool_call
-        // 浏览器的所有run_id都一样
+        // if there is a tool_result with the same run_id as the tool_call, skip the tool_call
+        // all run_ids in the browser are the same
         if (toolChunk.type === 'tool_call') {
           const toolResultChunk = chunksCopy.find(
             (resultChunk, index2) =>
@@ -72,7 +74,7 @@ export const useChunksProcessor = (chunks: MessageChunk[]) => {
 
         const currentIndex = index;
 
-        // 如果这次对话结束，则将isFinish设置为true，浏览器在结束后只显示图片，不显示sandbox
+        // if the conversation ends, set isFinish to true, the browser only displays images after the end, not sandbox
         const futureChunks = chunksCopy.slice(currentIndex + 1);
         const futureHasUserInput = futureChunks.some((chunk) => chunk.role === 'user');
         if (futureHasUserInput) {
@@ -90,6 +92,8 @@ export const useChunksProcessor = (chunks: MessageChunk[]) => {
         type: (chunk as MessageToolChunk).detail.tool,
       }));
 
-    setWorkspaceMessages(detailList);
+    if (!isEqual(useAgentStore.getState().workspaceMessages, detailList)) {
+      setWorkspaceMessages(detailList);
+    }
   }, [chunks, setWorkspaceMessages]);
 };

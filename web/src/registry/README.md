@@ -1,41 +1,41 @@
-# Registry 消息类型注册系统
+# Registry message type registration system
 
-## 概述
+## Overview
 
-`src/registry` 目录实现了一个灵活的消息类型注册系统，用于管理不同类型消息的渲染组件。该系统支持为每种消息类型注册左侧简要渲染组件（BriefRenderer）和右侧详情渲染组件（DetailRenderer），并提供默认渲染组件作为回退机制。
+`src/registry` directory implements a flexible message type registration system, used to manage the rendering components of different types of messages. This system supports registering the left brief rendering component (BriefRenderer) and the right detail rendering component (DetailRenderer) for each message type, and provides a default rendering component as a fallback mechanism.
 
-## 架构设计
+## Architecture design
 
-### 核心概念
+### Core concepts
 
-- **BriefRenderer**: 左侧消息列表中的简要渲染组件
-- **DetailRenderer**: 右侧详情区域中的详细渲染组件
-- **MessageTypeRegistry**: 消息类型注册表，管理所有注册的渲染组件
-- **MessageTypeConfig**: 单个消息类型的配置接口
+- **BriefRenderer**: the brief rendering component in the left message list
+- **DetailRenderer**: the detail rendering component in the right detail area
+- **MessageTypeRegistry**: the message type registration table, managing all registered rendering components
+- **MessageTypeConfig**: the configuration interface for a single message type
 
-### 类型匹配机制
+### Type matching mechanism
 
-系统支持三种类型匹配方式：
+The system supports three types of matching ways:
 
-1. **字符串匹配**: 精确匹配特定消息类型
-2. **数组匹配**: 多个类型使用同一套渲染组件
-3. **正则匹配**: 动态类型匹配，支持模式匹配
+1. **String matching**: exact matching for specific message types
+2. **Array matching**: multiple types use the same rendering component
+3. **Regular matching**: dynamic type matching, support pattern matching
 
 ```typescript
-// 字符串匹配
+// String matching
 registry.registerMessageType({
   type: 'text',
   briefRenderer: TextBriefRenderer,
 });
 
-// 数组匹配
+// Array matching
 registry.registerMessageType({
   type: ['file_read', 'file_write', 'file_delete'],
   briefRenderer: FileOperationBrief,
   detailRenderer: FileOperationDetail,
 });
 
-// 正则匹配
+// Regular matching
 registry.registerMessageType({
   type: /^browser_/,
   briefRenderer: BrowserToolBrief,
@@ -44,48 +44,48 @@ registry.registerMessageType({
 });
 ```
 
-## 目录结构
+## Directory structure
 
 ```
 src/registry/
-├── index.ts                    # 主注册表和核心接口定义
-├── builtin.ts                  # 内置消息类型注册入口
-├── default/                    # 默认渲染组件
+├── index.ts                    # main registration table and core interface definition
+├── builtin.ts                  # builtin message type registration entry
+├── default/                    # default rendering component
 │   ├── DefaultBriefRenderer.tsx
 │   └── DefaultDetailRenderer.tsx
-├── common/                     # 公共组件和工具
-│   ├── icons.tsx               # 工具图标组件
-│   ├── ToolBriefRenderer.tsx   # 通用工具简要渲染器
+├── common/                     # common component and tool
+│   ├── icons.tsx               # tool icon component
+│   ├── ToolBriefRenderer.tsx   # common tool brief renderer
 │   ├── ErrorDetailRenderer.tsx
 │   ├── ImageDetailRenderer.tsx
 │   ├── MessageBrief.tsx
-│   └── useToolContent.ts       # 工具内容处理 Hook
-├── text/                       # 文本消息类型
-├── web_search/                 # 网页搜索类型
-├── code_interpreter/           # 代码解释器类型
-├── file_*                      # 文件操作相关类型
-├── image_*                     # 图片相关类型
-├── browser/                    # 浏览器工具类型
-├── phone/                      # 手机工具类型
-├── mysql/                      # MySQL 数据库类型
-├── error/                      # 错误消息类型
-├── plan/                       # 计划消息类型
-├── live_status/                # 实时状态类型
-├── user_input/                 # 用户输入类型
-├── finish_reason/              # 完成原因类型
-├── message_to_user/        # 用户通知类型
-├── knowledge_search/           # 知识库搜索类型
-├── chunk_retrieval/            # 块检索类型
-└── service_deploy/             # 服务部署类型
+│   └── useToolContent.ts       # tool content processing Hook
+├── text/                       # text message type
+├── web_search/                 # web search type
+├── code_interpreter/           # code interpreter type
+├── file_*                      # file operation related type
+├── image_*                     # image related type
+├── browser/                    # browser tool type
+├── phone/                      # phone tool type
+├── mysql/                      # MySQL database type
+├── error/                      # error message type
+├── plan/                       # plan message type
+├── live_status/                # real-time status type
+├── user_input/                 # user input type
+├── finish_reason/              # finish reason type
+├── message_to_user/            # user notification type
+├── knowledge_search/           # knowledge base search type
+├── chunk_retrieval/            # chunk retrieval type
+└── service_deploy/             # service deploy type
 ```
 
-## 核心接口
+## Core interface
 
 ### MessageTypeConfig
 
 ```typescript
 export interface MessageTypeConfig {
-  type: MessageTypeMatcher; // 支持字符串、数组或正则表达式
+  type: MessageTypeMatcher; // support string, array or regular expression
   briefRenderer?: React.ComponentType<BriefRendererProps>;
   detailRenderer?: React.ComponentType<DetailRendererProps>;
   icon?: React.ComponentType<CustomIconComponentProps>;
@@ -111,78 +111,78 @@ export interface DetailRendererProps {
 }
 ```
 
-## 内置消息类型
+## Builtin message type
 
-### 基础类型
+### Basic type
 
-| 类型          | 描述       | BriefRenderer | DetailRenderer | 图标 |
+| Type          | Description       | BriefRenderer | DetailRenderer | Icon |
 | ------------- | ---------- | ------------- | -------------- | ---- |
-| `text`        | 纯文本消息 | ✅            | ❌             | -    |
-| `error`       | 错误消息   | ✅            | ❌             | -    |
-| `live_status` | 实时状态   | ✅            | ❌             | -    |
-| `plan`        | 计划消息   | ✅            | ❌             | -    |
+| `text`        | Pure text message | ✅            | ❌             | -    |
+| `error`       | Error message   | ✅            | ❌             | -    |
+| `live_status` | Real-time status   | ✅            | ❌             | -    |
+| `plan`        | Plan message   | ✅            | ❌             | -    |
 
-### 工具类型
+### Tool type
 
-| 类型               | 描述         | BriefRenderer | DetailRenderer | 图标 |
+| Type               | Description         | BriefRenderer | DetailRenderer | Icon |
 | ------------------ | ------------ | ------------- | -------------- | ---- |
-| `web_search`       | 网页搜索     | ❌            | ✅             | 🔍   |
-| `code_interpreter` | 代码解释器   | ❌            | ✅             | 💻   |
-| `browser/*`        | 浏览器工具   | ❌            | ✅             | 🌐   |
-| `phone/*`          | 手机工具     | ❌            | ✅             | 📱   |
-| `mysql/*`          | MySQL 数据库 | ❌            | ✅             | 🗄️   |
+| `web_search`       | Web search     | ❌            | ✅             | 🔍   |
+| `code_interpreter` | Code interpreter   | ❌            | ✅             | 💻   |
+| `browser/*`        | Browser tool   | ❌            | ✅             | 🌐   |
+| `phone/*`          | Phone tool     | ❌            | ✅             | 📱   |
+| `mysql/*`          | MySQL database | ❌            | ✅             | 🗄️   |
 
-### 文件操作类型
+### File operation type
 
-| 类型                | 描述         | BriefRenderer | DetailRenderer | 图标 |
+| Type                | Description         | BriefRenderer | DetailRenderer | Icon |
 | ------------------- | ------------ | ------------- | -------------- | ---- |
-| `write_file`        | 写文件       | ❌            | ✅             | 📄   |
-| `read_file`         | 读文件       | ❌            | ✅             | 📄   |
-| `file_read_text`    | 读取文本文件 | ❌            | ✅             | 📄   |
-| `file_append_text`  | 追加文本     | ❌            | ✅             | 📄   |
-| `file_replace_text` | 替换文本     | ❌            | ✅             | 📄   |
-| `file_parser`       | 文件解析     | ❌            | ✅             | 📄   |
-| `delete_file`       | 删除文件     | ❌            | ✅             | 🗑️   |
+| `write_file`        | Write file       | ❌            | ✅             | 📄   |
+| `read_file`         | Read file       | ❌            | ✅             | 📄   |
+| `file_read_text`    | Read text file | ❌            | ✅             | 📄   |
+| `file_append_text`  | Append text     | ❌            | ✅             | 📄   |
+| `file_replace_text` | Replace text     | ❌            | ✅             | 📄   |
+| `file_parser`       | File parser     | ❌            | ✅             | 📄   |
+| `delete_file`       | Delete file     | ❌            | ✅             | 🗑️   |
 
-### 图片相关类型
+### Image related type
 
-| 类型               | 描述     | BriefRenderer | DetailRenderer | 图标 |
+| Type               | Description     | BriefRenderer | DetailRenderer | Icon |
 | ------------------ | -------- | ------------- | -------------- | ---- |
-| `image_parser`     | 图片解析 | ❌            | ✅             | 🖼️   |
-| `image_generation` | 图片生成 | ❌            | ✅             | 🎨   |
+| `image_parser`     | Image parser | ❌            | ✅             | 🖼️   |
+| `image_generation` | Image generation | ❌            | ✅             | 🎨   |
 
-### 其他类型
+### Other type
 
-| 类型                  | 描述       | BriefRenderer | DetailRenderer | 图标 |
+| Type                  | Description       | BriefRenderer | DetailRenderer | Icon |
 | --------------------- | ---------- | ------------- | -------------- | ---- |
-| `run_command`         | 执行命令   | ❌            | ✅             | ⚡   |
-| `service_deploy`      | 服务部署   | ❌            | ✅             | 🚀   |
-| `knowledge_search`    | 知识库搜索 | ❌            | ✅             | 📚   |
-| `chunk_retrieval`     | 块检索     | ❌            | ✅             | 🔍   |
-| `user_input`          | 用户输入   | ✅            | ❌             | -    |
-| `finish_reason`       | 完成原因   | ✅            | ❌             | -    |
-| `message_to_user` | 用户通知   | ✅            | ❌             | -    |
+| `run_command`         | Run command   | ❌            | ✅             | ⚡   |
+| `service_deploy`      | Service deploy   | ❌            | ✅             | 🚀   |
+| `knowledge_search`    | Knowledge search | ❌            | ✅             | 📚   |
+| `chunk_retrieval`     | Chunk retrieval | ❌            | ✅             | 🔍   |
+| `user_input`          | User input   | ✅            | ❌             | -    |
+| `finish_reason`       | Finish reason   | ✅            | ❌             | -    |
+| `message_to_user` | User notification   | ✅            | ❌             | -    |
 
-## 使用指南
+## Usage guide
 
-### 1. 注册新的消息类型
+### 1. Register new message type
 
 ```typescript
-// 1. 创建渲染组件
+// 1. Create rendering component
 const CustomBriefRenderer: React.FC<BriefRendererProps> = ({ message }) => (
   <div className="custom-brief">
-    <span>自定义消息: {message.content}</span>
+    <span>Custom message: {message.content}</span>
   </div>
 );
 
 const CustomDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => (
   <div className="custom-detail">
-    <h3>详细信息</h3>
+    <h3>Detailed information</h3>
     <pre>{JSON.stringify(message.detail, null, 2)}</pre>
   </div>
 );
 
-// 2. 注册消息类型
+// 2. Register message type
 import registry from '@/registry';
 import { ToolIconCustom } from '@/registry/common/icons';
 
@@ -194,10 +194,10 @@ registry.registerMessageType({
 });
 ```
 
-### 2. 在容器组件中使用
+### 2. Use in container component
 
 ```typescript
-// 左侧消息列表渲染
+// Left message list rendering
 const MessageList: React.FC<{ messages: MessageChunk[] }> = ({ messages }) => {
   return (
     <div className="message-list">
@@ -209,7 +209,7 @@ const MessageList: React.FC<{ messages: MessageChunk[] }> = ({ messages }) => {
   );
 };
 
-// 右侧详情区域渲染
+// Right detail area rendering
 const MessageDetail: React.FC<{ message?: MessageChunk }> = ({ message }) => {
   if (!message) return null;
 
@@ -222,10 +222,10 @@ const MessageDetail: React.FC<{ message?: MessageChunk }> = ({ message }) => {
 };
 ```
 
-### 3. 工具类型特殊处理
+### 3. Tool type special handling
 
 ```typescript
-// 工具类型消息需要特殊处理
+// Tool type message needs special handling
 const ToolMessage: React.FC<{ message: MessageToolChunk }> = ({ message }) => {
   const ToolBriefRenderer = registry.getBriefRenderer(message.type);
   const ToolIcon = registry.getToolIcon(message.type);
@@ -239,22 +239,22 @@ const ToolMessage: React.FC<{ message: MessageToolChunk }> = ({ message }) => {
 };
 ```
 
-## 公共组件
+## Common component
 
 ### ToolBriefRenderer
 
-通用的工具简要渲染器，用于显示工具类型消息的基本信息。
+A generic tool brief renderer, used to display the basic information of tool type messages.
 
 ```typescript
 import ToolBriefRenderer from '@/registry/common/ToolBriefRenderer';
 
-// 使用示例
+// Usage example
 <ToolBriefRenderer message={message} withIcon={true} />;
 ```
 
 ### useToolContent
 
-用于提取工具消息内容的 Hook。
+A hook for extracting tool message content.
 
 ```typescript
 import useToolContent from '@/registry/common/useToolContent';
@@ -265,70 +265,70 @@ const MyDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
 };
 ```
 
-### 图标组件
+### Icon component
 
-预定义的工具图标组件，位于 `common/icons.tsx`：
+Predefined tool icon components, located in `common/icons.tsx`:
 
-- `ToolIconDefault`: 默认工具图标
-- `ToolIconSearch`: 搜索图标
-- `ToolIconCode`: 代码图标
-- `ToolIconFile`: 文件图标
-- `ToolIconImage`: 图片图标
-- `ToolIconBrowser`: 浏览器图标
-- `ToolIconPhone`: 手机图标
-- `ToolIconCheck`: 检查图标
-- `ToolIconEmpty`: 空状态图标
+- `ToolIconDefault`: Default tool icon
+- `ToolIconSearch`: Search icon
+- `ToolIconCode`: Code icon
+- `ToolIconFile`: File icon
+- `ToolIconImage`: Image icon
+- `ToolIconBrowser`: Browser icon
+- `ToolIconPhone`: Phone icon
+- `ToolIconCheck`: Check icon
+- `ToolIconEmpty`: Empty status icon
 
-## 最佳实践
+## Best practices
 
-### 1. 文件组织
+### 1. File organization
 
 ```
 src/registry/
 ├── my_type/
-│   ├── index.ts                    # 注册逻辑
-│   ├── MyTypeBriefRenderer.tsx     # 简要渲染器
-│   ├── MyTypeDetailRenderer.tsx    # 详情渲染器
-│   └── README.md                   # 说明文档
+│   ├── index.ts                    # Registration logic
+│   ├── MyTypeBriefRenderer.tsx     # Brief renderer
+│   ├── MyTypeDetailRenderer.tsx    # Detail renderer
+│   └── README.md                   # Documentation
 ```
 
-### 2. 类型安全
+### 2. Type safety
 
 ```typescript
-// 为特定工具类型定义专门的 props 接口
+// Define specific props interface for specific tool type
 interface WebSearchBriefProps extends BriefRendererProps {
   message: MessageChunk & { type: 'web_search' };
 }
 
 const WebSearchBrief: React.FC<WebSearchBriefProps> = ({ message }) => {
-  // 这里 message 的类型是安全的
+  // Here the type of message is safe
   return <div>搜索: {message.query}</div>;
 };
 ```
 
-### 3. 错误处理
+### 3. Error handling
 
 ```typescript
-// 检查消息类型是否已注册
+// Check if the message type is registered
 const isRegistered = (type: string): boolean => {
   return !!registry.getMessageType(type);
 };
 
-// 获取渲染组件时提供默认值
+// Get default value when getting renderer
 const getRenderer = (type: string) => {
   try {
     return registry.getBriefRenderer(type);
   } catch (error) {
     console.warn(`Failed to get renderer for type: ${type}`, error);
-    return registry.getBriefRenderer('text'); // 回退到文本渲染器
+    return registry.getBriefRenderer('text'); // Fallback to text renderer
   }
 };
 ```
 
-### 4. 性能优化
+### 4. Performance optimization
 
 ```typescript
-// 缓存渲染组件引用
+// Cache renderer component reference
 const rendererCache = new Map<string, React.ComponentType<any>>();
 
 const getCachedRenderer = (type: string) => {
@@ -339,17 +339,17 @@ const getCachedRenderer = (type: string) => {
 };
 ```
 
-## 扩展指南
+## Extension guide
 
-### 添加新的消息类型
+### Add new message type
 
-1. **创建目录结构**：
+1. **Create directory structure**：
 
    ```bash
    mkdir -p src/registry/new_type
    ```
 
-2. **创建渲染组件**：
+2. **Create rendering component**：
 
    ```typescript
    // src/registry/new_type/NewTypeBriefRenderer.tsx
@@ -357,13 +357,13 @@ const getCachedRenderer = (type: string) => {
    import { BriefRendererProps } from '..';
 
    const NewTypeBriefRenderer: React.FC<BriefRendererProps> = ({ message }) => {
-     return <div>新类型消息: {message.content}</div>;
+     return <div>New type message: {message.content}</div>;
    };
 
    export default NewTypeBriefRenderer;
    ```
 
-3. **注册消息类型**：
+3. **Register message type**：
 
    ```typescript
    // src/registry/new_type/index.ts
@@ -376,34 +376,34 @@ const getCachedRenderer = (type: string) => {
    });
    ```
 
-4. **添加到内置注册**：
+4. **Add to builtin registration**：
    ```typescript
    // src/registry/builtin.ts
    import './new_type';
    ```
 
-### 自定义默认渲染组件
+### Custom default rendering component
 
 ```typescript
-// 替换默认渲染组件
+// Replace default rendering component
 registry.defaultBriefRenderer = CustomDefaultBriefRenderer;
 registry.defaultDetailRenderer = CustomDefaultDetailRenderer;
 registry.defaultIcon = CustomDefaultIcon;
 ```
 
-## 调试和测试
+## Debug and test
 
-### 调试工具
+### Debug tool
 
 ```typescript
-// 检查注册状态
+// Check registration status
 const debugRegistry = () => {
   console.log('Registered types:', Array.from(registry.stringTypes.keys()));
   console.log('Pattern types:', registry.patternTypes.length);
   console.log('Array types:', registry.arrayTypes.length);
 };
 
-// 测试类型匹配
+// Test type matching
 const testTypeMatch = (type: string) => {
   const config = registry.getMessageType(type);
   console.log(`Type "${type}":`, config ? 'Found' : 'Not found');
@@ -414,7 +414,7 @@ const testTypeMatch = (type: string) => {
 ### 单元测试
 
 ```typescript
-// 测试注册和获取
+// Test registration and retrieval
 describe('MessageTypeRegistry', () => {
   it('should register and retrieve message type', () => {
     const mockRenderer = () => <div>Test</div>;
@@ -430,44 +430,44 @@ describe('MessageTypeRegistry', () => {
 });
 ```
 
-## 注意事项
+## Notes
 
-1. **类型匹配优先级**：字符串匹配 > 数组匹配 > 正则匹配
-2. **组件生命周期**：渲染组件应该是纯函数组件，避免副作用
-3. **性能考虑**：大量消息时考虑使用 React.memo 优化渲染
-4. **错误边界**：在容器组件中添加错误边界处理渲染异常
-5. **国际化**：使用 `getTranslation` 函数支持多语言
+1. **Type matching priority**：String matching > Array matching > Regular matching
+2. **Component lifecycle**：Rendering component should be a pure function component, avoid side effects
+3. **Performance consideration**：Consider using React.memo to optimize rendering when there are a lot of messages
+4. **Error boundary**：Add error boundary handling to render exceptions in container components
+5. **Internationalization**：Use `getTranslation` function to support multiple languages
 
-## 更新日志
+## Update log
 
-| 日期       | 增加的类型                          |
+| Date       | Added type                          |
 | ---------- | ----------------------------------- |
-| 2025-06-24 | live_status (实时状态)              |
-| 2025-06-24 | plan (计划)                         |
-| 2025-06-30 | web_search (网页搜索)               |
-| 2025-07-01 | run_command (执行命令)              |
-| 2025-07-01 | delete_file (删除文件)              |
-| 2025-07-01 | file_read_text (文件读取)           |
-| 2025-07-01 | write_file (文件写入)               |
-| 2025-07-01 | file_append_text (文件追加)         |
-| 2025-07-01 | file_replace_text (文件替换)        |
-| 2025-07-02 | browser_navigate_to (浏览器导航)    |
-| 2025-07-03 | browser_click_element (浏览器点击)  |
-| 2025-07-03 | browser_scroll (浏览器滚动)         |
-| 2025-07-03 | browser_go_back (浏览器后退)        |
-| 2025-07-03 | browser_send_keys (浏览器发送按键)  |
-| 2025-07-03 | browser_input_text (浏览器输入文本) |
-| 2025-07-04 | browser_switch_tab (浏览器切换标签) |
-| 2025-07-04 | service_deploy (服务部署)           |
-| 2025-07-05 | code_interpreter (代码解释器)       |
-| 2025-07-05 | user_input (用户输入)               |
-| 2025-07-07 | finish_reason (完成原因)            |
-| 2025-07-09 | file_parser (文件解析)              |
-| 2025-07-10 | message_to_user (用户通知消息)  |
-| 2025-07-14 | image_parser (图片解析)             |
-| 2025-07-15 | image_generation (图片生成)         |
-| 2025-07-18 | mysql (SQL 执行)                    |
-| 2025-07-18 | browser (浏览器)                    |
-| 2025-07-18 | phone (手机)                        |
-| 2025-07-25 | markdown_result (Markdown 结果)     |
-| 2025-07-25 | file_diff (文件差异)                |
+| 2025-06-24 | live_status (Real-time status)      |
+| 2025-06-24 | plan (Plan)                         |
+| 2025-06-30 | web_search (Web search)             |
+| 2025-07-01 | run_command (Run command)           |
+| 2025-07-01 | delete_file (Delete file)           |
+| 2025-07-01 | file_read_text (Read file)           |
+| 2025-07-01 | write_file (Write file)               |
+| 2025-07-01 | file_append_text (Append text)         |
+| 2025-07-01 | file_replace_text (Replace text)        |
+| 2025-07-02 | browser_navigate_to (Navigate to)    |
+| 2025-07-03 | browser_click_element (Click element)  |
+| 2025-07-03 | browser_scroll (Scroll)         |
+| 2025-07-03 | browser_go_back (Go back)        |
+| 2025-07-03 | browser_send_keys (Send keys)  |
+| 2025-07-03 | browser_input_text (Input text) |
+| 2025-07-04 | browser_switch_tab (Switch tab) |
+| 2025-07-04 | service_deploy (Service deploy)           |
+| 2025-07-05 | code_interpreter (Code interpreter)       |
+| 2025-07-05 | user_input (User input)               |
+| 2025-07-07 | finish_reason (Finish reason)            |
+| 2025-07-09 | file_parser (File parser)              |
+| 2025-07-10 | message_to_user (User notification)  |
+| 2025-07-14 | image_parser (Image parser)             |
+| 2025-07-15 | image_generation (Image generation)         |
+| 2025-07-18 | mysql (MySQL)                    |
+| 2025-07-18 | browser (Browser)                    |
+| 2025-07-18 | phone (Phone)                        |
+| 2025-07-25 | markdown_result (Markdown result)     |
+| 2025-07-25 | file_diff (File diff)                |

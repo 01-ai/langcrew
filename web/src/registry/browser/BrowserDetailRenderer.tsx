@@ -7,7 +7,7 @@ import { Spin } from 'antd';
 const BrowserDetailRenderer: React.FC<DetailRendererProps> = ({ message, isRealTime }) => {
   const sandboxUrl = message?.detail?.param?.sandbox_url || message?.detail?.result?.sandbox_url;
 
-  // 使用 useMemo 缓存 iframe，只有当 sandbox_url 改变时才重新创建
+  // use useMemo to cache iframe, only when sandbox_url changes
   const iframeElement = useMemo(() => {
     if (!useAgentStore.getState().shareId && sandboxUrl) {
       return <iframe key={sandboxUrl} src={sandboxUrl} className="w-full h-full" />;

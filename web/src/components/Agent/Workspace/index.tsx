@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Flex, List, Skeleton, Spin, Typography } from 'antd';
-import { CloseOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useAgentStore } from '@/store';
 import registry from '@/registry';
 import Controller from './Controller';
@@ -47,7 +46,7 @@ const Workspace = () => {
     }
     const Detail = registry.getDetailRenderer(message?.type);
     if (message?.type.startsWith('browser')) {
-      // 浏览器相关的，pending也渲染sandbox，所以自己处理
+      // browser related, pending also renders sandbox, so handle it yourself
       return <Detail key="detail" message={message} isRealTime={isRealTime} />;
     }
     if (message?.detail?.status === 'running' || message?.detail?.status === 'pending') {
@@ -94,7 +93,7 @@ const Workspace = () => {
         ? workspaceMessages.find((message) => message.id === pipelineTargetMessage.id)
         : workspaceMessages.at(-1);
     setRenderMessage(targetMessage);
-    // 只有用户点击了tool，才打开workspace
+    // only open workspace when user clicks the tool
     if (pipelineTargetMessage?.type && !!registry.getMessageType(pipelineTargetMessage?.type)?.detailRenderer) {
       setWorkspaceVisible(true);
     }

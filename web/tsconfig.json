@@ -3,11 +3,16 @@
     "jsx": "react",
     "lib": ["es2023", "DOM"],
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
+    "moduleResolution": "node",
     "baseUrl": "./",
     "paths": {
       "@/*": ["./src/*"]
-    }
-    // "noCheck": true
-  }
+    },
+    "declaration": true,
+    "declarationMap": true
+  },
+  "exclude": ["node_modules"],
+  "include": ["src/**/*"]
 }

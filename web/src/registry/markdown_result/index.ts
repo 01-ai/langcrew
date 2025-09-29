@@ -3,7 +3,7 @@ import { ToolIconSearch } from '../common/icons';
 import MarkdownResultDetailRenderer from './MarkdownResultDetailRenderer';
 
 registry.registerMessageType({
-  // 这些类型的，结果是Markdown
+  // these types, the result is Markdown
   type: ['knowledge_search', 'chunk_retrieval'],
   detailRenderer: MarkdownResultDetailRenderer,
   icon: ToolIconSearch,

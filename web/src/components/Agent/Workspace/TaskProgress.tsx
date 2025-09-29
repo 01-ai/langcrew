@@ -5,13 +5,13 @@ import { useAgentStore } from '@/store';
 import { TaskStatus } from '@/types';
 import Loading from '@/components/Infra/Loading';
 
-// 提取常量
+// extract constants
 const ICON_STYLES = {
   success: { color: '#4AC90F' },
   default: { fontSize: '12px' },
 } as const;
 
-// 提取默认数字圆圈组件
+// extract default number circle component
 const NumberCircle: React.FC<{ number: number }> = ({ number }) => (
   <div className="flex items-center justify-center flex-none w-5 h-5 rounded-full bg-[#999] text-white text-xs">
     {number}
@@ -37,7 +37,7 @@ const TaskProgress: React.FC = () => {
     return 0;
   }, [taskPlan]);
 
-  // 使用 useMemo 缓存图标映射，避免每次渲染都重新创建
+  // use useMemo to cache icon mapping, avoid re-creating every time
   const iconMap = useMemo(
     () => ({
       [TaskStatus.Success]: <CheckOutlined style={ICON_STYLES.success} />,
@@ -46,12 +46,12 @@ const TaskProgress: React.FC = () => {
     [],
   );
 
-  // 优化后的 iconRender 函数
+  // optimized iconRender function
   const iconRender = (index: number) => {
     const task = taskPlan?.[index];
     const status = task?.status;
 
-    // 如果状态匹配，返回对应图标，否则返回默认数字圆圈
+    // if the status matches, return the corresponding icon, otherwise return the default number circle
     return iconMap[status] || <NumberCircle number={index + 1} />;
   };
 

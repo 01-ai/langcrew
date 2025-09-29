@@ -38,13 +38,13 @@ const Markdown: React.FC<MarkdownProps> = ({ content = '', className = '', proce
     return content.replace(pattern, replacement);
   };
 
-  //以$开头，非英文字母结尾,中间全是数字的字符串，识别为美元符号
+  // a string that starts with $, non-alphabetic characters in the middle, and all digits, is recognized as a dollar symbol
   const escapeDollarNumber = (text: string) => {
     return text?.replace(/(\$\d+[^a-zA-Z])/g, '\\$1');
   };
 
   const escapeBrackets = (text: string) => {
-    // 处理代码块和数学公式
+    // handle code blocks and mathematical formulas
     const pattern = /(```[\s\S]*?```|`.*?`)|\\\[([\s\S]*?[^\\])\\\]|\\\((.*?)\\\)/g;
     let result = text.replace(pattern, (match, codeBlock, squareBracket, roundBracket) => {
       if (codeBlock) {
@@ -57,8 +57,8 @@ const Markdown: React.FC<MarkdownProps> = ({ content = '', className = '', proce
       return match;
     });
 
-    // 处理 URL 后面的标点符号问题
-    // 在 URL 后面添加空格来防止标点符号被包含在链接中
+    // handle punctuation after URL
+    // add a space after the URL to prevent punctuation being included in the link
     result = result.replace(
       /(https?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+)/g,
       '$1 ',
@@ -90,7 +90,7 @@ const Markdown: React.FC<MarkdownProps> = ({ content = '', className = '', proce
         ]}
         rehypePlugins={[
           RehypeRaw as any,
-          //RehypeSanitize：防止脚本注入，默认使用github.com工作方式。参考：https://github.com/rehypejs/rehype-sanitize
+          //RehypeSanitize: prevent script injection, default using github.com way. Reference: https://github.com/rehypejs/rehype-sanitize
           [
             RehypeSanitize,
             {

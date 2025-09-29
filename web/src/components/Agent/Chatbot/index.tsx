@@ -1,16 +1,15 @@
 import React, { Fragment, useEffect, useRef } from 'react';
-import { Button, Flex, Layout, Card, Typography, ConfigProvider, theme, message as antdMessage } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { CopyOutlined, RedoOutlined, FireOutlined, ShareAltOutlined } from '@ant-design/icons';
-import { Bubble, Actions, Prompts } from '@ant-design/x';
+import { Button, Flex, Layout, Typography, message as antdMessage } from 'antd';
+import { CopyOutlined, LinkOutlined, EyeOutlined, ExportOutlined } from '@ant-design/icons';
+import { Bubble, Actions } from '@ant-design/x';
 import { useAgentStore } from '@/store';
 import Sender from '@/components/Agent/Chatbot/Sender';
 import MessageAttachments from '@/components/Agent/Chatbot/MessageAttachments';
 import ClickableTool from '@/components/Agent/Chatbot/ClickableTool';
-import { AgentMode, MessageToolChunk, TaskStage } from '@/types';
+import { AgentMode, MessageToolChunk } from '@/types';
 import ZoomIn from '@/assets/png/zoom-in.png';
 import Back from '@/assets/png/back.png';
-import { isToolMessage } from '@/hooks/useChat/utils';
+import { isFinishChunk, isToolMessage } from '@/hooks/useChat/utils';
 import footerBgUrl from '@/assets/png/footer-bg.png';
 import classNames from 'classnames';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -22,14 +21,11 @@ import Loading from '@/components/Infra/Loading';
 const Chatbot = ({ shareButtonNode }: { shareButtonNode?: React.ReactNode }) => {
   const { Header } = Layout;
   const { Title, Text } = Typography;
-  const navigate = useNavigate();
   const { t } = useTranslation();
 
   const {
     mode,
     sessionInfo,
-    basePath,
-    backPath,
     pipelineMessages,
     taskStage,
     workspaceVisible,
@@ -38,68 +34,21 @@ const Chatbot = ({ shareButtonNode }: { shareButtonNode?: React.ReactNode }) => 
     workspaceMessages,
   } = useAgentStore();
 
-  const sessionStatus = sessionInfo?.status;
-
-  const actionItems = [
-    {
-      key: 'retry',
-      icon: <RedoOutlined />,
-      label: 'Retry',
-    },
-    {
-      key: 'copy',
-      icon: <CopyOutlined />,
-      label: 'Copy',
-    },
-    {
-      key: 'share',
-      icon: <ShareAltOutlined />,
-      label: 'Share',
-    },
-  ];
-
-  const suggestionItems = [
-    {
-      key: 'a',
-      label: (
-        <Flex>
-          <FireOutlined style={{ color: '#FF4D4F' }} />
-          <Text>{'Hot Topics'}</Text>
-        </Flex>
-      ),
-      description: 'What are you interested in?',
-      children: [
-        {
-          key: 'a-a',
-          description: `First Question?`,
-        },
-        {
-          key: 'a-b',
-          description: `Second Question?`,
-        },
-        {
-          key: 'a-c',
-          description: `Third Question?`,
-        },
-      ],
-    },
-  ];
-
   const handleWorkspaceOpen = () => {
     setWorkspaceVisible(true);
   };
 
-  // 自动打开 workspace 功能
+  // auto open workspace function
   const autoOpenRef = useRef(false);
   useEffect(() => {
-    // 只自动打开一次
+    // only auto open once
     if (workspaceMessages?.length > 0 && !workspaceVisible && !autoOpenRef.current) {
       setWorkspaceVisible(true);
       autoOpenRef.current = true;
     }
   }, [setWorkspaceVisible, workspaceMessages?.length, workspaceVisible]);
 
-  // 移除原有的滚动逻辑，使用 ScrollToBottom 组件
+  // remove the original scroll logic, use ScrollToBottom component
 
   return (
     <div
@@ -121,8 +70,7 @@ const Chatbot = ({ shareButtonNode }: { shareButtonNode?: React.ReactNode }) => 
                 type="text"
                 icon={<img src={Back} />}
                 onClick={() => {
-                  // 避免sessionId 重置失败
-                  navigate(`${backPath || basePath}`);
+                  useAgentStore.getState().resetStore();
                 }}
               />
             </Flex>
@@ -167,7 +115,7 @@ const Chatbot = ({ shareButtonNode }: { shareButtonNode?: React.ReactNode }) => 
                             if (navigator.clipboard && navigator.clipboard.writeText) {
                               navigator.clipboard.writeText(msg.content);
                             } else {
-                              // 降级方案：使用传统的复制方法
+                              // fallback solution: use the traditional copy method
                               const textArea = document.createElement('textarea');
                               textArea.value = msg.content;
                               document.body.appendChild(textArea);
@@ -235,42 +183,20 @@ const Chatbot = ({ shareButtonNode }: { shareButtonNode?: React.ReactNode }) => 
                           </Fragment>
                         );
                       })}
+                      {message.messages.some((msg) => isFinishChunk(msg)) && message.trace_id && (
+                        <div className="rounded-[14px] w-fit px-3 py-1 flex items-center gap-1 bg-[#e6f0ff] text-[#3e82f0]">
+                          <a
+                            href={`https://dashboard-agentops-boe.lingyiwanwu.net/traces?trace_id=${message.trace_id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2 transition-colors"
+                          >
+                            View trace
+                            <ExportOutlined />
+                          </a>
+                        </div>
+                      )}
                     </Flex>
-                  }
-                  footer={
-                    taskStage === TaskStage.Success ? (
-                      <>
-                        <Actions items={actionItems} />
-                        <ConfigProvider
-                          theme={{
-                            algorithm: theme.defaultAlgorithm,
-                          }}
-                        >
-                          <Card style={{ borderRadius: 0, border: 0 }} className="w-full">
-                            <Prompts
-                              title="You might also want to ask"
-                              items={suggestionItems}
-                              wrap
-                              styles={{
-                                item: {
-                                  flex: 'none',
-                                  width: 'calc(30% - 6px)',
-                                  backgroundImage: `linear-gradient(137deg, #e5f4ff 0%, #efe7ff 100%)`,
-                                  border: 0,
-                                },
-                                subItem: {
-                                  background: 'rgba(255,255,255,0.45)',
-                                  border: '1px solid #FFF',
-                                },
-                              }}
-                              onItemClick={(info) => {
-                                console.info(`You have clicked the suggestion: ${info.data.key}`);
-                              }}
-                            />
-                          </Card>
-                        </ConfigProvider>
-                      </>
-                    ) : null
                   }
                 />
               );

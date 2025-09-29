@@ -1,7 +1,6 @@
 import { isPhoneHIL } from '@/registry/common/useHumanInTheLoop';
 import { useAgentStore } from '@/store';
 import { InnerMessageChunk } from '@/types';
-import { devLog } from '@/utils';
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
 
@@ -29,13 +28,13 @@ const useTakeOverPhone = (isRealTime: boolean) => {
     if (!innerMessage) {
       return false;
     }
-    // 找到最后一条消息
+    // find the last message
     const lastMessage = pipelineMessages[pipelineMessages.length - 1];
-    // 如果最后一条消息是assistant，则有可能需要用户操作
+    // if the last message is assistant, then it may need user operation
     if (lastMessage?.role === 'assistant') {
-      // 找到最后一条消息中type为user_input的消息
+      // find the message with type user_input in the last message
       const userInputMessage = lastMessage.messages.find((item) => isPhoneHIL(item));
-      // 如果找到，则需要用户操作
+      // if found, then need user operation
       if (userInputMessage && isRealTime) {
         return true;
       }

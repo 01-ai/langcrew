@@ -28,10 +28,10 @@ const LiElement: React.FC<LiElementProps> = ({ children, className, ...props }) 
     return () => observer.disconnect();
   }, []);
 
-  // 检查是否为任务列表项
+  // check if it is a task list item
   const isTaskListItem = className?.includes('task-list-item');
 
-  // 过滤掉非标准的 DOM 属性
+  // filter out non-standard DOM attributes
   const { ordered, ...domProps } = props;
 
   return (

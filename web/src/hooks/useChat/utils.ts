@@ -24,7 +24,7 @@ export const ignoreToolChunks = [
   'ask_user',
 ];
 
-// 过滤掉live_status
+// filter out live_status
 function filterLiveStatus(message: MessageItem) {
   message.messages = message.messages
     .filter((msg) => msg.type !== 'live_status')
@@ -42,7 +42,7 @@ function filterLiveStatus(message: MessageItem) {
   return message;
 }
 
-// 把所有plan里的所有step的status都改成success
+// change the status of all steps in all plans to success
 function changePlanStepStatusToSuccess(message: MessageItem) {
   message.messages.forEach((msg) => {
     if (isPlanChunk(msg)) {
@@ -56,84 +56,96 @@ function changePlanStepStatusToSuccess(message: MessageItem) {
   return message;
 }
 
-// 没开始的step不显示
-function hideFutureSteps(message: MessageItem) {
-  message.messages.forEach((msg) => {
-    if (isPlanChunk(msg)) {
-      (msg as MessagePlanChunk).children = (msg as MessagePlanChunk).children.filter((step: PlanStep) => {
-        return step.status === TaskStatus.Success || step.status === TaskStatus.Running;
-      });
-    }
-  });
-  return message;
-}
-
-// 没children的step不显示
-function hideEmptySteps(message: MessageItem) {
-  message.messages.forEach((msg) => {
-    if (isPlanChunk(msg)) {
-      (msg as MessagePlanChunk).children = (msg as MessagePlanChunk).children.filter((step: PlanStep) => step.children.length > 0);
-    }
-  });
-  return message;
-}
-
 export function isPlanChunk(message: MessageChunk) {
   return message.type === 'plan';
 }
 
-export const transformChunksToMessages = (chunks: MessageChunk[]) => {
-  // 创建 chunks 的深拷贝，避免修改原始数据
-  // 使用 lodash cloneDeep 进行高性能深拷贝
+export const loadingMessage: MessageItem = {
+  role: 'assistant',
+  messages: [
+    {
+      type: 'live_status',
+      content: getTranslation('chatbot.task.thinking'),
+    },
+  ],
+};
+
+function removeIsLast(message: MessageItem) {
+  message.messages = message.messages.map((msg) => {
+    if (msg.isLast !== undefined) {
+      delete msg.isLast;
+    }
+    if (msg.type === 'plan') {
+      (msg as MessagePlanChunk).children?.forEach((step) => {
+        step.children?.forEach((child) => {
+          if (child.isLast !== undefined) {
+            delete child.isLast;
+          }
+        });
+      });
+    }
+    return msg;
+  });
+  return message;
+}
+
+export const transformChunksToMessages = (chunks: MessageChunk[], existingMessages: MessageItem[] = []) => {
+  // create a deep copy of chunks, avoid modifying the original data
+  // use lodash cloneDeep for high-performance deep copy
   const chunksCopy = cloneDeep(chunks);
-  // 要返回的
-  const newMessages: MessageItem[] = [];
+  // the messages to return
+  const newMessages: MessageItem[] = existingMessages.slice();
 
-  // 当前的AI消息
-  let currentAIMessage: MessageItem | null = null;
+  // the current AI message
+  let currentAIMessage: MessageItem | undefined = newMessages.findLast((msg) => msg.role === 'assistant');
 
-  // 最后一个live_status，别的live_status不显示
+  const existingAIMessage = !!currentAIMessage;
+
+  // the last live_status, other live_statuss are not displayed
   const latestLiveStatusChunk = chunksCopy
     .slice()
     .reverse()
     .find((chunk) => chunk.type === 'live_status');
 
   for (let i = 0; i < chunksCopy.length; i++) {
-    // 当前的chunk
+    // the current chunk
     const chunk = chunksCopy[i];
 
     const futureChunks = chunksCopy.slice(i + 1);
     const hasUserMessage = futureChunks.some((chunk) => chunk.role === 'user');
 
-    chunk.isLast = !hasUserMessage;
+    if (!hasUserMessage && chunk.role === 'assistant') {
+      chunk.isLast = true;
+    }
 
-    // 忽略某些特定工具调用
+    // ignore certain specific tool calls
     if (ignoreToolChunks.includes((chunk as MessageToolChunk).detail?.tool) || ignoreToolChunks.includes(chunk.type)) {
       continue;
     }
 
-    // 用户消息 - 检查是否是新的一轮对话
+    // user message - check if it is a new round of conversation
     if (chunk.role === 'user') {
-      // 如果当前有AI消息，则先保存
+      // if there is a current AI message, save it first
       if (currentAIMessage) {
-        // 如果currentAIMessage已结束，则过滤掉live_status，并把plan里running的step的status改成success，并隐藏未开始的step
+        // if currentAIMessage has ended, filter out live_status, and change the status of the running steps in the plan to success, and hide the steps that have not started
 
         currentAIMessage = filterLiveStatus(currentAIMessage);
         currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
-        currentAIMessage = hideFutureSteps(currentAIMessage);
-        currentAIMessage = hideEmptySteps(currentAIMessage);
-        newMessages.push(currentAIMessage);
+        currentAIMessage = removeIsLast(currentAIMessage);
+        if (!existingAIMessage) {
+          newMessages.push(currentAIMessage);
+        }
         currentAIMessage = null;
       }
 
-      // 添加用户消息
+      // add user message
       newMessages.push({
         role: 'user',
         messages: [chunk],
       });
       continue;
     }
-    // 如果当前没有AI消息，则创建一个
+    // if there is no current AI message, create one
     if (!currentAIMessage) {
       currentAIMessage = {
         role: 'assistant',
@@ -141,61 +153,83 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       };
     }
 
-    // 处理live_status
+    // if the chunk has a trace_id, add it to the current AI message
+    if (chunk.trace_id && currentAIMessage) {
+      currentAIMessage.trace_id = chunk.trace_id;
+    }
+
+    // handle live_status
     if (chunk.type === 'live_status') {
-      // 只处理最后一个
+      // only handle the last one
       if (chunk.id === latestLiveStatusChunk?.id) {
-        // 找到plan
+        // find the plan
         const latestPlan = currentAIMessage.messages.find(isPlanChunk) as MessagePlanChunk;
-        // 如果有plan
+        // if there is a plan
         if (latestPlan) {
-          // 有未完成的step，就加在step中，不然加在messages中
+          // if there is a running step, add it to the step, otherwise add it to the messages
           const step = latestPlan.children.find((step: PlanStep) => step.status === 'running') as PlanStep;
           if (step) {
             step.children.push(chunk);
             continue;
           }
         }
-        // 没有plan或者没有未完成的step，就加在messages中
+        // if there is no plan or no running step, add it to the messages
         currentAIMessage.messages.push(chunk);
       }
-      // 其他的不处理，且跳出本次循环
+      // other ones are not handled, and the current loop is exited
       continue;
     }
 
-    // 处理plan
+    // handle plan
     if (isPlanChunk(chunk)) {
       currentAIMessage = filterLiveStatus(currentAIMessage);
       currentAIMessage.messages.push(handlePlanChunk(chunk as EventPlanChunk));
       continue;
     }
 
-    // plan_update处理
+    // handle plan_update
     if (chunk.type === 'plan_update') {
-      // 指定chunk是PlanUpdateChunk
+      // specify chunk is PlanUpdateChunk
       const planUpdateChunk = chunk as PlanUpdateChunk;
-      // 找到已有plan
+      // find the existing plan
       const plan = currentAIMessage.messages.find(isPlanChunk) as MessagePlanChunk;
       if (plan) {
         handlePlanUpdateChunk(plan, planUpdateChunk);
       }
-      // 处理完就跳出本次循环
+      // after handling, exit the current loop
       continue;
     }
 
-    // tool_call处理 - 检查下一条是否为tool_result
+    // no tool and has run_id: try to merge the items with same run_id
+    if (!chunk.detail?.tool && !!chunk.detail?.run_id) {
+      // the first item with same run_id
+      const firstRunIndex = chunksCopy.findIndex((c) => c.detail?.run_id === chunk.detail?.run_id);
+      // find all items with same run_id
+      const items = chunksCopy.filter((c) => c.detail?.run_id === chunk.detail?.run_id);
+      // if this is the first item with same run_id
+      if (items.length > 1) {
+        if (firstRunIndex === i) {
+          chunk.content = items.map((c) => c.content).join('');
+        } else {
+          // skip items not the first
+          continue;
+        }
+      }
+    }
+
+    // handle tool_call - check if the next one is tool_result
     if (chunk.type === 'tool_call') {
-      // 指定chunk是MessageToolChunk
+      // specify chunk is MessageToolChunk
       const toolCallChunk = chunk as MessageToolChunk;
-      // 指定chunk的type为tool
+      // specify chunk's type is tool
       chunk.type = toolCallChunk.detail.tool;
-      // 如果有一条tool_result的run_id和tool_call的run_id相同，则跳过tool_call
+      // if there is a tool_result with the same run_id as the tool_call, skip the tool_call
       const toolResultChunk = chunksCopy.find(
         (resultChunk) =>
           resultChunk.type === 'tool_result' && resultChunk.detail?.run_id === toolCallChunk.detail?.run_id,
       );
       if (toolResultChunk) {
-        // 更新toolResultChunk的detail，把tool_call的param赋值给tool_result
+        // update toolResultChunk's detail, assign the param of tool_call to tool_result
         toolResultChunk.content = toolCallChunk.content;
         toolResultChunk.detail = {
           ...toolResultChunk.detail,
@@ -206,11 +240,23 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
         continue;
       }
 
-      // 否则保留tool_call
+      // otherwise keep tool_call
 
-      // 这里不执行操作，留给下面处理
+      // here do not execute operation, leave it to the next one
     }
     if (chunk.type === 'tool_result') {
+      const lastItem = currentAIMessage.messages[currentAIMessage.messages.length - 1];
+      // merge tool_call and tool_result
+      if (lastItem && lastItem.type === chunk.detail?.tool && lastItem.detail?.run_id === chunk.detail?.run_id) {
+        lastItem.id = chunk.id;
+        lastItem.detail = {
+          ...chunk.detail,
+          param: lastItem.detail.param,
+          action: lastItem.detail.action,
+          action_content: lastItem.detail.action_content,
+        };
+        continue;
+      }
       const toolResultChunk = chunk as MessageToolChunk;
       chunk.type = toolResultChunk.detail.tool;
     }
@@ -228,30 +274,67 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
     }
 
     const plan = currentAIMessage.messages.find(isPlanChunk) as MessagePlanChunk;
-    // 处理普通的，如果有step_id，则添加到step中，不然加到messages中
+    // handle ordinary, if there is step_id, add it to the step, otherwise add it to the messages
     if (chunk.step_id) {
       if (plan) {
         const step = plan.children.find((step: PlanStep) => step.id === chunk.step_id);
         if (step) {
-          // 如果当前step里有liveStatus，则干掉liveStatus
+          // if there is a liveStatus in the current step, remove it
           step.children = step.children.filter((child) => child.type !== 'live_status');
           step.children.push(chunk);
           continue;
         }
       }
     }
-    // 没有step_id的，看看有没有running的step
+    // if there is no step_id, check if there is a running step
     if (plan) {
       const step = plan.children.find((step: PlanStep) => step.status === 'running');
       if (step) {
+        const lastItem = step.children[step.children.length - 1];
+        // merge tool_call and tool_result
+        if (lastItem && lastItem?.type === chunk.detail?.tool && lastItem?.detail?.run_id === chunk.detail?.run_id) {
+          lastItem.id = chunk.id;
+          lastItem.detail = {
+            ...chunk.detail,
+            param: lastItem.detail.param,
+            action: lastItem.detail.action,
+            action_content: lastItem.detail.action_content,
+          };
+          continue;
+        }
+        // run_id and type are the same, merge, avoid tool_call and tool_result merge
+        if (
+          !!lastItem?.detail?.run_id &&
+          lastItem?.detail?.run_id === chunk.detail?.run_id &&
+          lastItem?.type === chunk.type &&
+          !lastItem?.detail?.tool &&
+          !chunk?.detail?.tool
+        ) {
+          lastItem.content += chunk.content;
+
+          continue;
+        }
         step.children.push(chunk);
         continue;
       }
     }
 
-    // 没有step_id，则添加到messages中
+    // if there is no step_id, add it to the messages
     currentAIMessage = filterLiveStatus(currentAIMessage);
-    currentAIMessage.messages.push(chunk);
+    const lastItem = currentAIMessage.messages[currentAIMessage.messages.length - 1];
+
+    // run_id and type are the same, merge, avoid tool_call and tool_result merge
+    if (
+      !!lastItem?.detail?.run_id &&
+      lastItem?.detail?.run_id === chunk.detail?.run_id &&
+      lastItem?.type === chunk.type &&
+      !chunk.detail?.tool &&
+      !lastItem.detail?.tool
+    ) {
+      lastItem.content += chunk.content;
+    } else {
+      currentAIMessage.messages.push(chunk);
+    }
     continue;
   }
 
@@ -260,22 +343,14 @@ export const transformChunksToMessages = (chunks: MessageChunk[]) => {
       currentAIMessage = filterLiveStatus(currentAIMessage);
       currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
     }
-    currentAIMessage = hideFutureSteps(currentAIMessage);
-    currentAIMessage = hideEmptySteps(currentAIMessage);
-    newMessages.push(currentAIMessage);
+    if (!existingAIMessage) {
+      newMessages.push(currentAIMessage);
+    }
   }
 
-  // 如果最后一条是user，则添加一个live_status，用于显示任务执行中
+  // if the last item is user message, add a live_status
   if (newMessages[newMessages.length - 1]?.role === 'user') {
-    newMessages.push({
-      role: 'assistant',
-      messages: [
-        {
-          type: 'live_status',
-          content: getTranslation('chatbot.task.thinking'),
-        },
-      ],
-    });
+    newMessages.push(cloneDeep(loadingMessage));
   }
 
   return newMessages;
@@ -290,24 +365,24 @@ function handlePlanChunk(chunk: EventPlanChunk) {
 }
 
 function handlePlanUpdateChunk(plan: MessagePlanChunk, planUpdateChunk: PlanUpdateChunk) {
-  // 如果action是add，则直接添加
+  // if the action is add, add it directly
   if (planUpdateChunk.detail?.action === 'add') {
-    // 如果detail.steps为空，则直接赋值
+    // if detail.steps is empty, assign it directly
     if (!plan.children) {
       plan.children = planUpdateChunk.detail.steps.map(stepMapper);
     } else {
-      // 否则合并
+      // otherwise merge
       plan.children.push(...planUpdateChunk.detail.steps.map(stepMapper));
     }
   }
-  // 如果action是update，则更新
+  // if the action is update, update it
   if (planUpdateChunk.detail?.action === 'update') {
     planUpdateChunk.detail?.steps?.forEach((newStep) => {
-      // 找到对应的step
+      // find the corresponding step
       const index = plan.children.findIndex((step: PlanStep) => step.id === newStep.id);
-      // 如果找到，则更新
+      // if found, update it
       if (index !== -1) {
-        // 合并
+        // merge
         plan.children[index] = {
           ...plan.children[index],
           ...newStep,
@@ -315,12 +390,12 @@ function handlePlanUpdateChunk(plan: MessagePlanChunk, planUpdateChunk: PlanUpda
       }
     });
   }
-  // 如果action是remove，则删除
+  // if the action is remove, delete it
   if (planUpdateChunk.detail?.action === 'remove') {
     planUpdateChunk.detail?.steps?.forEach((newStep) => {
-      // 找到对应的step
+      // find the corresponding step
       const index = plan.children.findIndex((step: PlanStep) => step.id === newStep.id);
-      // 如果找到，则删除
+      // if found, delete it
       if (index !== -1) {
         plan.children.splice(index, 1);
       }
@@ -365,7 +440,7 @@ export function isFinishChunk(chunk: MessageChunk) {
 }
 
 /**
- * 给step添加children
+ * add children to step
  * @param step
  * @returns
  */
@@ -376,49 +451,10 @@ const stepMapper = (step: PlanStep) => {
   };
 };
 
-export const createSession = async ({
-  content,
-  kb_ids,
-  agent_tool_items,
-  super_employee_id,
-}: {
-  content: string;
-  kb_ids: string[];
-  agent_tool_items: { agent_tool_id: string; agent_tool_type: string }[];
-  super_employee_id: string;
-}) => {
-  try {
-    const response = await sessionApi.create({
-      content,
-      kb_info: {
-        kb_ids,
-      },
-      agent_tool_info: {
-        agent_tool_items,
-      },
-      super_employee_id,
-    });
-    return response.data as SessionInfo;
-  } catch (error) {
-    console.error('Failed to create session:', error);
-    throw error;
-  }
-};
-
-export const getSession = async (conversation_id: string) => {
-  try {
-    const response = await sessionApi.getDetail(conversation_id);
-    return response.data;
-  } catch (error) {
-    console.error('Failed to get session:', error);
-    throw error;
-  }
-};
-
 /**
- * 判断是否是工具消息
- * @param chunk 消息体
- * @returns 是否是工具消息
+ * check if it is a tool message
+ * @param chunk message body
+ * @returns whether it is a tool message
  */
 export const isToolMessage = (chunk: MessageToolChunk) => {
   return !!chunk.detail?.tool && chunk.detail?.tool !== 'agent_end_task';

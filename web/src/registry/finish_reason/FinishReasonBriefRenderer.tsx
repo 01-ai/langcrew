@@ -7,7 +7,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 const FinishReasonBriefRenderer: React.FC<BriefRendererProps> = ({ hasUserInput, message }) => {
   const { t } = useTranslation();
   const { detail } = message as FinishReasonChunk;
-  // 如果用户输入，则不显示
+  // if it is the user input, do not show
   if (detail?.status === 'user_input') {
     return null;
   }

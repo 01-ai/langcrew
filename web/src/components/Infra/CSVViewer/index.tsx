@@ -21,32 +21,32 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ content }) => {
     }
 
     try {
-      // 检测并处理BOM（字节顺序标记）
+      // detect and process BOM (byte order mark)
       let processedContent = content;
       if (content.charCodeAt(0) === 0xfeff) {
-        // 移除UTF-8 BOM
+        // remove UTF-8 BOM
         processedContent = content.slice(1);
       } else if (content.charCodeAt(0) === 0xfffe) {
-        // 移除UTF-16 LE BOM
+        // remove UTF-16 LE BOM
         processedContent = content.slice(1);
       }
 
-      // 解析CSV内容
+      // parse CSV content
       const lines = processedContent.trim().split('\n');
       if (lines.length === 0) {
         return { data: [], columns: [] };
       }
 
-      // 解析表头
+      // parse headers
       const headers = lines[0].split(',').map((header) => header.trim().replace(/^["']|["']$/g, ''));
 
-      // 解析数据行
+      // parse data rows
       const data: CSVData[] = [];
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
         if (!line.trim()) continue;
 
-        // 简单的CSV解析，处理引号内的逗号
+        // simple CSV parsing, handle commas inside quotes
         const values: string[] = [];
         let current = '';
         let inQuotes = false;
@@ -62,7 +62,7 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ content }) => {
             current += char;
           }
         }
-        values.push(current.trim()); // 添加最后一个值
+        values.push(current.trim()); // add the last value
 
         const row: CSVData = {};
         headers.forEach((header, index) => {
@@ -71,7 +71,7 @@ const CSVViewer: React.FC<CSVViewerProps> = ({ content }) => {
         data.push(row);
       }
 
-      // 生成表格列配置
+      // generate table column configuration
       const tableColumns: ColumnsType<CSVData> = headers.map((header) => ({
         title: header,
         dataIndex: header,

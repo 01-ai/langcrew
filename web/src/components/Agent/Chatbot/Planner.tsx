@@ -1,7 +1,7 @@
 import React, { Fragment, useEffect, useState, useRef } from 'react';
 import { ThoughtChain } from '@ant-design/x';
-import { Card, Typography, Spin } from 'antd';
-import { CheckOutlined, LoadingOutlined, WarningOutlined } from '@ant-design/icons';
+import { Card, Typography } from 'antd';
+import { CheckOutlined, WarningOutlined } from '@ant-design/icons';
 import { useAgentStore } from '@/store';
 import { MessageToolChunk, TaskStatus } from '@/types';
 import registry from '@/registry';
@@ -15,9 +15,8 @@ import Loading from '@/components/Infra/Loading';
 const Planner = (props: any) => {
   const { data } = props;
   const { Paragraph } = Typography;
-  const { setPipelineTargetMessage, sessionInfo } = useAgentStore();
+  const { setPipelineTargetMessage } = useAgentStore();
 
-  const sessionStatus = sessionInfo?.status;
 
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const prevDataLengthRef = useRef(0);
@@ -63,42 +62,44 @@ const Planner = (props: any) => {
     return <Paragraph>{item.content}</Paragraph>;
   };
 
-  const items = data.map((step) => ({
-    key: step.id,
-    title: step.title,
-    status: getStepStatus(step.status),
-    icon: getStepIcon(step.status),
-    description: step.description,
-    ...(step?.children?.length && {
-      content: (
-        <div className="flex flex-col gap-4 pl-2">
-          {step.children.map((item, idx) => (
-            <Fragment key={idx}>
-              {renderContent(item, idx)}
-              <MessageAttachments message={item} />
-            </Fragment>
-          ))}
-        </div>
-      ),
-    }),
-  }));
+  const items = data
+    .filter((step) => step.children.length > 0)
+    .map((step) => ({
+      key: step.id,
+      title: step.title,
+      status: getStepStatus(step.status),
+      icon: getStepIcon(step.status),
+      description: step.description,
+      ...(step?.children?.length && {
+        content: (
+          <div className="flex flex-col gap-4 pl-2">
+            {step.children.map((item, idx) => (
+              <Fragment key={idx}>
+                {renderContent(item, idx)}
+                <MessageAttachments message={item} />
+              </Fragment>
+            ))}
+          </div>
+        ),
+      }),
+    }));
 
   useEffect(() => {
     const currentDataLength = data.length;
     const prevDataLength = prevDataLengthRef.current;
 
-    // 如果是首次加载或者有新增的步骤
+    // if it is the first load or there are new steps
     if (prevDataLength === 0) {
-      // 首次加载时展开所有步骤
+      // when the first load, expand all steps
       setExpandedKeys(data.map((item) => item.id));
     } else if (currentDataLength > prevDataLength) {
-      // 有新增步骤时，只展开新增的步骤，保持现有的展开状态
+      // when there are new steps, only expand the new steps, keep the existing expanded state
       const newSteps = data.slice(prevDataLength);
       const newStepIds = newSteps.map((item) => item.id);
       setExpandedKeys((prev) => [...prev, ...newStepIds]);
     }
 
-    // 更新之前的长度
+    // update the previous length
     prevDataLengthRef.current = currentDataLength;
   }, [data]);
 

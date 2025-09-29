@@ -5,12 +5,11 @@ import ImageDetailRenderer from '@/registry/common/ImageDetailRenderer';
 import { getFileExtension } from '@/utils/parser';
 import { Spin } from 'antd';
 import OfficeFilePreview from './OfficeFilePreview';
-import { devLog } from '@/utils';
 
 const prefix = 'https://view.officeapps.live.com/op/embed.aspx?src=';
 
 const officeFileExtensions = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'];
-// 纯文本文件后缀名
+// plaintext file extensions
 const plaintextFileExtensions = [
   'txt',
   'log',
@@ -36,7 +35,7 @@ const plaintextFileExtensions = [
   'properties',
   'toml',
 ];
-// 代码文件后缀名
+// code file extensions
 const codeFileExtensions = [
   'js',
   'jsx',
@@ -72,21 +71,20 @@ export interface FileReaderProps {
 }
 
 /**
- * @param url 文件url，注意：URL可能不带后缀名，需要通过type参数来判断文件类型
- * @param type 文件类型，text/csv 这种样子的
+ * @param url file url, note: URL may not have a suffix, need to determine the file type through the type parameter
+ * @param type file type, like text/csv
  */
 const FileReader: FC<FileReaderProps> = ({ url, contentType, filename }) => {
   const { data, loading, fileType, blobUrl, error } = useUrlContent({ url, contentType });
 
   const ext = getFileExtension(url) || getFileExtension(filename);
-  devLog(url, filename, contentType, ext);
 
   const isImage =
     ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) ||
     ['image/png', 'image/jpg', 'image/jpeg', 'image/gif', 'image/webp'].includes(contentType);
 
   useEffect(() => {
-    // 组件卸载时释放blob URL
+    // when the component is unloaded, release the blob URL
     return () => {
       if (blobUrl && blobUrl.startsWith('blob:')) {
         URL.revokeObjectURL(blobUrl);
@@ -110,7 +108,6 @@ const FileReader: FC<FileReaderProps> = ({ url, contentType, filename }) => {
     return <ImageDetailRenderer imageUrl={url} />;
   }
 
-  devLog(fileContentSupportFileTypes, ext, contentType);
   if (
     fileContentSupportFileTypes.includes(ext) ||
     plaintextFileExtensions.includes(ext) ||
@@ -119,8 +116,8 @@ const FileReader: FC<FileReaderProps> = ({ url, contentType, filename }) => {
     return <FileContentRender key={url} fileContent={data || error || ''} fileExtension={ext} isDiff={false} />;
   }
 
-  // 附件office文件预览（预览链接不带后缀名，需要通过contentType来判断文件类型）
-  if (['docx', 'xlsx', 'pptx'].includes(fileType)) {
+  // preview link does not have a suffix, need to determine the file type through contentType
+  if (!ext && ['docx', 'xlsx', 'pptx'].includes(fileType)) {
     return <OfficeFilePreview url={url} fileType={fileType} />;
   }
 

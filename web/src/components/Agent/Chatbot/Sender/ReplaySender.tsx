@@ -11,12 +11,12 @@ const SenderContainer: React.FC = () => {
 
   const { isPlaying, start, end, loaded } = useReplay(shareId.slice(2), shareId.startsWith('e-'), sharePassword);
 
-  // 处理跳到结束
+  // handle jump to end
   const handleJumpToEnd = useCallback(() => {
     end();
   }, [end]);
 
-  // 处理重头开始
+  // handle restart from the beginning
   const handleRestart = useCallback(() => {
     start();
   }, [start]);

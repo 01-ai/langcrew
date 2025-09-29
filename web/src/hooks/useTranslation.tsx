@@ -2,31 +2,29 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { resources } from '@/config/resources';
 
 /**
- * 更改语言设置的工具函数
- * @param lang 新的语言代码
+ * tool function to change language setting
+ * @param lang new language code
  */
 export const changeLanguage = (lang: string) => {
   localStorage.setItem('i18nextLng', lang);
-  // 触发自定义事件通知所有 useTranslation Hook 实例
+  // trigger custom event to notify all useTranslation Hook instances
   window.dispatchEvent(new CustomEvent('languageChanged'));
 };
 
-
-
 /**
- * 自定义的 useTranslation Hook
- * 在组件中使用时，需要将：
+ * custom useTranslation Hook
+ * when used in a component, need to replace:
  * import { useTranslation } from 'react-i18next';
- * 替换为：
+ * replace with:
  * import { useTranslation } from '@/hooks/useTranslation';
  */
 const useTranslation = () => {
-  // 缓存当前语言，避免每次都访问 localStorage
+  // cache current language, avoid accessing localStorage every time
   const [language, setLanguage] = useState<'zh' | 'en'>(() => {
     return getLanguage();
   });
 
-  // 监听 localStorage 变化
+  // listen to localStorage changes
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'i18nextLng' && e.newValue) {
@@ -34,7 +32,7 @@ const useTranslation = () => {
       }
     };
 
-    // 监听同一窗口内的 localStorage 变化
+    // listen to localStorage changes in the same window
     const handleLocalStorageChange = () => {
       const newLang = getLanguage();
       if (newLang !== language) {
@@ -42,10 +40,10 @@ const useTranslation = () => {
       }
     };
 
-    // 监听跨窗口的 localStorage 变化
+    // listen to localStorage changes in different windows
     window.addEventListener('storage', handleStorageChange);
 
-    // 监听自定义事件（用于同一窗口内的变化）
+    // listen to custom events (for changes in the same window)
     window.addEventListener('languageChanged', handleLocalStorageChange);
 
     return () => {
@@ -54,20 +52,30 @@ const useTranslation = () => {
     };
   }, [language]);
 
-  // 缓存当前语言包
+  // cache current language pack
   const currentLangPack = useMemo(() => {
     return resources[language] || {};
   }, [language]);
 
-  // 使用 useCallback 缓存 t 函数，避免每次渲染都重新创建
+  // use useCallback to cache t function, avoid re-creating every time
   const t = useCallback(
-    (key: string) => {
-      return currentLangPack[key] || key;
+    (key: string, options?: Record<string, any>) => {
+      let message = currentLangPack[key] || key;
+
+      // Replace template variables if options are provided
+      if (options) {
+        Object.entries(options).forEach(([placeholder, value]) => {
+          const regex = new RegExp(`{{${placeholder}}}`, 'g');
+          message = message.replace(regex, String(value));
+        });
+      }
+
+      return message;
     },
     [currentLangPack],
   );
 
-  // 使用 useMemo 缓存返回对象，避免每次渲染都重新创建
+  // use useMemo to cache the returned object, avoid re-creating every time
   return useMemo(
     () => ({
       t,
@@ -77,29 +85,39 @@ const useTranslation = () => {
   );
 };
 
-export const getTranslation = (key: string) => {
+export const getTranslation = (key: string, options?: Record<string, any>) => {
   const language = getLanguage();
-  return resources[language][key] || key;
+  let message = resources[language][key] || key;
+
+  // Replace template variables if options are provided
+  if (options) {
+    Object.entries(options).forEach(([placeholder, value]) => {
+      const regex = new RegExp(`{{${placeholder}}}`, 'g');
+      message = message.replace(regex, String(value));
+    });
+  }
+
+  return message;
 };
 
 /**
- * 获取当前语言
- * 判断值是否合法
- * 如果合法则返回
- * 否则返回默认值，并设置默认值到localStorage
- * @returns 'zh' | 'en'
+ * get current language
+ * check if the value is valid
+ * if valid, return it
+ * otherwise return the default value, and set the default value to localStorage
+ * @returns 'zh' | 'en' | 'ru'
  */
 export const getLanguage = (): 'zh' | 'en' => {
   const langInStorage = localStorage.getItem('i18nextLng');
-  if (['zh', 'en'].includes(langInStorage)) {
+  if (['zh', 'en', 'ru'].includes(langInStorage)) {
     return langInStorage as 'zh' | 'en';
   }
-  // 兼容非标准值
+  // compatible with non-standard values
   if (langInStorage === 'zh-CN') {
     localStorage.setItem('i18nextLng', 'zh');
     return 'zh';
   }
-  // 兼容非标准值
+  // compatible with non-standard values
   if (langInStorage === 'en-US') {
     localStorage.setItem('i18nextLng', 'en');
     return 'en';
