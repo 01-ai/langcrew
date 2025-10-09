@@ -1,5 +1,5 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/powered%20by-LangGraph-green.svg)](https://langchain-ai.github.io/langgraph/)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](./docs/)
 
