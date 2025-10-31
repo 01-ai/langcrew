@@ -4,6 +4,7 @@
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](./docs/)
 
 # LangCrew
+> LangCrew, as the OAK Framework, is a part of [Open AgentKit](https://github.com/01-ai/open-agentkit). 
 
 LangCrew is a high-level multi-agent development framework built on LangGraph, combining CrewAI's intuitive concepts with enterprise-grade capabilities and out-of-the-box core features for complex agent collaboration systems.
 
