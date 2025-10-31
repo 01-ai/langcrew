@@ -13,7 +13,10 @@ description: 理解团队 - 协调多个智能体协同工作
 from langcrew import Agent, Task, Crew
 
 agents = [Agent(role="研究员", goal="收集数据"), Agent(role="写手", goal="创建内容")]
-tasks = [Task(agent=agents[0], description="研究AI趋势"), Task(agent=agents[1], description="撰写报告")]
+tasks = [
+    Task(agent=agents[0], description="研究AI趋势", expected_output="研究发现"),
+    Task(agent=agents[1], description="撰写报告", expected_output="书面报告")
+]
 crew = Crew(agents=agents, tasks=tasks)
 result = crew.kickoff()
 ```
@@ -72,9 +75,9 @@ researcher = Agent(role="研究员", goal="收集信息")
 analyst = Agent(role="分析师", goal="分析数据")
 writer = Agent(role="写手", goal="创建报告")
 
-research_task = Task(agent=researcher, description="研究市场趋势", name="research")
-analysis_task = Task(agent=analyst, description="分析发现", context=[research_task], name="analysis")
-report_task = Task(agent=writer, description="写最终报告", context=[analysis_task], name="report")
+research_task = Task(agent=researcher, description="研究市场趋势", expected_output="研究发现", name="research")
+analysis_task = Task(agent=analyst, description="分析发现", expected_output="分析结果", context=[research_task], name="analysis")
+report_task = Task(agent=writer, description="写最终报告", expected_output="书面报告", context=[analysis_task], name="report")
 
 crew = Crew(
     agents=[researcher, analyst, writer],
@@ -87,6 +90,12 @@ crew = Crew(
 当未指定任务时，智能体按顺序工作：
 
 ```python
+from langchain_core.messages import HumanMessage
+
+researcher = Agent(role="研究员", goal="收集信息")
+analyst = Agent(role="分析师", goal="分析数据")
+writer = Agent(role="写手", goal="创建报告")
+
 crew = Crew(
     agents=[researcher, analyst, writer]  # 无任务 - 智能体按顺序处理输入
 )
@@ -122,6 +131,9 @@ crew = Crew(agents=[coordinator, specialist, reviewer])
 团队在对话间维护持久记忆：
 
 ```python
+assistant = Agent(role="助手", goal="帮助用户")
+support_task = Task(agent=assistant, description="回答用户问题", expected_output="有帮助的回复")
+
 # 启用基础记忆
 crew = Crew(
     agents=[assistant],
@@ -130,8 +142,8 @@ crew = Crew(
 )
 
 # 记忆在会话间持久化
-result1 = crew.kickoff(thread_id="conversation_1")
-result2 = crew.kickoff(thread_id="conversation_1")  # 记住之前的上下文
+result1 = crew.kickoff(config={"configurable": {"thread_id": "conversation_1"}})
+result2 = crew.kickoff(config={"configurable": {"thread_id": "conversation_1"}})  # 记住之前的上下文
 ```
 
 ### 人机协作
@@ -141,10 +153,15 @@ result2 = crew.kickoff(thread_id="conversation_1")  # 记住之前的上下文
 ```python
 from langcrew.hitl import HITLConfig
 
+decision_agent = Agent(role="决策者", goal="做出关键决策")
+critical_task = Task(agent=decision_agent, description="审查并批准行动", expected_output="批准决策")
+
 crew = Crew(
     agents=[decision_agent],
     tasks=[critical_task],
-    hitl=HITLConfig(enabled=True)  # 需要人工批准
+    hitl=HITLConfig(
+        interrupt_before_tools=["critical_operation"]  # 特定工具需要人工批准
+    )
 )
 ```
 
@@ -154,10 +171,14 @@ crew = Crew(
 
 ```python
 # 上下文通过依赖关系自动流转
+collector = Agent(role="数据收集器", goal="收集信息")
+processor = Agent(role="数据处理器", goal="处理信息")
+reporter = Agent(role="报告员", goal="生成报告")
+
 tasks = [
-    Task(agent=collector, description="收集数据", name="collect"),
-    Task(agent=processor, description="处理数据", context=["collect"], name="process"),
-    Task(agent=reporter, description="生成报告", context=["process"], name="report")
+    Task(agent=collector, description="收集数据", expected_output="收集的数据", name="collect"),
+    Task(agent=processor, description="处理数据", expected_output="处理的数据", context=["collect"], name="process"),
+    Task(agent=reporter, description="生成报告", expected_output="最终报告", context=["process"], name="report")
 ]
 
 crew = Crew(agents=[collector, processor, reporter], tasks=tasks)
@@ -190,12 +211,14 @@ result = crew.kickoff(inputs={"topic": "AI趋势", "deadline": "2024-12-31"})
 # 持久对话
 result = crew.kickoff(
     inputs={"query": "分析这些数据"},
-    thread_id="project_123"  # 维护对话历史
+    config={"configurable": {"thread_id": "project_123"}}  # 维护对话历史
 )
 ```
 
 ### 流式执行
 ```python
+from langchain_core.messages import HumanMessage
+
 # 流式团队执行以进行实时监控
 for chunk in crew.stream(input={"messages": [HumanMessage(content="处理请求")]}):
     print(f"步骤：{chunk}")
@@ -205,36 +228,33 @@ for chunk in crew.stream(input={"messages": [HumanMessage(content="处理请求"
 
 ### 研究管道
 ```python
+researcher = Agent(role="研究员", goal="收集数据")
+analyst = Agent(role="分析师", goal="分析发现")
+writer = Agent(role="写手", goal="创建报告")
+
 crew = Crew(
-    agents=[
-        Agent(role="研究员", goal="收集数据"),
-        Agent(role="分析师", goal="分析发现"), 
-        Agent(role="写手", goal="创建报告")
-    ],
+    agents=[researcher, analyst, writer],
     tasks=[
-        Task(agent=researcher, description="研究主题", name="research"),
-        Task(agent=analyst, description="分析数据", context=["research"], name="analyze"),
-        Task(agent=writer, description="写报告", context=["analyze"], name="report")
+        Task(agent=researcher, description="研究主题", expected_output="研究发现", name="research"),
+        Task(agent=analyst, description="分析数据", expected_output="分析结果", context=["research"], name="analyze"),
+        Task(agent=writer, description="写报告", expected_output="书面报告", context=["analyze"], name="report")
     ]
 )
 ```
 
 ### 审核工作流
 ```python
+author = Agent(role="作者", goal="创建内容")
+reviewer = Agent(role="审核员", goal="审核质量")
+approver = Agent(role="批准者", goal="最终批准")
+
 crew = Crew(
-    agents=[
-        Agent(role="作者", goal="创建内容"),
-        Agent(role="审核员", goal="审核质量"),
-        Agent(role="批准者", goal="最终批准")
-    ],
+    agents=[author, reviewer, approver],
     tasks=[
-        Task(agent=author, description="创建草稿", name="draft"),
-        Task(agent=reviewer, description="审核内容", context=["draft"], name="review"),
-        Task(agent=approver, description="最终批准", context=["review"], name="approve")
+        Task(agent=author, description="创建草稿", expected_output="草稿文档", name="draft"),
+        Task(agent=reviewer, description="审核内容", expected_output="审核反馈", context=["draft"], name="review"),
+        Task(agent=approver, description="最终批准", expected_output="批准决策", context=["review"], name="approve")
     ]
 )
 ```
 
-## 下一步
-
-继续学习 [内存管理](/concepts/memory) - 理解有状态工作流的持久记忆系统。

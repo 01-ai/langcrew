@@ -19,7 +19,7 @@ from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 logger = logging.getLogger(__name__)
 
 ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
-ARK_MODEL = "doubao-seedream-3-0-t2i-250415"
+ARK_MODEL = "doubao-seedream-4-0-250828"
 
 
 class ImageGenerationInput(BaseModel):
@@ -46,14 +46,20 @@ class ImageGenerationTool(BaseTool, SandboxMixin, S3ClientMixin):
         "Returns a JSON object containing both the original image URL and the sandbox file path."
     )
     args_schema: type[BaseModel] = ImageGenerationInput
+    model: str = Field(
+        default=ARK_MODEL,
+        description="The model to use for image generation. Default is doubao-seedream-4-0-250828.",
+    )
 
-    def __init__(self, **kwargs):
+    def __init__(self, model: str = ARK_MODEL, **kwargs):
         """Initialize the ImageGenerationTool.
 
         Args:
+            model: The model to use for image generation
             **kwargs: Additional arguments for parent class
         """
         super().__init__(**kwargs)
+        self.model = model
 
     def _run(
         self,
@@ -73,7 +79,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin, S3ClientMixin):
 
         Args:
             prompt: Text description of the desired image(s)
-            file_path: Optional relative file path for the generated image
+            path: Optional relative file path for the generated image
 
         Returns:
             JSON string containing image URLs and any warnings
@@ -121,7 +127,7 @@ class ImageGenerationTool(BaseTool, SandboxMixin, S3ClientMixin):
             api_key=os.environ.get("ARK_API_KEY"),
         )
 
-        response = client.images.generate(model=ARK_MODEL, prompt=prompt)
+        response = client.images.generate(model=self.model, prompt=prompt)
 
         if not hasattr(response, "data") or not response.data:
             raise RuntimeError("Invalid ARK API response: missing data field")
@@ -202,6 +208,10 @@ class ImageGenerationTool(BaseTool, SandboxMixin, S3ClientMixin):
         async_sandbox = await self.get_sandbox()
 
         sandbox_id = async_sandbox.sandbox_id
+
+        # Ensure workspace directory exists
+        await async_sandbox.commands.run("sudo mkdir -p /workspace")
+        logger.info("Ensured workspace directory exists: /workspace")
 
         # Process file path
         if file_path:

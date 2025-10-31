@@ -1,0 +1,117 @@
+---
+title: Installation
+description: Complete installation guide for LangCrew
+---
+
+This guide covers installation scenarios for LangCrew, from basic setup to development.
+
+## Basic Installation
+
+### Using pip
+
+The simplest way to install LangCrew:
+
+```bash
+pip install langcrew
+```
+
+### Using uv (Recommended)
+
+For faster, more reliable installations:
+
+```bash
+uv add langcrew
+```
+
+### Verify Installation
+
+```python
+import langcrew
+print(f"LangCrew version: {langcrew.__version__}")
+```
+
+## LLM Configuration
+
+LangCrew requires an LLM provider. Configure your API keys as environment variables:
+
+### OpenAI
+
+```bash
+export OPENAI_API_KEY=your_openai_key
+export OPENAI_BASE_URL=https://api.openai.com/v1  # Optional
+```
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+```
+
+### Anthropic
+
+```bash
+export ANTHROPIC_API_KEY=your_anthropic_key
+```
+
+```python
+from langchain_anthropic import ChatAnthropic
+
+llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+```
+
+### DashScope (Alibaba)
+
+```bash
+export DASHSCOPE_API_KEY=your_dashscope_key
+```
+
+```python
+from langchain_community.chat_models import ChatTongyi
+
+llm = ChatTongyi(model="qwen-max")
+```
+
+### Google Gemini
+
+```bash
+export GOOGLE_API_KEY=your_google_key
+```
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(model="gemini-pro")
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Import Error: Cannot import langcrew
+
+**Solution**: Ensure you're in the correct virtual environment and LangCrew is installed:
+
+```bash
+pip install --upgrade langcrew
+```
+
+#### LLM API Key Not Found
+
+**Solution**: Verify environment variables are set:
+
+```bash
+echo $OPENAI_API_KEY
+```
+
+If empty, set it:
+
+```bash
+export OPENAI_API_KEY=your_key
+```
+
+## Next Steps
+
+- [Quick Start Guide](/guides/quickstart/) - Build your first agent crew
+- [Core Concepts](/concepts/agents/) - Understand the framework fundamentals
+- [Memory Guide](/guides/memory/getting-started/) - Configure persistence and memory
+

@@ -1,0 +1,293 @@
+---
+title: 安全护栏示例
+description: 安全护栏的实际应用示例
+---
+
+本页面提供安全护栏的实际应用示例，从基本使用到高级模式。
+
+## 基础内容生成护栏
+
+### 示例：安全内容生成
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew.guardrail import input_guard, output_guard, GuardrailError
+from langcrew.llm_factory import LLMFactory
+
+# 定义护栏
+@input_guard
+def check_no_sensitive_info(data):
+    """防止处理敏感信息"""
+    content = str(data).lower()
+    sensitive_patterns = ["password:", "api_key:", "secret:", "ssn:"]
+    
+    for pattern in sensitive_patterns:
+        if pattern in content:
+            return False, f"包含敏感信息: {pattern}"
+    
+    return True, "未检测到敏感信息"
+
+@output_guard
+def check_output_quality(data):
+    """确保输出符合质量标准"""
+    output_str = str(data)
+    
+    if not output_str:
+        return False, "不允许空输出"
+    
+    if len(output_str) < 10:
+        return False, "输出太短（最少10个字符）"
+    
+    return True, "输出质量检查通过"
+
+# 创建带有护栏的智能体
+llm = LLMFactory.create_llm({
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.3
+})
+
+agent = Agent(
+    role="内容创作者",
+    goal="生成安全内容",
+    llm=llm,
+    input_guards=[check_no_sensitive_info],
+    output_guards=[check_output_quality]
+)
+
+# 创建并执行任务
+task = Task(
+    description="撰写一篇关于人工智能的文章",
+    expected_output="一篇关于AI的优质文章",
+    agent=agent
+)
+
+crew = Crew(agents=[agent], tasks=[task])
+
+try:
+    result = crew.kickoff()
+    print("✅ 任务成功完成")
+except GuardrailError as e:
+    print(f"❌ 护栏阻止: {e}")
+```
+
+### 示例：任务特定护栏
+
+```python
+# 具有基本保护的智能体
+agent = Agent(
+    role="内容处理器",
+    goal="安全处理内容",
+    llm=llm,
+    input_guards=[check_no_sensitive_info]  # 全局保护
+)
+
+# 具有额外要求的任务
+task = Task(
+    description="生成关于网络安全的内容",
+    agent=agent,
+    input_guards=[check_input_length],  # 任务特定
+    output_guards=[check_output_quality]  # 任务特定
+)
+
+@input_guard
+def check_input_length(data):
+    """限制输入长度以防止滥用"""
+    content = str(data)
+    max_length = 1000
+    
+    if len(content) > max_length:
+        return False, f"输入太长: {len(content)} > {max_length} 字符"
+    
+    return True, f"输入长度正常: {len(content)} 字符"
+```
+
+## 高级护栏模式
+
+### 示例：条件护栏
+
+```python
+@input_guard
+def conditional_sensitive_check(data):
+    """基于上下文的条件敏感数据检查"""
+    content = str(data).lower()
+    
+    # 检查是否为安全相关任务
+    security_keywords = ["安全", "认证", "登录"]
+    is_security_task = any(keyword in content for keyword in security_keywords)
+    
+    if is_security_task:
+        # 对于安全任务，更严格
+        strict_patterns = ["密码:", "pwd:", "秘密:", "密钥:"]
+        for pattern in strict_patterns:
+            if pattern in content:
+                return False, f"安全任务包含敏感数据: {pattern}"
+    else:
+        # 对于非安全任务，更宽松
+        lenient_patterns = ["密码:", "pwd:"]
+        for pattern in lenient_patterns:
+            if pattern in content:
+                return False, f"包含敏感数据: {pattern}"
+    
+    return True, "条件检查通过"
+```
+
+### 示例：速率限制
+
+```python
+@input_guard
+def check_rate_limiting(data):
+    """简单的速率限制护栏"""
+    import time
+    
+    if not hasattr(check_rate_limiting, "_request_count"):
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = time.time()
+    
+    current_time = time.time()
+    
+    # 每分钟重置计数器
+    if current_time - check_rate_limiting._last_reset > 60:
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = current_time
+    
+    # 每分钟最多允许5个请求
+    max_requests = 5
+    check_rate_limiting._request_count += 1
+    
+    if check_rate_limiting._request_count > max_requests:
+        return False, f"超出速率限制: {check_rate_limiting._request_count} > {max_requests}"
+    
+    return True, f"速率限制正常: {check_rate_limiting._request_count}/{max_requests}"
+```
+
+## 错误处理示例
+
+### 示例：自定义错误处理
+
+```python
+class CustomGuardrailError(GuardrailError):
+    """带有额外上下文的自定义护栏错误"""
+    
+    def __init__(self, message: str, guardrail_name: str | None = None, 
+                 error_code: str | None = None, suggestions: list[str] | None = None):
+        self.error_code = error_code
+        self.suggestions = suggestions or []
+        super().__init__(message, guardrail_name)
+    
+    def __str__(self):
+        base_msg = super().__str__()
+        if self.error_code:
+            base_msg += f" (代码: {self.error_code})"
+        if self.suggestions:
+            base_msg += f"\n建议: {', '.join(self.suggestions)}"
+        return base_msg
+
+@input_guard
+def enhanced_sensitive_check(data):
+    """带有自定义错误处理的增强敏感数据检查"""
+    content = str(data)
+    
+    # 增强的模式检测
+    import re
+    sensitive_patterns = {
+        "信用卡": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
+        "身份证": r"\b\d{3}[\s-]?\d{2}[\s-]?\d{4}\b",
+        "邮箱": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+    }
+    
+    detected_patterns = []
+    for pattern_type, pattern in sensitive_patterns.items():
+        if re.search(pattern, content, re.IGNORECASE):
+            detected_patterns.append(pattern_type)
+    
+    if detected_patterns:
+        suggestions = [
+            "删除或编辑敏感信息",
+            "使用占位符文本（例如，[已编辑]）",
+            "考虑使用安全的数据处理流程"
+        ]
+        
+        raise CustomGuardrailError(
+            message=f"检测到敏感数据类型: {', '.join(detected_patterns)}",
+            guardrail_name="enhanced_sensitive_check",
+            error_code="SENSITIVE_DATA_DETECTED",
+            suggestions=suggestions
+        )
+    
+    return True, "增强检查通过"
+```
+
+### 示例：错误恢复
+
+```python
+def execute_with_guardrails(crew, max_retries=3):
+    """使用护栏错误恢复执行团队"""
+    for attempt in range(max_retries):
+        try:
+            result = crew.kickoff()
+            print(f"✅ 任务在第 {attempt + 1} 次尝试时完成")
+            return result
+        except CustomGuardrailError as e:
+            print(f"❌ 第 {attempt + 1} 次尝试的增强护栏错误: {e}")
+            if e.suggestions:
+                print("解决建议:")
+                for suggestion in e.suggestions:
+                    print(f"  - {suggestion}")
+        except GuardrailError as e:
+            print(f"❌ 第 {attempt + 1} 次尝试的标准护栏错误: {e}")
+        except Exception as e:
+            print(f"❌ 第 {attempt + 1} 次尝试的意外错误: {e}")
+    
+    print(f"❌ {max_retries} 次尝试后失败")
+    return None
+
+# 使用方法
+result = execute_with_guardrails(crew)
+```
+
+## 常见使用场景
+
+### 内容质量验证
+
+```python
+@output_guard
+def validate_content_quality(data):
+    """验证AI生成的内容"""
+    content = str(data)
+    
+    # 检查最小长度
+    if len(content) < 50:
+        return False, "内容太短"
+    
+    # 检查适当的结构
+    if not content[0].isupper():
+        return False, "内容应以大写字母开头"
+    
+    # 检查平衡的语言
+    if "绝对" in content.lower() or "100%" in content:
+        return False, "内容应使用平衡的语言"
+    
+    return True, "内容质量已验证"
+```
+
+### 数据格式验证
+
+```python
+@input_guard
+def validate_data_format(data):
+    """验证输入数据格式"""
+    if not isinstance(data, dict):
+        return False, "输入必须是字典"
+    
+    required_fields = ["task_type", "priority"]
+    for field in required_fields:
+        if field not in data:
+            return False, f"缺少必需字段: {field}"
+    
+    if data.get("priority") not in ["低", "中", "高"]:
+        return False, "优先级必须是 '低'、'中' 或 '高'"
+    
+    return True, "数据格式有效"
+```
+

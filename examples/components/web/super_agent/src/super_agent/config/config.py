@@ -4,7 +4,7 @@ Super Agent configuration module
 
 from dataclasses import dataclass
 
-from .prompt import COMPLEX_MODE_SYSTEM_PROMPT_NEW
+from .prompt import SYSTEM_PROMPT
 
 
 @dataclass
@@ -28,7 +28,7 @@ class SuperAgentConfig:
     verbose: bool = True
 
     # Prompt configuration
-    system_prompt_template: str = COMPLEX_MODE_SYSTEM_PROMPT_NEW
+    system_prompt_template: str = SYSTEM_PROMPT
 
     # Logging configuration
     log_level: str = "INFO"

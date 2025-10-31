@@ -17,7 +17,7 @@ hero:
 import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
 
 <div class="hero-stats">
-  <Badge text="Python 3.11+" variant="note" />
+  <Badge text="Python 3.10+" variant="note" />
   <Badge text="基于 LangGraph" variant="tip" />
   <Badge text="生产就绪" variant="success" />
   <Badge text="开箱即用" variant="caution" />
@@ -132,13 +132,38 @@ server.run()  # 访问 http://localhost:8000/docs
 
 ```bash
 # 1. 安装 LangCrew
-uv add langcrew --prerelease=allow
+pip install langcrew
 
 # 2. 设置 API 密钥
 export OPENAI_API_KEY=your_openai_key
+```
 
-# 3. 运行示例
-python -m langcrew.examples.quickstart
+```python
+from langcrew import Agent, Task, Crew
+from langchain_openai import ChatOpenAI
+
+# 配置 LLM
+llm = ChatOpenAI(model="gpt-4o")
+
+# 创建智能体
+researcher = Agent(
+    role="研究员",
+    goal="收集和分析市场信息",
+    backstory="资深市场研究专家",
+    tools=["web_search"],  # 内置工具
+    llm=llm
+)
+
+# 创建任务
+research_task = Task(
+    agent=researcher,
+    description="研究 {topic} 的最新趋势",
+    expected_output="详细的市场分析报告"
+)
+
+# 创建团队并执行
+crew = Crew(agents=[researcher], tasks=[research_task], memory=True)
+result = crew.kickoff(inputs={"topic": "AI自动化"})
 ```
 
 ### 🚀 完整应用体验

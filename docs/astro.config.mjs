@@ -25,7 +25,8 @@ export default defineConfig({
                 src: './src/assets/langcrew-logo.png',
             },
             social: [
-                { icon: 'github', label: 'GitHub', href: 'https://github.com/01-ai/langcrew' }
+                { icon: 'github', label: 'GitHub', href: 'https://github.com/01-ai/langcrew' },
+                { icon: 'rocket', label: 'Langcrew Studio', href: 'https://studio.langcrew.ai/' }
             ],
             sidebar: [
                 {
@@ -42,10 +43,10 @@ export default defineConfig({
                             }
                         },
                         {
-                            label: '超级智能体',
-                            link: '/guides/super-agent',
+                            label: '安装指南',
+                            link: '/guides/installation',
                             translations: {
-                                en: 'Super Agent'
+                                en: 'Installation'
                             }
                         },
                     ],
@@ -99,6 +100,13 @@ export default defineConfig({
                             }
                         },
                         {
+                            label: 'Web服务',
+                            link: '/concepts/web',
+                            translations: {
+                                en: 'Web'
+                            }
+                        },
+                        {
                             label: '安全护栏',
                             link: '/concepts/guardrails',
                             translations: {
@@ -110,13 +118,6 @@ export default defineConfig({
                             link: '/concepts/trace',
                             translations: {
                                 en: 'Observability'
-                            }
-                        },
-                        {
-                            label: 'Web服务',
-                            link: '/concepts/web',
-                            translations: {
-                                en: 'Web'
                             }
                         },
                     ],
@@ -152,13 +153,6 @@ export default defineConfig({
                                     link: '/guides/memory/long-term',
                                     translations: {
                                         en: 'Long-term Memory'
-                                    }
-                                },
-                                {
-                                    label: '实体记忆',
-                                    link: '/guides/memory/entity',
-                                    translations: {
-                                        en: 'Entity Memory'
                                     }
                                 },
                                 {
@@ -229,28 +223,6 @@ export default defineConfig({
                             ]
                         },
                         {
-                            label: '安全护栏',
-                            translations: {
-                                en: 'Guardrails'
-                            },
-                            items: [
-                                {
-                                    label: '快速开始',
-                                    link: '/guides/guardrails',
-                                    translations: {
-                                        en: 'Getting Started'
-                                    }
-                                },
-                                {
-                                    label: '实用示例',
-                                    link: '/examples/guardrails',
-                                    translations: {
-                                        en: 'Examples'
-                                    }
-                                },
-                            ]
-                        },
-                        {
                             label: 'Web服务',
                             translations: {
                                 en: 'Web'
@@ -280,10 +252,47 @@ export default defineConfig({
                             ]
                         },
                         {
+                            label: '安全护栏',
+                            translations: {
+                                en: 'Guardrails'
+                            },
+                            items: [
+                                {
+                                    label: '快速开始',
+                                    link: '/guides/guardrails',
+                                    translations: {
+                                        en: 'Getting Started'
+                                    }
+                                },
+                            ]
+                        },
+                        {
                             label: '工具库',
                             link: '/guides/utils',
                             translations: {
                                 en: 'Utils'
+                            }
+                        },
+                    ],
+                },
+                {
+                    label: '示例',
+                    translations: {
+                        en: 'Examples'
+                    },
+                    items: [
+                        {
+                            label: '超级智能体',
+                            link: '/examples/super-agent',
+                            translations: {
+                                en: 'Super Agent'
+                            }
+                        },
+                        {
+                            label: '安全护栏',
+                            link: '/examples/guardrails',
+                            translations: {
+                                en: 'Guardrails'
                             }
                         },
                     ],

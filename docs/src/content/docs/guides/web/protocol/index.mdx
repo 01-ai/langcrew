@@ -364,7 +364,7 @@ async def protected_chat(request: dict, token = Depends(verify_token)):
 **Parameters:**
 
 - `message` (required): User's message content
-- `session_id` (optional): Session identifier for conversation continuity. If not provided or empty, a new session will be automatically created with format `session_{16-character-uuid}`
+- `session_id` (optional): Session identifier for conversation continuity. If not provided or empty, a new session will be automatically created as a 16-character hexadecimal string (e.g., `abc123def456789a`)
 - `interrupt_data` (optional): Additional data for resuming interrupted conversations
 
 **Response:** Streaming return of StreamMessage (see message definitions above)
@@ -419,7 +419,7 @@ for line in response.iter_lines():
 # Continue existing conversation with session_id
 response = requests.post('/api/v1/chat', json={
     "message": "Can you provide more details?",
-    "session_id": "session_abc123def456"  # Use existing session
+    "session_id": "abc123def456789a"  # Use existing session
 })
 
 # Handle streaming response

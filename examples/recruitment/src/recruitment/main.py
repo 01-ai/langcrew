@@ -1,6 +1,5 @@
-#!/usr/bin/env python
-
 from dotenv import load_dotenv
+
 from recruitment.crew import RecruitmentCrew
 
 load_dotenv()

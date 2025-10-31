@@ -3,59 +3,40 @@
 ## Introduction
 This project leverages the LangCrew framework to automate intelligent matching between CVs (resumes) and job positions. By orchestrating multiple AI agents, it deeply analyzes candidate resumes and matches them with a job database, outputting structured recommendation reports.
 
+Based on CV analysis and job matching best practices, enhanced with LangCrew.
+
 - [Running the Script](#running-the-script)
 - [Details & Explanation](#details--explanation)
-- [Input & Output Examples](#input--output-examples)
 
 ## Running the Script
-- **Environment Setup**: Python 3.11-3.12 is recommended. Activate your virtual environment before installing dependencies.
-- **Configure Environment Variables**: Copy `.env.example` to `.env` and set up your OpenAI API key and other required variables.
-- **Install Dependencies**: Run `uv sync --prerelease=allow` to install all dependencies.
-- **Customize Configuration**: 
-  - Check `src/match_to_proposal/config/agents.yaml` to update your agents and `src/match_to_proposal/config/tasks.yaml` to update your tasks.
-  - Replace or edit `data/cv.md` (resume) and `data/jobs.csv` (job database)
-- **Run the Script**: Run `uv run --prerelease=allow match_to_proposal` or `source .venv/bin/activate && match_to_proposal` and see the results.
+It uses gpt-5-mini by default so you should have access to that to run it.
 
+***Disclaimer:** This will use gpt-5-mini unless you change it to use a different model, and by doing so it may incur different costs.*
+
+- **Configure Environment**: Create a `.env` file with the following required environment variables:
+  - `OPENAI_API_KEY`: Your [OpenAI API key](https://platform.openai.com/api-keys) for LLM access
+- **Install Dependencies**: Run `uv sync` to install all dependencies.
+- **Prepare Data Files**: 
+  - Edit `src/match_to_proposal/data/cv.md` with the candidate's resume (Markdown format)
+  - Edit `src/match_to_proposal/data/jobs.csv` with available job positions (CSV format)
+- **Customize Configuration**: 
+  - Check `src/match_to_proposal/config/agents.yaml` to update your agents
+  - Check `src/match_to_proposal/config/tasks.yaml` to update your tasks
+- **Execute the Script**: Run `uv run match_to_proposal` or `source .venv/bin/activate && match_to_proposal` to see the results.
 
 ## Details & Explanation
-- **Main Entry**: `src/match_to_proposal/main.py` loads configuration and executes the matching workflow.
-- **Core Logic**: `src/match_to_proposal/crew.py` auto-loads agent/task configs, builds the Crew, and runs the process.
-- **Configuration Files**:
-  - `config/agents.yaml`: Defines agents such as CV analysis expert, job matching expert, etc.
-  - `config/tasks.yaml`: Defines tasks and workflow for CV analysis and job matching
+- **Running the Script**: Execute `uv run match_to_proposal`. The script will leverage the LangCrew framework to analyze the CV and generate position recommendations.
+- **Key Components**:
+  - `src/match_to_proposal/main.py`: Main script file containing the workflow execution logic.
+  - `src/match_to_proposal/crew.py`: Main crew file where agents and tasks come together. Uses custom tools:
+    - **FileReadTool**: Read and parse resume files in Markdown format
+    - **CSVAnalyzerTool**: Parse and analyze job database in CSV format
+  - `src/match_to_proposal/config/agents.yaml`: Configuration file for defining AI agents specialized in CV analysis and job matching.
+  - `src/match_to_proposal/config/tasks.yaml`: Configuration file for defining analysis and matching tasks.
+  - `src/match_to_proposal/tools/custom_tools.py`: Custom tools for file reading and CSV parsing.
 - **Data Files**:
-  - `data/cv.md`: Candidate resume (Markdown format)
-  - `data/jobs.csv`: Job information (CSV format)
-
-## Input & Output Examples
-### CV Input (`cv.md` sample excerpt)
-```markdown
-# Zhang Wei - Senior Software Engineer
-
-## Personal Information
-- **Name**: Zhang Wei
-- **Age**: 29
-- **Experience**: 6 years
-...
-## Skills
-- **Python**: ★★★★★ (5 years, proficient in Django/Flask/FastAPI)
-- **JavaScript**: ★★★★☆ (4 years, skilled in React/Vue.js/Node.js)
-...
-```
-
-### Job Database Input (`jobs.csv` sample excerpt)
-```csv
-Position,Skills,Responsibilities,Company,Location,Salary,Experience Required,Education Required
-Senior Python Developer,"Python,Django,Flask,MySQL,Redis","Backend system development, API design, DB optimization, code review",Alibaba,Hangzhou,28-45K,3-5 years,Bachelor or above
-Frontend Architect,"JavaScript,React,Vue.js,TypeScript,Node.js","Frontend architecture, tech selection, team management, performance optimization",Tencent,Shenzhen,35-55K,5-8 years,Bachelor or above
-...
-```
-
-### Output
-- Structured CV analysis report
-- Ranked job recommendations (with match scores, highlights, and application advice)
-
-## Configuration
-- **agents.yaml**: Customize agent roles, goals, LLM parameters, and available tools
-- **tasks.yaml**: Customize task descriptions, agent assignment, and output requirements
-- **cv.md / jobs.csv**: Replace with any candidate resume and job database as needed
+  - `data/cv.md`: Candidate resume in Markdown format
+  - `data/jobs.csv`: Job database in CSV format with columns: Position, Skills, Responsibilities, Company, Location, Salary, Experience Required, Education Required
+- **Output**:
+  - Structured CV analysis report with skills matrix and experience summary
+  - Ranked job recommendations (Top 5) with match scores, highlights, and application advice

@@ -2,6 +2,12 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+exclude = [
+    "tests/",
+    "uv.lock",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["langcrew"]
 
@@ -60,10 +66,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/langcrew/langcrew"
-Repository = "https://github.com/langcrew/langcrew"
-Documentation = "https://langcrew.readthedocs.io"
-Issues = "https://github.com/langcrew/langcrew/issues"
+Homepage = "https://langcrew.ai/"
+Repository = "https://github.com/01-ai/langcrew"
+Documentation = "https://langcrew.ai/guides/quickstart/"
+Issues = "https://github.com/01-ai/langcrew/issues"
 
 [project.optional-dependencies]
 redis = ["langgraph-checkpoint-redis>=0.0.8"]

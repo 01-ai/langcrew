@@ -992,14 +992,15 @@ class TestTaskExecutorErrorHandling:
         # Input with no matching context outputs
         input_data = {"task_outputs": [{"name": "other_task", "raw": "Other output"}]}
 
-        result = task._executor_invoke(input_data)
+        # Test invoke method which handles context addition
+        result = task.invoke(input_data)
 
-        # Should still work, just with empty context
+        # Should still work, context should not be added since no matching outputs found
         assert result == {"output": "result"}
         call_args = mock_agent.invoke.call_args
         actual_input = call_args[0][0]
-        assert "context" in actual_input
-        assert actual_input["context"] == ""  # Empty context
+        # Context key should not be added when context_str is empty
+        assert "context" not in actual_input
 
     def test_executor_invoke_context_extraction_error_handling(self):
         """Test _executor_invoke with malformed task_outputs."""
@@ -1026,11 +1027,12 @@ class TestTaskExecutorErrorHandling:
         }
 
         # Should handle gracefully and continue execution
-        result = task._executor_invoke(input_data)
+        result = task.invoke(input_data)
         assert result == {"output": "result"}
 
-        # Context should be empty due to missing 'raw' field
+        # Context should contain task information even without raw field
         call_args = mock_agent.invoke.call_args
         actual_input = call_args[0][0]
         assert "context" in actual_input
-        assert actual_input["context"] == ""
+        # Should contain task1 information even without raw field (empty content)
+        assert "task1" in actual_input["context"]

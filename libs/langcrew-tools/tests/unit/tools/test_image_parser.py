@@ -490,16 +490,13 @@ class TestErrorHandling:
 
     @patch.object(ImageParserTool, "_create_default_llm")
     def test_sync_run_method(self, mock_create_llm):
-        """Test the synchronous _run method wrapper."""
+        """Test that the synchronous _run method raises NotImplementedError."""
         mock_create_llm.return_value = Mock()
         tool = ImageParserTool()
 
-        async def mock_arun(image_url, question):
-            return "Analysis complete"
-
-        with patch.object(tool, "_arun", mock_arun):
-            result = tool._run("https://example.com/image.jpg", "What do you see?")
-            assert result == "Analysis complete"
+        # Source code raises NotImplementedError for sync execution
+        with pytest.raises(NotImplementedError, match="image_parser only supports async execution"):
+            tool._run("https://example.com/image.jpg", "What do you see?")
 
     @pytest.mark.asyncio
     @patch.object(ImageParserTool, "_create_default_llm")

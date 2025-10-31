@@ -4,7 +4,7 @@ Minimal demonstration of LangCrew's input and output guardrails.
 
 ## Files
 
-- `guardrail_example.py` - Simple guardrail demonstration (~100 lines)
+- `guardrail_example.py` - Simple guardrail demonstration
 - `README.md` - This file
 
 ## Run the Demo
@@ -20,8 +20,9 @@ uv run guardrail_example.py
 
 ## What You'll See
 
-- ✅ **Normal Task** - Agent successfully processes safe content
-- ✅ **Sensitive Data Blocking** - Guardrail prevents processing of passwords/secrets
+- ✅ **Normal Task** - Agent successfully processes safe content about renewable energy
+- ✅ **Sensitive Data Blocking** - Input guardrail prevents processing when "password:" or "secret:" is detected in the task description
+- ✅ **Short Output Blocking** - Output guardrail blocks responses shorter than 3 characters
 
 ## Prerequisites
 
@@ -31,9 +32,9 @@ uv run guardrail_example.py
 
 ## Core Concepts Demonstrated
 
-- **Input Guard**: `check_no_sensitive_info` - Blocks sensitive data in input
-- **Output Guard**: `check_output_quality` - Ensures output meets basic quality standards
-- **Agent Guards**: Guardrails applied to all tasks executed by an agent
+- **Input Guard**: `check_no_sensitive_info` - Scans task descriptions for sensitive keywords ("password:", "secret:") and blocks execution
+- **Output Guard**: `check_output_quality` - Validates that agent responses meet minimum length requirements (3+ characters)
+- **Agent Guards**: Both input and output guardrails are applied to all tasks executed by the agent
 
 ## Full Documentation
 

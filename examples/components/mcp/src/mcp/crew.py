@@ -1,12 +1,11 @@
 import os
 
-from langchain_openai import ChatOpenAI
+from langcrew.llm_factory import LLMFactory
 
 from langcrew.agent import Agent
 from langcrew.crew import Crew
 from langcrew.task import Task
 from langcrew.project import CrewBase, agent, crew, task
-
 
 
 @CrewBase
@@ -18,8 +17,8 @@ class MapCrew:
 
     def _get_default_llm(self):
         """Get default LLM for agents"""
-        return ChatOpenAI(
-            model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")
+        return LLMFactory.create_llm(
+            {"provider": "openai", "model": "gpt-4o-mini", "temperature": 0.1}
         )
 
     @agent
@@ -32,7 +31,7 @@ class MapCrew:
         return Agent(
             config=self.agents_config["planner"],
             mcp_servers=mcp_server_configs,
-            mcp_tool_filter=["xxx"], #只引入固定的tool
+            mcp_tool_filter=["xxx"],  # 只引入固定的tool
             llm=self._get_default_llm(),
             verbose=True,
         )
@@ -73,8 +72,8 @@ class MapStreamHttpCrew:
 
     def _get_default_llm(self):
         """Get default LLM for agents"""
-        return ChatOpenAI(
-            model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")
+        return LLMFactory.create_llm(
+            {"provider": "openai", "model": "gpt-4o-mini", "temperature": 0.1}
         )
 
     @agent
@@ -83,7 +82,7 @@ class MapStreamHttpCrew:
             "url": f"https://mcp.amap.com/mcp?key={os.getenv('AMAP_TOKEN')}",
             "transport": "streamable_http",
         }
-        
+
         mcp_server_configs = {"amap-streamable_http": server_config}
         return Agent(
             config=self.agents_config["planner"],
@@ -128,8 +127,8 @@ class CalculatorCrew:
 
     def _get_default_llm(self):
         """Get default LLM for agents"""
-        return ChatOpenAI(
-            model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")
+        return LLMFactory.create_llm(
+            {"provider": "openai", "model": "gpt-4o-mini", "temperature": 0.1}
         )
 
     @agent

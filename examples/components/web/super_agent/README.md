@@ -19,7 +19,8 @@ A powerful intelligent agent system built on the LangCrew framework, integrating
 
 #### Method 1: Docker Compose (Full Stack)
 ```bash
-# From project root directory
+# From super_agent directory
+cd examples/components/web/super_agent
 docker-compose -f compose-super-agent.yaml up --build -d
 ```
 
@@ -100,12 +101,13 @@ cd examples/components/web/super_agent
 ./run_docker.sh test
 
 # Show help
-./run_docker.sh help
+./run_docker.sh
 ```
 
 #### Using Docker Compose
 ```bash
-# From project root directory
+# From super_agent directory
+cd examples/components/web/super_agent
 
 # Start full stack (Super Agent + Frontend)
 docker-compose -f compose-super-agent.yaml up --build -d
@@ -420,10 +422,6 @@ await crew.send_new_message("Update task requirements")
 src/super_agent/
 ├── agent/
 │   ├── crew.py              # Main SuperAgentCrew class
-│   └── enhanced_crew.py     # Enhanced Crew implementation
-├── common/
-│   ├── session_state.py     # Session state management
-│   └── sandbox_config.py    # Sandbox configuration
 ├── config/
 │   ├── config.py           # Configuration class definitions
 │   └── prompt.py           # System prompts

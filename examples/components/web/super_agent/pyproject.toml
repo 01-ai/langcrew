@@ -31,8 +31,9 @@ dependencies = [
     "tenacity>=8.2.0",
     # Browser automation
     "browser-use==0.5.5",
-    "openai>=1.81.0,<1.82.0",
+    "openai>=1.83.0",
     "adb-shell>=0.4.4",
+    "agentbox-python-sdk>=0.2.9",
 ]
 
 [tool.uv.sources]

@@ -1,0 +1,117 @@
+---
+title: 安装指南
+description: LangCrew 的完整安装指南
+---
+
+本指南涵盖 LangCrew 的各种安装场景，从基础设置到开发环境。
+
+## 基础安装
+
+### 使用 pip
+
+最简单的安装方式：
+
+```bash
+pip install langcrew
+```
+
+### 使用 uv（推荐）
+
+更快速、更可靠的安装：
+
+```bash
+uv add langcrew
+```
+
+### 验证安装
+
+```python
+import langcrew
+print(f"LangCrew 版本: {langcrew.__version__}")
+```
+
+## LLM 配置
+
+LangCrew 需要 LLM 提供商。将您的 API 密钥配置为环境变量：
+
+### OpenAI
+
+```bash
+export OPENAI_API_KEY=your_openai_key
+export OPENAI_BASE_URL=https://api.openai.com/v1  # 可选
+```
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+```
+
+### Anthropic
+
+```bash
+export ANTHROPIC_API_KEY=your_anthropic_key
+```
+
+```python
+from langchain_anthropic import ChatAnthropic
+
+llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+```
+
+### DashScope（阿里巴巴）
+
+```bash
+export DASHSCOPE_API_KEY=your_dashscope_key
+```
+
+```python
+from langchain_community.chat_models import ChatTongyi
+
+llm = ChatTongyi(model="qwen-max")
+```
+
+### Google Gemini
+
+```bash
+export GOOGLE_API_KEY=your_google_key
+```
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(model="gemini-pro")
+```
+
+## 故障排查
+
+### 常见问题
+
+#### 导入错误：无法导入 langcrew
+
+**解决方案**：确保您在正确的虚拟环境中，并且已安装 LangCrew：
+
+```bash
+pip install --upgrade langcrew
+```
+
+#### 找不到 LLM API 密钥
+
+**解决方案**：验证环境变量已设置：
+
+```bash
+echo $OPENAI_API_KEY
+```
+
+如果为空，设置它：
+
+```bash
+export OPENAI_API_KEY=your_key
+```
+
+## 下一步
+
+- [快速开始指南](/zh/guides/quickstart/) - 构建您的第一个智能体团队
+- [核心概念](/zh/concepts/agents/) - 理解框架基础
+- [记忆指南](/zh/guides/memory/getting-started/) - 配置持久化和记忆
+

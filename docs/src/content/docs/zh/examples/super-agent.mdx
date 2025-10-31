@@ -35,19 +35,12 @@ S3_GATEWAY=
 S3_REGION=
 
 # WebSearchTool 配置
-LANGCREW_WEB_SEARCH_ENDPOINT=
-LANGCREW_WEB_SEARCH_API_KEY=
 
-# WebFetchTool 配置
-LANGCREW_CRAWL4AI_SERVICE_URL=
+# WebSearchTool 配置（网络搜索功能所需）
+SERPER_API_KEY=your_serper_api_key_here
 
-# ImageGenerationTool 配置
-LANGCREW_IMAGE_GEN_API_KEY=
-
-# 云手机自动化配置
-AGENTBOX_API_KEY=
-AGENTBOX_TEMPLATE=
-AGENTBOX_TIMEOUT=1800
+# ImageGenerationTool 配置（可选，用于 AI 图像生成）
+ARK_API_KEY=your_image_gen_api_key_here
 ```
 
 ### 变量说明
@@ -66,11 +59,7 @@ AGENTBOX_TIMEOUT=1800
 
 - **图像生成配置**：用于 AI 图像生成功能，需要配置图像生成服务密钥
 
-- **云手机自动化配置**：用于移动设备自动化操作
-  - `AGENTBOX_API_KEY`：AgentBox 云手机服务 API 密钥
-  - `AGENTBOX_TEMPLATE`：云手机模版
-
-**重要提示**：`E2B_TEMPLATE` 和 `E2B_DOMAIN` 必须使用上述指定值，这是 01 为当前 demo 提供的专用沙盒环境配置，请勿修改。
+**重要提示**：所有环境变量应根据您自己的服务账户和需求进行配置。模板文件 `.env.example` 提供了所需变量的示例。
 
 ## 快速启动
 
@@ -96,13 +85,13 @@ cp .env.example .env
 docker-compose -f compose-super-agent.yaml up --build
 ```
 
-### 第三步：访问服务
+### 第四步：访问服务
 
 启动完成后，您可以访问：
 - **Super Agent API**：http://localhost:8000
 - **前端 Web UI**：http://localhost:3600
 
-* 注：前端服务启动需要加载5-6分钟。
+* 注：前端服务启动需要加载 5-6 分钟。
 
 ### Docker Compose 架构说明
 
@@ -175,16 +164,6 @@ Content-Type: application/json
 - 支持用户主动接管控制和登录页面的人工干预
 - 内置错误恢复和重试机制确保任务稳定执行
 
-#### 云手机自动化
-- 基于 AgentBox 的智能移动设备操作和应用自动化
-- 支持 Android 设备的完整 UI 交互和应用管理
-- 智能截屏和可点击元素识别，提供实时视觉上下文
-- 全面的移动端操作能力：点击、滑动、文本输入、按键操作
-- 应用生命周期管理：启动应用、切换应用、获取应用列表
-- 支持复杂移动端任务：购物、社交、搜索、内容浏览等
-- 智能错误处理和任务恢复机制
-- 支持用户接管控制处理验证码、登录等敏感操作
-
 #### 信息检索与处理
 - 网络搜索和内容抓取
 - 多源信息整合和验证
@@ -215,7 +194,7 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "搜索2024年人工智能发展趋势并总结关键洞察",
-    "session_id": "research_session"
+    "session_id": "a1b2c3d4e5f6g7h8"
   }'
 ```
 
@@ -225,7 +204,7 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "打开12306官网帮我查询一下后天下午三点以后从北京到上海有哪些高铁有余票",
-    "session_id": "automation_session"
+    "session_id": "b2c3d4e5f6g7h8i9"
   }'
 ```
 
@@ -235,18 +214,7 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "创建一份关于AI技术发展的研究报告并保存为markdown文件",
-    "session_id": "document_session"
-  }'
-```
-
-### 云手机自动化任务
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/chat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "启动淘宝应用，搜索iPhone 15 Pro，查看前三个商品的价格并截图保存",
-    "session_id": "shopping_session"
+    "session_id": "c3d4e5f6g7h8i9j0"
   }'
 ```
 
@@ -255,16 +223,10 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
 ```
 src/super_agent/
 ├── agent/
-│   ├── crew.py              # 主要的 SuperAgentCrew 类
-│   └── enhanced_crew.py     # 增强的 Crew 实现
-├── common/
-│   ├── session_state.py     # 会话状态管理
-│   └── sandbox_config.py    # 沙盒配置
+│   └── crew.py              # 主要的 SuperAgentCrew 类
 ├── config/
 │   ├── config.py           # 配置类定义
 │   └── prompt.py           # 系统提示词
-├── tool/
-│   └── cloud_phone_streaming_tool.py           # 自定义工具
 ├── main.py                 # 直接执行入口点
 └── server.py              # FastAPI 服务器
 ```
@@ -277,6 +239,5 @@ Super Agent 完全基于 LangCrew 框架构建，展示了框架的强大能力�
 - **工具生态系统**：集成 LangCrew-Tools 工具集
 - **流式监控**：实时执行状态和结果流
 - **会话管理**：持久化上下文和状态
-- **人机协作**：内置审批和交互机制
 
 Super Agent 是 LangCrew 框架能力的完美展示，为构建生产级智能体系统提供了完整的参考实现。

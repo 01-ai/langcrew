@@ -18,8 +18,8 @@ You can build and run the web chat server with Docker for one‑click deployment
 
 #### 1) Build image
 ```bash
-# From the repository root (important!)
-docker build -f examples/components/web/web_chat/Dockerfile -t langcrew-web-chat:latest .
+cd examples/components/web/web_chat
+docker build -f Dockerfile -t langcrew-web-chat:latest .
 ```
 
 #### 2) Run container
@@ -127,7 +127,7 @@ Send a POST request to `/api/v1/chat`:
 ```json
 {
   "message": "What's the weather like in New York?",
-  "thread_id": "optional-thread-id"
+  "session_id": "optional-session-id"
 }
 ```
 
@@ -142,6 +142,6 @@ Send a POST request to `/api/v1/chat`:
 ### Model Selection
 
 The system automatically selects the best available model:
-1. **OpenAI** - `gpt-4o-mini` (recommended)
+1. **OpenAI** - `gpt-5-mini` (recommended)
 2. **Anthropic** - `claude-3-haiku-20240307`
 3. **DashScope** - `qwen-plus` 

@@ -1,8 +1,8 @@
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-from langcrew.utils.async_utils import run_async_func_no_wait
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from .client import AsyncS3Client
@@ -42,12 +42,17 @@ class S3ClientMixin(BaseModel):
                 self._s3_client = await self.s3_client_source()
             else:
                 config = self.s3_client_source or {}
-            self._s3_client = ClientFactory.create_s3_client(config)
+                self._s3_client = ClientFactory.create_s3_client(config)
         return self._s3_client
 
     def __del__(self):
         if self._s3_client:
-            run_async_func_no_wait(self._s3_client.close)
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(self._s3_client.close())
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(self._s3_client.close())
 
 
 async def none_s3_client():

@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 from dotenv import load_dotenv
+
 from surprise_travel.crew import SurpriseTravelCrew
 
 load_dotenv()

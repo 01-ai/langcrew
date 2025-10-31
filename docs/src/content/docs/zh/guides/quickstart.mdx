@@ -7,42 +7,23 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 让我们构建您的第一个 langcrew 应用程序！在本教程中，我们将创建一个简单的内容创作团队，其中两个智能体协同工作。
 
-## 前置要求与安装
+## 前置要求
 
-### 系统要求
+- **Python 3.10+**
+- **LLM API 密钥**（OpenAI、Anthropic、DashScope 或 Google）
 
-在安装 langcrew 之前，请确保您具备：
+## 安装
 
-- **Python**: 3.11 到 3.12 版本
-- **uv**: 推荐的包管理器
-- **虚拟环境**: 建议用于项目隔离
-
-### 安装方法
-
-> **注意**: langcrew 目前不是开源的，需要访问私有包索引。
-
-使用 uv 和私有索引直接安装 langcrew：
+使用 pip 快速安装：
 
 ```bash
-uv add langcrew --prerelease=allow
+pip install langcrew
+export OPENAI_API_KEY=your_openai_key
 ```
 
-### 验证安装
-
-```python
-import langcrew
-print(langcrew.__version__)
-
-# 测试基本功能
-from langcrew import Agent
-
-agent = Agent(
-    role="测试智能体",
-    goal="验证安装",
-    backstory="一个有用的测试智能体"
-)
-print(f"智能体已创建: {agent.role}")
-```
+:::tip[需要更多安装选项？]
+有关详细的安装说明、可选依赖项、Docker 部署和其他 LLM 提供商，请参阅**[安装指南](/zh/guides/installation)**。
+:::
 
 ## 我们要构建什么
 
@@ -54,8 +35,10 @@ print(f"智能体已创建: {agent.role}")
 
 ```python
 from langcrew import Agent, Task, Crew
-from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew_tools.fetch.langchain_tools import WebFetchTool
+from langchain_openai import ChatOpenAI
+
+# 配置 LLM
+llm = ChatOpenAI(model="gpt-4o")
 ```
 
 ## 步骤2：创建您的智能体
@@ -68,7 +51,8 @@ researcher = Agent(
     goal="收集给定主题的全面信息",
     backstory="""您是一位经验丰富的研究员，对可信来源和相关信息有敏锐的眼光。
     您擅长从多个来源查找和综合数据。""",
-    tools=[WebSearchTool(), WebFetchTool()],
+    tools=["web_search", "web_fetch"],  # 内置工具
+    llm=llm,
     verbose=True
 )
 ```
@@ -81,6 +65,7 @@ writer = Agent(
     goal="基于研究创建引人入胜且信息丰富的内容",
     backstory="""您是一位技能娴熟的作家，能够将研究转化为引人入胜的叙述。
     您有将复杂主题变得易于读者理解的天赋。""",
+    llm=llm,
     verbose=True
 )
 ```
@@ -153,15 +138,18 @@ print(result)
 
 ```python
 from langcrew import Agent, Task, Crew
-from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew_tools.fetch.langchain_tools import WebFetchTool
+from langchain_openai import ChatOpenAI
+
+# 配置 LLM
+llm = ChatOpenAI(model="gpt-4o")
 
 # 创建智能体
 researcher = Agent(
     role="高级研究分析师",
     goal="收集给定主题的全面信息",
     backstory="""您是一位经验丰富的研究员，对可信来源和相关信息有敏锐的眼光。""",
-    tools=[WebSearchTool(), WebFetchTool()],
+    tools=["web_search", "web_fetch"],
+    llm=llm,
     verbose=True
 )
 
@@ -169,6 +157,7 @@ writer = Agent(
     role="内容作家",
     goal="创建引人入胜且信息丰富的内容",
     backstory="""您是一位技能娴熟的作家，能够将研究转化为引人入胜的叙述。""",
+    llm=llm,
     verbose=True
 )
 

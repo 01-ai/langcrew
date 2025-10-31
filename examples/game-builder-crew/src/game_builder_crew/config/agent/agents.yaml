@@ -9,7 +9,7 @@ chief_qa_engineer_agent:
     For code review and error checking, use qa_engineer_agent.
   llm:
     provider: openai
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0
   # Handoff configuration - can handoff to these agents
   handoff_to: ["senior_engineer_agent", "qa_engineer_agent"]
@@ -33,7 +33,7 @@ senior_engineer_agent:
     Remember: Your job is to write the complete code first, then hand it off for review.
   llm:
     provider: openai
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0
   # Can handoff to QA engineer for code review
   handoff_to: ["qa_engineer_agent"]
@@ -52,5 +52,5 @@ qa_engineer_agent:
     You also check for security vulnerabilities, and logic errors
   llm:
     provider: openai
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0

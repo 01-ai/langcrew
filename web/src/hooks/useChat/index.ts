@@ -1,5 +1,5 @@
 import { EventErrorChunk, FileItem, KnowledgeBaseItem, MCPToolItem, MessageChunk, UserInputChunk } from '@/types';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { XStream } from '@ant-design/x';
 import { useAgentStore } from '@/store';
@@ -17,6 +17,8 @@ export interface SendOptions {
   mcpTools?: MCPToolItem[];
   knowledgeBases?: KnowledgeBaseItem[];
 }
+
+const DEBOUNCE_TIME = 16;
 
 interface UseChatReturn {
   /**
@@ -42,6 +44,17 @@ const useChat = (): UseChatReturn => {
 
   // use chunks from global store
   useChunksProcessor(chunks);
+
+  const debounceTimer = useRef<number>(0);
+  const pendingChunks = useRef<MessageChunk[]>([]);
+
+  const addPendingChunks = useCallback(() => {
+    if (pendingChunks.current.length === 0) {
+      return;
+    }
+    useAgentStore.getState().addChunks(pendingChunks.current);
+    pendingChunks.current = [];
+  }, []);
 
   // functions
 
@@ -89,7 +102,7 @@ const useChat = (): UseChatReturn => {
 
       return;
     }
-    useAgentStore.getState().addChunk(data);
+    pendingChunks.current.push(data);
   }, []);
 
   /**
@@ -110,14 +123,25 @@ const useChat = (): UseChatReturn => {
    */
   const handleResponse = useCallback(
     async (response: Response, onTimeout: () => void, onComplete: () => void) => {
+      if (!debounceTimer.current) {
+        debounceTimer.current = window.setInterval(() => {
+          addPendingChunks();
+          debounceTimer.current = 0;
+        }, DEBOUNCE_TIME);
+      }
       for await (const chunk of XStream({
         readableStream: response.body,
       })) {
         handleChunk(chunk.data);
       }
       onComplete();
+      if (debounceTimer.current) {
+        window.clearInterval(debounceTimer.current);
+        debounceTimer.current = 0;
+        addPendingChunks();
+      }
     },
-    [handleChunk],
+    [addPendingChunks, handleChunk],
   );
 
   const send = useCallback(

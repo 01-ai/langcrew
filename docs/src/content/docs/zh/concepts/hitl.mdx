@@ -24,8 +24,119 @@ from langcrew.hitl import HITLConfig
 # 基本配置
 hitl_config = HITLConfig(
     interrupt_before_tools=["file_write", "database_query"],
-    interrupt_after_tools=["data_analysis"],
-    interrupt_tool_mode="specified"
+    interrupt_after_tools=["data_analysis"]
+)
+```
+
+## 执行模式
+
+LangCrew 支持两种执行模式，决定哪些中断有效：
+
+| 模式 | 何时使用 | 有效中断 | 忽略的中断 |
+|------|---------|---------|-----------|
+| **任务模式** | 同时提供 `agents` 和 `tasks` | `interrupt_before_tasks`<br/>`interrupt_after_tasks` | `interrupt_before_agents`<br/>`interrupt_after_agents` |
+| **智能体模式** | 只提供 `agents`（无 tasks） | `interrupt_before_agents`<br/>`interrupt_after_agents` | `interrupt_before_tasks`<br/>`interrupt_after_tasks` |
+
+**重要**：工具级和节点级中断在两种模式下都有效。
+
+## 六种中断类型
+
+### 1. 任务级中断
+
+#### interrupt_before_tasks
+**有效范围**：仅任务模式
+
+在特定任务执行前暂停以审查或修改任务输入：
+
+```python
+from langcrew import Crew, HITLConfig
+
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    hitl=HITLConfig(
+        interrupt_before_tasks=["research_task"]  # 研究开始前审查
+    )
+)
+```
+
+#### interrupt_after_tasks
+**有效范围**：仅任务模式
+
+在特定任务完成后暂停以审查或修改输出：
+
+```python
+hitl=HITLConfig(
+    interrupt_after_tasks=["research_task"]  # 审查研究结果
+)
+```
+
+### 2. 智能体级中断
+
+#### interrupt_before_agents
+**有效范围**：仅智能体模式
+
+在特定智能体执行前暂停：
+
+```python
+crew = Crew(
+    agents=[coordinator, specialist],  # 无任务 - 智能体模式
+    hitl=HITLConfig(
+        interrupt_before_agents=["specialist"]  # 专家运行前批准
+    )
+)
+```
+
+#### interrupt_after_agents
+**有效范围**：仅智能体模式
+
+在特定智能体完成工作后暂停：
+
+```python
+hitl=HITLConfig(
+    interrupt_after_agents=["coordinator"]  # 审查协调员的决策
+)
+```
+
+### 3. 工具级中断
+
+#### interrupt_before_tools
+**有效范围**：两种模式
+
+在特定工具执行前暂停（最常用于敏感操作）：
+
+```python
+hitl=HITLConfig(
+    interrupt_before_tools=["send_email", "make_payment", "delete_file"]
+)
+```
+
+#### interrupt_after_tools
+**有效范围**：两种模式（有会话限制）
+
+在特定工具完成后暂停以审查结果：
+
+```python
+hitl=HITLConfig(
+    interrupt_after_tools=["data_analysis"]  # 审查分析结果
+)
+```
+
+:::caution[会话限制]
+`interrupt_after_tools` 仅在单个执行会话内有效，工作流重启后无法从中断点恢复。
+:::
+
+### 4. 节点级中断
+
+#### interrupt_before_nodes / interrupt_after_nodes
+**有效范围**：两种模式
+
+在特定 LangGraph 节点暂停以进行工作流级控制：
+
+```python
+hitl=HITLConfig(
+    interrupt_before_nodes=["decision_node"],
+    interrupt_after_nodes=["processing_node"]
 )
 ```
 
@@ -39,11 +150,12 @@ hitl_config = HITLConfig(
 
 | 参数 | 类型 | 描述 | 默认值 |
 |------|------|------|--------|
-| `enabled` | bool | 启用/禁用 HITL 功能 | True |
+| `interrupt_before_tasks` | List[str] | 前置中断的任务（仅任务模式） | [] |
+| `interrupt_after_tasks` | List[str] | 后置中断的任务（仅任务模式） | [] |
+| `interrupt_before_agents` | List[str] | 前置中断的智能体（仅智能体模式） | [] |
+| `interrupt_after_agents` | List[str] | 后置中断的智能体（仅智能体模式） | [] |
 | `interrupt_before_tools` | List[str] | 执行前需要审批的工具 | [] |
 | `interrupt_after_tools` | List[str] | 执行后需要审查的工具 | [] |
-| `interrupt_tool_mode` | str | 中断模式："specified"、"all" | "specified" |
-| `excluded_tools` | List[str] | 在"all"模式下排除的工具 | [] |
 | `interrupt_before_nodes` | List[str] | 前置中断的节点 | [] |
 | `interrupt_after_nodes` | List[str] | 后置中断的节点 | [] |
 
@@ -92,7 +204,7 @@ hitl_config = HITLConfig(
 用于智能体主动请求输入的动态用户交互工具。
 
 ```python
-from langcrew.tools.hitl import UserInputTool
+from langcrew_tools.hitl import UserInputTool
 
 # 智能体可在执行过程中请求用户输入
 user_input_tool = UserInputTool()

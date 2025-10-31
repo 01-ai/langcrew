@@ -22,6 +22,7 @@ class ExecutionState:
     tool_executed: bool = False
     tool_result: Any | None = None
     after_interrupt_processed: bool = False
+    saved_kwargs: dict[str, Any] | None = None  # Save kwargs for resume
 
 
 class HITLToolWrapper:
@@ -195,13 +196,23 @@ class HITLToolWrapper:
 
             # Before interrupt
             if interrupt_before and not exec_state.before_interrupt_processed:
+                # Always save kwargs for resume (even if empty, they might be filled later)
+                if not exec_state.saved_kwargs:
+                    exec_state.saved_kwargs = kwargs.copy() if kwargs else {}
+                elif kwargs:
+                    # Update saved kwargs if we have new values
+                    exec_state.saved_kwargs.update(kwargs)
+
+                # Use saved kwargs if current kwargs are empty
+                effective_kwargs = kwargs if kwargs else (exec_state.saved_kwargs or {})
+
                 before_request = {
                     "type": "tool_interrupt_before",
                     "execution_id": execution_id,
                     "tool": {
                         "name": original_tool.name,
-                        "args": kwargs,
-                        "description": f"Execute {original_tool.name} with parameters: {kwargs}",
+                        "args": effective_kwargs,
+                        "description": f"Execute {original_tool.name} with parameters: {effective_kwargs}",
                     },
                 }
 
@@ -244,30 +255,54 @@ class HITLToolWrapper:
 
                 # Apply parameter modifications
                 if "modified_args" in parsed_response:
-                    kwargs.update(parsed_response["modified_args"])
+                    effective_kwargs.update(parsed_response["modified_args"])
+                    # Update saved kwargs as well
+                    if exec_state.saved_kwargs:
+                        exec_state.saved_kwargs.update(parsed_response["modified_args"])
+
+                # Update kwargs with effective_kwargs (may have been modified)
+                kwargs.update(effective_kwargs)
 
                 # Mark before interrupt as processed
                 exec_state.before_interrupt_processed = True
 
             # Tool execution
             if not exec_state.tool_executed:
+                # Always prefer current kwargs, but fall back to saved kwargs if empty
+                # This handles resume scenarios where kwargs might not be passed
+                if kwargs:
+                    # Update saved kwargs with current values
+                    if exec_state.saved_kwargs:
+                        exec_state.saved_kwargs.update(kwargs)
+                    else:
+                        exec_state.saved_kwargs = kwargs.copy()
+                    effective_kwargs = kwargs
+                else:
+                    # Use saved kwargs (for resume scenarios)
+                    effective_kwargs = exec_state.saved_kwargs or {}
+
                 # Execute original tool with proper config handling
                 if hasattr(original_tool, "_arun"):
                     if arun_accepts_config:
-                        result = await original_tool._arun(config=config, **kwargs)
+                        result = await original_tool._arun(
+                            config=config, **effective_kwargs
+                        )
                     else:
-                        result = await original_tool._arun(**kwargs)
+                        result = await original_tool._arun(**effective_kwargs)
                 else:
                     # Original tool only supports sync
-                    if run_accepts_config:
-                        result = await asyncio.get_event_loop().run_in_executor(
-                            None,
-                            lambda: original_tool._run(config=config, **kwargs),
-                        )
-                    else:
-                        result = await asyncio.get_event_loop().run_in_executor(
-                            None, lambda: original_tool._run(**kwargs)
-                        )
+                    # Create a proper function closure to capture effective_kwargs
+                    def run_with_kwargs(
+                        tool=original_tool, args=effective_kwargs, cfg=config
+                    ):
+                        if run_accepts_config:
+                            return tool._run(config=cfg, **args)
+                        else:
+                            return tool._run(**args)
+
+                    result = await asyncio.get_event_loop().run_in_executor(
+                        None, run_with_kwargs
+                    )
 
                 # Save tool execution result and state
                 exec_state.tool_executed = True

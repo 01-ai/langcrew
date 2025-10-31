@@ -129,13 +129,8 @@ def with_guardrails(func: Callable) -> Callable:
             # Execute original method
             result = await func(self, *args, **kwargs)
 
-            # Check output guardrails if available and input was provided
-            if (
-                hasattr(self, "output_guards")
-                and self.output_guards
-                and args
-                and isinstance(args[0], dict)
-            ):
+            # Check output guardrails if available
+            if hasattr(self, "output_guards") and self.output_guards:
                 await check_guardrails(self.output_guards, result)
 
             return result
@@ -157,13 +152,8 @@ def with_guardrails(func: Callable) -> Callable:
             # Execute original method
             result = func(self, *args, **kwargs)
 
-            # Check output guardrails if available and input was provided
-            if (
-                hasattr(self, "output_guards")
-                and self.output_guards
-                and args
-                and isinstance(args[0], dict)
-            ):
+            # Check output guardrails if available
+            if hasattr(self, "output_guards") and self.output_guards:
                 check_guardrails_sync(self.output_guards, result)
 
             return result

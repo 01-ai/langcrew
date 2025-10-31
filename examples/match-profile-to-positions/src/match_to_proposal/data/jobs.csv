@@ -1,18 +1,18 @@
-# 注意：本文件包含的所有数据均为示例数据，仅供演示使用
-# 不代表任何真实的公司、个人或职位信息
-职位名称,技能要求,工作职责,公司名称,工作地点,薪资待遇,工作年限要求,学历要求
-高级Python开发工程师,"Python,Django,Flask,MySQL,Redis","负责后端系统开发,API设计,数据库优化,代码审查",TechCorp A,杭州,28-45K,3-5年,本科及以上
-前端架构师,"JavaScript,React,Vue.js,TypeScript,Node.js","前端架构设计,技术选型,团队管理,性能优化",TechCorp B,深圳,35-55K,5-8年,本科及以上
-技术经理,"Python,Java,团队管理,系统架构,项目管理","技术团队管理,架构设计,技术决策,项目规划",TechCorp C,北京,40-70K,5-8年,本科及以上
-全栈工程师,"Python,JavaScript,React,Django,MySQL","全栈开发,前后端协调,产品功能实现,用户体验优化",FoodTech Inc,北京,25-40K,3-6年,本科及以上
-后端开发专家,"Python,Go,微服务,Kubernetes,Docker","微服务架构设计,容器化部署,系统性能优化,技术调研",EcommerceCorp,北京,30-50K,4-7年,本科及以上
-数据工程师,"Python,SQL,Spark,Hadoop,ETL","数据处理,ETL开发,数据仓库建设,数据质量保证",MobilityTech Ltd,北京,28-45K,3-5年,本科及以上
-DevOps工程师,"Docker,Kubernetes,Jenkins,AWS,Linux","CI/CD流程建设,容器化部署,监控系统搭建,自动化运维",SmartDevice Co,北京,25-40K,3-5年,本科及以上
-软件架构师,"Java,Python,分布式系统,微服务,系统设计","系统架构设计,技术选型,架构治理,技术难题攻关",GameTech Corp,杭州,45-80K,7-10年,本科及以上
-高级前端工程师,"JavaScript,React,Vue.js,Webpack,CSS3","前端组件开发,用户界面实现,前端性能优化,代码重构",SearchTech Inc,北京,22-35K,3-5年,本科及以上
-产品技术经理,"Python,项目管理,产品设计,用户研究,数据分析","产品技术规划,需求分析,技术与产品协调,用户体验设计",SocialCommerce Co,上海,35-60K,5-8年,本科及以上
-云计算工程师,"AWS,Docker,Kubernetes,Python,Linux","云平台架构,容器编排,自动化部署,云服务优化",TelecomTech Corp,深圳,30-50K,4-6年,本科及以上
-移动端架构师,"React Native,Flutter,iOS,Android,JavaScript","移动端架构设计,跨平台开发,性能优化,技术选型",MobileTech Ltd,深圳,40-65K,6-8年,本科及以上
-大数据开发工程师,"Python,Spark,Hive,Kafka,Hadoop","大数据处理,实时计算,数据建模,数据平台建设",FinTech Solutions,杭州,32-55K,4-7年,本科及以上
-AI算法工程师,"Python,机器学习,深度学习,TensorFlow,PyTorch","算法研发,模型训练,算法优化,AI产品落地",AI Vision Corp,北京,35-60K,3-6年,硕士及以上
-安全工程师,"Python,网络安全,渗透测试,安全架构,Linux","安全体系建设,漏洞挖掘,安全防护,安全培训",CyberSecurity Inc,北京,28-45K,3-5年,本科及以上
+# Note: All data in this file is sample data for demonstration purposes only.
+# It does not represent any real company, person, or position.
+Position,Skills,Responsibilities,Company,Location,Salary,Experience Required,Education Required
+Senior Python Developer,"Python,Django,Flask,MySQL,Redis","Backend system development, API design, database optimization, code review",TechCorp A,San Francisco,120-180K,3-5 years,Bachelor or above
+Frontend Architect,"JavaScript,React,Vue.js,TypeScript,Node.js","Frontend architecture design, tech selection, team management, performance optimization",TechCorp B,New York,140-220K,5-8 years,Bachelor or above
+Technical Manager,"Python,Java,Team Management,System Architecture,Project Management","Technical team management, architecture design, technical decisions, project planning",TechCorp C,Seattle,160-280K,5-8 years,Bachelor or above
+Full Stack Engineer,"Python,JavaScript,React,Django,MySQL","Full-stack development, frontend-backend coordination, feature implementation, UX optimization",FoodTech Inc,Austin,100-160K,3-6 years,Bachelor or above
+Backend Development Expert,"Python,Go,Microservices,Kubernetes,Docker","Microservices architecture, containerization, system optimization, technical research",EcommerceCorp,San Francisco,120-200K,4-7 years,Bachelor or above
+Data Engineer,"Python,SQL,Spark,Hadoop,ETL","Data processing, ETL development, data warehouse, data quality assurance",MobilityTech Ltd,Chicago,112-180K,3-5 years,Bachelor or above
+DevOps Engineer,"Docker,Kubernetes,Jenkins,AWS,Linux","CI/CD pipeline, containerization, monitoring setup, automation",SmartDevice Co,Boston,100-160K,3-5 years,Bachelor or above
+Software Architect,"Java,Python,Distributed Systems,Microservices,System Design","System architecture, tech selection, architecture governance, technical problem solving",GameTech Corp,Los Angeles,180-320K,7-10 years,Bachelor or above
+Senior Frontend Engineer,"JavaScript,React,Vue.js,Webpack,CSS3","Frontend component development, UI implementation, performance optimization, code refactoring",SearchTech Inc,Mountain View,88-140K,3-5 years,Bachelor or above
+Product Technical Manager,"Python,Project Management,Product Design,User Research,Data Analysis","Product tech planning, requirement analysis, tech-product coordination, UX design",SocialCommerce Co,Denver,140-240K,5-8 years,Bachelor or above
+Cloud Computing Engineer,"AWS,Docker,Kubernetes,Python,Linux","Cloud platform architecture, container orchestration, automation deployment, cloud optimization",TelecomTech Corp,Dallas,120-200K,4-6 years,Bachelor or above
+Mobile Architect,"React Native,Flutter,iOS,Android,JavaScript","Mobile architecture, cross-platform development, performance optimization, tech selection",MobileTech Ltd,Miami,160-260K,6-8 years,Bachelor or above
+Big Data Engineer,"Python,Spark,Hive,Kafka,Hadoop","Big data processing, real-time computing, data modeling, data platform",FinTech Solutions,San Diego,128-220K,4-7 years,Bachelor or above
+AI Algorithm Engineer,"Python,Machine Learning,Deep Learning,TensorFlow,PyTorch","Algorithm R&D, model training, algorithm optimization, AI product development",AI Vision Corp,San Jose,140-240K,3-6 years,Master or above
+Security Engineer,"Python,Network Security,Penetration Testing,Security Architecture,Linux","Security system, vulnerability discovery, security protection, security training",CyberSecurity Inc,Portland,112-180K,3-5 years,Bachelor or above

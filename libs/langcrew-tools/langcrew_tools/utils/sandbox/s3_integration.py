@@ -115,7 +115,7 @@ class SandboxS3Toolkit:
 
             # Guess MIME type by file extension
             content_type, _ = mimetypes.guess_type(file_path)
-            if content_type in ["text/plain", "text/html"]:
+            if content_type in ["text/plain", "text/html", "text/markdown"]:
                 content_type = f"{content_type};charset=utf-8"
                 
             if not content_type:
@@ -131,7 +131,7 @@ class SandboxS3Toolkit:
             )
 
             logger.info(
-                f"Successfully uploaded {file_path} to S3 as {s3_path}, URL: {url}"
+                f"Successfully uploaded {file_path} to S3 as {s3_path}, URL: {url}, content_type:{content_type}"
             )
             return {"url": url, "size": file_size, "content_type": content_type}
 

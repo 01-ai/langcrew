@@ -1,170 +1,165 @@
 <!--
-注意：本文件包含的所有数据均为示例数据，仅供演示使用
-不代表任何真实的公司、个人或职位信息
+Note: All data in this file is sample data for demonstration purposes only.
+It does not represent any real company, person, or position.
 -->
 
-# John Smith - 高级软件工程师
+# John Smith - Senior Software Engineer
 
-## 个人信息
-- **姓名**：John Smith
-- **年龄**：29岁
-- **工作年限**：6年
-- **手机**：138-XXXX-XXXX
-- **邮箱**：john.smith@example.com
-- **地址**：北京市朝阳区
-- **期望薪资**：25-35K
+## Personal Information
+- **Name**: John Smith
+- **Age**: 29
+- **Experience**: 6 years
+- **Phone**: +1-XXX-XXX-XXXX
+- **Email**: john.smith@example.com
+- **Location**: San Francisco, CA
+- **Expected Salary**: $120K-150K
 
-## 专业技能
+## Professional Skills
 
-### 编程语言
-- **Python**：★★★★★ (5年经验，精通Django/Flask/FastAPI)
-- **JavaScript**：★★★★☆ (4年经验，熟练React/Vue.js/Node.js)
-- **Go**：★★★☆☆ (2年经验，了解微服务开发)
-- **Java**：★★★☆☆ (3年经验，Spring Boot开发经验)
-- **SQL**：★★★★☆ (熟练MySQL/PostgreSQL/Redis)
+### Programming Languages
+- **Python**: ★★★★★ (5 years, proficient in Django/Flask/FastAPI)
+- **JavaScript**: ★★★★☆ (4 years, skilled in React/Vue.js/Node.js)
+- **Go**: ★★★☆☆ (2 years, microservices development)
+- **Java**: ★★★☆☆ (3 years, Spring Boot experience)
+- **SQL**: ★★★★☆ (proficient in MySQL/PostgreSQL/Redis)
 
-### 技术框架与工具
-- **前端**：React、Vue.js、TypeScript、HTML5/CSS3
-- **后端**：Django、Flask、FastAPI、Spring Boot、Express.js
-- **数据库**：MySQL、PostgreSQL、Redis、MongoDB
-- **云服务**：AWS（EC2、S3、RDS）、AWS、Azure
-- **容器化**：Docker、Kubernetes、Docker Compose
-- **DevOps**：Jenkins、GitLab CI/CD、Nginx
-- **开发工具**：Git、PyCharm、VSCode、Postman
+### Technologies & Frameworks
+- **Frontend**: React, Vue.js, TypeScript, HTML5/CSS3
+- **Backend**: Django, Flask, FastAPI, Spring Boot, Express.js
+- **Databases**: MySQL, PostgreSQL, Redis, MongoDB
+- **Cloud Services**: AWS (EC2, S3, RDS), Azure
+- **Containerization**: Docker, Kubernetes, Docker Compose
+- **DevOps**: Jenkins, GitLab CI/CD, Nginx
+- **Development Tools**: Git, PyCharm, VSCode, Postman
 
-### 其他技能
-- **项目管理**：Agile/Scrum方法论，团队协作经验
-- **系统设计**：微服务架构、RESTful API设计
-- **性能优化**：数据库优化、缓存策略、系统调优
-- **代码质量**：单元测试、代码审查、重构经验
+### Other Skills
+- **Project Management**: Agile/Scrum methodology, team collaboration
+- **System Design**: Microservices architecture, RESTful API design
+- **Performance Optimization**: Database optimization, caching strategies, system tuning
+- **Code Quality**: Unit testing, code review, refactoring experience
 
-## 工作经验
+## Work Experience
 
-### 高级软件工程师 | TechInnovation Corp
-**2021.03 - 至今 (3年)**
+### Senior Software Engineer | TechInnovation Corp
+**2021.03 - Present (3 years)**
 
-**主要职责：**
-- 负责公司核心电商平台的后端系统架构设计和开发
-- 带领5人技术团队，负责代码审查和技术决策
-- 参与产品需求分析，提供技术解决方案
+**Key Responsibilities:**
+- Lead backend system architecture design and development for core e-commerce platform
+- Manage technical team of 5, responsible for code reviews and technical decisions
+- Participate in product requirement analysis and provide technical solutions
 
-**核心项目：**
-1. **电商平台重构项目**
-   - 将单体应用重构为微服务架构，提升系统可扩展性
-   - 使用Python Django + Redis + MySQL技术栈
-   - 系统响应时间从2秒优化到200ms，提升90%性能
-   - 支持日活跃用户从10万增长到50万
+**Core Projects:**
+1. **E-commerce Platform Refactoring**
+   - Refactored monolithic application into microservices architecture
+   - Tech stack: Python Django + Redis + MySQL
+   - Improved system response time from 2s to 200ms (90% performance boost)
+   - Scaled from 100K to 500K daily active users
 
-2. **实时推荐系统**
-   - 基于用户行为数据构建推荐算法
-   - 使用Python + Redis + Kafka技术栈
-   - 提升用户转化率25%，增加平台收入15%
+2. **Real-time Recommendation System**
+   - Built recommendation algorithm based on user behavior data
+   - Tech stack: Python + Redis + Kafka
+   - Increased user conversion rate by 25%, revenue by 15%
 
-3. **移动端API网关**
-   - 设计统一的API网关系统，支持多端接入
-   - 实现接口限流、鉴权、监控等功能
-   - 支撑日均API调用量500万次
+3. **Mobile API Gateway**
+   - Designed unified API gateway supporting multiple endpoints
+   - Implemented rate limiting, authentication, and monitoring
+   - Handles 5M+ API calls daily
 
-**技术成就：**
-- 建立了完整的CI/CD流程，提升部署效率80%
-- 制定代码规范和最佳实践，降低bug率60%
-- 培养了2名初级工程师成长为独立开发者
+**Technical Achievements:**
+- Established complete CI/CD pipeline, improving deployment efficiency by 80%
+- Created coding standards and best practices, reducing bug rate by 60%
+- Mentored 2 junior engineers to become independent developers
 
-### 软件工程师 | InternetTech Solutions
-**2018.07 - 2021.02 (2.5年)**
+### Software Engineer | InternetTech Solutions
+**2018.07 - 2021.02 (2.5 years)**
 
-**主要职责：**
-- 负责公司SaaS产品的全栈开发
-- 参与产品架构设计和数据库设计
-- 与产品和设计团队协作，实现用户需求
+**Key Responsibilities:**
+- Full-stack development for company SaaS products
+- Participated in product architecture and database design
+- Collaborated with product and design teams to implement features
 
-**主要项目：**
-1. **企业管理SaaS平台**
-   - 前后端分离架构，React + Python Flask
-   - 实现用户权限管理、数据统计、报表生成等功能
-   - 服务企业客户200+，获得客户高度认可
+**Main Projects:**
+1. **Enterprise Management SaaS Platform**
+   - Frontend-backend separation: React + Python Flask
+   - Implemented user permissions, data analytics, and reporting
+   - Served 200+ enterprise clients with high satisfaction
 
-2. **数据可视化系统**
-   - 基于D3.js和ECharts构建数据可视化
-   - 支持多种图表类型和实时数据更新
-   - 帮助客户提升数据分析效率50%
+2. **Data Visualization System**
+   - Built visualizations using D3.js and ECharts
+   - Supported various chart types with real-time updates
+   - Improved client data analysis efficiency by 50%
 
-**技术成长：**
-- 掌握了完整的Web开发技术栈
-- 学习了系统设计和架构思维
-- 培养了良好的代码质量意识
+### Junior Developer | SoftwareDev Outsourcing
+**2017.06 - 2018.06 (1 year)**
 
-### 初级开发工程师 | SoftwareDev Outsourcing
-**2017.06 - 2018.06 (1年)**
+**Main Work:**
+- Participated in multiple small-to-medium web projects
+- Learned and practiced mainstream development technologies
+- Built project experience and team collaboration skills
 
-**主要工作：**
-- 参与多个中小型Web项目开发
-- 学习和实践主流开发技术
-- 积累项目经验和团队协作能力
+## Education
 
-## 教育背景
-
-### Tech University | 计算机科学与技术 | 本科
+### Tech University | Computer Science & Technology | Bachelor's
 **2013.09 - 2017.06**
 
-**主要课程：**
-- 数据结构与算法、操作系统、计算机网络
-- 数据库原理、软件工程、计算机组成原理
-- Java程序设计、C++程序设计、Web开发技术
+**Key Courses:**
+- Data Structures & Algorithms, Operating Systems, Computer Networks
+- Database Principles, Software Engineering, Computer Architecture
+- Java Programming, C++ Programming, Web Development
 
-**学术成就：**
-- GPA：3.6/4.0，专业排名前20%
-- 获得校级优秀学生奖学金2次
-- 参与大学生创新创业项目，获得省级三等奖
+**Academic Achievements:**
+- GPA: 3.6/4.0, Top 20% in major
+- University Scholarship (2 times)
+- Provincial Third Prize in Innovation & Entrepreneurship Competition
 
-**项目经验：**
-- 毕业设计：基于机器学习的电影推荐系统
-- 课程项目：在线图书管理系统、学生选课系统
+**Projects:**
+- Graduation Project: Movie Recommendation System based on Machine Learning
+- Course Projects: Online Library System, Student Course Selection System
 
-## 项目作品
+## Open Source & Contributions
 
-### 开源项目
-1. **Python工具库** (GitHub: 1.2k stars)
-   - 开发了一个常用的Python工具集合
-   - 包含数据处理、API封装、配置管理等模块
-   - 被多家公司采用，获得社区认可
+### Open Source Projects
+1. **Python Utility Library** (GitHub: 1.2k stars)
+   - Developed popular Python utility collection
+   - Includes data processing, API wrappers, config management
+   - Adopted by multiple companies
 
-2. **微服务框架模板**
-   - 基于FastAPI构建的微服务快速开发模板
-   - 集成了认证、日志、监控、部署等最佳实践
-   - 帮助团队快速启动新项目
+2. **Microservices Framework Template**
+   - FastAPI-based microservices quick-start template
+   - Integrated authentication, logging, monitoring, deployment best practices
+   - Helps team quickly bootstrap new projects
 
-### 技术分享
-- 在公司内部分享技术讲座10+次
-- 撰写技术博客文章30+篇，总阅读量5万+
-- 参与技术会议演讲2次，分享微服务实践经验
+### Technical Sharing
+- Delivered 10+ internal technical presentations
+- Published 30+ technical blog posts (50K+ total views)
+- Spoke at 2 tech conferences on microservices practices
 
-## 个人特质
+## Personal Strengths
 
-### 技术优势
-- **全栈能力**：具备前后端完整开发能力
-- **架构思维**：有系统设计和架构重构经验
-- **学习能力**：快速掌握新技术，关注技术趋势
-- **代码质量**：注重代码规范和最佳实践
+### Technical Advantages
+- **Full-stack Capability**: Complete frontend and backend development skills
+- **Architectural Thinking**: System design and refactoring experience
+- **Learning Ability**: Quick to master new technologies, stays current with trends
+- **Code Quality**: Focus on coding standards and best practices
 
-### 管理能力
-- **团队领导**：有技术团队管理经验
-- **项目管理**：熟悉Agile开发流程
-- **沟通协调**：良好的跨部门协作能力
-- **技术指导**：有新人培养和技术分享经验
+### Management Skills
+- **Team Leadership**: Technical team management experience
+- **Project Management**: Familiar with Agile development processes
+- **Communication**: Strong cross-functional collaboration skills
+- **Mentoring**: Experience training juniors and sharing knowledge
 
-### 职业规划
-- **短期目标**：成为技术专家，深入某个技术领域
-- **中期目标**：承担更大的技术责任，带领更大的团队
-- **长期目标**：成为技术总监或架构师
+### Career Goals
+- **Short-term**: Become technical expert, deepen expertise in specific domain
+- **Mid-term**: Take on greater technical responsibilities, lead larger teams
+- **Long-term**: Become Technical Director or Chief Architect
 
-## 获得证书
-- AWS云从业者认证 (2022)
-- PMP项目管理专业认证 (2021)  
-- Oracle数据库认证 (2019)
+## Certifications
+- AWS Cloud Practitioner Certification (2022)
+- PMP Project Management Professional (2021)
+- Oracle Database Certification (2019)
 
-## 兴趣爱好
-- 🏃‍♂️ **运动健身**：跑步、游泳，保持良好身体状态
-- 📚 **技术阅读**：关注技术博客，阅读技术书籍
-- 🎮 **开源贡献**：参与开源项目，贡献代码和文档
-- 🎵 **音乐**：业余时间学习吉他，放松身心
+## Interests & Hobbies
+- 🏃‍♂️ **Fitness**: Running, swimming, maintaining good physical health
+- 📚 **Technical Reading**: Following tech blogs, reading technical books
+- 🎮 **Open Source**: Contributing code and documentation to OSS projects
+- 🎵 **Music**: Learning guitar in spare time for relaxation

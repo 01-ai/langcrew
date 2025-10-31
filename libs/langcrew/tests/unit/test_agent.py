@@ -14,6 +14,7 @@ from langcrew.agent import Agent
 from langcrew.guardrail import input_guard, output_guard
 from langcrew.hitl import HITLConfig
 from langcrew.memory import MemoryConfig
+from langcrew.memory.config import ShortTermMemoryConfig
 
 
 class TestAgent:
@@ -62,7 +63,7 @@ class TestAgent:
 
     def test_agent_initialization_with_memory(self, mock_llm):
         """Test agent initialization with memory configuration."""
-        memory_config = MemoryConfig(enabled=True)
+        memory_config = MemoryConfig(short_term=ShortTermMemoryConfig(enabled=True))
         agent = Agent(
             role="Memory Specialist",
             goal="Remember information",
@@ -393,7 +394,7 @@ class TestAgent:
 
     def test_agent_initialization_with_hitl(self, mock_llm):
         """Test agent initialization with HITL configuration."""
-        hitl_config = HITLConfig(enabled=True, interrupt_tool_mode="all")
+        hitl_config = HITLConfig(interrupt_before_tools=["test_tool"])
 
         agent = Agent(
             role="HITL Specialist",
@@ -403,8 +404,7 @@ class TestAgent:
             hitl=hitl_config,
         )
 
-        assert agent.hitl_config.enabled is True
-        assert agent.hitl_config.interrupt_tool_mode == "all"
+        assert agent.hitl_config.interrupt_before_tools == ["test_tool"]
 
     def test_agent_initialization_with_handoff_config(self, mock_llm):
         """Test agent initialization with handoff configuration."""

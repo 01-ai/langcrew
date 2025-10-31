@@ -74,7 +74,7 @@ class TestTokenUtils:
 
     def test_count_message_tokens_without_llm(self, sample_messages):
         """Test counting tokens without LLM model raises error."""
-        with pytest.raises(ValueError, match="LLM must have model_name attribute"):
+        with pytest.raises(ValueError, match="LLM must be provided"):
             count_message_tokens(sample_messages, None)
 
     @patch("langcrew.context.token_utils.token_counter")

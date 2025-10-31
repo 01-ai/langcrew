@@ -1,44 +1,72 @@
 ---
 title: Short-term Memory
-description: Session-based conversation history management
+description: Session-based conversation history for immediate context retention
 ---
 
-Short-term memory provides session-based conversation history using LangGraph's Checkpointer system. It maintains context within a conversation thread and automatically injects relevant history into agent prompts.
+Short-term memory provides session-based conversation history using LangGraph's Checkpointer system. It automatically preserves conversation context within a session, enabling agents to maintain coherent multi-turn conversations.
 
-## Overview
+## Quick Start
 
-Short-term memory is ideal for:
-
-- **Conversational continuity** within a session
-- **Context-aware responses** based on recent interactions
-- **Multi-turn conversations** with maintained state
-- **Session-based applications** with temporary context needs
-
-## Configuration
-
-### Basic Setup
+### Basic Configuration
 
 ```python
-from langcrew.memory import MemoryConfig
+from langcrew import Crew, Agent
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
 
+# Enable short-term memory
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///short_term.db",
-    short_term={
-        "enabled": True,
-        "max_history": 20,  # Keep last 20 conversation turns
-    }
+    connection_string="sqlite:///memory.db",
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
+
+crew = Crew(agents=[agent], memory=memory_config)
 ```
 
 ### Configuration Parameters
 
-| Parameter     | Type | Description                            | Default |
-| ------------- | ---- | -------------------------------------- | ------- |
-| `enabled`     | bool | Enable short-term memory               | True    |
-| `max_history` | int  | Maximum conversation turns to remember | 20      |
+| Parameter           | Type        | Description                                    | Default  |
+| ------------------- | ----------- | ---------------------------------------------- | -------- |
+| `enabled`           | bool        | Enable short-term memory                       | True     |
+| `provider`          | str \| None | Storage provider override (inherits if None)   | None     |
+| `connection_string` | str \| None | Connection string override (inherits if None)  | None     |
+
+**Advanced Configuration:**
+
+```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
+
+# Override storage provider for short-term memory only
+memory_config = MemoryConfig(
+    provider="sqlite",  # Global provider
+    connection_string="sqlite:///global.db",
+    short_term=ShortTermMemoryConfig(
+        enabled=True,
+        provider="postgres",  # Override for short-term only
+        connection_string="postgresql://localhost/short_term"
+    )
+)
+```
 
 ## How It Works
+
+Short-term memory is managed at the Crew level and automatically propagated to all agents through LangGraph's checkpointer system.
+
+### Crew-Level Management
+
+When you configure memory on a Crew, the checkpointer is created and shared across all agents:
+
+```python
+crew = Crew(
+    agents=[agent1, agent2],
+    memory=memory_config  # Checkpointer managed by Crew
+)
+```
+
+- Crew creates the checkpointer instance
+- LangGraph compiles the graph with the checkpointer
+- All agents automatically get conversation history
+- No need for agents to explicitly manage checkpoints
 
 ### Thread-based Sessions
 
@@ -79,259 +107,144 @@ crew.kickoff(
     thread_id="conversation_1"
 )
 
-# Second message - agent has context from first message
+# Second message - agent remembers the first
 crew.kickoff(
-    inputs={"user_input": "Recommend a restaurant"},
-    thread_id="conversation_1"  # Agent knows user likes Italian food
+    inputs={"user_input": "What kind of food do I like?"},
+    thread_id="conversation_1"  # Same thread = remembers context
 )
+# Response: "You mentioned you like Italian food"
 ```
 
-### Memory Lifecycle
+## Use Cases
 
-1. **Save**: Each agent response is saved to short-term memory
-2. **Retrieve**: Recent history is retrieved for context
-3. **Inject**: Relevant context is injected into agent prompts
-4. **Limit**: Old history is removed when max_history is exceeded
+### Customer Support
 
-## Usage Examples
-
-### Customer Support Chat
+Maintain conversation context across a support session:
 
 ```python
-from langcrew import Agent, Crew
-from langcrew.memory import MemoryConfig
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
 
-# Configure for customer support
+# Customer support configuration
 memory_config = MemoryConfig(
     provider="postgresql",
     connection_string="postgresql://user:pass@localhost:5432/support_db",
-    short_term={
-        "enabled": True,
-        "max_history": 30,  # Longer history for complex issues
-    }
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
 
 support_agent = Agent(
     role="Customer Support Agent",
     goal="Provide helpful support using conversation context",
-    backstory="You remember the conversation history to provide contextual help"
+    backstory="You remember conversation history to provide contextual help"
 )
 
 crew = Crew(agents=[support_agent], memory=memory_config)
 
-# Customer conversation
-def handle_customer_message(customer_id, message):
-    return crew.kickoff(
-        inputs={"user_input": message},
-        thread_id=f"customer_{customer_id}"
-    )
+# Support session
+crew.kickoff(
+    inputs={"user_input": "My order #12345 hasn't arrived"},
+    thread_id="support_session_789"
+)
 
-# Example usage
-response1 = handle_customer_message("12345", "My order hasn't arrived")
-response2 = handle_customer_message("12345", "It was supposed to be here yesterday")
-# Agent remembers the context about the missing order
+crew.kickoff(
+    inputs={"user_input": "When was it supposed to arrive?"},
+    thread_id="support_session_789"  # Remembers order #12345
+)
 ```
 
-### Multi-turn Planning Assistant
+### Educational Tutoring
+
+Track learning progress within a tutoring session:
 
 ```python
-# Configure for planning tasks
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
+
+# Educational session configuration
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///planning.db",
-    short_term={
-        "enabled": True,
-        "max_history": 15,  # Moderate history for planning context
-    }
-)
-
-planning_agent = Agent(
-    role="Planning Assistant",
-    goal="Help users plan projects step by step",
-    backstory="You remember the planning context and build on previous discussions"
-)
-
-crew = Crew(agents=[planning_agent], memory=memory_config)
-
-# Planning conversation
-session_id = "project_planning_123"
-
-# Step 1: Initial requirements
-crew.kickoff(
-    inputs={"user_input": "I need to plan a marketing campaign for Q2"},
-    thread_id=session_id
-)
-
-# Step 2: Add details (agent remembers Q2 marketing campaign context)
-crew.kickoff(
-    inputs={"user_input": "The budget is $50,000 and target audience is young professionals"},
-    thread_id=session_id
-)
-
-# Step 3: Specific tasks (agent has full context)
-crew.kickoff(
-    inputs={"user_input": "What should be the first milestone?"},
-    thread_id=session_id
-)
-```
-
-### Educational Tutor
-
-```python
-# Configure for educational sessions
-memory_config = MemoryConfig(
-    provider="sqlite", 
     connection_string="sqlite:///education.db",
-    short_term={
-        "enabled": True,
-        "max_history": 25,  # Remember learning progress
-    }
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
 
 tutor_agent = Agent(
     role="Math Tutor",
     goal="Teach math concepts building on previous explanations",
-    backstory="You remember what concepts have been covered and student's understanding level"
+    backstory="You remember concepts covered and student's understanding level"
 )
 
 crew = Crew(agents=[tutor_agent], memory=memory_config)
 
-# Teaching session
-student_id = "student_456"
-
-# Lesson 1: Basic concepts
+# Tutoring session
+student_id = "student_123"
 crew.kickoff(
-    inputs={"user_input": "Explain what algebra is"},
+    inputs={"user_input": "Explain linear equations"},
     thread_id=f"student_{student_id}"
 )
 
-# Lesson 2: Building on previous (agent remembers algebra explanation)
 crew.kickoff(
     inputs={"user_input": "Now show me how to solve x + 5 = 10"},
     thread_id=f"student_{student_id}"
 )
 ```
 
-## Memory Management
+## Storage Providers
 
-### Search Short-term Memory
+Short-term memory supports all LangCrew storage providers:
 
-```python
-# Search within short-term memory
-results = crew.search_memory(
-    query="pizza order",
-    memory_type="short_term",
-    limit=5
-)
-
-for result in results:
-    print(f"Found: {result['content']}")
-    print(f"Timestamp: {result['timestamp']}")
-```
-
-### Clear Session Memory
+### In-Memory (Development)
 
 ```python
-# Clear memory for a specific session
-crew.short_term_memory.clear(thread_id="user_alice")
-
-# Or clear all short-term memory
-crew.short_term_memory.clear()
-```
-
-### Get Context for Session
-
-```python
-# Get conversation context
-context = crew.short_term_memory.get_context(
-    thread_id="conversation_1",
-    limit=10  # Last 10 messages
-)
-
-for item in context:
-    print(f"Agent: {item['agent']}")
-    print(f"Content: {item['value']}")
-    print(f"Time: {item['timestamp']}")
-```
-
-## Best Practices
-
-### Thread ID Strategy
-
-```python
-# Use meaningful thread IDs
-thread_patterns = {
-    "user_sessions": f"user_{user_id}",
-    "support_tickets": f"ticket_{ticket_id}",
-    "project_planning": f"project_{project_id}_{phase}",
-    "learning_sessions": f"student_{student_id}_{subject}"
-}
-```
-
-### Memory Size Management
-
-```python
-# Adjust max_history based on use case
-memory_configs = {
-    "quick_chat": {"max_history": 5},      # Brief interactions
-    "support": {"max_history": 30},        # Complex problem solving
-    "tutoring": {"max_history": 25},       # Educational continuity
-    "planning": {"max_history": 15},       # Project discussions
-}
-```
-
-### Performance Optimization
-
-```python
-# Use appropriate storage for your scale
-storage_choices = {
-    "development": "memory",               # Fast, no persistence
-    "small_scale": "sqlite",              # File-based, good performance
-    "production": "postgresql",           # Scalable, concurrent access
-}
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
 
 memory_config = MemoryConfig(
-    provider=storage_choices["production"],
-    connection_string="postgresql://...",
-    short_term={"enabled": True, "max_history": 20}
+    provider="memory",  # Fast, no persistence
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
 ```
 
-## Integration with Other Memory Types
-
-Short-term memory works alongside long-term and entity memory:
+### SQLite (Single-user/Development)
 
 ```python
-# Combined memory configuration
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
+
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db",
+    short_term=ShortTermMemoryConfig(enabled=True)
+)
+```
+
+### PostgreSQL (Production)
+
+```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
+
 memory_config = MemoryConfig(
     provider="postgresql",
-    connection_string="postgresql://...",
-    short_term={"enabled": True, "max_history": 20},    # Recent context
-    long_term={"enabled": True, "min_quality": 0.8},    # Important knowledge
-    entity={"enabled": True}                            # Track entities
+    connection_string="postgresql://user:pass@localhost:5432/memory_db",
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
-
-# Agent benefits from all memory types
-crew = Crew(agents=[agent], memory=memory_config)
 ```
 
 ## Troubleshooting
 
-### Memory Not Loading
+### Memory Not Persisting
 
-- Verify thread_id consistency between calls
-- Check database connection and permissions
-- Ensure checkpointer is properly configured
+- Ensure you're using the same `thread_id` across conversations
+- Verify database connection and permissions
+- Check that checkpointer is properly configured
 
 ### Context Not Injected
 
-- Confirm `enabled: True` in short_term configuration
-- Check that max_history > 0
-- Verify agent is using the same crew instance
+- Confirm short-term config has `enabled: True`
+- Verify agents are using the same crew instance
 
 ### Performance Issues
 
-- Reduce max_history for faster context loading
 - Use connection pooling for database providers
 - Consider SQLite for single-user applications
 
+## Next Steps
+
+- **[Long-term Memory](/guides/memory/long-term)** - Persistent knowledge storage
+- **[Storage Configuration](/guides/memory/storage)** - Configure storage backends
+- **[Memory Concepts](/concepts/memory)** - Understand memory architecture

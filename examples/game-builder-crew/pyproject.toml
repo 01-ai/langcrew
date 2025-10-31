@@ -9,12 +9,9 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     "pydantic>=2.0.0",
     "PyYAML>=6.0",
-    "dotenv>=0.9.9",
-    "langcrew>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "langcrew>=0.1.1",
 ]
-
-[tool.uv.sources]
-langcrew = { path = "../../libs/langcrew", editable = true }
 
 [project.scripts]
 game_builder_crew = "game_builder_crew.main:run_agents_crew"

@@ -7,9 +7,12 @@ This project demonstrates the use of the LangCrew framework to automate the recr
 
 Based on [@joaomdmoura](https://x.com/joaomdmoura)'s CrewAI example, enhanced with LangCrew.
 
-- [Running the Script](#running-the-script)
-- [Details & Explanation](#details--explanation)
-- [License](#license)
+- [AI Crew for Recruitment](#ai-crew-for-recruitment)
+  - [Introduction](#introduction)
+  - [Running the Script](#running-the-script)
+    - [Steps to get Linkedin Cookie (LI\_AT)](#steps-to-get-linkedin-cookie-li_at)
+  - [Details \& Explanation](#details--explanation)
+  - [License](#license)
 
 ## Running the Script
 It uses gpt-4o-mini by default so you should have access to that to run it.
@@ -23,7 +26,7 @@ It uses gpt-4o-mini by default so you should have access to that to run it.
 - **Customize**: Modify `src/recruitment/main.py` to add custom inputs for your agents and tasks.
 - **Customize Further**: Check `src/recruitment/config/agents.yaml` to update your agents and `src/recruitment/config/tasks.yaml` to update your tasks.
 - **Custom Tools**: You can find custom tools at `src/recruitment/tools/` (includes LinkedIn automation tools).
-- **Execute the Script**: Run `uv run --prerelease=allow recruitment` or `source .venv/bin/activate && recruitment` and input your project details.
+- **Execute the Script**: Run `uv run recruitment` or `source .venv/bin/activate && recruitment` and input your project details.
 
 ### Steps to get Linkedin Cookie (LI_AT)
 - Navigate to www.linkedin.com and log in
@@ -34,7 +37,7 @@ It uses gpt-4o-mini by default so you should have access to that to run it.
 - Be sure to fetch the cookies again if selenium doesnt login to linkedin after a while
 
 ## Details & Explanation
-- **Running the Script**: Execute `uv run --prerelease=allow recruitment`. The script will leverage the LangCrew framework to automate recruitment tasks and generate a detailed report.
+- **Running the Script**: Execute `uv run recruitment`. The script will leverage the LangCrew framework to automate recruitment tasks and generate a detailed report.
 - **Key Components**:
   - `src/recruitment/main.py`: Main script file containing the recruitment workflow execution logic.
   - `src/recruitment/crew.py`: Main crew file where agents and tasks come together, and the main logic is executed.

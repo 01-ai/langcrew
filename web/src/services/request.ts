@@ -44,22 +44,11 @@ request.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const { data, config } = response;
 
+    console.log('response', response);
+
     // 如果响应是流数据（如 SSE），直接返回
     if (response.headers['content-type']?.includes('text/event-stream')) {
       return response;
-    }
-
-    // 处理业务错误
-    if (!data.success) {
-      const errorMessage = data.message || '请求失败';
-
-      // 根据配置决定是否显示错误提示
-      const showError = (config as RequestConfig).showError !== false;
-      if (showError) {
-        message.error(errorMessage);
-      }
-
-      return Promise.reject(new Error(errorMessage));
     }
 
     return response;

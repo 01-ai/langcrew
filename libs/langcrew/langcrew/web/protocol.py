@@ -38,6 +38,8 @@ class MessageType(str, Enum):
     # HITL related message types
     USER_INPUT = "user_input"  # User input request
     TOOL_APPROVAL_REQUEST = "tool_approval_request"  # Tool approval request
+    
+    TOOL_CALL_CHUNK = "tool_call_chunk"
 
 
 # Stream message protocol
@@ -53,6 +55,7 @@ class StreamMessage(BaseModel):
     session_id: str | None = None
     task_id: str | None = None  # Task identifier for precise control and tracking
     trace_id: str | None = None
+    field_name: str | None = None
 
 
 class TaskExecutionStatus(str, Enum):

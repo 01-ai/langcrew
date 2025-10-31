@@ -1,26 +1,67 @@
 from typing import List
-from langcrew import Agent, Crew, Task
-from langcrew.project import CrewBase, agent, crew, task
-
-# Uncomment the following line to use an example of a custom tool
-# from marketing_posts.tools.custom_tool import MyCustomTool
-
-# Check our tools documentations for more information on how to use them
-from crewai_tools import SerperDevTool, ScrapeWebsiteTool
 from pydantic import BaseModel, Field
 
-# Add default LLM import
-import os
-from langchain_openai import ChatOpenAI
+from langcrew import Agent, Crew, Task
+from langcrew.project import CrewBase, agent, crew, task
+from langcrew.llm_factory import LLMFactory
+from langchain_community.utilities import GoogleSerperAPIWrapper
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_core.tools import Tool
+import logging
 
-# Import tool converter
-from langcrew.tools.converter import convert_tools
+# Setup logging
+logger = logging.getLogger(__name__)
 
 
-# Simple tool conversion function
-def get_research_tools():
-    """Get converted research tools"""
-    return convert_tools([SerperDevTool(), ScrapeWebsiteTool()])
+# Create Serper search tool (replaces SerperDevTool)
+def _create_serper_search_tool() -> Tool:
+    """Create a web search tool based on Google Serper API"""
+    search = GoogleSerperAPIWrapper()
+
+    return Tool(
+        name="web_search",
+        description=(
+            "Perform web search to obtain the latest information related to the query. "
+            "Returns search results containing titles, URLs and snippets. "
+            "Input should be a search query string."
+        ),
+        func=search.run,
+    )
+
+
+# Create web scrape tool (replaces ScrapeWebsiteTool)
+def _create_web_scrape_tool() -> Tool:
+    """Create a web content scraping tool based on WebBaseLoader"""
+
+    def scrape_url(url: str) -> str:
+        """Scrape webpage content and return as text"""
+        try:
+            loader = WebBaseLoader(web_paths=[url])
+            docs = loader.load()
+            if docs:
+                # Return page content, limit length to avoid excessive size
+                content = docs[0].page_content
+                if len(content) > 50000:
+                    content = content[:50000] + "\n\n[Content truncated...]"
+                return content
+            return "No content extracted from the webpage."
+        except Exception as e:
+            return f"Error scraping webpage: {str(e)}"
+
+    return Tool(
+        name="web_scrape",
+        description=(
+            "Scrape a web page and extract its content in text format. "
+            "Automatically filters out navigation, ads, and other irrelevant content. "
+            "Input should be a valid URL string."
+        ),
+        func=scrape_url,
+    )
+
+
+# Initialize tools
+web_search_tool = _create_serper_search_tool()
+web_scrape_tool = _create_web_scrape_tool()
 
 
 class MarketStrategy(BaseModel):
@@ -61,18 +102,21 @@ class MarketingPostsCrew:
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"
 
-    def _get_default_llm(self):
+    def _get_llm(self):
         """Get default LLM for agents"""
-        return ChatOpenAI(
-            model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")
+        return LLMFactory.create_llm(
+            {
+                "provider": "openai",
+                "model": "gpt-5-mini",
+            }
         )
 
     @agent
     def lead_market_analyst(self) -> Agent:
         return Agent(
             config=self.agents_config["lead_market_analyst"],
-            tools=get_research_tools(),
-            llm=self._get_default_llm(),
+            tools=[web_search_tool, web_scrape_tool],
+            llm=self._get_llm(),
             verbose=True,
             debug=True,
         )
@@ -81,8 +125,8 @@ class MarketingPostsCrew:
     def chief_marketing_strategist(self) -> Agent:
         return Agent(
             config=self.agents_config["chief_marketing_strategist"],
-            tools=get_research_tools(),
-            llm=self._get_default_llm(),
+            tools=[web_search_tool, web_scrape_tool],
+            llm=self._get_llm(),
             verbose=True,
             debug=True,
         )
@@ -91,7 +135,7 @@ class MarketingPostsCrew:
     def creative_content_creator(self) -> Agent:
         return Agent(
             config=self.agents_config["creative_content_creator"],
-            llm=self._get_default_llm(),
+            llm=self._get_llm(),
             verbose=True,
             debug=True,
         )
@@ -142,5 +186,4 @@ class MarketingPostsCrew:
             agents=self.agents,  # Automatically created by the @agent decorator
             tasks=self.tasks,  # Automatically created by the @task decorator
             verbose=True,
-            memory=True,  # Enable memory system
         )

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-
+from dotenv import load_dotenv
 from job_posting.crew import JobPostingCrew
+
+load_dotenv()
 
 
 def run():

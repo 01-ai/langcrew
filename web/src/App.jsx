@@ -29,7 +29,26 @@ const antdConfig = {
 
 function App() {
   // return <AgentX requestPrefix="http://localhost:8000" />;
-  return <AgentX />;
+  return (
+    <AgentX
+      onToolsUpdate={(messages) => {
+        console.log('onToolsUpdate', messages);
+      }}
+      fileUploadConfig={{
+        customUploadRequest: async (file) => {
+          console.log('customUploadRequest', file);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          return Promise.resolve('https://www.baidu.com');
+        },
+      }}
+      onChunks={(chunks) => {
+        console.log('onChunks', chunks);
+      }}
+      onNewMessage={(message) => {
+        console.log('onNewMessage', message);
+      }}
+    />
+  );
 }
 
 export default App;

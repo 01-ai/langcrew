@@ -96,14 +96,27 @@ async def create_sandbox_from_env_config(
     Returns:
         AsyncSandbox: async sandbox instance.
     """
+    if sandbox_id is None:
+        sandbox_id = E2B_CONFIG.get("sandbox_id")
+
+    api_key = E2B_CONFIG.get("api_key")
+    timeout = int(E2B_CONFIG.get("timeout"))
+    domain = E2B_CONFIG.get("domain")
+    template = E2B_CONFIG.get("template")
+
     if sandbox_id:
-        sandbox = await AsyncSandbox.resume(
-            api_key=E2B_CONFIG["api_key"], sandbox_id=sandbox_id
-        )
-    else:
-        sandbox = await AsyncSandbox.create(
-            api_key=E2B_CONFIG["api_key"],
-            template=E2B_CONFIG["template"],
-            timeout=int(E2B_CONFIG["timeout"]),
-        )
-    return sandbox
+        running_sandboxes = await AsyncSandbox.list(api_key=api_key, domain=domain)
+        for sandbox in running_sandboxes:
+            if sandbox.sandbox_id == sandbox_id:
+                return await AsyncSandbox.connect(
+                    sandbox_id=sandbox_id,
+                    api_key=api_key,
+                    domain=domain,
+                )
+
+    return await AsyncSandbox.create(
+        api_key=api_key,
+        template=template,
+        timeout=timeout,
+        domain=domain,
+    )

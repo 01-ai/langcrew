@@ -15,19 +15,27 @@ The `HITLConfig` class is your main interface for configuring HITL behavior:
 from langcrew.hitl import HITLConfig
 
 config = HITLConfig(
-    enabled=True,                              # Enable/disable HITL
-    interrupt_before_tools=["tool1", "tool2"], # Tools requiring pre-approval
-    interrupt_after_tools=["tool3"],           # Tools requiring post-review
-    interrupt_tool_mode="specified",           # Control mode
-    excluded_tools=["safe_tool"],              # Tools to exclude
-    interrupt_before_nodes=["node1"],          # LangGraph node interrupts
-    interrupt_after_nodes=["node2"]            # LangGraph node interrupts
+    # Tool-level interrupts
+    interrupt_before_tools=["tool1", "tool2"],  # Tools requiring pre-approval
+    interrupt_after_tools=["tool3"],            # Tools requiring post-review
+    
+    # Task-level interrupts (Task Mode only)
+    interrupt_before_tasks=["task1"],
+    interrupt_after_tasks=["task2"],
+    
+    # Agent-level interrupts (Agent Mode only)
+    interrupt_before_agents=["agent1"],
+    interrupt_after_agents=["agent2"],
+    
+    # Node-level interrupts (LangGraph native)
+    interrupt_before_nodes=["node1"],
+    interrupt_after_nodes=["node2"]
 )
 ```
 
-## Configuration Modes
+## Configuration Patterns
 
-### Specified Tools Mode
+### Specified Tools
 
 Target specific tools for interrupts:
 
@@ -43,8 +51,7 @@ hitl_config = HITLConfig(
         "send_email",      # Confirm email sending
         "database_query",  # Validate database access
         "external_api"     # Review API calls
-    ],
-    interrupt_tool_mode="specified"  # Only specified tools
+    ]
 )
 ```
 
@@ -59,13 +66,11 @@ hitl_config = HITLConfig(
         "content_generator", # Check generated content
         "report_writer",    # Validate reports
         "image_processor"   # Review processed images
-    ],
-    interrupt_tool_mode="specified"
+    ]
 )
 
 # ⚠️ IMPORTANT: After interrupts only work within single execution session
 # They will NOT trigger after workflow restarts or checkpointed state recovery
-# unless the tool supports re-entrant execution
 ```
 
 </TabItem>
@@ -147,35 +152,6 @@ hitl_config = HITLConfig(
 </TabItem>
 </Tabs>
 
-### All Tools Mode
-
-Require approval for all tools with exceptions:
-
-```python
-# High-security configuration
-hitl_config = HITLConfig(
-    interrupt_tool_mode="all",  # All tools require approval
-    excluded_tools=[
-        "calculator",       # Safe mathematical operations
-        "date_time",        # Simple date/time queries
-        "user_input",       # User interaction tool
-        "text_formatter"    # Safe text operations
-    ]
-)
-```
-
-### No Interrupts Mode
-
-Disable HITL completely:
-
-```python
-# Development/testing mode
-hitl_config = HITLConfig(enabled=False)
-
-# Or simply omit HITL configuration
-agent = Agent(role="Developer", tools=[...])  # No HITL
-```
-
 ## Agent-Level Configuration
 
 ### Individual Agent Setup
@@ -205,10 +181,9 @@ worker_agent = Agent(
 # Public-facing agent with maximum oversight
 public_agent = Agent(
     role="Public Assistant", 
-    tools=[WebSearchTool(), CalculatorTool()],
+    tools=[WebSearchTool(), CalculatorTool(), FileWriteTool()],
     hitl=HITLConfig(
-        interrupt_tool_mode="all",
-        excluded_tools=["calculator"]
+        interrupt_before_tools=["web_search", "file_write"]  # Approve all risky operations
     )
 )
 ```
@@ -225,8 +200,7 @@ def create_context_aware_hitl(user_role, data_sensitivity):
         )
     elif data_sensitivity == "high":
         return HITLConfig(
-            interrupt_tool_mode="all",
-            excluded_tools=["calculator", "date_time"]
+            interrupt_before_tools=["file_write", "database_write", "external_api"]
         )
     else:
         return HITLConfig(
@@ -275,7 +249,9 @@ Combine agent-level and crew-level HITL:
 critical_agent = Agent(
     role="Critical Operations",
     tools=[DatabaseTool()],
-    hitl=HITLConfig(interrupt_tool_mode="all")  # Agent-specific policy
+    hitl=HITLConfig(
+        interrupt_before_tools=["database_write", "database_delete"]  # Agent-specific policy
+    )
 )
 
 # Agent without HITL config (will inherit from crew)
@@ -398,7 +374,7 @@ def get_hitl_config():
     
     if env == "development":
         # Minimal interrupts for faster development
-        return HITLConfig(enabled=False)
+        return None  # No HITL for development
     
     elif env == "staging":
         # Critical operations only
@@ -407,10 +383,13 @@ def get_hitl_config():
         )
     
     elif env == "production":
-        # Comprehensive oversight
+        # Comprehensive oversight - specify all sensitive tools
         return HITLConfig(
-            interrupt_tool_mode="all",
-            excluded_tools=["calculator", "date_time", "text_formatter"]
+            interrupt_before_tools=[
+                "database_write", "database_delete", 
+                "file_write", "file_delete",
+                "external_api", "send_email"
+            ]
         )
     
     else:
@@ -431,18 +410,22 @@ agent = Agent(
 ### 1. Security-First Approach
 
 ```python
-# Start restrictive, then relax as needed
+# Start by specifying sensitive operations
 initial_config = HITLConfig(
-    interrupt_tool_mode="all",
-    excluded_tools=["calculator"]  # Only obviously safe tools
+    interrupt_before_tools=[
+        "file_write", "file_delete",
+        "database_write", "database_delete",
+        "external_api", "send_email"
+    ]
 )
 
-# Gradually add to excluded_tools based on experience
-mature_config = HITLConfig(
-    interrupt_tool_mode="all", 
-    excluded_tools=[
-        "calculator", "date_time", "text_formatter",
-        "unit_converter", "weather_info"  # Proven safe tools
+# Expand as needed based on your application's requirements
+production_config = HITLConfig(
+    interrupt_before_tools=[
+        "file_write", "file_delete",
+        "database_write", "database_delete",
+        "external_api", "send_email",
+        "system_command", "user_data_access"  # Add more as identified
     ]
 )
 ```
@@ -464,8 +447,7 @@ def get_role_based_hitl(user_role):
             interrupt_before_tools=["database_write", "external_api"]
         ),
         "viewer": HITLConfig(
-            interrupt_tool_mode="all",
-            excluded_tools=["calculator", "date_time"]
+            interrupt_before_tools=["file_write", "database_write", "external_api"]
         )
     }
     
@@ -480,18 +462,19 @@ SAFE_TOOLS = ["calculator", "date_time", "text_formatter", "unit_converter"]
 MODERATE_TOOLS = ["web_search", "file_read", "data_query"]  
 DANGEROUS_TOOLS = ["file_write", "file_delete", "database_write", "send_email"]
 
-# Risk-based configuration
+# Low risk: only dangerous tools need approval
 low_risk_config = HITLConfig(
     interrupt_before_tools=DANGEROUS_TOOLS
 )
 
+# High risk: dangerous and moderate tools need approval
 high_risk_config = HITLConfig(
     interrupt_before_tools=DANGEROUS_TOOLS + MODERATE_TOOLS
 )
 
+# Maximum security: explicitly list all tools that need approval
 maximum_security_config = HITLConfig(
-    interrupt_tool_mode="all",
-    excluded_tools=SAFE_TOOLS
+    interrupt_before_tools=DANGEROUS_TOOLS + MODERATE_TOOLS + ["advanced_operation"]
 )
 ```
 
@@ -518,9 +501,9 @@ for tool in agent.tools:
 
 ```python
 # ❌ Problem: Using after-interrupts across sessions
-result1 = crew.kickoff(thread_id="session1")  # Tool executes, triggers after-interrupt
+result1 = crew.kickoff(config={"configurable": {"thread_id": "session1"}})  # Tool executes, triggers after-interrupt
 # System restarts...
-result2 = crew.kickoff(thread_id="session1")  # After-interrupt won't trigger again
+result2 = crew.kickoff(config={"configurable": {"thread_id": "session1"}})  # After-interrupt won't trigger again
 
 # ✅ Solution: Use before-interrupts for persistent approvals
 hitl_config = HITLConfig(

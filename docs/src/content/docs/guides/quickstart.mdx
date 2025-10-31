@@ -7,42 +7,23 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 Let's build your first langcrew application! In this tutorial, we'll create a simple content creation crew with two agents working together.
 
-## Prerequisites & Installation
+## Prerequisites
 
-### System Requirements
+- **Python 3.10+**
+- **An LLM API key** (OpenAI, Anthropic, DashScope, or Google)
 
-Before installing langcrew, ensure you have:
+## Installation
 
-- **Python**: 3.11 to 3.12
-- **uv**: Recommended package manager
-- **Virtual Environment**: Recommended for project isolation
-
-### Installation
-
-> **Note**: langcrew is currently not open source and requires access to a private package index.
-
-Install langcrew directly using uv with the private index:
+Quick installation with pip:
 
 ```bash
-uv add langcrew --prerelease=allow
+pip install langcrew
+export OPENAI_API_KEY=your_openai_key
 ```
 
-### Verify Installation
-
-```python
-import langcrew
-print(langcrew.__version__)
-
-# Test basic functionality
-from langcrew import Agent
-
-agent = Agent(
-    role="Test Agent",
-    goal="Verify installation",
-    backstory="A helpful test agent"
-)
-print(f"Agent created: {agent.role}")
-```
+:::tip[Need more installation options?]
+For detailed installation instructions, optional dependencies, Docker deployment, and other LLM providers, see the **[Installation Guide](/guides/installation)**.
+:::
 
 ## What We'll Build
 
@@ -55,8 +36,10 @@ A content creation system where:
 
 ```python
 from langcrew import Agent, Task, Crew
-from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew_tools.fetch.langchain_tools import WebFetchTool
+from langchain_openai import ChatOpenAI
+
+# Configure LLM
+llm = ChatOpenAI(model="gpt-4o")
 ```
 
 ## Step 2: Create Your Agents
@@ -70,7 +53,8 @@ researcher = Agent(
     backstory="""You are an experienced researcher with a keen eye for 
     credible sources and relevant information. You excel at finding and 
     synthesizing data from multiple sources.""",
-    tools=[WebSearchTool(), WebFetchTool()],
+    tools=["web_search", "web_fetch"],  # Built-in tools
+    llm=llm,
     verbose=True
 )
 ```
@@ -84,6 +68,7 @@ writer = Agent(
     backstory="""You are a skilled writer who transforms research into 
     compelling narratives. You have a talent for making complex topics 
     accessible to readers.""",
+    llm=llm,
     verbose=True
 )
 ```
@@ -154,8 +139,10 @@ print(result)
 
 ```python
 from langcrew import Agent, Task, Crew
-from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew_tools.fetch.langchain_tools import WebFetchTool
+from langchain_openai import ChatOpenAI
+
+# Configure LLM
+llm = ChatOpenAI(model="gpt-4o")
 
 # Create agents
 researcher = Agent(
@@ -163,7 +150,8 @@ researcher = Agent(
     goal="Gather comprehensive information on the given topic",
     backstory="""You are an experienced researcher with a keen eye for 
     credible sources and relevant information.""",
-    tools=[WebSearchTool(), WebFetchTool()],
+    tools=["web_search", "web_fetch"],
+    llm=llm,
     verbose=True
 )
 
@@ -172,6 +160,7 @@ writer = Agent(
     goal="Create engaging and informative content",
     backstory="""You are a skilled writer who transforms research into 
     compelling narratives.""",
+    llm=llm,
     verbose=True
 )
 
@@ -205,11 +194,11 @@ print(result)
 ### Adding Human Input
 
 ```python
-from langcrew.tools import HumanInputTool
+from langcrew_tools.hitl import UserInputTool
 
 agent = Agent(
     role="Interactive Agent",
-    tools=[HumanInputTool()],
+    tools=[UserInputTool()],
     # ... other parameters
 )
 ```

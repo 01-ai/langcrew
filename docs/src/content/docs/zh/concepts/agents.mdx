@@ -98,7 +98,9 @@ from langcrew.hitl import HITLConfig
 
 agent = Agent(
     role="决策者",
-    hitl=HITLConfig(enabled=True)
+    hitl=HITLConfig(
+        interrupt_before_tools=["critical_tool"]  # 对特定工具需要批准
+    )
 )
 ```
 
@@ -138,6 +140,244 @@ writer = Agent(role="写手", goal="创建内容")
 # 组织成一个团队
 crew = Crew(agents=[researcher, writer])
 result = crew.kickoff(inputs={"task": "分析市场数据"})
+```
+
+## 高级配置
+
+### MCP 服务器集成
+
+通过模型上下文协议将智能体连接到外部数据源和工具：
+
+```python
+from langcrew import Agent
+
+agent = Agent(
+    role="数据分析师",
+    goal="从多个数据源分析数据",
+    backstory="擅长连接各种数据系统的专家",
+    llm=llm,
+    mcp_servers={
+        "github-mcp": {
+            "url": "http://localhost:3000/sse",
+            "transport": "sse"  # Server-Sent Events（服务器发送事件）
+        },
+        "filesystem-mcp": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/data"],
+            "transport": "stdio"  # 标准输入输出
+        }
+    },
+    mcp_tool_filter=["github_search_repos", "read_file"]  # 可选的工具过滤
+)
+```
+
+**MCP 传输类型：**
+- **SSE (Server-Sent Events)**：基于 HTTP 的流式传输，适用于远程服务器
+- **stdio**：直接进程通信，最适合本地工具
+- **streamable_http**：带分块传输编码的 HTTP 流式传输
+
+了解更多：[MCP 集成指南](/zh/guides/tools/tool-mcp/)
+
+### 记忆配置
+
+智能体可以维护对话历史和跨会话知识：
+
+```python
+from langcrew import Agent, MemoryConfig
+from langcrew.memory import LongTermMemoryConfig
+
+agent = Agent(
+    role="个人助理",
+    goal="提供个性化协助",
+    backstory="能够记住用户偏好的有用助手",
+    memory=MemoryConfig(
+        provider="sqlite",
+        connection_string="sqlite:///agent_memory.db",
+        long_term=LongTermMemoryConfig(
+            enabled=True,
+            app_id="my-assistant-v1",  # 按应用隔离记忆
+            index={"dims": 1536, "embed": "openai:text-embedding-3-small"}
+        )
+    ),
+    llm=llm
+)
+```
+
+**记忆层次：**
+- **短期记忆**：会话内的对话状态
+- **长期记忆**：跨会话的持久知识
+  - **用户记忆**：个人偏好和信息
+  - **应用记忆**：共享见解（实验性）
+
+了解更多：[记忆指南](/zh/guides/memory/getting-started/)
+
+### 执行器配置
+
+LangCrew 智能体默认使用 ReAct（推理与行动）执行策略：
+
+```python
+# 默认配置 - executor_type 默认为 "react"
+agent = Agent(
+    role="问题解决者",
+    llm=llm
+    # executor_type="react" 是隐式的 - 无需指定
+)
+```
+
+**ReAct 执行器特性：**
+- **推理**：智能体在采取行动前思考问题
+- **行动**：基于推理执行工具
+- **观察**：分析结果并调整方法
+- **迭代**：持续进行直到任务完成或达到最大迭代次数
+
+**注意**：ReAct 目前是唯一支持的执行器类型，会自动应用。除非您想明确表达，否则无需指定 `executor_type` 参数。
+
+### 自定义提示词
+
+覆盖默认系统提示词以实现专门行为：
+
+```python
+from langchain_core.messages import SystemMessage
+
+agent = Agent(
+    role="代码审查员",
+    prompt=SystemMessage(content="""你是一位资深代码审查员。
+    始终检查：
+    - 代码质量和可维护性
+    - 安全漏洞
+    - 性能问题
+    - 最佳实践遵循情况"""),
+    llm=llm
+)
+```
+
+### 上下文管理
+
+在达到 token 限制时自动压缩对话上下文：
+
+```python
+from langcrew import Agent
+from langcrew.context import ContextConfig, SummaryConfig
+
+agent = Agent(
+    role="长对话智能体",
+    goal="在长对话中维护上下文",
+    backstory="擅长处理扩展对话的专家",
+    context_config=ContextConfig(
+        pre_model=SummaryConfig(
+            compression_threshold=150000,  # 达到此 token 限制时触发总结
+            keep_recent_tokens=64000  # 在此预算内保留最近的消息
+        )
+    ),
+    llm=llm
+)
+```
+
+**可用策略：**
+
+```python
+from langcrew.context import (
+    ContextConfig,
+    KeepLastConfig,
+    SummaryConfig,
+    CompressToolsConfig,
+    ToolCallCompressor
+)
+
+# 保留最后 N 条消息（最简单的策略）
+config = ContextConfig(
+    pre_model=KeepLastConfig(keep_last=25)
+)
+
+# 总结旧消息（最适合长对话）
+config = ContextConfig(
+    pre_model=SummaryConfig(
+        compression_threshold=150000,
+        keep_recent_tokens=64000
+    )
+)
+
+# 压缩工具调用输出（适用于工具密集型工作流）
+compressor = ToolCallCompressor(tools=['web_search'], max_length=500)
+config = ContextConfig(
+    pre_model=CompressToolsConfig(compressor=compressor)
+)
+```
+
+### 安全防护栏
+
+添加输入/输出验证以确保安全性和合规性：
+
+```python
+from langcrew import Agent
+from langcrew.guardrail import input_guard, output_guard
+
+@input_guard
+def validate_input(data):
+    """验证传入请求"""
+    if "敏感关键词" in str(data).lower():
+        return False, "检测到敏感内容"
+    return True, ""
+
+@output_guard
+def validate_output(data):
+    """验证智能体响应"""
+    if len(str(data)) < 10:
+        return False, "响应过短"
+    return True, ""
+
+agent = Agent(
+    role="安全智能体",
+    input_guards=[validate_input],
+    output_guards=[validate_output],
+    llm=llm
+)
+```
+
+### 人机协作 (HITL)
+
+为关键决策启用人工监督：
+
+```python
+from langcrew import Agent
+from langcrew.hitl import HITLConfig
+
+agent = Agent(
+    role="决策者",
+    goal="做出重要决策",
+    backstory="关键行动需要人工批准",
+    hitl=HITLConfig(
+        interrupt_before_tools=["send_email", "make_payment"]  # 使用这些工具前批准
+    ),
+    llm=llm
+)
+```
+
+了解更多：[人机协作指南](/zh/guides/hitl/getting-started/)
+
+### 前置/后置模型钩子
+
+在 LLM 调用前后注入自定义逻辑：
+
+```python
+from langcrew import Agent
+
+def pre_hook(state):
+    """LLM 调用前记录日志"""
+    print(f"即将调用 LLM，输入: {state}")
+    return state
+
+def post_hook(response):
+    """处理 LLM 响应"""
+    print(f"LLM 响应: {response}")
+    return response
+
+agent = Agent(
+    role="监控智能体",
+    pre_model_hook=pre_hook,
+    post_model_hook=post_hook,
+    llm=llm
+)
 ```
 
 ## 下一步

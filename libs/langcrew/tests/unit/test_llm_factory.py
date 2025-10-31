@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from langcrew import DEFAULT_TEMPERATURE, LLMFactory
+from langcrew.llm_factory import DEFAULT_TEMPERATURE, LLMFactory
 
 
 def test_default_temperature_value():
@@ -37,6 +37,7 @@ def test_create_openai_llm_basic(mock_chat_openai):
         max_tokens=4096,
         max_retries=10,
         request_timeout=60.0,
+        openai_proxy=None,
     )
 
 
@@ -58,6 +59,7 @@ def test_create_openai_llm_default_temperature(mock_chat_openai):
         max_tokens=4096,
         max_retries=10,
         request_timeout=60.0,
+        openai_proxy=None,
     )
 
 
@@ -84,6 +86,7 @@ def test_create_openai_llm_with_custom_max_tokens(mock_chat_openai):
         max_tokens=2048,
         max_retries=10,
         request_timeout=60.0,
+        openai_proxy=None,
     )
 
 
@@ -266,7 +269,7 @@ def test_create_llm_missing_model():
     }
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test_key"}):
-        with patch("langcrew.utils.llm.factory.ChatOpenAI") as mock_openai:
+        with patch("langchain_openai.ChatOpenAI") as mock_openai:
             mock_llm = Mock()
             mock_openai.return_value = mock_llm
 
@@ -279,8 +282,9 @@ def test_create_llm_missing_model():
                 api_key="test_key",
                 temperature=DEFAULT_TEMPERATURE,
                 max_tokens=4096,
-                max_retries=1,
+                max_retries=10,
                 request_timeout=60.0,
+                openai_proxy=None,
             )
 
 
@@ -306,6 +310,7 @@ def test_create_llm_missing_provider():
                 max_tokens=4096,
                 max_retries=10,
                 request_timeout=60.0,
+                openai_proxy=None,
             )
 
 
@@ -367,6 +372,7 @@ def test_create_llm_with_extra_kwargs(mock_chat_openai):
         max_tokens=1000,  # Uses custom max_tokens from config
         max_retries=10,
         request_timeout=60.0,
+        openai_proxy=None,
     )
 
 
@@ -390,6 +396,7 @@ def test_create_llm_empty_config():
                 max_tokens=4096,
                 max_retries=10,
                 request_timeout=60.0,
+                openai_proxy=None,
             )
 
 
@@ -423,6 +430,7 @@ def test_temperature_type_conversion(mock_chat_openai):
         max_tokens=4096,
         max_retries=10,
         request_timeout=60.0,
+        openai_proxy=None,
     )
 
 
@@ -820,6 +828,7 @@ def test_openai_provider_with_all_custom_params(mock_chat_openai):
         max_tokens=1024,
         max_retries=5,
         request_timeout=30.0,
+        openai_proxy=None,
     )
 
 
@@ -936,6 +945,7 @@ def test_create_llm_with_zero_temperature():
                 max_tokens=4096,
                 max_retries=10,
                 request_timeout=60.0,
+                openai_proxy=None,
             )
 
 
@@ -962,4 +972,5 @@ def test_create_llm_with_high_temperature():
                 max_tokens=4096,
                 max_retries=10,
                 request_timeout=60.0,
+                openai_proxy=None,
             )

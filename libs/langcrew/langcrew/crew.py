@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 import logging
-import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from typing import (
@@ -1305,72 +1304,88 @@ class Crew:
 
     # CrewAI compatibility methods
     def kickoff(
-        self, inputs: dict[str, Any] | None = None, thread_id: str | None = None
+        self,
+        inputs: dict[str, Any] | None = None,
+        config: RunnableConfig | None = None,
     ) -> Any:
-        """CrewAI compatible execution method with thread_id support.
+        """CrewAI compatible execution method.
 
         Args:
-            inputs: Input data for the crew
-            thread_id: Optional thread ID for maintaining conversation context
-
-        Returns:
-            Execution result with thread_id attribute
-        """
-        # Replace all placeholders in tasks if inputs provided
-        if inputs:
-            self._replace_all_placeholders(inputs)
-
-        # Use provided thread_id or generate new one (local variable)
-        current_thread_id = thread_id or str(uuid.uuid4())
-
-        # Create config with thread_id
-        config = RunnableConfig(configurable={"thread_id": current_thread_id})
-
-        # Execute with empty state (task_outputs initialized by CrewState default)
-        result = self.invoke({}, config)
-
-        # Add thread_id to result for continuity
-        if isinstance(result, dict):
-            result["thread_id"] = current_thread_id
-        else:
-            # Create a wrapper if result is not dict
-            result = {"output": result, "thread_id": current_thread_id}
-
-        return result
-
-    async def akickoff(
-        self, inputs: dict[str, Any] | None = None, thread_id: str | None = None
-    ) -> Any:
-        """Async version of kickoff with thread_id support.
-
-        Args:
-            inputs: Input data for the crew
-            thread_id: Optional thread ID for maintaining conversation context
+            inputs: Input data for the crew. Placeholders in task descriptions will be replaced.
+            config: Optional RunnableConfig for runtime settings.
+                   - Set thread_id via config={"configurable": {"thread_id": "your-id"}}
+                   - Set recursion_limit, callbacks, tags, metadata, etc.
 
         Returns:
             Execution result
+
+        Examples:
+            # Simple execution without persistence
+            result = crew.kickoff(inputs={"topic": "AI"})
+
+            # With thread_id for conversation continuity
+            result = crew.kickoff(
+                inputs={"topic": "AI"},
+                config={"configurable": {"thread_id": "conversation-123"}}
+            )
+
+            # Advanced config with multiple settings
+            result = crew.kickoff(
+                inputs={"topic": "AI"},
+                config={
+                    "configurable": {"thread_id": "conversation-123"},
+                    "recursion_limit": 100
+                }
+            )
         """
         # Replace all placeholders in tasks if inputs provided
         if inputs:
             self._replace_all_placeholders(inputs)
 
-        # Use provided thread_id or generate new one (local variable)
-        current_thread_id = thread_id or str(uuid.uuid4())
+        # Execute with empty state (task_outputs initialized by CrewState default)
+        return self.invoke({}, config)
 
-        # Create config with thread_id
-        config = RunnableConfig(configurable={"thread_id": current_thread_id})
+    async def akickoff(
+        self,
+        inputs: dict[str, Any] | None = None,
+        config: RunnableConfig | None = None,
+    ) -> Any:
+        """Async version of kickoff.
+
+        Args:
+            inputs: Input data for the crew. Placeholders in task descriptions will be replaced.
+            config: Optional RunnableConfig for runtime settings.
+                   - Set thread_id via config={"configurable": {"thread_id": "your-id"}}
+                   - Set recursion_limit, callbacks, tags, metadata, etc.
+
+        Returns:
+            Execution result
+
+        Examples:
+            # Simple execution without persistence
+            result = await crew.akickoff(inputs={"topic": "AI"})
+
+            # With thread_id for conversation continuity
+            result = await crew.akickoff(
+                inputs={"topic": "AI"},
+                config={"configurable": {"thread_id": "conversation-123"}}
+            )
+
+            # Advanced config with multiple settings
+            result = await crew.akickoff(
+                inputs={"topic": "AI"},
+                config={
+                    "configurable": {"thread_id": "conversation-123"},
+                    "recursion_limit": 100
+                }
+            )
+        """
+        # Replace all placeholders in tasks if inputs provided
+        if inputs:
+            self._replace_all_placeholders(inputs)
 
         # Execute with empty state (task_outputs initialized by CrewState default)
-        result = await self.ainvoke({}, config)
-
-        # Add thread_id to result for continuity
-        if isinstance(result, dict):
-            result["thread_id"] = current_thread_id
-        else:
-            # Create a wrapper if result is not dict
-            result = {"output": result, "thread_id": current_thread_id}
-
-        return result
+        return await self.ainvoke({}, config)
 
     def _replace_all_placeholders(self, inputs: dict[str, Any]) -> None:
         """Replace all placeholders in task descriptions and expected outputs, and agent backstories.

@@ -10,16 +10,10 @@ dependencies = [
     "pydantic>=2.0.0",
     "PyYAML>=6.0",
     "dotenv>=0.9.9",
-    "crewai[tools]>=0.130.0",
-    "crewai-tools>=0.47.1",
     "crawl4ai>=0.3.0",
-    "langcrew-tools>=0.1.0",
-    "langcrew>=0.1.0",
+    "langcrew-tools>=0.1.1",
+    "langcrew>=0.1.1",
 ]
-
-[tool.uv.sources]
-langcrew = { path = "../../libs/langcrew", editable = true }
-langcrew-tools = { path = "../../libs/langcrew-tools", editable = true }
 
 [project.scripts]
 surprise_travel = "surprise_travel.main:run"

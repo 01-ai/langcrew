@@ -1,75 +1,73 @@
 analyze_cv:
   description: |
-    请深度分析提供的简历文件，提取以下关键信息：
+    Please deeply analyze the provided resume file and extract the following key information:
     
-    **分析维度：**
-    1. **专业技能**：编程语言、框架、工具、技术栈
-    2. **工作经验**：职位级别、工作年限、项目经验、管理经验
-    3. **教育背景**：学历、专业、院校、相关认证
-    4. **核心优势**：特长领域、突出成就、职业亮点
-    5. **发展方向**：职业规划、技能偏好、行业倾向
+    **Analysis Dimensions:**
+    1. **Professional Skills**: Programming languages, frameworks, tools, tech stack
+    2. **Work Experience**: Position level, years of experience, project experience, management experience
+    3. **Educational Background**: Degree, major, institution, relevant certifications
+    4. **Core Strengths**: Areas of expertise, notable achievements, career highlights
+    5. **Development Direction**: Career planning, skill preferences, industry tendencies
     
-    **输出要求：**
-    - 使用结构化格式组织信息
-    - 突出关键技能和经验亮点
-    - 评估候选人的整体竞争力
-    - 识别可能的职业发展方向
+    **Output Requirements:**
+    - Use structured format to organize information
+    - Highlight key skills and experience highlights
+    - Evaluate candidate's overall competitiveness
+    - Identify potential career development directions
     
-    **简历文件路径：** {cv_path}
+    **Resume File Path:** {cv_path}
     
   expected_output: |
-    结构化的简历分析报告，包含：
-    - 基本信息摘要
-    - 技能矩阵（按熟练度分类）
-    - 工作经验总结（突出关键成就）
-    - 教育背景
-    - 核心竞争力分析
-    - 职业发展建议
-  agent: cv_analyzer
+    Structured resume analysis report containing:
+    - Basic information summary
+    - Skills matrix (categorized by proficiency level)
+    - Work experience summary (highlighting key achievements)
+    - Educational background
+    - Core competency analysis
+    - Career development recommendations
 
 match_positions:
   description: |
-    基于CV分析结果，从职位数据库中找出最匹配的职位。请进行全面的匹配分析：
+    Based on the CV analysis results, find the best matching positions from the job database. Please conduct comprehensive matching analysis:
     
-    **匹配维度：**
-    1. **技能匹配度**：
-       - 核心技能覆盖率
-       - 技能深度匹配
-       - 技能栈契合度
+    **Matching Dimensions:**
+    1. **Skill Match**:
+       - Core skill coverage rate
+       - Skill depth alignment
+       - Tech stack compatibility
     
-    2. **经验匹配度**：
-       - 工作年限要求
-       - 项目经验相关性
-       - 行业背景匹配
+    2. **Experience Match**:
+       - Years of experience required
+       - Project experience relevance
+       - Industry background alignment
     
-    3. **职位发展潜力**：
-       - 职业发展阶梯
-       - 技能成长空间
-       - 薪资发展预期
+    3. **Position Development Potential**:
+       - Career progression ladder
+       - Skill growth opportunities
+       - Salary development expectations
     
-    **分析方法：**
-    - 对每个职位计算综合匹配分数（0-100分）
-    - 分析匹配优势和不足
-    - 提供具体的匹配理由
-    - 给出应聘建议和准备方向
+    **Analysis Method:**
+    - Calculate comprehensive match score for each position (0-100 points)
+    - Analyze matching strengths and gaps
+    - Provide specific matching rationale
+    - Offer application advice and preparation directions
     
-    **职位数据文件：** {jobs_path}
+    **Job Data File:** {jobs_path}
     
   expected_output: |
-    按匹配度排序的职位推荐列表：
+    Job recommendation list sorted by match score:
     
-    **格式要求：**
-    推荐职位排序 (Top 5)
+    **Format Requirements:**
+    Recommended Positions (Top 5)
     
-    对每个推荐职位包含：
-    - 职位信息：职位名称、公司、地点、薪资
-    - 匹配分数：总分 + 分维度得分
-    - 匹配亮点：核心优势分析
-    - 提升建议：技能或经验补强方向
-    - 应聘策略：面试准备重点
+    For each recommended position include:
+    - Position Information: Job title, company, location, salary
+    - Match Score: Total score + dimensional scores
+    - Match Highlights: Core advantage analysis
+    - Improvement Suggestions: Skills or experience enhancement directions
+    - Application Strategy: Interview preparation focus points
     
-    **总结部分：**
-    - 整体匹配趋势分析
-    - 职业发展路径建议
-    - 下一步行动计划
-  agent: job_matcher
+    **Summary Section:**
+    - Overall matching trend analysis
+    - Career development path recommendations
+    - Next steps action plan

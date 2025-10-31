@@ -9,15 +9,12 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     "pydantic>=2.0.0",
     "PyYAML>=6.0",
-    "dotenv>=0.9.9",
-    "crewai-tools>=0.58.0",
-    "langcrew>=0.1.0",
-    "langcrew-tools>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "langcrew>=0.1.1",
+    "langchain-community>=0.3.0",
+    "google-search-results>=2.4.0",
+    "beautifulsoup4>=4.12.0",
 ]
-
-[tool.uv.sources]
-langcrew = { path = "../../libs/langcrew", editable = true }
-langcrew-tools = { path = "../../libs/langcrew-tools", editable = true }
 
 [project.scripts]
 deep_research = "deep_research.main:run"
@@ -30,5 +27,4 @@ requires = [
     "hatchling",
 ]
 build-backend = "hatchling.build"
-
 

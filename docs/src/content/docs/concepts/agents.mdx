@@ -121,7 +121,9 @@ from langcrew.hitl import HITLConfig
 
 agent = Agent(
     role="Decision Maker",
-    hitl=HITLConfig(enabled=True)
+    hitl=HITLConfig(
+        interrupt_before_tools=["critical_tool"]  # Require approval for specific tools
+    )
 )
 ```
 
@@ -147,6 +149,243 @@ Agents are ideal for:
 - **Complex Reasoning** - Multi-step problem solving
 - **Tool-Rich Environments** - Applications with many available tools
 
+## Advanced Configuration
+
+### MCP Server Integration
+
+Connect agents to external data sources and tools via Model Context Protocol:
+
+```python
+from langcrew import Agent
+
+agent = Agent(
+    role="Data Analyst",
+    goal="Analyze data from multiple sources",
+    backstory="Expert at connecting to various data systems",
+    llm=llm,
+    mcp_servers={
+        "github-mcp": {
+            "url": "http://localhost:3000/sse",
+            "transport": "sse"  # Server-Sent Events
+        },
+        "filesystem-mcp": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/data"],
+            "transport": "stdio"  # Standard I/O
+        }
+    },
+    mcp_tool_filter=["github_search_repos", "read_file"]  # Optional filtering
+)
+```
+
+**MCP Transport Types:**
+- **SSE (Server-Sent Events)**: HTTP-based streaming, ideal for remote servers
+- **stdio**: Direct process communication, best for local tools
+- **streamable_http**: HTTP streaming with chunked transfer encoding
+
+Learn more: [MCP Integration Guide](/guides/tools/tool-mcp/)
+
+### Memory Configuration
+
+Agents can maintain conversation history and cross-session knowledge:
+
+```python
+from langcrew import Agent, MemoryConfig
+from langcrew.memory import LongTermMemoryConfig
+
+agent = Agent(
+    role="Personal Assistant",
+    goal="Provide personalized assistance",
+    backstory="Helpful assistant that remembers user preferences",
+    memory=MemoryConfig(
+        provider="sqlite",
+        connection_string="sqlite:///agent_memory.db",
+        long_term=LongTermMemoryConfig(
+            enabled=True,
+            app_id="my-assistant-v1",  # Isolate memories by application
+            index={"dims": 1536, "embed": "openai:text-embedding-3-small"}
+        )
+    )
+)
+```
+
+**Memory Layers:**
+- **Short-term**: Conversation state within a session
+- **Long-term**: Persistent knowledge across sessions
+  - **User memory**: Personal preferences and information
+  - **App memory**: Shared insights (experimental)
+
+Learn more: [Memory Guide](/guides/memory/getting-started/)
+
+### Executor Configuration
+
+LangCrew agents use the ReAct (Reasoning and Acting) execution strategy by default:
+
+```python
+# Default configuration - executor_type is "react" by default
+agent = Agent(
+    role="Problem Solver",
+    llm=llm
+    # executor_type="react" is implicit - no need to specify
+)
+```
+
+**ReAct Executor Features:**
+- **Reasoning**: Agents think through problems before taking action
+- **Acting**: Execute tools based on reasoning
+- **Observing**: Analyze results and adapt approach
+- **Iterative**: Continues until task is complete or max iterations reached
+
+**Note:** ReAct is currently the only supported executor type and is applied automatically. You don't need to specify `executor_type` parameter unless you want to be explicit.
+
+### Custom Prompts
+
+Override the default system prompt for specialized behavior:
+
+```python
+from langchain_core.messages import SystemMessage
+
+agent = Agent(
+    role="Code Reviewer",
+    prompt=SystemMessage(content="""You are a senior code reviewer. 
+    Always check for:
+    - Code quality and maintainability
+    - Security vulnerabilities
+    - Performance issues
+    - Best practices adherence"""),
+    llm=llm
+)
+```
+
+### Context Management
+
+Automatically compress conversation context when token limits are reached:
+
+```python
+from langcrew import Agent
+from langcrew.context import ContextConfig, SummaryConfig
+
+agent = Agent(
+    role="Long Conversation Agent",
+    goal="Maintain context in long conversations",
+    backstory="Expert at handling extended dialogues",
+    context_config=ContextConfig(
+        pre_model=SummaryConfig(
+            compression_threshold=150000,  # Trigger summarization at this token limit
+            keep_recent_tokens=64000  # Keep recent messages within this budget
+        )
+    ),
+    llm=llm
+)
+```
+
+**Available Strategies:**
+
+```python
+from langcrew.context import (
+    ContextConfig,
+    KeepLastConfig,
+    SummaryConfig,
+    CompressToolsConfig,
+    ToolCallCompressor
+)
+
+# Keep last N messages (simplest strategy)
+config = ContextConfig(
+    pre_model=KeepLastConfig(keep_last=25)
+)
+
+# Summarize old messages (best for long conversations)
+config = ContextConfig(
+    pre_model=SummaryConfig(
+        compression_threshold=150000,
+        keep_recent_tokens=64000
+    )
+)
+
+# Compress tool call outputs (for tool-heavy workflows)
+compressor = ToolCallCompressor(tools=['web_search'], max_length=500)
+config = ContextConfig(
+    pre_model=CompressToolsConfig(compressor=compressor)
+)
+```
+
+### Guardrails
+
+Add input/output validation for safety and compliance:
+
+```python
+from langcrew import Agent
+from langcrew.guardrail import input_guard, output_guard
+
+@input_guard
+def validate_input(data):
+    """Validate incoming requests"""
+    if "sensitive_keyword" in str(data).lower():
+        return False, "Sensitive content detected"
+    return True, ""
+
+@output_guard
+def validate_output(data):
+    """Validate agent responses"""
+    if len(str(data)) < 10:
+        return False, "Response too short"
+    return True, ""
+
+agent = Agent(
+    role="Safe Agent",
+    input_guards=[validate_input],
+    output_guards=[validate_output],
+    llm=llm
+)
+```
+
+### Human-in-the-Loop (HITL)
+
+Enable human oversight for critical decisions:
+
+```python
+from langcrew import Agent
+from langcrew.hitl import HITLConfig
+
+agent = Agent(
+    role="Decision Maker",
+    goal="Make important decisions",
+    backstory="Requires human approval for critical actions",
+    hitl=HITLConfig(
+        interrupt_before_tools=["send_email", "make_payment"]  # Approve before using these tools
+    ),
+    llm=llm
+)
+```
+
+Learn more: [HITL Guide](/guides/hitl/getting-started/)
+
+### Pre/Post Model Hooks
+
+Inject custom logic before and after LLM calls:
+
+```python
+from langcrew import Agent
+
+def pre_hook(state):
+    """Log before LLM call"""
+    print(f"About to call LLM with: {state}")
+    return state
+
+def post_hook(response):
+    """Process LLM response"""
+    print(f"LLM responded: {response}")
+    return response
+
+agent = Agent(
+    role="Monitored Agent",
+    pre_model_hook=pre_hook,
+    post_model_hook=post_hook,
+    llm=llm
+)
+```
+
 ## Integration with Crews
 
 Agents work best when organized into crews for collaborative workflows:
@@ -155,8 +394,8 @@ Agents work best when organized into crews for collaborative workflows:
 from langcrew import Agent, Crew
 
 # Create specialized agents
-researcher = Agent(role="Researcher", goal="Gather information")
-writer = Agent(role="Writer", goal="Create content")
+researcher = Agent(role="Researcher", goal="Gather information", llm=llm)
+writer = Agent(role="Writer", goal="Create content", llm=llm)
 
 # Organize into a crew
 crew = Crew(agents=[researcher, writer])

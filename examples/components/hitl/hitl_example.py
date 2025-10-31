@@ -1,28 +1,30 @@
 """
 Human-in-the-Loop (HITL) Integration Examples
 
-This example demonstrates advanced HITL integration with intelligent user interaction:
+This example demonstrates HITL integration with human interaction:
 
-1. Configuration Examples: 9 comprehensive HITL configuration patterns
-2. Tool Approval Workflow: Smart approval system with parameter/result modification
-3. Bilingual Support: Chinese/English keyword recognition and UI options
+1. Configuration Examples: Comprehensive HITL configuration patterns
+2. Tool Approval Workflow: Approval system with parameter/result modification
+3. Bilingual Support: Chinese/English keyword recognition
 4. Advanced Response Handling: Support for complex user feedback and modifications
 5. Complete Implementation: Production-ready examples with proper interrupt/resume handling
 
 Perfect for: Content moderation, financial transactions, sensitive operations, interactive AI assistants, and international deployment.
 
-New Features:
+Features:
 - Bilingual user interface (Chinese/English)
 - Smart keyword recognition for natural language responses
-- Parameter modification support (interrupt_before)
-- Result modification support (interrupt_after)
+- Parameter modification support (interrupt_before_tools)
+- Result modification support (interrupt_after_tools)
+- Proper interrupt/resume handling
+- State persistence with checkpointing
 - Frontend-ready options integration
-- Advanced error handling with user feedback
 """
 
 import tempfile
 import os
 import time
+import warnings
 
 from langchain_core.tools import BaseTool
 from langchain_core.runnables.config import RunnableConfig
@@ -33,11 +35,20 @@ from langgraph.types import Command
 from langcrew.agent import Agent
 from langcrew.crew import Crew
 from langcrew.hitl import HITLConfig
-
-# from langcrew.tools.hitl import UserInputTool
-# UserInputTool import temporarily disabled
 from langcrew.llm_factory import LLMFactory
 from langcrew.task import Task
+
+import dotenv
+
+dotenv.load_dotenv()
+
+# Suppress expected warning about custom checkpointer in examples
+# InMemorySaver is safe for examples and doesn't require special lifecycle management
+warnings.filterwarnings(
+    "ignore",
+    message="Custom checkpointer/store detected.*",
+    category=UserWarning,
+)
 
 # ==================== Demo Tools ====================
 
@@ -52,7 +63,7 @@ class FileWriteTool(BaseTool):
 
     def _run(self, file_path: str, content: str) -> str:
         try:
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
             return f"✅ Successfully wrote content to {file_path}"
         except Exception as e:
@@ -97,7 +108,7 @@ def show_hitl_configurations():
     print("=" * 80)
     print()
 
-    print("🔧 Pattern 1: Approval for Critical Operations")
+    print("🔧 Pattern 1: Approval for Critical Tools")
     print("   Perfect for: Financial transactions, data deletion, system changes")
     config1 = HITLConfig(interrupt_before_tools=["file_write", "send_email"])
     print(f"   ✓ Requires approval for: {config1.interrupt_before_tools}")
@@ -106,51 +117,62 @@ def show_hitl_configurations():
     )
     print()
 
-    print("🔧 Pattern 2: Approval for Everything (with safe exceptions)")
-    print("   Perfect for: High-security environments, content moderation")
-    config2 = HITLConfig(
-        interrupt_tool_mode="all", excluded_tools=["calculator", "web_search"]
-    )
-    print(f"   ✓ Approval required for all tools except: {config2.excluded_tools}")
-    print(
-        "   📝 Usage: HITLConfig(interrupt_tool_mode='all', excluded_tools=['calculator', 'web_search'])"
-    )
-    print()
-
-    print("🔧 Pattern 3: Interactive User Input")
-    print("   Perfect for: Chatbots, personal assistants, data collection")
-    print("   ✓ Use UserInputTool to collect information during execution")
-    print(
-        "   📝 Usage: Simply add # UserInputTool() # temporarily disabled to your agent's tools"
-    )
-    print()
-    print("🔧 Pattern 4: After-Execution Review")
+    print("🔧 Pattern 2: After-Execution Review")
     print("   Perfect for: Content review, audit trails, quality checks")
-    config4 = HITLConfig(interrupt_after_tools=["report_generator", "email_sender"])
-    print(f"   ✓ Review required after: {config4.interrupt_after_tools}")
+    config2 = HITLConfig(interrupt_after_tools=["report_generator", "email_sender"])
+    print(f"   ✓ Review required after: {config2.interrupt_after_tools}")
     print(
         "   📝 Usage: HITLConfig(interrupt_after_tools=['report_generator', 'email_sender'])"
     )
-    print("   ⚠️  Note: interrupt_after only works within single execution session")
+    print(
+        "   ⚠️  Note: interrupt_after_tools only works within single execution session"
+    )
     print("      (not across workflow restarts from checkpointed state)")
     print()
 
-    print("🔧 Pattern 5: Before + After Interrupts")
+    print("🔧 Pattern 3: Before + After Interrupts")
     print("   Perfect for: Critical workflows with full oversight")
-    config5 = HITLConfig(
+    config3 = HITLConfig(
         interrupt_before_tools=["data_processor"],
         interrupt_after_tools=["report_generator"],
-        interrupt_tool_mode="specified",
     )
-    print(f"   ✓ Before approval: {config5.interrupt_before_tools}")
-    print(f"   ✓ After review: {config5.interrupt_after_tools}")
+    print(f"   ✓ Before approval: {config3.interrupt_before_tools}")
+    print(f"   ✓ After review: {config3.interrupt_after_tools}")
     print(
         "   📝 Usage: HITLConfig(interrupt_before_tools=[...], interrupt_after_tools=[...])"
     )
     print()
 
-    print("🔧 Pattern 6: Node-level Interrupts (LangGraph Native)")
+    print("🔧 Pattern 4: Task-level Interrupts (TASK MODE)")
     print("   Perfect for: Workflow control, decision points, validation steps")
+    config4 = HITLConfig(
+        interrupt_before_tasks=["planning_task"],
+        interrupt_after_tasks=["validation_task"],
+    )
+    print(f"   ✓ Task interrupts before: {config4.interrupt_before_tasks}")
+    print(f"   ✓ Task interrupts after: {config4.interrupt_after_tasks}")
+    print(
+        "   📝 Usage: HITLConfig(interrupt_before_tasks=['planning_task'], interrupt_after_tasks=['validation_task'])"
+    )
+    print("   💡 Note: Only works when you provide both agents and tasks to Crew")
+    print()
+
+    print("🔧 Pattern 5: Agent-level Interrupts (AGENT MODE)")
+    print("   Perfect for: Agent orchestration, delegation control")
+    config5 = HITLConfig(
+        interrupt_before_agents=["research_agent"],
+        interrupt_after_agents=["review_agent"],
+    )
+    print(f"   ✓ Agent interrupts before: {config5.interrupt_before_agents}")
+    print(f"   ✓ Agent interrupts after: {config5.interrupt_after_agents}")
+    print(
+        "   📝 Usage: HITLConfig(interrupt_before_agents=['research_agent'], interrupt_after_agents=['review_agent'])"
+    )
+    print("   💡 Note: Only works when you provide only agents (no tasks) to Crew")
+    print()
+
+    print("🔧 Pattern 6: Node-level Interrupts (LangGraph Native)")
+    print("   Perfect for: Advanced workflow control, custom node validation")
     config6 = HITLConfig(
         interrupt_before_nodes=["decision_node"],
         interrupt_after_nodes=["validation_node"],
@@ -168,9 +190,10 @@ def show_hitl_configurations():
         # Tool-level interrupts
         interrupt_before_tools=["critical_operation"],
         interrupt_after_tools=["data_export"],
-        interrupt_tool_mode="specified",
-        excluded_tools=["calculator", "user_input"],
-        # Node-level interrupts (LangGraph native)
+        # Task-level interrupts
+        interrupt_before_tasks=["planning_task"],
+        interrupt_after_tasks=["validation_task"],
+        # Node-level interrupts
         interrupt_before_nodes=["decision_node"],
         interrupt_after_nodes=["validation_node"],
     )
@@ -178,25 +201,19 @@ def show_hitl_configurations():
         f"   ✓ Tool interrupts: {config7.interrupt_before_tools} (before), {config7.interrupt_after_tools} (after)"
     )
     print(
+        f"   ✓ Task interrupts: {config7.interrupt_before_tasks} (before), {config7.interrupt_after_tasks} (after)"
+    )
+    print(
         f"   ✓ Node interrupts: {config7.interrupt_before_nodes} (before), {config7.interrupt_after_nodes} (after)"
     )
     print("   📝 Usage: Combines all interrupt types for maximum control")
     print()
 
-    print("🔧 Pattern 8: Explicit No Interrupts")
-    print("   Perfect for: Explicitly disable interrupts with HITL config")
-    config8 = HITLConfig(enabled=False)
-    print(f"   ✓ HITL explicitly disabled: {not config8.enabled}")
-    print("   📝 Usage: HITLConfig(enabled=False)")
-    print()
-
-    print("🔧 Pattern 9: No Interrupts (Default)")
+    print("🔧 Pattern 8: No Interrupts (Default)")
     print("   Perfect for: Development, testing, low-risk operations")
     print("   ✓ All tools execute automatically")
-    print("   📝 Usage: Simply don't add hitl parameter to Agent()")
-    print(
-        "   💡 Example: agent = Agent(role='Assistant', tools=[...])"
-    )  # No hitl needed
+    print("   📝 Usage: Simply don't add hitl parameter to Agent() or Crew()")
+    print("   💡 Example: agent = Agent(role='Assistant', tools=[...])")
     print()
 
 
@@ -248,14 +265,25 @@ def execute_with_human_approval(crew, inputs, thread_id, description):
                     tool_info = info["value"]["tool"]
                     print(f"🔧 Tool: {tool_info.get('name', 'unknown')}")
                     if "args" in tool_info:
-                        print(f"📝 Parameters: {tool_info['args']}")
+                        args = tool_info["args"]
+                        if args:
+                            print(f"📝 Parameters: {args}")
+                        else:
+                            print(
+                                "📝 Parameters: (will be determined by agent after approval)"
+                            )
                     if "result" in tool_info:
-                        print(f"📊 Result: {tool_info.get('result', '')[:200]}...")
+                        result_preview = str(tool_info.get("result", ""))[:200]
+                        print(f"📊 Result: {result_preview}...")
 
                 interrupted = True
                 interrupt_info = info
                 # Stream will naturally end when interrupted - no need for manual break
-    except Exception:
+    except Exception as e:
+        print(f"❌ Error during execution: {e}")
+        import traceback
+
+        traceback.print_exc()
         return False
 
     if not interrupted:
@@ -341,6 +369,9 @@ def execute_with_human_approval(crew, inputs, thread_id, description):
 
     except Exception as e:
         print(f"❌ Resume error: {e}")
+        import traceback
+
+        traceback.print_exc()
         return False
 
 
@@ -434,7 +465,7 @@ def demo_tool_approval_workflow():
     )
 
     if success and os.path.exists(target_file):
-        with open(target_file, "r") as f:
+        with open(target_file, "r", encoding="utf-8") as f:
             content = f.read()
         print(f"\n📄 Generated report preview:\n{content[:300]}...")
 
@@ -459,7 +490,7 @@ def demo_user_input_workflow():
         {
             "provider": "openai",
             "model": "gpt-4o-mini",
-            "temperature": 0.3,
+            "temperature": 0.1,
             "max_tokens": 500,
         }
     )
@@ -564,18 +595,18 @@ def main():
             print(f"   User Input: {'✅ Success' if success2 else '❌ Failed'}")
 
         print()
-        print("🌟 New HITL Features:")
+        print("🌟 HITL Features:")
         print("• Bilingual Support: 批准/拒绝 ↔ Approve/Deny")
         print("• Smart Recognition: Natural language → structured responses")
         print("• Parameter Modification: Edit tool parameters before execution")
         print("• Result Modification: Edit tool results after execution")
         print("• Error Feedback: Provide reasons for denials")
-        print("• UI Integration: Ready-made options for frontend components")
+        print("• Multiple Interrupt Types: Tools, Tasks, Agents, Nodes")
 
         print()
         print("📖 Next Steps:")
-        print("• Review the 9 configuration patterns above")
-        print("• Try different interrupt_tool_mode settings")
+        print("• Review the 8 configuration patterns above")
+        print("• Try different interrupt types (tools, tasks, agents, nodes)")
         print("• Experiment with advanced response formats")
         print("• Integrate HITL into your own workflows")
         print("• Build rich approval UIs with bilingual support")

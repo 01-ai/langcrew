@@ -25,8 +25,121 @@ from langcrew.hitl import HITLConfig
 # Basic configuration
 hitl_config = HITLConfig(
     interrupt_before_tools=["file_write", "database_query"],
-    interrupt_after_tools=["data_analysis"],
-    interrupt_tool_mode="specified"
+    interrupt_after_tools=["data_analysis"]
+)
+```
+
+## Execution Modes
+
+LangCrew supports two execution modes that determine which interrupts are effective:
+
+| Mode | When Used | Effective Interrupts | Ignored Interrupts |
+|------|-----------|---------------------|-------------------|
+| **Task Mode** | When you provide both `agents` and `tasks` | `interrupt_before_tasks`<br/>`interrupt_after_tasks` | `interrupt_before_agents`<br/>`interrupt_after_agents` |
+| **Agent Mode** | When you provide only `agents` (no tasks) | `interrupt_before_agents`<br/>`interrupt_after_agents` | `interrupt_before_tasks`<br/>`interrupt_after_tasks` |
+
+**Important**: Tool-level and node-level interrupts work in both modes.
+
+## Six Interrupt Types
+
+### 1. Task-Level Interrupts
+
+#### interrupt_before_tasks
+**Effective in**: Task Mode only
+
+Pause before specific tasks execute to review or modify task inputs:
+
+```python
+from langcrew import Crew, HITLConfig
+
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    hitl=HITLConfig(
+        interrupt_before_tasks=["research_task"]  # Review before research starts
+    )
+)
+```
+
+#### interrupt_after_tasks
+**Effective in**: Task Mode only
+
+Pause after specific tasks complete to review or modify outputs:
+
+```python
+hitl=HITLConfig(
+    interrupt_after_tasks=["research_task"]  # Review research results
+)
+```
+
+### 2. Agent-Level Interrupts
+
+#### interrupt_before_agents
+**Effective in**: Agent Mode only
+
+Pause before specific agents execute:
+
+```python
+from langcrew import Crew, HITLConfig
+
+crew = Crew(
+    agents=[coordinator, specialist],  # No tasks - Agent Mode
+    hitl=HITLConfig(
+        interrupt_before_agents=["specialist"]  # Approve before specialist runs
+    )
+)
+```
+
+#### interrupt_after_agents
+**Effective in**: Agent Mode only
+
+Pause after specific agents complete their work:
+
+```python
+hitl=HITLConfig(
+    interrupt_after_agents=["coordinator"]  # Review coordinator's decisions
+)
+```
+
+### 3. Tool-Level Interrupts
+
+#### interrupt_before_tools
+**Effective in**: Both modes
+
+Pause before specific tools execute (most common for sensitive operations):
+
+```python
+hitl=HITLConfig(
+    interrupt_before_tools=["send_email", "make_payment", "delete_file"]
+)
+```
+
+#### interrupt_after_tools
+**Effective in**: Both modes (with session limitations)
+
+Pause after specific tools complete to review results:
+
+```python
+hitl=HITLConfig(
+    interrupt_after_tools=["data_analysis"]  # Review analysis results
+)
+```
+
+:::caution[Session Limitation]
+`interrupt_after_tools` only works within a single execution session and cannot resume from the interrupt point after workflow restarts.
+:::
+
+### 4. Node-Level Interrupts
+
+#### interrupt_before_nodes / interrupt_after_nodes
+**Effective in**: Both modes
+
+Pause at specific LangGraph nodes for workflow-level control:
+
+```python
+hitl=HITLConfig(
+    interrupt_before_nodes=["decision_node"],
+    interrupt_after_nodes=["processing_node"]
 )
 ```
 
@@ -40,13 +153,14 @@ Unified configuration for all interrupt and approval settings.
 
 | Parameter                | Type      | Description                               | Default     |
 | ------------------------ | --------- | ----------------------------------------- | ----------- |
-| `enabled`                | bool      | Enable/disable HITL functionality         | True        |
-| `interrupt_before_tools` | List[str] | Tools requiring approval before execution | []          |
-| `interrupt_after_tools`  | List[str] | Tools requiring review after execution    | []          |
-| `interrupt_tool_mode`    | str       | Interrupt mode: "specified", "all"        | "specified" |
-| `excluded_tools`         | List[str] | Tools excluded from "all" mode            | []          |
-| `interrupt_before_nodes` | List[str] | Nodes to interrupt before                 | []          |
-| `interrupt_after_nodes`  | List[str] | Nodes to interrupt after                  | []          |
+| `interrupt_before_tasks` | List[str] | Tasks to interrupt before (Task Mode only) | []          |
+| `interrupt_after_tasks`  | List[str] | Tasks to interrupt after (Task Mode only)  | []          |
+| `interrupt_before_agents`| List[str] | Agents to interrupt before (Agent Mode only) | []        |
+| `interrupt_after_agents` | List[str] | Agents to interrupt after (Agent Mode only) | []         |
+| `interrupt_before_tools` | List[str] | Tools requiring approval before execution  | []          |
+| `interrupt_after_tools`  | List[str] | Tools requiring review after execution     | []          |
+| `interrupt_before_nodes` | List[str] | Nodes to interrupt before                  | []          |
+| `interrupt_after_nodes`  | List[str] | Nodes to interrupt after                   | []          |
 
 ### Tool-Level Interrupts
 
@@ -93,7 +207,7 @@ Node-level interrupts provide granular control over workflow execution, allowing
 Dynamic user interaction tool for agent-initiated input requests.
 
 ```python
-from langcrew.tools.hitl import UserInputTool
+from langcrew_tools.hitl import UserInputTool
 
 # Agent can request user input during execution
 user_input_tool = UserInputTool()

@@ -92,5 +92,7 @@
   "form.validation.maxSelections": "最多只能选择{{max}}个选项",
   "form.submit.loading": "提交中...",
   "form.submit.button": "提交",
-  "form.error.checkInput": "请检查表单输入"
+  "form.error.checkInput": "请检查表单输入",
+  "inputoutput.input.label": "输入",
+  "inputoutput.output.label": "输出"
 }

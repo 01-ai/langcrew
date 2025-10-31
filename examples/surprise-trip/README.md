@@ -5,9 +5,11 @@ This project demonstrates the use of the LangCrew framework to automate the crea
 
 Based on [@joaomdmoura](https://x.com/joaomdmoura)'s CrewAI example, enhanced with LangCrew.
 
-- [Running the Script](#running-the-script)
-- [Details & Explanation](#details--explanation)
-- [License](#license)
+- [AI Crew for Surprise Travel Planning](#ai-crew-for-surprise-travel-planning)
+  - [Introduction](#introduction)
+  - [Running the Script](#running-the-script)
+  - [Details \& Explanation](#details--explanation)
+  - [License](#license)
 
 ## Running the Script
 It uses GPT-4o-mini by default.
@@ -17,13 +19,13 @@ It uses GPT-4o-mini by default.
 - **Configure Environment**: Copy `.env.example` to `.env` and set up the environment variables:
   - `OPENAI_API_KEY`: Your [OpenAI API key](https://platform.openai.com/api-keys) 
   - Web Search and Web Fetch tools configuration (optional, see `.env.example` for details)
-- **Install Dependencies**: Run `uv sync --prerelease=allow` to install all dependencies.
+- **Install Dependencies**: Run `uv sync` to install all dependencies.
 - **Customize**: Modify `src/surprise_travel/main.py` to add custom inputs for your agents and tasks.
 - **Customize Further**: Check `src/surprise_travel/config/agents.yaml` to update your agents and `src/surprise_travel/config/tasks.yaml` to update your tasks.
-- **Execute the Script**: Run `uv run --prerelease=allow surprise_travel` or `source .venv/bin/activate && surprise_travel` and input your project details.
+- **Execute the Script**: Run `uv run surprise_travel` or `source .venv/bin/activate && surprise_travel` and input your project details.
 
 ## Details & Explanation
-- **Running the Script**: Execute `uv run --prerelease=allow surprise_travel`. The script will leverage the LangCrew framework to generate a detailed surprise travel plan.
+- **Running the Script**: Execute `uv run surprise_travel`. The script will leverage the LangCrew framework to generate a detailed surprise travel plan.
 - **Key Components**:
   - `src/surprise_travel/main.py`: Main script file containing the execution logic.
   - `src/surprise_travel/crew.py`: Main crew file where agents and tasks come together, and the main logic is executed.

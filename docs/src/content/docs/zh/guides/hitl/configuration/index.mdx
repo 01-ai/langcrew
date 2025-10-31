@@ -15,19 +15,27 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 from langcrew.hitl import HITLConfig
 
 config = HITLConfig(
-    enabled=True,                              # 启用/禁用 HITL
-    interrupt_before_tools=["tool1", "tool2"], # 需要预批准的工具
-    interrupt_after_tools=["tool3"],           # 需要后审查的工具
-    interrupt_tool_mode="specified",           # 控制模式
-    excluded_tools=["safe_tool"],              # 要排除的工具
-    interrupt_before_nodes=["node1"],          # LangGraph 节点中断
-    interrupt_after_nodes=["node2"]            # LangGraph 节点中断
+    # 工具级中断
+    interrupt_before_tools=["tool1", "tool2"],  # 需要预批准的工具
+    interrupt_after_tools=["tool3"],            # 需要后审查的工具
+    
+    # 任务级中断（仅任务模式）
+    interrupt_before_tasks=["task1"],
+    interrupt_after_tasks=["task2"],
+    
+    # 智能体级中断（仅智能体模式）
+    interrupt_before_agents=["agent1"],
+    interrupt_after_agents=["agent2"],
+    
+    # 节点级中断（LangGraph 原生）
+    interrupt_before_nodes=["node1"],
+    interrupt_after_nodes=["node2"]
 )
 ```
 
 ## 配置模式
 
-### 指定工具模式
+### 指定工具
 
 针对特定工具进行中断：
 
@@ -43,8 +51,7 @@ hitl_config = HITLConfig(
         "send_email",      # 确认邮件发送
         "database_query",  # 验证数据库访问
         "external_api"     # 审查 API 调用
-    ],
-    interrupt_tool_mode="specified"  # 仅指定工具
+    ]
 )
 ```
 
@@ -59,12 +66,11 @@ hitl_config = HITLConfig(
         "content_generator", # 检查生成内容
         "report_writer",    # 验证报告
         "image_processor"   # 审查处理的图像
-    ],
-    interrupt_tool_mode="specified"
+    ]
 )
 
 # ⚠️ 重要：后置中断仅在单个执行会话内有效
-# 工作流重启或从检查点恢复后将不会触发，除非工具支持可重入执行
+# 工作流重启或从检查点恢复后将不会触发
 ```
 
 </TabItem>
@@ -146,35 +152,6 @@ hitl_config = HITLConfig(
 </TabItem>
 </Tabs>
 
-### 所有工具模式
-
-对所有工具要求审批，但有例外：
-
-```python
-# 高安全性配置
-hitl_config = HITLConfig(
-    interrupt_tool_mode="all",  # 所有工具都需要审批
-    excluded_tools=[
-        "calculator",       # 安全的数学运算
-        "date_time",        # 简单的日期/时间查询
-        "user_input",       # 用户交互工具
-        "text_formatter"    # 安全的文本操作
-    ]
-)
-```
-
-### 无中断模式
-
-完全禁用 HITL：
-
-```python
-# 开发/测试模式
-hitl_config = HITLConfig(enabled=False)
-
-# 或简单省略 HITL 配置
-agent = Agent(role="开发者", tools=[...])  # 无 HITL
-```
-
 ## 智能体级配置
 
 ### 个人智能体设置
@@ -204,10 +181,9 @@ worker_agent = Agent(
 # 面向公众的智能体，最大监督
 public_agent = Agent(
     role="公共助手", 
-    tools=[WebSearchTool(), CalculatorTool()],
+    tools=[WebSearchTool(), CalculatorTool(), FileWriteTool()],
     hitl=HITLConfig(
-        interrupt_tool_mode="all",
-        excluded_tools=["calculator"]
+        interrupt_before_tools=["web_search", "file_write"]  # 批准所有风险操作
     )
 )
 ```
@@ -224,8 +200,7 @@ def create_context_aware_hitl(user_role, data_sensitivity):
         )
     elif data_sensitivity == "high":
         return HITLConfig(
-            interrupt_tool_mode="all",
-            excluded_tools=["calculator", "date_time"]
+            interrupt_before_tools=["file_write", "database_write", "external_api"]
         )
     else:
         return HITLConfig(
@@ -274,7 +249,9 @@ crew = Crew(
 critical_agent = Agent(
     role="关键操作",
     tools=[DatabaseTool()],
-    hitl=HITLConfig(interrupt_tool_mode="all")  # 智能体特定策略
+    hitl=HITLConfig(
+        interrupt_before_tools=["database_write", "database_delete"]  # 智能体特定策略
+    )
 )
 
 # 没有 HITL 配置的智能体（将从团队继承）
@@ -397,7 +374,7 @@ def get_hitl_config():
     
     if env == "development":
         # 最少中断以加快开发
-        return HITLConfig(enabled=False)
+        return None  # 开发环境无 HITL
     
     elif env == "staging":
         # 仅关键操作
@@ -406,10 +383,13 @@ def get_hitl_config():
         )
     
     elif env == "production":
-        # 全面监督
+        # 全面监督 - 指定所有敏感工具
         return HITLConfig(
-            interrupt_tool_mode="all",
-            excluded_tools=["calculator", "date_time", "text_formatter"]
+            interrupt_before_tools=[
+                "database_write", "database_delete", 
+                "file_write", "file_delete",
+                "external_api", "send_email"
+            ]
         )
     
     else:
@@ -430,18 +410,22 @@ agent = Agent(
 ### 1. 安全优先方法
 
 ```python
-# 从严格开始，然后根据需要放宽
+# 从严格开始，指定敏感操作
 initial_config = HITLConfig(
-    interrupt_tool_mode="all",
-    excluded_tools=["calculator"]  # 仅明显安全的工具
+    interrupt_before_tools=[
+        "file_write", "file_delete",
+        "database_write", "database_delete",
+        "external_api", "send_email"
+    ]
 )
 
-# 基于经验逐渐添加到 excluded_tools
-mature_config = HITLConfig(
-    interrupt_tool_mode="all", 
-    excluded_tools=[
-        "calculator", "date_time", "text_formatter",
-        "unit_converter", "weather_info"  # 经过验证的安全工具
+# 根据应用需求扩展
+production_config = HITLConfig(
+    interrupt_before_tools=[
+        "file_write", "file_delete",
+        "database_write", "database_delete",
+        "external_api", "send_email",
+        "system_command", "user_data_access"  # 根据需要添加更多
     ]
 )
 ```
@@ -463,8 +447,7 @@ def get_role_based_hitl(user_role):
             interrupt_before_tools=["database_write", "external_api"]
         ),
         "viewer": HITLConfig(
-            interrupt_tool_mode="all",
-            excluded_tools=["calculator", "date_time"]
+            interrupt_before_tools=["file_write", "database_write", "external_api"]
         )
     }
     
@@ -479,18 +462,19 @@ SAFE_TOOLS = ["calculator", "date_time", "text_formatter", "unit_converter"]
 MODERATE_TOOLS = ["web_search", "file_read", "data_query"]  
 DANGEROUS_TOOLS = ["file_write", "file_delete", "database_write", "send_email"]
 
-# 基于风险的配置
+# 低风险：仅危险工具需要批准
 low_risk_config = HITLConfig(
     interrupt_before_tools=DANGEROUS_TOOLS
 )
 
+# 高风险：危险和中等工具需要批准
 high_risk_config = HITLConfig(
     interrupt_before_tools=DANGEROUS_TOOLS + MODERATE_TOOLS
 )
 
+# 最大安全性：明确列出所有需要批准的工具
 maximum_security_config = HITLConfig(
-    interrupt_tool_mode="all",
-    excluded_tools=SAFE_TOOLS
+    interrupt_before_tools=DANGEROUS_TOOLS + MODERATE_TOOLS + ["advanced_operation"]
 )
 ```
 
@@ -517,9 +501,9 @@ for tool in agent.tools:
 
 ```python
 # ❌ 问题：跨会话使用后置中断
-result1 = crew.kickoff(thread_id="session1")  # 工具执行，触发后置中断
+result1 = crew.kickoff(config={"configurable": {"thread_id": "session1"}})  # 工具执行，触发后置中断
 # 系统重启...
-result2 = crew.kickoff(thread_id="session1")  # 后置中断不会再次触发
+result2 = crew.kickoff(config={"configurable": {"thread_id": "session1"}})  # 后置中断不会再次触发
 
 # ✅ 解决方案：使用前置中断进行持久审批
 hitl_config = HITLConfig(

@@ -5,6 +5,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from langcrew import Agent, Crew
+from langcrew.llm_factory import LLMFactory
 from langcrew.project import CrewBase, agent, crew
 from langcrew.runnable_crew import RunnableCrew
 from langcrew.tools import HitlGetHandoverInfoTool
@@ -33,8 +34,63 @@ from langcrew_tools.utils.sandbox.base_sandbox import (
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from super_agent.config.config import SuperAgentConfig, default_config
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_core.tools import Tool
+from langchain_community.utilities import GoogleSerperAPIWrapper
+
 
 logger = logging.getLogger(__name__)
+
+
+# Create Serper search tool (replaces WebSearchTool)
+def _create_serper_search_tool() -> Tool:
+    """Create a web search tool based on Google Serper API"""
+    search = GoogleSerperAPIWrapper()
+
+    return Tool(
+        name="web_search",
+        description=(
+            "Perform web search to obtain the latest information related to the query. "
+            "Returns search results containing titles, URLs and snippets. "
+            "Input should be a search query string."
+        ),
+        func=search.run,
+    )
+
+
+# Create web fetch tool (replaces WebFetchTool)
+def _create_web_fetch_tool() -> Tool:
+    """Create a web content fetching tool based on WebBaseLoader"""
+
+    def fetch_url(url: str) -> str:
+        """Fetch webpage content and return as text"""
+        try:
+            loader = WebBaseLoader(web_paths=[url])
+            docs = loader.load()
+            if docs:
+                # Return page content, limit length to avoid excessive size
+                content = docs[0].page_content
+                if len(content) > 50000:
+                    content = content[:50000] + "\n\n[Content truncated...]"
+                return content
+            return "No content extracted from the webpage."
+        except Exception as e:
+            return f"Error fetching webpage: {str(e)}"
+
+    return Tool(
+        name="web_fetch",
+        description=(
+            "Crawl a web page and extract its content in text format. "
+            "Automatically filters out navigation, ads, and other irrelevant content. "
+            "Input should be a valid URL string."
+        ),
+        func=fetch_url,
+    )
+
+
+# Initialize tools
+web_search_tool = _create_serper_search_tool()
+web_fetch_tool = _create_web_fetch_tool()
 
 
 @CrewBase
@@ -80,7 +136,6 @@ class SuperAgentCrew:
     def get_browser_llm(self) -> BrowserBaseChatModel:
         """Create browser-specific LLM client"""
         from browser_use.llm import ChatOpenAI as BrowserChatOpenAI
-
         return BrowserChatOpenAI(
             model=self.config.browser_model,
             temperature=self.config.browser_temperature,
@@ -105,17 +160,8 @@ class SuperAgentCrew:
                 vl_llm=self.get_browser_llm(),
                 async_s3_client=self.async_s3_client,
             ),
-            CloudPhoneStreamingTool(
-                model_name=self.config.model_name,
-                base_model=self.get_llm_client(),
-                session_id=self.session_id,
-                sandbox_source=create_cloud_phone_sandbox_by_session_id(
-                    self.session_id,
-                    checkpointer_state_manager=self.checkpointer_state_manager,
-                ),
-            ),
-            WebSearchTool(),
-            WebFetchTool(),
+            web_search_tool, 
+            web_fetch_tool,
             WriteFileTool(),
             ReadFileTool(),
             DeleteFileTool(),
@@ -127,13 +173,6 @@ class SuperAgentCrew:
             CodeInterpreterTool(),
             RunCommandTool(),
         ]
-        tools.append(
-            HitlHandoverTool(
-                tools=[
-                    tool for tool in tools if isinstance(tool, HitlGetHandoverInfoTool)
-                ],
-            )
-        )
         for tool in tools:
             if isinstance(tool, SandboxMixin):
                 if not tool.sandbox_source:

@@ -13,7 +13,10 @@ Get your first crew running in just 3 lines:
 from langcrew import Agent, Task, Crew
 
 agents = [Agent(role="Researcher", goal="Gather data"), Agent(role="Writer", goal="Create content")]
-tasks = [Task(agent=agents[0], description="Research AI trends"), Task(agent=agents[1], description="Write report")]
+tasks = [
+    Task(agent=agents[0], description="Research AI trends", expected_output="Research findings"),
+    Task(agent=agents[1], description="Write report", expected_output="Written report")
+]
 crew = Crew(agents=agents, tasks=tasks)
 result = crew.kickoff()
 ```
@@ -72,9 +75,9 @@ researcher = Agent(role="Researcher", goal="Gather information")
 analyst = Agent(role="Analyst", goal="Analyze data")
 writer = Agent(role="Writer", goal="Create reports")
 
-research_task = Task(agent=researcher, description="Research market trends", name="research")
-analysis_task = Task(agent=analyst, description="Analyze findings", context=[research_task], name="analysis")
-report_task = Task(agent=writer, description="Write final report", context=[analysis_task], name="report")
+research_task = Task(agent=researcher, description="Research market trends", expected_output="Research findings", name="research")
+analysis_task = Task(agent=analyst, description="Analyze findings", expected_output="Analysis results", context=[research_task], name="analysis")
+report_task = Task(agent=writer, description="Write final report", expected_output="Written report", context=[analysis_task], name="report")
 
 crew = Crew(
     agents=[researcher, analyst, writer],
@@ -87,6 +90,12 @@ crew = Crew(
 When no tasks are specified, agents work sequentially:
 
 ```python
+from langchain_core.messages import HumanMessage
+
+researcher = Agent(role="Researcher", goal="Gather information")
+analyst = Agent(role="Analyst", goal="Analyze data")
+writer = Agent(role="Writer", goal="Create reports")
+
 crew = Crew(
     agents=[researcher, analyst, writer]  # No tasks - agents process input in sequence
 )
@@ -122,6 +131,9 @@ crew = Crew(agents=[coordinator, specialist, reviewer])
 Crews maintain persistent memory across conversations:
 
 ```python
+assistant = Agent(role="Assistant", goal="Help users")
+support_task = Task(agent=assistant, description="Answer user questions", expected_output="Helpful response")
+
 # Enable basic memory
 crew = Crew(
     agents=[assistant],
@@ -130,8 +142,8 @@ crew = Crew(
 )
 
 # Memory persists across sessions
-result1 = crew.kickoff(thread_id="conversation_1")
-result2 = crew.kickoff(thread_id="conversation_1")  # Remembers previous context
+result1 = crew.kickoff(config={"configurable": {"thread_id": "conversation_1"}})
+result2 = crew.kickoff(config={"configurable": {"thread_id": "conversation_1"}})  # Remembers previous context
 ```
 
 ### Human-in-the-Loop
@@ -141,10 +153,15 @@ Enable human oversight when needed:
 ```python
 from langcrew.hitl import HITLConfig
 
+decision_agent = Agent(role="Decision Maker", goal="Make critical decisions")
+critical_task = Task(agent=decision_agent, description="Review and approve action", expected_output="Approval decision")
+
 crew = Crew(
     agents=[decision_agent],
     tasks=[critical_task],
-    hitl=HITLConfig(enabled=True)  # Human approval required
+    hitl=HITLConfig(
+        interrupt_before_tools=["critical_operation"]  # Human approval required for specific tools
+    )
 )
 ```
 
@@ -154,10 +171,14 @@ Automatic context flow between agents and tasks:
 
 ```python
 # Context flows automatically through dependencies
+collector = Agent(role="Data Collector", goal="Collect information")
+processor = Agent(role="Data Processor", goal="Process information")
+reporter = Agent(role="Reporter", goal="Generate reports")
+
 tasks = [
-    Task(agent=collector, description="Collect data", name="collect"),
-    Task(agent=processor, description="Process data", context=["collect"], name="process"),
-    Task(agent=reporter, description="Generate report", context=["process"], name="report")
+    Task(agent=collector, description="Collect data", expected_output="Collected data", name="collect"),
+    Task(agent=processor, description="Process data", expected_output="Processed data", context=["collect"], name="process"),
+    Task(agent=reporter, description="Generate report", expected_output="Final report", context=["process"], name="report")
 ]
 
 crew = Crew(agents=[collector, processor, reporter], tasks=tasks)
@@ -190,12 +211,14 @@ result = crew.kickoff(inputs={"topic": "AI trends", "deadline": "2024-12-31"})
 # Persistent conversations
 result = crew.kickoff(
     inputs={"query": "Analyze this data"},
-    thread_id="project_123"  # Maintains conversation history
+    config={"configurable": {"thread_id": "project_123"}}  # Maintains conversation history
 )
 ```
 
 ### Streaming Execution
 ```python
+from langchain_core.messages import HumanMessage
+
 # Stream crew execution for real-time monitoring
 for chunk in crew.stream(input={"messages": [HumanMessage(content="Process request")]}):
     print(f"Step: {chunk}")
@@ -205,32 +228,32 @@ for chunk in crew.stream(input={"messages": [HumanMessage(content="Process reque
 
 ### Research Pipeline
 ```python
+researcher = Agent(role="Researcher", goal="Gather data")
+analyst = Agent(role="Analyst", goal="Analyze findings")
+writer = Agent(role="Writer", goal="Create reports")
+
 crew = Crew(
-    agents=[
-        Agent(role="Researcher", goal="Gather data"),
-        Agent(role="Analyst", goal="Analyze findings"), 
-        Agent(role="Writer", goal="Create reports")
-    ],
+    agents=[researcher, analyst, writer],
     tasks=[
-        Task(agent=researcher, description="Research topic", name="research"),
-        Task(agent=analyst, description="Analyze data", context=["research"], name="analyze"),
-        Task(agent=writer, description="Write report", context=["analyze"], name="report")
+        Task(agent=researcher, description="Research topic", expected_output="Research findings", name="research"),
+        Task(agent=analyst, description="Analyze data", expected_output="Analysis results", context=["research"], name="analyze"),
+        Task(agent=writer, description="Write report", expected_output="Written report", context=["analyze"], name="report")
     ]
 )
 ```
 
 ### Review Workflow
 ```python
+author = Agent(role="Author", goal="Create content")
+reviewer = Agent(role="Reviewer", goal="Review quality")
+approver = Agent(role="Approver", goal="Final approval")
+
 crew = Crew(
-    agents=[
-        Agent(role="Author", goal="Create content"),
-        Agent(role="Reviewer", goal="Review quality"),
-        Agent(role="Approver", goal="Final approval")
-    ],
+    agents=[author, reviewer, approver],
     tasks=[
-        Task(agent=author, description="Create draft", name="draft"),
-        Task(agent=reviewer, description="Review content", context=["draft"], name="review"),
-        Task(agent=approver, description="Final approval", context=["review"], name="approve")
+        Task(agent=author, description="Create draft", expected_output="Draft document", name="draft"),
+        Task(agent=reviewer, description="Review content", expected_output="Review feedback", context=["draft"], name="review"),
+        Task(agent=approver, description="Final approval", expected_output="Approval decision", context=["review"], name="approve")
     ]
 )
 ```

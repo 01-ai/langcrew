@@ -1,12 +1,13 @@
 """Tests for the code interpreter tool."""
 
+import asyncio
 import base64
 import re
 from textwrap import dedent
 
 import pytest
 
-from langcrew_tools.code_interpreter import CodeInterpreterTool
+from langcrew_tools.code_interpreter.langchain_tools import CodeInterpreterTool
 
 
 def _decode_code_from_command(command: str) -> str:
@@ -83,15 +84,16 @@ def sandbox_code_tool() -> CodeInterpreterTool:
     return CodeInterpreterTool(sandbox_source=provider)
 
 
-def test_code_interpreter_basic(sandbox_code_tool: CodeInterpreterTool) -> None:
+@pytest.mark.asyncio
+async def test_code_interpreter_basic(sandbox_code_tool: CodeInterpreterTool) -> None:
     """Test basic code execution."""
 
     # Test simple code
-    result = sandbox_code_tool._run("print('Hello, World!')")
+    result = await sandbox_code_tool._arun("print('Hello, World!')")
     assert "Hello, World!" in result
 
     # Test math operations
-    result = sandbox_code_tool._run("print(2 + 2)")
+    result = await sandbox_code_tool._arun("print(2 + 2)")
     assert "4" in result
 
     # Test with variables
@@ -102,27 +104,29 @@ def test_code_interpreter_basic(sandbox_code_tool: CodeInterpreterTool) -> None:
         print(f"Sum: {x + y}")
         """
     )
-    result = sandbox_code_tool._run(code)
+    result = await sandbox_code_tool._arun(code)
     assert "Sum: 30" in result
 
 
-def test_code_interpreter_errors(sandbox_code_tool: CodeInterpreterTool) -> None:
+@pytest.mark.asyncio
+async def test_code_interpreter_errors(sandbox_code_tool: CodeInterpreterTool) -> None:
     """Test error handling."""
 
     # Test syntax error
-    result = sandbox_code_tool._run("print('unclosed string")
+    result = await sandbox_code_tool._arun("print('unclosed string")
     assert "SyntaxError" in result or "Error" in result
 
     # Test runtime error
-    result = sandbox_code_tool._run("1 / 0")
+    result = await sandbox_code_tool._arun("1 / 0")
     assert "ZeroDivisionError" in result
 
     # Test undefined variable
-    result = sandbox_code_tool._run("print(undefined_variable)")
+    result = await sandbox_code_tool._arun("print(undefined_variable)")
     assert "NameError" in result
 
 
-def test_code_interpreter_safe_modules(sandbox_code_tool: CodeInterpreterTool) -> None:
+@pytest.mark.asyncio
+async def test_code_interpreter_safe_modules(sandbox_code_tool: CodeInterpreterTool) -> None:
     """Test allowed modules."""
 
     # Test math module
@@ -133,7 +137,7 @@ def test_code_interpreter_safe_modules(sandbox_code_tool: CodeInterpreterTool) -
         print(f"Square root of 16: {math.sqrt(16)}")
         """
     )
-    result = sandbox_code_tool._run(code)
+    result = await sandbox_code_tool._arun(code)
     assert "Pi: 3.1416" in result
     assert "Square root of 16: 4.0" in result
 
@@ -145,7 +149,7 @@ def test_code_interpreter_safe_modules(sandbox_code_tool: CodeInterpreterTool) -
         print(f"Current year: {now.year}")
         """
     )
-    result = sandbox_code_tool._run(code)
+    result = await sandbox_code_tool._arun(code)
     assert "Current year:" in result
 
     # Test json module
@@ -156,11 +160,12 @@ def test_code_interpreter_safe_modules(sandbox_code_tool: CodeInterpreterTool) -
         print(json.dumps(data))
         """
     )
-    result = sandbox_code_tool._run(code)
+    result = await sandbox_code_tool._arun(code)
     assert '{"name": "test", "value": 123}' in result
 
 
-def test_code_interpreter_timeout(sandbox_code_tool: CodeInterpreterTool) -> None:
+@pytest.mark.asyncio
+async def test_code_interpreter_timeout(sandbox_code_tool: CodeInterpreterTool) -> None:
     """Test timeout handling."""
 
     # Test infinite loop with short timeout
@@ -170,11 +175,12 @@ def test_code_interpreter_timeout(sandbox_code_tool: CodeInterpreterTool) -> Non
             pass
         """
     )
-    result = sandbox_code_tool._run(code, timeout=1)
+    result = await sandbox_code_tool._arun(code, timeout=1)
     assert "timed out" in result.lower() or "timeout" in result.lower()
 
 
-def test_code_interpreter_output_truncation(
+@pytest.mark.asyncio
+async def test_code_interpreter_output_truncation(
     sandbox_code_tool: CodeInterpreterTool,
 ) -> None:
     """Test output truncation."""
@@ -186,12 +192,13 @@ def test_code_interpreter_output_truncation(
             print(f"Line {i}: This is a test line with some content")
         """
     )
-    result = sandbox_code_tool._run(code)
+    result = await sandbox_code_tool._arun(code)
     assert "truncated" in result
     assert len(result) < 10100  # Should be close to max_output_length
 
 
-def test_code_interpreter_multiline_output(
+@pytest.mark.asyncio
+async def test_code_interpreter_multiline_output(
     sandbox_code_tool: CodeInterpreterTool,
 ) -> None:
     """Test handling of multiline output."""
@@ -203,14 +210,15 @@ def test_code_interpreter_multiline_output(
         print("Done")
         """
     )
-    result = sandbox_code_tool._run(code)
+    result = await sandbox_code_tool._arun(code)
     assert "Line 0" in result
     assert "Line 1" in result
     assert "Line 2" in result
     assert "Done" in result
 
 
-def test_code_interpreter_input_function(
+@pytest.mark.asyncio
+async def test_code_interpreter_input_function(
     sandbox_code_tool: CodeInterpreterTool,
 ) -> None:
     """Test custom input handling."""

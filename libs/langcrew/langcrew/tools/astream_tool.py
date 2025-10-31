@@ -757,7 +757,6 @@ class StreamingBaseTool(ToolCallback):
                 external_task.cancel()
 
     def _run(self, config: RunnableConfig, *args: Any, **kwargs: Any) -> Any:
-        logger.warn("sync _run in new loop")
         try:
             return asyncio.run(self._arun(config, *args, **kwargs))
         except RuntimeError as e:
@@ -975,7 +974,7 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
                 logger.info("Stop signal received")
                 self._stop_event.clear()
                 return self._stop_result
-            
+
             if self._new_message_event.is_set():
                 logger.info("New message signal received")
                 self._new_message_event.clear()
@@ -1036,12 +1035,15 @@ class GraphStreamingBaseTool(StreamingBaseTool, ABC):
                 self._stop_result = result
                 self._stop_event.set()
             elif event_type == EventType.NEW_MESSAGE:
-                result = await self.tool_stop_result(EventType.NEW_MESSAGE, str(event_data))
+                result = await self.tool_stop_result(
+                    EventType.NEW_MESSAGE, str(event_data)
+                )
                 self._stop_result = result
                 self._new_message_event.set()
         except BaseException as e:
             result = f"Error occurred during tool execution: {e}"
         return result
+
     # Deprecated
     @override
     async def _astream_events(

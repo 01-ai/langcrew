@@ -11,25 +11,120 @@ langcrew中的内存管理提供：
 
 - **短期记忆**：使用LangGraph Checkpointer的基于会话的对话历史
 - **长期记忆**：使用LangGraph Store系统的持久知识存储
-- **实体记忆**：跨对话跟踪和记住实体（人员、组织、概念）
-- **多提供商支持**：内存、SQLite、PostgreSQL后端（已测试）；Redis、MongoDB、MySQL（实验性）
+- **多提供商支持**：内存、SQLite、PostgreSQL、MySQL（生产就绪）；Redis、MongoDB（实验性）
 - **统一配置**：单个MemoryConfig类管理所有内存类型
 
 ## 核心架构
 
-内存管理基于[LangGraph的Store和Checkpointer](https://langchain-ai.github.io/langgraph/concepts/persistence/)，具有三种专门的内存类型：
+内存管理提供基于 [LangGraph 持久化层](https://langchain-ai.github.io/langgraph/concepts/persistence/)的**多层架构**：
+
+### 记忆层次
+
+LangCrew 实现了复杂的多层记忆系统：
+
+```
+┌─────────────────────────────────────────┐
+│       短期记忆 (STM)                     │  ← 会话/对话状态
+│     (LangGraph Checkpointer)            │     - 基于线程
+│                                         │     - 消息历史
+├─────────────────────────────────────────┤
+│       长期记忆 (LTM)                     │  ← 跨会话知识
+│      (LangGraph Store)                  │     - 用户记忆
+│                                         │     - 应用记忆（实验性）
+│  ┌───────────────┬───────────────────┐ │
+│  │ 用户记忆      │  应用记忆         │ │
+│  │ (个人)        │  (共享见解)       │ │
+│  └───────────────┴───────────────────┘ │
+├─────────────────────────────────────────┤
+│       向量搜索层                         │  ← 语义检索
+│     (可选 IndexConfig)                  │     - 基于嵌入
+│                                         │     - 相似度搜索
+└─────────────────────────────────────────┘
+```
+
+### 使用 app_id 实现应用隔离
+
+**多租户系统的关键**：`app_id` 参数在多个应用共享同一数据库时提供命名空间隔离：
+
+```python
+from langcrew import MemoryConfig
+from langcrew.memory import LongTermMemoryConfig
+
+# 应用 A
+memory_a = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://shared-db/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="chatbot-prod-v1"  # 为应用 A 隔离所有记忆
+    )
+)
+
+# 应用 B（相同数据库，完全隔离）
+memory_b = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://shared-db/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="assistant-prod-v2"  # 不同的命名空间
+    )
+)
+```
+
+**数据隔离保证**：
+- **有 app_id**：应用 A 中的用户"alice"与应用 B 中的"alice"完全分离
+  - 应用 A 用户记忆：`("user_memories", "chatbot-prod-v1", "alice")`
+  - 应用 B 用户记忆：`("user_memories", "assistant-prod-v2", "alice")`
+- **无 app_id**：记忆缺少应用级命名空间（不推荐用于生产）
+
+**最佳实践**：在生产环境中始终使用 `app_id`，特别是当：
+- 多个应用共享一个数据库
+- 需要在环境之间隔离数据（dev/staging/prod）
+- 合规性要求租户分离
+
+### 向量搜索集成
+
+使用向量嵌入启用语义记忆检索：
+
+```python
+from langcrew import MemoryConfig
+from langcrew.memory import LongTermMemoryConfig
+
+memory = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://localhost/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app",
+        index={
+            "dims": 1536,  # OpenAI text-embedding-3-small 维度
+            "embed": "openai:text-embedding-3-small"
+        }
+    )
+)
+```
+
+**支持的嵌入提供商**：
+- `openai:text-embedding-3-small` (1536 维)
+- `openai:text-embedding-3-large` (3072 维)
+- `openai:text-embedding-ada-002` (1536 维)
+- 自定义嵌入模型
 
 ```python
 from langcrew import Crew
-from langcrew.memory import MemoryConfig
+from langcrew.memory import ShortTermMemoryConfig, MemoryScopeConfig
 
-# 统一内存配置
+# 统一记忆配置
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///memory.db",
-    short_term={"enabled": True, "max_history": 20},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app",  # 生产环境推荐
+        user_memory=MemoryScopeConfig(enabled=True),
+        app_memory=MemoryScopeConfig(enabled=False)  # 实验性
+    )
 )
 
 crew = Crew(
@@ -53,7 +148,6 @@ crew = Crew(
 | `connection_string` | str \| None | 数据库连接字符串 | None |
 | `short_term` | dict | 短期记忆配置 | 见下文 |
 | `long_term` | dict | 长期记忆配置 | 见下文 |
-| `entity` | dict | 实体记忆配置 | 见下文 |
 
 ### 短期记忆
 
@@ -63,73 +157,145 @@ crew = Crew(
 
 - 基于线程的会话管理
 - 自动上下文注入
-- 可配置的历史限制
+- 支持存储提供商覆盖
 - 性能本地缓存
+
+**配置参数：**
+
+| 参数                | 类型        | 描述                                  | 默认值  |
+| ------------------- | ----------- | ------------------------------------- | ------- |
+| `enabled`           | bool        | 启用短期记忆                           | True    |
+| `provider`          | str \| None | 存储提供商覆盖（None时继承全局配置）    | None    |
+| `connection_string` | str \| None | 连接字符串覆盖（None时继承全局配置）    | None    |
 
 ```python
 # 短期记忆配置
 memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///memory.db",
     short_term={
         "enabled": True,
-        "max_history": 20,    # 要记住的最大对话轮数
+        # 可选：覆盖全局提供商
+        # "provider": "postgres",
+        # "connection_string": "postgresql://..."
     }
 )
 ```
 
 ### 长期记忆
 
-使用LangGraph Store系统的持久知识存储，用于跨会话信息保留。
+使用 LangGraph Store 系统的持久知识存储，用于跨会话信息保留。
 
 **核心特性：**
 
-- 基于质量的知识过滤
-- 基于任务的知识组织
-- 代理特定命名空间
-- 学习提取和存储
+- **用户记忆**：每个用户特定的个人偏好、习惯和上下文
+- **应用记忆**：所有用户共享的见解（实验性功能）
+- **语义搜索**：基于向量的相关记忆检索
+- **主动学习**：基于对话模式的自动记忆触发器
+
+**记忆范围**：
+
+| 范围 | 默认启用 | 用途 | 隔离级别 |
+|------|---------|------|---------|
+| **用户记忆** | ✅ 是 | 个人用户数据和偏好 | 每个用户每个应用 |
+| **应用记忆** | ❌ 否（实验性） | 共享应用见解 | 每个应用（所有用户） |
+
+**配置参数：**
+
+| 参数                     | 类型                  | 描述                                     | 默认值     |
+| ------------------------ | --------------------- | ---------------------------------------- | ---------- |
+| `enabled`                | bool                  | 启用长期记忆                              | False      |
+| `provider`               | str \| None           | 存储提供商覆盖（None时继承全局配置）       | None       |
+| `connection_string`      | str \| None           | 连接字符串覆盖（None时继承全局配置）       | None       |
+| `app_id`                 | str \| None           | 应用标识符（生产环境强烈推荐）             | None       |
+| `index`                  | IndexConfig \| None   | 向量搜索配置                              | None       |
+| `user_memory`            | MemoryScopeConfig     | 用户特定记忆配置                          | 已启用     |
+| `app_memory`             | MemoryScopeConfig     | 应用范围记忆（⚠️ 实验性）                 | 已禁用     |
+| `search_response_format` | str                   | 搜索结果格式（"content" 或 "content_and_artifact"） | "content" |
+
+**MemoryScopeConfig 参数：**
+
+| 参数                  | 类型  | 描述                                    | 默认值                     |
+| --------------------- | ----- | --------------------------------------- | -------------------------- |
+| `enabled`             | bool  | 启用此记忆范围                           | True（用户），False（应用） |
+| `manage_instructions` | str   | AI何时保存记忆的指令                     | 内置默认值                  |
+| `search_instructions` | str   | AI何时搜索记忆的指令                     | 内置默认值                  |
+| `schema`              | type  | 内容验证的数据模式                       | str                        |
+| `actions_permitted`   | tuple | 允许的操作：("create", "update", "delete") | 所有操作                  |
 
 ```python
-# 长期记忆配置
+from langcrew.memory import LongTermMemoryConfig, MemoryScopeConfig
+from langgraph.store.base import IndexConfig
+
+# 包含所有参数的生产配置
 memory_config = MemoryConfig(
-    long_term={
-        "enabled": True,
-        "min_quality": 0.7       # 存储的最低质量阈值
-    }
+    provider="postgres",
+    connection_string="postgresql://localhost/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app-prod",  # 推荐：防止数据混合
+        
+        # 向量搜索配置
+        index=IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small"
+        ),
+        
+        # 用户记忆（默认启用）
+        user_memory=MemoryScopeConfig(
+            enabled=True,
+            manage_instructions="""在以下情况调用此工具：
+            1. 用户表达偏好（我喜欢/爱/更喜欢）
+            2. 用户分享个人信息（工作、位置、爱好）
+            3. 用户明确要求记住某事
+            """,
+            search_instructions="""在以下情况调用：
+            1. 需要回忆用户偏好或上下文
+            2. 提供个性化推荐
+            """,
+            schema=str,
+            actions_permitted=("create", "update", "delete")
+        ),
+        
+        # 应用记忆（实验性，默认禁用）
+        app_memory=MemoryScopeConfig(
+            enabled=False,  # ⚠️ 实验性功能
+            manage_instructions="存储应用范围的见解...",
+            search_instructions="搜索常见模式..."
+        ),
+        
+        # 搜索结果格式
+        search_response_format="content"  # 或 "content_and_artifact"
+    )
 )
-```
+            """,
+            search_instructions="""在以下情况调用此工具：
+            1. 用户询问他们的偏好
+            2. 您需要个性化推荐
+            """
 
-### 实体记忆
+- **管理（保存）**：当用户表达偏好、分享信息或更正先前数据时触发
+- **搜索（检索）**：当用户询问自己或需要个性化响应时触发
 
-使用结构化存储跨对话跟踪实体（人员、组织、概念）。
+了解更多：[长期记忆指南](/zh/guides/memory/long-term/)
 
-**核心特性：**
+**自定义嵌入模型：**
 
-- 自动实体识别和更新
-- 实体间关系跟踪
-- 提及计数和时近性跟踪
-- 基于类型的实体组织
-
-```python
-# 实体记忆配置
-memory_config = MemoryConfig(
-    entity={
-        "enabled": True,
-    }
-)
-```
+对于OpenAI之外的自定义嵌入模型，请参考 [LangGraph的IndexConfig文档](https://langchain-ai.github.io/langgraph/how-tos/persistence_postgres/#semantic-search-using-embedding-similarity) 获取完整配置选项。
 
 ## 存储提供商
 
-**✅ 已测试提供商：**
+**✅ 生产就绪提供商：**
 
 - `memory` - 内存存储（开发/测试）
-- `postgresql` - PostgreSQL数据库（生产）
 - `sqlite` - SQLite数据库（单用户/开发）
+- `postgresql` - PostgreSQL数据库（生产）
+- `mysql` - MySQL数据库（生产）
 
 **⚠️ 实验性提供商：**
 
-- `redis` - Redis存储（未完全测试）
-- `mongodb` - MongoDB存储（未完全测试）
-- `mysql` - MySQL存储（未完全测试）
+- `redis` - Redis存储（实验性，未完全测试）
+- `mongodb` - MongoDB存储（实验性，未完全测试）
 
 ```python
 # PostgreSQL生产配置

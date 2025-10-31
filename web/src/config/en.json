@@ -92,5 +92,7 @@
   "form.validation.maxSelections": "At most {{max}} options can be selected",
   "form.submit.loading": "Submitting...",
   "form.submit.button": "Submit",
-  "form.error.checkInput": "Please check form input"
+  "form.error.checkInput": "Please check form input",
+  "inputoutput.input.label": "Input",
+  "inputoutput.output.label": "Output"
 }

@@ -147,6 +147,7 @@ class BrowserStreamingTool(
         request_language: str = "en",
         browser_profile: BrowserProfile | None = None,
         desktop_resolution: tuple[int, int] = DESKTOP_RESOLUTION,
+        stream_event_timeout_seconds: int | None = 100,
         **kwargs,
     ):
         """Initialize BrowserStreamingTool
@@ -163,7 +164,7 @@ class BrowserStreamingTool(
         """
         # Initialize parent classes
         super().__init__(
-            stream_event_timeout_seconds=100,
+            stream_event_timeout_seconds=stream_event_timeout_seconds,
             step_limit=step_limit,
             vl_llm=vl_llm,
             page_extraction_llm=page_extraction_llm,

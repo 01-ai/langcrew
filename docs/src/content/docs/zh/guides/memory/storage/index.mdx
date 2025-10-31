@@ -1,63 +1,48 @@
 ---
 title: 存储配置
-description: 为内存管理配置不同的存储后端
+description: 配置内存持久化的存储后端
 ---
 
-# 存储配置
-
-为LangCrew内存管理配置不同的存储后端，以匹配您的部署需求，从开发到生产规模。
+LangCrew 内存管理支持多种存储提供商用于短期和长期记忆。根据您的部署环境和可扩展性需求选择合适的提供商。
 
 ## 概述
 
 LangCrew内存管理支持多种存储提供商：
 
-- **✅ 已测试**: `memory`, `sqlite`, `postgresql`
-- **⚠️ 实验性**: `redis`, `mongodb`, `mysql`
+- **✅ 生产就绪**: `memory`, `sqlite`, `postgresql`, `mysql`
+- **⚠️ 实验性**: `redis`, `mongodb`
 
 ## 存储提供商
 
 ### 内存存储
 
-完美适用于开发和测试：
+快速、临时的存储，用于开发和测试。重启后不持久化。
 
 ```python
 from langcrew.memory import MemoryConfig
 
-# 内存配置
 memory_config = MemoryConfig(
     provider="memory",  # 无持久化
-    short_term={"enabled": True, "max_history": 20},
+    short_term={"enabled": True},
     long_term={"enabled": True},
-    entity={"enabled": True}
 )
 ```
 
-**特性：**
+**特点：**
+- **速度**：最快
+- **持久化**：无（重启后丢失）
+- **适用于**：开发、测试、临时会话
 
-- ✅ **快速**：无磁盘I/O开销
-- ✅ **简单**：无需设置
-- ❌ **易失**：重启时数据丢失
-- ❌ **单进程**：实例间无法共享
+### SQLite
 
-**最适合：**
-
-- 单元测试
-- 开发环境
-- 概念验证
-- 临时会话
-
-### SQLite存储
-
-适用于单用户应用程序和开发：
+基于文件的数据库，适用于单用户应用和开发。
 
 ```python
-# SQLite配置
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///memory.db",
-    short_term={"enabled": True, "max_history": 30},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    short_term={"enabled": True},
+    long_term={"enabled": True},
 )
 ```
 
@@ -68,42 +53,28 @@ memory_config = MemoryConfig(
 "sqlite:///memory.db"
 
 # 绝对路径
-"sqlite:////path/to/database/memory.db"
+"sqlite:////var/data/memory.db"
 
-# 内存SQLite（测试）
+# 内存中的 SQLite（仅测试用）
 "sqlite:///:memory:"
-
-# 带选项
-"sqlite:///memory.db?check_same_thread=false"
 ```
 
-**特性：**
+**特点：**
+- **速度**：快
+- **持久化**：基于文件
+- **适用于**：单用户应用、开发、本地部署
 
-- ✅ **持久**：数据在重启后保持
-- ✅ **基于文件**：易于备份和迁移
-- ✅ **无服务器**：嵌入式数据库
-- ❌ **单写入者**：并发性有限
-- ❌ **仅本地**：无网络访问
+### PostgreSQL
 
-**最适合：**
-
-- 个人应用程序
-- 本地开发
-- 小团队项目
-- 桌面应用程序
-
-### PostgreSQL存储
-
-生产就绪，适用于可扩展应用程序：
+可扩展、生产就绪的数据库，具有完整的 ACID 合规性。
 
 ```python
-# PostgreSQL配置
+# PostgreSQL 配置
 memory_config = MemoryConfig(
     provider="postgresql",
     connection_string="postgresql://user:password@localhost:5432/memory_db",
-    short_term={"enabled": True, "max_history": 50},
-    long_term={"enabled": True, "min_quality": 0.8},
-    entity={"enabled": True}
+    short_term={"enabled": True},
+    long_term={"enabled": True},
 )
 ```
 
@@ -113,224 +84,136 @@ memory_config = MemoryConfig(
 # 基本连接
 "postgresql://user:password@localhost:5432/database"
 
-# 带主机和端口
-"postgresql://user:password@db.example.com:5432/memory_db"
+# 指定模式
+"postgresql://user:password@localhost:5432/database?schema=memory"
 
-# 带SSL
-"postgresql://user:password@localhost:5432/memory_db?sslmode=require"
 
-# 连接池
-"postgresql://user:password@localhost:5432/memory_db?pool_size=20&max_overflow=30"
-
-# 使用环境变量
-import os
-connection_string = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:5432/{os.getenv('DB_NAME')}"
-```
-
-**特性：**
-
-- ✅ **可扩展**：处理大型数据集
-- ✅ **并发**：多个读写者
-- ✅ **ACID**：完整事务支持
-- ✅ **网络**：远程访问支持
-- ❌ **复杂**：需要服务器设置
-- ❌ **资源**：更高内存/CPU使用
-
-**最适合：**
-
-- 生产应用程序
-- 多用户系统
-- 大规模部署
-- 企业环境
-
-## 配置示例
-
-### 开发环境
+生产就绪的关系数据库，广泛采用。
 
 ```python
-# 快速开发设置
 memory_config = MemoryConfig(
-    provider="memory",  # 快速，无需持久化
-    short_term={"enabled": True, "max_history": 10},
-    long_term={"enabled": True, "min_quality": 0.5},  # 测试用较低阈值
-    entity={"enabled": True}
+    provider="mysql",
+    connection_string="mysql://user:password@localhost:3306/memory_db",
+    short_term={"enabled": True},
+    long_term={"enabled": True},
 )
 ```
 
-### 本地开发带持久化
+**特点：**
+- **速度**：良好（取决于网络）
+- **持久化**：持久
+- **适用于**：生产、现有 MySQL 基础设施
+
+### Redis（⚠️ 实验性）
+
+高性能内存数据存储，具有可选持久化。
 
 ```python
-# 带文件持久化的本地开发
 memory_config = MemoryConfig(
-    provider="sqlite",
-    connection_string="sqlite:///dev_memory.db",
-    short_term={"enabled": True, "max_history": 25},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    provider="redis",
+    connection_string="redis://localhost:6379/0",
+    short_term={"enabled": True},
+    long_term={"enabled": True},
 )
 ```
 
-### 生产环境
+**连接字符串示例：**
 
 ```python
-# 带连接池的生产配置
-import os
+# 基本 Redis 连接
+"redis://localhost:6379/0"
 
+# 带认证的 Redis
+"redis://:password@localhost:6379/0"
+
+# 自定义数据库的 Redis
+"redis://localhost:6379/2"
+```
+
+**⚠️ 状态**：实验性 - 未在生产环境中充分测试。
+
+### MongoDB（⚠️ 实验性）
+
+面向文档的 NoSQL 数据库。
+
+```python
 memory_config = MemoryConfig(
-    provider="postgresql",
-    connection_string=f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:5432/{os.getenv('DB_NAME')}?pool_size=20&max_overflow=30",
-    short_term={"enabled": True, "max_history": 50},
-    long_term={"enabled": True, "min_quality": 0.85},
-    entity={"enabled": True}
+    provider="mongodb",
+    connection_string="mongodb://localhost:27017/memory_db",
+    short_term={"enabled": True},
+    long_term={"enabled": True},
 )
 ```
 
-## 高级配置
+**⚠️ 状态**：实验性 - 未在生产环境中充分测试。
 
-### 连接池
+## 基于环境的配置
 
-用于高流量应用程序：
-
-```python
-# 带连接池的PostgreSQL
-memory_config = MemoryConfig(
-    provider="postgresql",
-    connection_string="postgresql://user:pass@localhost:5432/memory_db?pool_size=20&max_overflow=30&pool_timeout=30&pool_recycle=3600"
-)
-```
-
-### SSL配置
-
-用于安全连接：
-
-```python
-# 带SSL的PostgreSQL
-memory_config = MemoryConfig(
-    provider="postgresql", 
-    connection_string="postgresql://user:pass@db.example.com:5432/memory_db?sslmode=require&sslcert=/path/to/client.crt&sslkey=/path/to/client.key&sslrootcert=/path/to/ca.crt"
-)
-```
-
-### 基于环境的配置
+为不同环境配置不同的存储提供商：
 
 ```python
 import os
-from langcrew.memory import MemoryConfig
 
-def create_memory_config():
-    """基于环境创建内存配置"""
+def get_memory_config():
     env = os.getenv("ENVIRONMENT", "development")
     
     if env == "production":
         return MemoryConfig(
             provider="postgresql",
             connection_string=os.getenv("DATABASE_URL"),
-            short_term={"enabled": True, "max_history": 50},
-            long_term={"enabled": True, "min_quality": 0.85},
-            entity={"enabled": True}
+            short_term={"enabled": True},
+            long_term={"enabled": True},
         )
     elif env == "staging":
         return MemoryConfig(
             provider="postgresql",
-            connection_string=os.getenv("STAGING_DATABASE_URL"),
-            short_term={"enabled": True, "max_history": 30},
-            long_term={"enabled": True, "min_quality": 0.75},
-            entity={"enabled": True}
+            connection_string="postgresql://staging_user:pass@staging-db:5432/memory_staging",
+            short_term={"enabled": True},
+            long_term={"enabled": True},
         )
     else:  # development
         return MemoryConfig(
             provider="sqlite",
             connection_string="sqlite:///dev_memory.db",
-            short_term={"enabled": True, "max_history": 20},
-            long_term={"enabled": True, "min_quality": 0.6},
-            entity={"enabled": True}
+            short_term={"enabled": True},
+            long_term={"enabled": True},
         )
 
-memory_config = create_memory_config()
+# 使用
+memory_config = get_memory_config()
 ```
 
-## 提供商间迁移
-
-### SQLite到PostgreSQL
-
 ```python
-# 从SQLite导出
-sqlite_config = MemoryConfig(
-    provider="sqlite",
-    connection_string="sqlite:///old_memory.db"
-)
+# 好：使用环境变量
+connection_string = os.getenv("DATABASE_URL")
 
-crew_sqlite = Crew(agents=[agent], memory=sqlite_config)
-
-# 导出记忆
-short_term_data = crew_sqlite.short_term_memory.export()
-long_term_data = crew_sqlite.long_term_memory.export()
-entity_data = crew_sqlite.entity_memory.export()
-
-# 导入到PostgreSQL
-postgres_config = MemoryConfig(
-    provider="postgresql",
-    connection_string="postgresql://user:pass@localhost:5432/new_memory_db"
-)
-
-crew_postgres = Crew(agents=[agent], memory=postgres_config)
-
-# 导入记忆
-crew_postgres.short_term_memory.import_memories(short_term_data)
-crew_postgres.long_term_memory.import_memories(long_term_data)
-crew_postgres.entity_memory.import_memories(entity_data)
+# 不好：硬编码凭据
+connection_string = "postgresql://admin:password123@localhost:5432/db"
 ```
 
-## 性能调优
-
-### SQLite优化
+### 安全连接字符串
 
 ```python
-# 带性能调优的SQLite
-memory_config = MemoryConfig(
-    provider="sqlite",
-    connection_string="sqlite:///memory.db?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&temp_store=MEMORY"
-)
-```
+# PostgreSQL with SSL
+"postgresql://user:pass@localhost:5432/db?sslmode=require"
 
-### PostgreSQL优化
-
-```python
-# 带优化设置的PostgreSQL
-memory_config = MemoryConfig(
-    provider="postgresql",
-    connection_string="postgresql://user:pass@localhost:5432/memory_db?pool_size=20&max_overflow=30&pool_pre_ping=true&pool_recycle=3600"
-)
+# MySQL with SSL
+"mysql://user:pass@localhost:3306/db?ssl=true"
 ```
 
 ## 故障排除
 
-### 连接问题
+### 连接失败
 
-```python
-# 测试数据库连接
-def test_connection(connection_string):
-    try:
-        # 用简单内存配置测试
-        test_config = MemoryConfig(
-            provider="postgresql",  # 或您的提供商
-            connection_string=connection_string
-        )
-        
-        # 尝试创建团队（这将测试连接）
-        from langcrew import Agent, Crew
-        test_agent = Agent(role="Test", goal="Test connection")
-        test_crew = Crew(agents=[test_agent], memory=test_config)
-        
-        return True
-    except Exception as e:
-        print(f"连接失败: {e}")
-        return False
-```
+- 验证数据库正在运行且可访问
+- 检查连接字符串格式
+- 确保数据库权限正确
+- 验证数据库文件/连接可访问
+
+### 性能问题
 
 ## 下一步
 
-- **[短期记忆](/zh/guides/memory/short-term)** - 基于会话的对话历史
-- **[长期记忆](/zh/guides/memory/long-term)** - 持久知识存储
-- **[实体记忆](/zh/guides/memory/entity)** - 跟踪实体和关系
+- **[短期记忆](/zh/guides/memory/short-term)** - 配置对话历史
+- **[长期记忆](/zh/guides/memory/long-term)** - 配置持久知识
 - **[内存概念](/zh/concepts/memory)** - 理解内存架构

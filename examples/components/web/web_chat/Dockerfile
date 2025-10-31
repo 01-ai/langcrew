@@ -1,8 +1,8 @@
 # Multi-stage build for unified frontend + backend application
-FROM 01ai-registry.cn-shanghai.cr.aliyuncs.com/public/node:22-alpine3.20 AS frontend-build
+FROM node:22-alpine3.22 AS frontend-build
 
 # Install pnpm globally
-RUN npm set registry https://registry.npmmirror.com/ && npm install -g pnpm
+RUN npm install -g pnpm
 
 # Set working directory for frontend
 WORKDIR /app/frontend
@@ -11,7 +11,7 @@ WORKDIR /app/frontend
 COPY web/package.json web/pnpm-lock.yaml ./
 
 # Install frontend dependencies
-RUN pnpm install --frozen-lockfile --registry=https://registry.npmmirror.com
+RUN pnpm install --frozen-lockfile
 
 # Copy frontend source code
 COPY web/ ./
@@ -21,7 +21,7 @@ ENV NODE_ENV=production
 RUN pnpm build
 
 # Backend build stage
-FROM 01ai-registry.cn-shanghai.cr.aliyuncs.com/public/uv:python3.11-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -29,15 +29,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
     MODE=full \
     UV_HTTP_TIMEOUT=120 \
-    UV_INDEX_TIMEOUT=120 \
-    UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
+    UV_INDEX_TIMEOUT=120 
 
 # System dependencies with security updates
-RUN echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
-    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
-    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
-    rm -rf /etc/apt/sources.list.d/* && \
-    apt-get update \
+RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
     curl ca-certificates nginx\

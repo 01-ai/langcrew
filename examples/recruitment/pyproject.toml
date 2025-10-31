@@ -11,13 +11,9 @@ dependencies = [
     "PyYAML>=6.0",
     "dotenv>=0.9.9",
     "selenium>=4.21.0",
-    "langcrew>=0.1.0",
-    "langcrew-tools>=0.1.0",
+    "langcrew>=0.1.1",
+    "langcrew-tools>=0.1.1",
 ]
-
-[tool.uv.sources]
-langcrew = { path = "../../libs/langcrew", editable = true }
-langcrew-tools = { path = "../../libs/langcrew-tools", editable = true }
 
 [project.scripts]
 recruitment = "recruitment.main:run"

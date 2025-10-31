@@ -1,5 +1,9 @@
 #!/usr/bin/env python
+from dotenv import load_dotenv
+from langchain_core.runnables import RunnableConfig
 from deep_research.crew import DeepResearchCrew
+
+load_dotenv()
 
 
 def run():
@@ -15,8 +19,15 @@ def run():
         "time_horizon": "last 12 months",
         "language": "en",
     }
-    result = DeepResearchCrew().crew().kickoff(inputs=inputs)
-    print("deep_research result:", result)
+
+    # Create config with recursion_limit
+    config = RunnableConfig(
+        recursion_limit=100,  # Set recursion limit for complex workflows
+    )
+
+    # Pass config to kickoff method
+    result = DeepResearchCrew().crew().kickoff(inputs=inputs, config=config)
+    print(f"deep_research result: {result}")
 
 
 if __name__ == "__main__":

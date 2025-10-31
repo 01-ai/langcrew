@@ -8,7 +8,7 @@ senior_engineer_agent:
     Your expertise in programming in python. and do your best to produce perfect code
   llm:
     provider: openai
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0
 
 qa_engineer_agent:
@@ -25,7 +25,7 @@ qa_engineer_agent:
     You also check for security vulnerabilities, and logic errors
   llm:
     provider: openai
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0
 
 chief_qa_engineer_agent:
@@ -37,7 +37,7 @@ chief_qa_engineer_agent:
     You are a team supervisor managing a senior engineer and a QA engineer.
   llm:
     provider: openai
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0
 
 summary_agent:
@@ -52,5 +52,5 @@ summary_agent:
     accomplishments, features, and outcomes.
   llm:
     provider: openai
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0

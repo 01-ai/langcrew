@@ -53,10 +53,10 @@ dependencies = [
 
 
 [project.urls]
-Homepage = "https://github.com/langcrew/langcrew-tools"
-Repository = "https://github.com/langcrew/langcrew-tools"
-Documentation = "https://langcrew-tools.readthedocs.io"
-Issues = "https://github.com/langcrew/langcrew-tools/issues"
+Homepage = "https://langcrew.ai/"
+Repository = "https://github.com/01-ai/langcrew"
+Documentation = "https://langcrew.ai/guides/tools/"
+Issues = "https://github.com/01-ai/langcrew/issues"
 
 [project.optional-dependencies]
 testing = [
@@ -150,6 +150,13 @@ omit = ["tests/*", "langcrew_tools/__pycache__/*"]
 now = true
 delay = 0.1
 patterns = ["*.py"]
+
+[tool.hatch.build]
+exclude = [
+    "e2b-template/",
+    "tests/",
+    "uv.lock",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["langcrew_tools"]

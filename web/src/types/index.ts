@@ -1,5 +1,6 @@
 import { FileReaderProps } from '@/components/Infra/FileReader';
 import { UploadFile } from 'antd';
+import { AxiosRequestHeaders } from 'axios';
 
 export enum TaskStage {
   Pending,
@@ -31,7 +32,7 @@ export interface MessageItem {
 }
 
 export interface MessageChunk {
-  id?: string;
+  id?: string | number;
   role?: 'user' | 'assistant' | 'inner_message';
   type: string;
   content: string;
@@ -124,9 +125,14 @@ export interface MessageToolChunk extends MessageChunk {
     action_content?: string;
     // detail_content?: string;
     // Tool parameters
-    param?: any;
+    param?: {
+      // tool id
+      tool_id?: string;
+    };
     // Tool output
     result?: {
+      // tool_call.detail.param.tool_id one-to-one correspondence
+      tool_use_id?: string;
       content?: string;
       content_type?: string; // Content type, such as 'text/plain', 'text/markdown', 'application/json', etc.
       image_url?: string;
@@ -291,7 +297,7 @@ export interface SessionInitChunk extends MessageChunk {
   };
 }
 
-export interface AntdUploadFile {
+export interface AntdUploadFile extends File {
   uid: string;
   name: string;
   size: number;
@@ -367,4 +373,13 @@ export interface InnerMessageChunk extends MessageChunk {
     expire_time?: string;
     user_id?: string;
   };
+}
+
+// 文件上传配置
+export interface FileUploadConfig {
+  accept?: string; // 允许的文件类型，如 "image/*,.pdf,.doc,.docx"
+  maxSize?: number; // 最大文件大小（字节）
+  maxCount?: number; // 最大文件数量
+  multiple?: boolean; // 是否支持多文件上传
+  customUploadRequest?: (file: File) => Promise<string>;
 }

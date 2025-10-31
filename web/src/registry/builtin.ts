@@ -51,3 +51,6 @@ import './file_diff';
 
 // vector search(added 2025-07-31)
 import './milvus_qa_search';
+
+// Claude skill(added 2025-10-23)
+import './claude_skill';

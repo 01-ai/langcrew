@@ -11,15 +11,15 @@ importers:
       '@rsbuild/plugin-node-polyfill':
         specifier: ^1.4.2
         version: 1.4.2(@rsbuild/core@1.5.11)
+      langcrew-agentx:
+        specifier: ^0.0.6
+        version: 0.0.6(@rsbuild/core@1.5.11)(@types/react@19.1.13)(core-js@3.45.1)(monaco-editor@0.53.0)(postcss@8.5.6)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       react:
         specifier: ^19.1.1
         version: 19.1.1
       react-dom:
         specifier: ^19.1.1
         version: 19.1.1(react@19.1.1)
-      shengoo-test-01:
-        specifier: ^0.0.13
-        version: 0.0.13(@rsbuild/core@1.5.11)(@types/react@19.1.13)(core-js@3.45.1)(monaco-editor@0.53.0)(postcss@8.5.6)
     devDependencies:
       '@rsbuild/core':
         specifier: ^1.5.6
@@ -1336,6 +1336,7 @@ packages:
 
   intersection-observer@0.12.2:
     resolution: {integrity: sha512-7m1vEcPCxXYI8HqnL8CKI6siDyD+eIWSwgB3DZA+ZTogxk9I4CDnj4wilt9x/+/QbHI4YG5YZNmC6458/e9Ktg==}
+    deprecated: The Intersection Observer polyfill is no longer needed and can safely be removed. Intersection Observer has been Baseline since 2019.
 
   is-alphabetical@2.0.1:
     resolution: {integrity: sha512-FWyyY60MeTNyeSRpkM2Iry0G9hpr7/9kD40mD/cGQEuilcZYS4okz8SN2Q6rLCJ8gbCt6fN+rC+6tMGS99LaxQ==}
@@ -1442,6 +1443,12 @@ packages:
   kolorist@1.8.0:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
 
+  langcrew-agentx@0.0.6:
+    resolution: {integrity: sha512-oL22Wyg1Ir1Q5npH4fW8zgIFsQ4VLUclJIaEPzndidPgJcbiQDbxfA381ST44zoLhfrLdP/8BTixLr8U7JPU4w==}
+    peerDependencies:
+      react: ^19.1.0
+      react-dom: ^19.1.0
+
   langium@3.3.1:
     resolution: {integrity: sha512-QJv/h939gDpvT+9SiLVlY7tZC3xB2qK57v0J04Sh9wpMb6MP1q8gB21L3WIo8T5P1MSMg3Ep14L7KkDCFG3y4w==}
     engines: {node: '>=16.0.0'}
@@ -1483,15 +1490,6 @@ packages:
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
-
-  lottie-react@2.4.1:
-    resolution: {integrity: sha512-LQrH7jlkigIIv++wIyrOYFLHSKQpEY4zehPicL9bQsrt1rnoKRYCYgpCUe5maqylNtacy58/sQDZTkwMcTRxZw==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
-  lottie-web@5.13.0:
-    resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
 
   lowlight@2.9.0:
     resolution: {integrity: sha512-OpcaUTCLmHuVuBcyNckKfH5B0oA4JUavb/M/8n9iAvanJYNQkrVm4pvyX0SUaqkBG4dnWHKt7p50B3ngAG2Rfw==}
@@ -2324,9 +2322,6 @@ packages:
     resolution: {integrity: sha512-8LzC5+bvI45BjpfXU8V5fdU2mfeKiQe1D1gIMn7XUlF3OTUrpdJpPPH4EMAnF0DsHHdSZqCdSss5qCmJKuiO3w==}
     engines: {node: '>= 0.10'}
     hasBin: true
-
-  shengoo-test-01@0.0.13:
-    resolution: {integrity: sha512-nLzY7dv2Z4sA2TRVW5kiEjJwO8OelgSLLu6YpmtszNrxx4EFnV0rf+YC9DBmEWGhrmTzrJVJ8ijWx26OEEWtLA==}
 
   side-channel-list@1.0.0:
     resolution: {integrity: sha512-FCLHtRD/gnpCiCHEiJLOwdmFP+wzCmDEkc9y7NsYxeF4u7Btsn1ZuwgwJGxImImHicJArLP4R0yX4c2KCrMrTA==}
@@ -4393,6 +4388,74 @@ snapshots:
 
   kolorist@1.8.0: {}
 
+  langcrew-agentx@0.0.6(@rsbuild/core@1.5.11)(@types/react@19.1.13)(core-js@3.45.1)(monaco-editor@0.53.0)(postcss@8.5.6)(react-dom@19.1.1(react@19.1.1))(react@19.1.1):
+    dependencies:
+      '@ant-design/icons': 6.0.2(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      '@ant-design/v5-patch-for-react-19': 1.0.3(antd@5.27.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      '@ant-design/x': 1.6.1(antd@5.27.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      '@js-preview/docx': 1.6.4(core-js@3.45.1)
+      '@js-preview/excel': 1.7.14
+      '@monaco-editor/react': 4.7.0(monaco-editor@0.53.0)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      '@rsbuild/plugin-node-polyfill': 1.4.2(@rsbuild/core@1.5.11)
+      '@types/lodash-es': 4.17.12
+      ahooks: 3.9.5(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      ansi-to-react: 6.1.6(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      antd: 5.27.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      autoprefixer: 10.4.21(postcss@8.5.6)
+      axios: 1.12.2
+      classnames: 2.5.1
+      dayjs: 1.11.18
+      highlight.js: 11.11.1
+      i18next: 25.5.2(typescript@5.9.2)
+      i18next-browser-languagedetector: 8.2.0
+      js-cookie: 3.0.5
+      katex: 0.16.22
+      lodash-es: 4.17.21
+      mermaid: 11.12.0
+      pptx-preview: 1.0.6
+      rc-image: 7.12.0(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      react: 19.1.1
+      react-copy-to-clipboard: 5.1.0(react@19.1.1)
+      react-dom: 19.1.1(react@19.1.1)
+      react-i18next: 15.7.3(i18next@25.5.2(typescript@5.9.2))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(typescript@5.9.2)
+      react-json-view: 1.21.3(@types/react@19.1.13)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      react-markdown: 8.0.7(@types/react@19.1.13)(react@19.1.1)
+      react-player: 2.16.1(react@19.1.1)
+      react-router-dom: 7.9.1(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      react-scroll-to-bottom: 4.2.0(react@19.1.1)
+      rehype-highlight: 6.0.0
+      rehype-katex: 6.0.3
+      rehype-raw: 7.0.0
+      rehype-sanitize: 6.0.0
+      remark-breaks: 3.0.3
+      remark-directive: 2.0.1
+      remark-directive-rehype: 0.4.2
+      remark-emoji: 3.1.2
+      remark-gfm: 3.0.1
+      remark-images: 3.1.0
+      remark-math: 5.1.1
+      tailwindcss: 4.1.13
+      typescript: 5.9.2
+      ua-parser-js: 2.0.5
+      uuid: 11.1.0
+      zustand: 5.0.8(@types/react@19.1.13)(react@19.1.1)
+    transitivePeerDependencies:
+      - '@babel/core'
+      - '@rsbuild/core'
+      - '@types/react'
+      - core-js
+      - date-fns
+      - debug
+      - encoding
+      - immer
+      - luxon
+      - moment
+      - monaco-editor
+      - postcss
+      - react-native
+      - supports-color
+      - use-sync-external-store
+
   langium@3.3.1:
     dependencies:
       chevrotain: 11.0.3
@@ -4432,14 +4495,6 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
-
-  lottie-react@2.4.1(react-dom@19.1.1(react@19.1.1))(react@19.1.1):
-    dependencies:
-      lottie-web: 5.13.0
-      react: 19.1.1
-      react-dom: 19.1.1(react@19.1.1)
-
-  lottie-web@5.13.0: {}
 
   lowlight@2.9.0:
     dependencies:
@@ -5705,75 +5760,6 @@ snapshots:
       inherits: 2.0.4
       safe-buffer: 5.2.1
       to-buffer: 1.2.1
-
-  shengoo-test-01@0.0.13(@rsbuild/core@1.5.11)(@types/react@19.1.13)(core-js@3.45.1)(monaco-editor@0.53.0)(postcss@8.5.6):
-    dependencies:
-      '@ant-design/icons': 6.0.2(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      '@ant-design/v5-patch-for-react-19': 1.0.3(antd@5.27.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      '@ant-design/x': 1.6.1(antd@5.27.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      '@js-preview/docx': 1.6.4(core-js@3.45.1)
-      '@js-preview/excel': 1.7.14
-      '@monaco-editor/react': 4.7.0(monaco-editor@0.53.0)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      '@rsbuild/plugin-node-polyfill': 1.4.2(@rsbuild/core@1.5.11)
-      '@types/lodash-es': 4.17.12
-      ahooks: 3.9.5(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      ansi-to-react: 6.1.6(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      antd: 5.27.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      autoprefixer: 10.4.21(postcss@8.5.6)
-      axios: 1.12.2
-      classnames: 2.5.1
-      dayjs: 1.11.18
-      highlight.js: 11.11.1
-      i18next: 25.5.2(typescript@5.9.2)
-      i18next-browser-languagedetector: 8.2.0
-      js-cookie: 3.0.5
-      katex: 0.16.22
-      lodash-es: 4.17.21
-      lottie-react: 2.4.1(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      mermaid: 11.12.0
-      pptx-preview: 1.0.6
-      rc-image: 7.12.0(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      react: 19.1.1
-      react-copy-to-clipboard: 5.1.0(react@19.1.1)
-      react-dom: 19.1.1(react@19.1.1)
-      react-i18next: 15.7.3(i18next@25.5.2(typescript@5.9.2))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(typescript@5.9.2)
-      react-json-view: 1.21.3(@types/react@19.1.13)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      react-markdown: 8.0.7(@types/react@19.1.13)(react@19.1.1)
-      react-player: 2.16.1(react@19.1.1)
-      react-router-dom: 7.9.1(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      react-scroll-to-bottom: 4.2.0(react@19.1.1)
-      rehype-highlight: 6.0.0
-      rehype-katex: 6.0.3
-      rehype-raw: 7.0.0
-      rehype-sanitize: 6.0.0
-      remark-breaks: 3.0.3
-      remark-directive: 2.0.1
-      remark-directive-rehype: 0.4.2
-      remark-emoji: 3.1.2
-      remark-gfm: 3.0.1
-      remark-images: 3.1.0
-      remark-math: 5.1.1
-      tailwindcss: 4.1.13
-      typescript: 5.9.2
-      ua-parser-js: 2.0.5
-      uuid: 11.1.0
-      zustand: 5.0.8(@types/react@19.1.13)(react@19.1.1)
-    transitivePeerDependencies:
-      - '@babel/core'
-      - '@rsbuild/core'
-      - '@types/react'
-      - core-js
-      - date-fns
-      - debug
-      - encoding
-      - immer
-      - luxon
-      - moment
-      - monaco-editor
-      - postcss
-      - react-native
-      - supports-color
-      - use-sync-external-store
 
   side-channel-list@1.0.0:
     dependencies:

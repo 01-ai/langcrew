@@ -12,11 +12,12 @@ Key Features:
 
 import json
 import logging
+import os
 import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, ToolMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
@@ -72,6 +73,9 @@ class LangGraphAdapter:
         self._session_stop_flags: dict[str, dict[str, Any]] = (
             {}
         )  # session_id -> stop_info
+        self._functon_call_stream: bool = os.getenv("LANGCREW_FUNCTION_CALL_STREAM", "false").lower() == "true"
+        logger.info(f"LANGCREW_FUNCTION_CALL_STREAM: {self._functon_call_stream}")
+    
 
     # ============ PROPERTIES ============
 
@@ -484,25 +488,44 @@ class LangGraphAdapter:
             return None
 
         content = self._extract_content_from_chunk(chunk)
-        if not content:
-            return None
-
-        detail = {
-            "streaming": True,
-            "run_id": event.get("run_id"),
-        }
-        detail = self._enhance_detail_with_metadata(event, detail)
-
-        return StreamMessage(
-            id=generate_message_id(),
-            type=MessageType.TEXT,
-            content=content,
-            detail=detail,
-            role="assistant",
-            timestamp=int(time.time() * 1000),
-            session_id=session_id,
-            task_id=task_id,
-        )
+        if content:
+            detail = {
+                "streaming": True,
+                "run_id": event.get("run_id"),
+            }
+            detail = self._enhance_detail_with_metadata(event, detail)
+            return StreamMessage(
+                id=generate_message_id(),
+                type=MessageType.TEXT,
+                content=content,
+                detail=detail,
+                role="assistant",
+                timestamp=int(time.time() * 1000),
+                session_id=session_id,
+                task_id=task_id,
+                field_name="content",
+            )
+        elif self._functon_call_stream and isinstance(chunk, AIMessageChunk) and hasattr(chunk, "tool_call_chunks"):
+            for tool_call_chunk in chunk.tool_call_chunks:
+                return StreamMessage(
+                    id=generate_message_id(),
+                    type=MessageType.TOOL_CALL_CHUNK,
+                    field_name="detail.name" if tool_call_chunk.get("name") else "detail.args",
+                    content="",
+                    detail={
+                        "streaming": True,
+                        "run_id": event.get("run_id"),
+                        "tool_call_id": tool_call_chunk.get("id"),
+                        "args": tool_call_chunk.get("args"),
+                        "name": tool_call_chunk.get("name"),
+                        "index": tool_call_chunk.get("index"),
+                    },
+                    role="assistant",
+                    timestamp=int(time.time() * 1000),
+                    session_id=session_id,  
+                    task_id=task_id,
+                )
+        return None
 
     def _handle_model_end(
         self, event: dict[str, Any], session_id: str, task_id: str

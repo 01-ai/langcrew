@@ -59,15 +59,14 @@ print(result2)  # Agent will remember Alice likes pizza
 ### 3. Persistent Memory with SQLite
 
 ```python
-from langcrew.memory import MemoryConfig
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig, LongTermMemoryConfig
 
 # Persistent memory configuration
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///my_memory.db",
-    short_term={"enabled": True, "max_history": 20},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(enabled=True)
 )
 
 crew = Crew(agents=[agent], memory=memory_config)
@@ -86,12 +85,11 @@ result = crew.kickoff(
 Remembers recent conversation history within a session:
 
 ```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
+
 # Configure short-term memory
 memory_config = MemoryConfig(
-    short_term={
-        "enabled": True,
-        "max_history": 15,  # Keep last 15 conversation turns
-    }
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
 
 # Agent will remember context from recent messages
@@ -103,53 +101,18 @@ crew = Crew(agents=[agent], memory=memory_config)
 Stores important knowledge across sessions:
 
 ```python
+from langcrew.memory import LongTermMemoryConfig
+
 # Configure long-term memory
 memory_config = MemoryConfig(
-    long_term={
-        "enabled": True,
-        "min_quality": 0.8,  # Only store high-quality information
-    }
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app"  # RECOMMENDED for production
+    )
 )
 
 # Agent learns and remembers important facts
 crew = Crew(agents=[agent], memory=memory_config)
-```
-
-### Entity Memory
-
-Tracks people, organizations, and concepts:
-
-```python
-# Configure entity memory
-memory_config = MemoryConfig(
-    entity={"enabled": True}
-)
-
-# Agent remembers entities and their relationships
-crew = Crew(agents=[agent], memory=memory_config)
-
-# Example: Agent will remember "Alice works at TechCorp"
-result = crew.kickoff(
-    inputs={"user_input": "Alice is the CEO of TechCorp"},
-    thread_id="business_context"
-)
-```
-
-## Memory Search
-
-Search across all memory types:
-
-```python
-# Search memory
-results = crew.search_memory(
-    query="Alice",
-    memory_type="all",  # Search all memory types
-    limit=5
-)
-
-for result in results:
-    print(f"Memory type: {result['memory_type']}")
-    print(f"Content: {result['content']}")
 ```
 
 ## Configuration Examples
@@ -157,35 +120,38 @@ for result in results:
 ### Development Setup (In-Memory)
 
 ```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig, LongTermMemoryConfig
+
 memory_config = MemoryConfig(
     provider="memory",  # Fast, no persistence
-    short_term={"enabled": True, "max_history": 10},
-    long_term={"enabled": True},
-    entity={"enabled": True}
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(enabled=True)
 )
 ```
 
 ### Production Setup (PostgreSQL)
 
 ```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig, LongTermMemoryConfig
+
 memory_config = MemoryConfig(
     provider="postgresql",
     connection_string="postgresql://user:pass@localhost:5432/memory_db",
-    short_term={"enabled": True, "max_history": 50},
-    long_term={"enabled": True, "min_quality": 0.8},
-    entity={"enabled": True}
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(enabled=True)
 )
 ```
 
 ### Local Development (SQLite)
 
 ```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig, LongTermMemoryConfig
+
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///development.db",
-    short_term={"enabled": True, "max_history": 30},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(enabled=True)
 )
 ```
 
@@ -194,12 +160,13 @@ memory_config = MemoryConfig(
 ### Customer Service Agent
 
 ```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
+
 # Memory-enabled customer service
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///customer_service.db",
-    short_term={"enabled": True, "max_history": 20},
-    entity={"enabled": True}  # Remember customer details
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
 
 service_agent = Agent(
@@ -220,12 +187,16 @@ result = crew.kickoff(
 ### Learning Assistant
 
 ```python
+from langcrew.memory import LongTermMemoryConfig
+
 # Memory-enabled learning assistant
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///learning.db",
-    long_term={"enabled": True, "min_quality": 0.8},  # Store learnings
-    entity={"enabled": True}  # Track concepts and topics
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="learning-assistant"
+    )
 )
 
 tutor = Agent(
@@ -248,8 +219,7 @@ crew = Crew(agents=[tutor], memory=memory_config)
 
 ### High Memory Usage
 
-- Reduce `max_history` in short-term memory
-- Increase `min_quality` threshold in long-term memory
+- Use connection pooling for database providers
 - Consider using SQLite/PostgreSQL instead of in-memory
 
 ### Slow Performance

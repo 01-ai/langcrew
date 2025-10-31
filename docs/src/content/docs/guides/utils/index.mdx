@@ -27,12 +27,15 @@ with open('document.pdf', 'rb') as f:
 Count tokens for LLM models:
 
 ```python
-from langcrew.utils import TokenCounter
+from langcrew.context.token_utils import count_message_tokens
 from langchain_core.messages import HumanMessage
+from langchain_openai import ChatOpenAI
 
-counter = TokenCounter("gpt-4")
+# Create an LLM instance (required for token counting)
+llm = ChatOpenAI(model="gpt-4o-mini")
+
 messages = [HumanMessage(content="Hello world")]
-token_count, is_exact = counter.count_messages(messages)
+token_count = count_message_tokens(messages, llm)
 print(f"Tokens: {token_count}")
 ```
 

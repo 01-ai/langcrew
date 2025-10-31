@@ -17,7 +17,7 @@ hero:
 import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
 
 <div class="hero-stats">
-  <Badge text="Python 3.11+" variant="note" />
+  <Badge text="Python 3.10+" variant="note" />
   <Badge text="Built on LangGraph" variant="success" />
   <Badge text="Production Ready" variant="caution" />
 </div>
@@ -59,10 +59,21 @@ import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
 
 **Build your first agent crew in under 5 minutes:**
 
+```bash
+# Install LangCrew
+pip install langcrew
+
+# Set up your LLM API key
+export OPENAI_API_KEY=your_openai_key
+```
+
 ```python
 from langcrew import Agent, Crew, Task
 from langcrew.project import CrewBase, agent, crew, task
-from langcrew_tools import WebSearchTool
+from langchain_openai import ChatOpenAI
+
+# Configure LLM
+llm = ChatOpenAI(model="gpt-4o")
 
 @CrewBase
 class ResearchCrew:
@@ -71,8 +82,9 @@ class ResearchCrew:
         return Agent(
             role="Market Researcher",
             goal="Find latest trends in AI automation",
-            tools=[WebSearchTool()],
-            backstory="Expert at finding market insights"
+            tools=["web_search"],  # Built-in tools
+            backstory="Expert at finding market insights",
+            llm=llm
         )
     
     @task

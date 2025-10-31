@@ -32,6 +32,7 @@ pip install langcrew-tools
 ### Information & Data Collection
 - **[Cloud Phone Automation](./langcrew_tools/cloud_phone/README.md)** - Control Android devices in the cloud
 - **[Data Fetching](./langcrew_tools/fetch/README.md)** - External data integration
+- **[Knowledge Management](./langcrew_tools/knowledge/README.md)** - Information storage and retrieval
 - **[Search Operations](./langcrew_tools/search/README.md)** - Advanced search capabilities
 
 ### Infrastructure & Utilities

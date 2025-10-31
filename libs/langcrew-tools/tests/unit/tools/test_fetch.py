@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from langchain_core.runnables.config import RunnableConfig
 
 from langcrew_tools.fetch import WebFetchInput, WebFetchTool
 
@@ -21,7 +22,7 @@ class TestWebFetchInput:
     def test_default_filter_type(self):
         """Test default filter_type value."""
         input_model = WebFetchInput(url="https://example.com")
-        assert input_model.filter_type == "llm"
+        assert input_model.filter_type == "pruning"
 
     def test_custom_filter_type(self):
         """Test custom filter_type value."""
@@ -31,6 +32,8 @@ class TestWebFetchInput:
 
 class TestWebFetchTool:
     """Test WebFetchTool functionality."""
+
+    config = RunnableConfig(configurable={"thread_id": "test_thread_id"})
 
     def test_default_configuration(self):
         """Test default configuration values."""
@@ -152,7 +155,9 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            result = await tool._arun(url="https://example.com", filter_type="pruning")
+            result = await tool._arun(
+                config=self.config, url="https://example.com", filter_type="pruning"
+            )
 
             # Verify the result
             assert result == "# Test Content\n\nThis is test content from the webpage."
@@ -213,7 +218,9 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            result = await tool._arun(url="https://example.com", filter_type="llm")
+            result = await tool._arun(
+                config=self.config, url="https://example.com", filter_type="llm"
+            )
 
             # Verify the result prefers fit_markdown
             assert result == "# Filtered Content\n\nThis is LLM-filtered content."
@@ -264,7 +271,7 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            await tool._arun(url="https://example.com")
+            await tool._arun(config=self.config, url="https://example.com")
 
             # Verify proxy is included in browser config
             call_args = mock_session_instance.post.call_args
@@ -303,7 +310,7 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            await tool._arun(url="https://example.com")
+            await tool._arun(config=self.config, url="https://example.com")
 
             # Verify proxy is not included in browser config
             call_args = mock_session_instance.post.call_args
@@ -348,7 +355,7 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            result = await tool._arun(url="https://example.com")
+            result = await tool._arun(config=self.config, url="https://example.com")
 
             # Verify content is truncated
             assert len(result) <= 20 + len("\n\n[Content truncated...]")
@@ -380,7 +387,7 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            result = await tool._arun(url="https://example.com")
+            result = await tool._arun(config=self.config, url="https://example.com")
 
             # Should return error message
             assert "HTTP error 500" in result
@@ -414,7 +421,7 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            result = await tool._arun(url="https://example.com")
+            result = await tool._arun(config=self.config, url="https://example.com")
 
             # Should return service error message
             assert "Failed to crawl the webpage: Service unavailable" in result
@@ -447,7 +454,7 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            result = await tool._arun(url="https://example.com")
+            result = await tool._arun(config=self.config, url="https://example.com")
 
             # Should return no results message
             assert result == "No results returned from crawl4ai service"
@@ -483,7 +490,7 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            result = await tool._arun(url="https://example.com")
+            result = await tool._arun(config=self.config, url="https://example.com")
 
             # Should return default message for empty content
             assert result == "No content extracted"
@@ -491,15 +498,15 @@ class TestWebFetchTool:
     def test_run_calls_arun(self):
         """Test that _run method calls _arun correctly."""
         tool = WebFetchTool(crawl4ai_service_url="https://api.example.com")
-
+        
         expected_result = "Test content"
 
         with patch.object(tool, "_arun", return_value=expected_result) as mock_arun:
-            result = tool._run(url="https://example.com", filter_type="pruning")
+            result = tool._run(config=self.config, url="https://example.com", filter_type="pruning")
 
             # Verify _arun was called with correct parameters
             mock_arun.assert_called_once_with(
-                url="https://example.com", filter_type="pruning"
+                self.config, url="https://example.com", filter_type="pruning"
             )
             assert result == expected_result
 
@@ -536,7 +543,9 @@ class TestWebFetchTool:
             )
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            await tool._arun(url="https://example.com", filter_type=None)
+            await tool._arun(
+                config=self.config, url="https://example.com", filter_type=None
+            )
 
             # Should use instance filter_type (pruning)
             call_args = mock_session_instance.post.call_args
@@ -619,7 +628,9 @@ class TestWebFetchTool:
             mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
             # Test that _arun accepts brief parameter without raising exception
-            result = await tool._arun(url="https://example.com", brief="测试抓取功能")
+            result = await tool._arun(
+                config=self.config, url="https://example.com", brief="测试抓取功能"
+            )
             # If no exception is raised, the **kwargs mechanism works correctly
             assert isinstance(result, str)
 

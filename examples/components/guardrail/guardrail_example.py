@@ -13,6 +13,10 @@ from langcrew.guardrail import GuardrailError, input_guard, output_guard
 from langcrew.llm_factory import LLMFactory
 from langcrew.task import Task
 
+import dotenv
+
+dotenv.load_dotenv()
+
 
 @input_guard
 def check_no_sensitive_info(data: Any) -> Tuple[bool, str]:
@@ -26,9 +30,19 @@ def check_no_sensitive_info(data: Any) -> Tuple[bool, str]:
 @output_guard
 def check_output_quality(data: Any) -> Tuple[bool, str]:
     """Ensure output meets basic quality"""
-    output = str(data)
-    if len(output) < 10:
-        return False, "❌ Output too short"
+    # Extract content from the result
+    if isinstance(data, dict) and "messages" in data:
+        # Get the last message's content
+        messages = data["messages"]
+        if messages:
+            content = str(messages[-1].content)
+        else:
+            content = ""
+    else:
+        content = str(data)
+
+    if len(content) < 3:
+        return False, f"❌ Output too short: '{content}' ({len(content)} chars)"
     return True, "✅ Output quality OK"
 
 
@@ -90,6 +104,23 @@ def main():
         print("❌ Unexpected: Sensitive data not blocked!")
     except GuardrailError:
         print("✅ Expected: Guardrail blocked sensitive data")
+    except Exception as e:
+        print("❌ Error:", e)
+
+    # Test 3: Short output (should be blocked)
+    print("\n3. Testing short output blocking...")
+    task3 = Task(
+        description="Say 'OK'",
+        expected_output="Just say OK",
+        agent=agent,
+    )
+
+    crew3 = Crew(agents=[agent], tasks=[task3])
+    try:
+        result = crew3.kickoff()
+        print("❌ Unexpected: Short output not blocked!")
+    except GuardrailError:
+        print("✅ Expected: Guardrail blocked short output")
     except Exception as e:
         print("❌ Error:", e)
 

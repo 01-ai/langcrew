@@ -14,6 +14,7 @@ import {
 import { sessionApi } from '@/services/api';
 import { cloneDeep } from 'lodash-es';
 import { getTranslation } from '../useTranslation';
+import { useAgentStore } from '@/store';
 
 export const ignoreToolChunks = [
   'agent_update_plan',
@@ -56,18 +57,55 @@ function changePlanStepStatusToSuccess(message: MessageItem) {
   return message;
 }
 
+function moveFilesToEnd(message: MessageItem) {
+  const filesIndex = message.messages.findLastIndex((msg) => msg.type === 'agent_result_delivery');
+  const endIndex = message.messages.findLastIndex(isFinishChunk);
+
+  // if both exist, move the element of filesIndex to the front of endIndex
+  if (filesIndex !== -1 && endIndex !== -1) {
+    const files = message.messages.splice(filesIndex, 1);
+    message.messages.splice(endIndex - 1, 0, ...files);
+  }
+  // if there is a plan, move the agent_result_delivery in the plan to the front of endIndex
+  const plan = message.messages.find(isPlanChunk) as MessagePlanChunk;
+  if (plan) {
+    const step = plan.children.find((step: PlanStep) =>
+      step.children.some((child) => child.type === 'agent_result_delivery'),
+    );
+    if (step) {
+      const filesIndex2 = step.children.findLastIndex((msg) => msg.type === 'agent_result_delivery');
+      if (filesIndex2 !== -1) {
+        const fileChunk = Object.assign({}, step.children[filesIndex2]);
+        step.children.splice(filesIndex2, 1);
+
+        // fix the insertion position logic
+        if (endIndex !== -1) {
+          // if found the finish chunk, insert it in front of it
+          message.messages.splice(endIndex, 0, fileChunk);
+        } else {
+          // if not found the finish chunk, add it to the end
+          message.messages.push(fileChunk);
+        }
+      }
+    }
+  }
+  return message;
+}
+
 export function isPlanChunk(message: MessageChunk) {
   return message.type === 'plan';
 }
 
-export const loadingMessage: MessageItem = {
-  role: 'assistant',
-  messages: [
-    {
-      type: 'live_status',
-      content: getTranslation('chatbot.task.thinking'),
-    },
-  ],
+export const getLoadingMessage = () => {
+  return {
+    role: 'assistant',
+    messages: [
+      {
+        type: 'live_status',
+        content: getTranslation('chatbot.task.thinking'),
+      },
+    ],
+  } as MessageItem;
 };
 
 function removeIsLast(message: MessageItem) {
@@ -87,6 +125,30 @@ function removeIsLast(message: MessageItem) {
     return msg;
   });
   return message;
+}
+
+function isPair(toolCallChunk: MessageToolChunk, toolResultChunk: MessageToolChunk) {
+  if (
+    toolCallChunk?.type !== toolResultChunk?.detail?.tool &&
+    toolCallChunk?.detail?.tool !== toolResultChunk?.detail?.tool
+  ) {
+    return false;
+  }
+  if (
+    toolCallChunk?.detail?.param?.tool_id &&
+    toolResultChunk?.detail?.result?.tool_use_id &&
+    toolCallChunk?.detail?.param?.tool_id === toolResultChunk?.detail?.result?.tool_use_id
+  ) {
+    return true;
+  }
+  if (
+    toolCallChunk?.detail?.run_id &&
+    toolResultChunk?.detail?.run_id &&
+    toolCallChunk?.detail?.run_id === toolResultChunk?.detail?.run_id
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export const transformChunksToMessages = (chunks: MessageChunk[], existingMessages: MessageItem[] = []) => {
@@ -131,9 +193,11 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
 
         currentAIMessage = filterLiveStatus(currentAIMessage);
         currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
-        currentAIMessage = removeIsLast(currentAIMessage);
         if (!existingAIMessage) {
+          // remove isLast from the current AI message before adding it to the newMessages
+          currentAIMessage = removeIsLast(currentAIMessage);
           newMessages.push(currentAIMessage);
+          useAgentStore.getState().onNewMessage?.(currentAIMessage);
         }
         currentAIMessage = null;
       }
@@ -182,8 +246,13 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
 
     // handle plan
     if (isPlanChunk(chunk)) {
-      currentAIMessage = filterLiveStatus(currentAIMessage);
-      currentAIMessage.messages.push(handlePlanChunk(chunk as EventPlanChunk));
+      const existingPlan = currentAIMessage.messages.find(isPlanChunk) as MessagePlanChunk;
+      if (existingPlan) {
+        planMerge(existingPlan, chunk as EventPlanChunk);
+      } else {
+        currentAIMessage = filterLiveStatus(currentAIMessage);
+        currentAIMessage.messages.push(handlePlanChunk(chunk as EventPlanChunk));
+      }
       continue;
     }
 
@@ -223,39 +292,45 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
       const toolCallChunk = chunk as MessageToolChunk;
       // specify chunk's type is tool
       chunk.type = toolCallChunk.detail.tool;
-      // if there is a tool_result with the same run_id as the tool_call, skip the tool_call
-      const toolResultChunk = chunksCopy.find(
-        (resultChunk) =>
-          resultChunk.type === 'tool_result' && resultChunk.detail?.run_id === toolCallChunk.detail?.run_id,
+    }
+    if (chunk.type === 'tool_result') {
+      const toolCallChunk = currentAIMessage.messages.findLast((ck) =>
+        isPair(ck as MessageToolChunk, chunk as MessageToolChunk),
       );
-      if (toolResultChunk) {
-        // update toolResultChunk's detail, assign the param of tool_call to tool_result
-        toolResultChunk.content = toolCallChunk.content;
-        toolResultChunk.detail = {
-          ...toolResultChunk.detail,
+      // merge tool_call and tool_result
+      if (toolCallChunk) {
+        toolCallChunk.id = chunk.id;
+        toolCallChunk.timestamp = chunk.timestamp;
+        toolCallChunk.detail = {
+          ...chunk.detail,
           param: toolCallChunk.detail.param,
           action: toolCallChunk.detail.action,
           action_content: toolCallChunk.detail.action_content,
         };
         continue;
       }
-
-      // otherwise keep tool_call
-
-      // here do not execute operation, leave it to the next one
-    }
-    if (chunk.type === 'tool_result') {
-      const lastItem = currentAIMessage.messages[currentAIMessage.messages.length - 1];
-      // merge tool_call and tool_result
-      if (lastItem && lastItem.type === chunk.detail?.tool && lastItem.detail?.run_id === chunk.detail?.run_id) {
-        lastItem.id = chunk.id;
-        lastItem.detail = {
-          ...chunk.detail,
-          param: lastItem.detail.param,
-          action: lastItem.detail.action,
-          action_content: lastItem.detail.action_content,
-        };
-        continue;
+      // find in plan if not found in messages
+      const plan = currentAIMessage.messages.find(isPlanChunk) as MessagePlanChunk;
+      if (plan) {
+        const step = plan.children.find((step: PlanStep) =>
+          step.children.some((child) => isPair(child as MessageToolChunk, chunk as MessageToolChunk)),
+        );
+        if (step) {
+          const toolCallChunk = step.children.findLast((child) =>
+            isPair(child as MessageToolChunk, chunk as MessageToolChunk),
+          );
+          if (toolCallChunk) {
+            toolCallChunk.id = chunk.id;
+            toolCallChunk.timestamp = chunk.timestamp;
+            toolCallChunk.detail = {
+              ...chunk.detail,
+              param: toolCallChunk.detail.param,
+              action: toolCallChunk.detail.action,
+              action_content: toolCallChunk.detail.action_content,
+            };
+            continue;
+          }
+        }
       }
       const toolResultChunk = chunk as MessageToolChunk;
       chunk.type = toolResultChunk.detail.tool;
@@ -270,6 +345,7 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
     if (isFinishChunk(chunk)) {
       currentAIMessage = filterLiveStatus(currentAIMessage);
       currentAIMessage.messages.push(chunk);
+      // currentAIMessage = moveFilesToEnd(currentAIMessage);
       continue;
     }
 
@@ -292,7 +368,11 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
       if (step) {
         const lastItem = step.children[step.children.length - 1];
         // merge tool_call and tool_result
-        if (lastItem && lastItem?.type === chunk.detail?.tool && lastItem?.detail?.run_id === chunk.detail?.run_id) {
+        if (
+          lastItem &&
+          isPair(lastItem as MessageToolChunk, chunk as MessageToolChunk) &&
+          (chunk.detail?.status === 'success' || chunk.detail?.status !== 'pending')
+        ) {
           lastItem.id = chunk.id;
           lastItem.detail = {
             ...chunk.detail,
@@ -340,6 +420,7 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
 
   if (currentAIMessage) {
     if (isMessageFinish(currentAIMessage)) {
+      useAgentStore.getState().onNewMessage?.(currentAIMessage);
       currentAIMessage = filterLiveStatus(currentAIMessage);
       currentAIMessage = changePlanStepStatusToSuccess(currentAIMessage);
     }
@@ -350,7 +431,7 @@ export const transformChunksToMessages = (chunks: MessageChunk[], existingMessag
 
   // if the last item is user message, add a live_status
   if (newMessages[newMessages.length - 1]?.role === 'user') {
-    newMessages.push(cloneDeep(loadingMessage));
+    newMessages.push(getLoadingMessage());
   }
 
   return newMessages;
@@ -402,6 +483,20 @@ function handlePlanUpdateChunk(plan: MessagePlanChunk, planUpdateChunk: PlanUpda
     });
   }
   return plan;
+}
+
+// merge plan
+function planMerge(existingPlan: MessagePlanChunk, newPlan: EventPlanChunk) {
+  newPlan.detail?.steps?.forEach((step) => {
+    const index = existingPlan.children.findIndex((s) => s.id === step.id);
+    if (index !== -1) {
+      existingPlan.children[index] = {
+        ...existingPlan.children[index],
+        ...step,
+      };
+    }
+  });
+  return existingPlan;
 }
 
 export const getPlan = (chunks: MessageChunk[]) => {

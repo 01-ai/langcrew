@@ -43,7 +43,6 @@ class SandboxS3ToolMixin(BaseTool, SandboxMixin, S3ClientMixin):
         Add run_manager: Optional[CallbackManagerForToolRun] = None
         to child implementations to enable tracing.
         """
-        self.logger.warn("sync _run in new loop")
         if asyncio.events._get_running_loop() is not None:
             return run_async_wait(self._arun(*args, **kwargs))
         else:

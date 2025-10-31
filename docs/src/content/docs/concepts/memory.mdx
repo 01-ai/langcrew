@@ -11,25 +11,120 @@ Memory is a high-level abstraction that wraps LangGraph's low-level persistence 
 
 - **Short-term memory**: Session-based conversation history using [LangGraph's Checkpointer](https://langchain-ai.github.io/langgraph/concepts/persistence/#checkpoints)
 - **Long-term memory**: Persistent knowledge storage using [LangGraph's Store system](https://langchain-ai.github.io/langgraph/concepts/persistence/#store)
-- **Entity memory**: Track and remember entities (people, organizations, concepts) across conversations
-- **Multi-provider support**: In-memory, SQLite, PostgreSQL backends (tested); Redis, MongoDB, MySQL (experimental)
+- **Multi-provider support**: In-memory, SQLite, PostgreSQL, MySQL (production-ready); Redis, MongoDB (experimental)
 - **Unified configuration**: Single MemoryConfig class manages all memory types and LangGraph backends
 
 ## Core Architecture
 
-Memory provides a high-level wrapper around [LangGraph's persistence layer](https://langchain-ai.github.io/langgraph/concepts/persistence/) with three specialized memory types:
+Memory provides a **multi-layer architecture** around [LangGraph's persistence layer](https://langchain-ai.github.io/langgraph/concepts/persistence/) with specialized memory types:
+
+### Memory Layers
+
+LangCrew implements a sophisticated multi-layer memory system:
+
+```
+┌─────────────────────────────────────────┐
+│       Short-Term Memory (STM)           │  ← Session/Conversation State
+│     (LangGraph Checkpointer)            │     - Thread-based
+│                                         │     - Message history
+├─────────────────────────────────────────┤
+│       Long-Term Memory (LTM)            │  ← Cross-Session Knowledge
+│      (LangGraph Store)                  │     - User memory
+│                                         │     - App memory (experimental)
+│  ┌───────────────┬───────────────────┐ │
+│  │ User Memory   │  App Memory       │ │
+│  │ (Personal)    │  (Shared Insights)│ │
+│  └───────────────┴───────────────────┘ │
+├─────────────────────────────────────────┤
+│       Vector Search Layer               │  ← Semantic Retrieval
+│     (Optional IndexConfig)              │     - Embedding-based
+│                                         │     - Similarity search
+└─────────────────────────────────────────┘
+```
+
+### Application Isolation with app_id
+
+**Critical for Multi-Tenant Systems**: The `app_id` parameter provides namespace isolation when multiple applications share the same database:
 
 ```python
-from langcrew import Crew
-from langcrew.memory import MemoryConfig
+from langcrew import MemoryConfig
+from langcrew.memory import LongTermMemoryConfig
+
+# Application A
+memory_a = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://shared-db/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="chatbot-prod-v1"  # Isolates all memories for App A
+    )
+)
+
+# Application B (same database, completely isolated)
+memory_b = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://shared-db/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="assistant-prod-v2"  # Different namespace
+    )
+)
+```
+
+**Data Isolation Guarantee**:
+- **With app_id**: User "alice" in App A is completely separate from "alice" in App B
+  - App A user memories: `("user_memories", "chatbot-prod-v1", "alice")`
+  - App B user memories: `("user_memories", "assistant-prod-v2", "alice")`
+- **Without app_id**: Memories lack application-level namespace (not recommended for production)
+
+**Best Practice**: Always use `app_id` in production, especially when:
+- Multiple applications share a database
+- You need data isolation between environments (dev/staging/prod)
+- Compliance requires tenant separation
+
+### Vector Search Integration
+
+Enable semantic memory retrieval with vector embeddings:
+
+```python
+from langcrew import MemoryConfig
+from langcrew.memory import LongTermMemoryConfig
+
+memory = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://localhost/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app",
+        index={
+            "dims": 1536,  # OpenAI text-embedding-3-small dimension
+            "embed": "openai:text-embedding-3-small"
+        }
+    )
+)
+```
+
+**Supported Embedding Providers**:
+- `openai:text-embedding-3-small` (1536 dims)
+- `openai:text-embedding-3-large` (3072 dims)
+- `openai:text-embedding-ada-002` (1536 dims)
+- Custom embedding models
+
+```python
+from langcrew import MemoryConfig
+from langcrew.memory import ShortTermMemoryConfig, LongTermMemoryConfig
 
 # Unified memory configuration
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///memory.db",
-    short_term={"enabled": True, "max_history": 20},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app",  # RECOMMENDED for production
+        user_memory=MemoryScopeConfig(enabled=True),
+        app_memory=MemoryScopeConfig(enabled=False)  # Experimental
+    )
 )
 
 crew = Crew(
@@ -53,7 +148,6 @@ Unified configuration class that manages all three memory types and storage prov
 | `connection_string` | str \| None | Database connection string                             | None      |
 | `short_term`        | dict        | Short-term memory configuration                        | See below |
 | `long_term`         | dict        | Long-term memory configuration                         | See below |
-| `entity`            | dict        | Entity memory configuration                            | See below |
 
 ### Short-term Memory
 
@@ -63,16 +157,25 @@ Session-based conversation history using LangGraph's Checkpointer system for imm
 
 - Thread-based session management
 - Automatic context injection
-- Configurable history limits
+- Storage provider override support
 - Local caching for performance
 
+**Configuration Parameters:**
+
+| Parameter           | Type        | Description                                    | Default  |
+| ------------------- | ----------- | ---------------------------------------------- | -------- |
+| `enabled`           | bool        | Enable short-term memory                       | True     |
+| `provider`          | str \| None | Storage provider override (inherits if None)   | None     |
+| `connection_string` | str \| None | Connection string override (inherits if None)  | None     |
+
 ```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig
+
 # Short-term memory configuration
 memory_config = MemoryConfig(
-    short_term={
-        "enabled": True,
-        "max_history": 20,    # Maximum conversation turns to remember
-    }
+    provider="sqlite",
+    connection_string="sqlite:///memory.db",
+    short_term=ShortTermMemoryConfig(enabled=True)
 )
 ```
 
@@ -82,66 +185,132 @@ Persistent knowledge storage using LangGraph's Store system for cross-session in
 
 **Key Features:**
 
-- Quality-based knowledge filtering
-- Task-based knowledge organization
-- Agent-specific namespaces
-- Learning extraction and storage
+- **User Memory**: Personal preferences, habits, and context specific to each user
+- **App Memory**: Shared insights across all users (experimental feature)
+- **Semantic Search**: Vector-based retrieval for relevant memories
+- **Active Learning**: Automatic memory triggers based on conversation patterns
+
+**Memory Scopes**:
+
+| Scope | Enabled by Default | Purpose | Isolation Level |
+|-------|-------------------|---------|-----------------|
+| **User Memory** | ✅ Yes | Personal user data and preferences | Per-user per-app |
+| **App Memory** | ❌ No (Experimental) | Shared application insights | Per-app (all users) |
+
+**Configuration Parameters:**
+
+| Parameter              | Type                  | Description                                           | Default  |
+| ---------------------- | --------------------- | ----------------------------------------------------- | -------- |
+| `enabled`              | bool                  | Enable long-term memory                               | False    |
+| `provider`             | str \| None           | Storage provider override (inherits if None)          | None     |
+| `connection_string`    | str \| None           | Connection string override (inherits if None)         | None     |
+| `app_id`               | str \| None           | Application identifier (RECOMMENDED for production)   | None     |
+| `index`                | IndexConfig \| None   | Vector search configuration                           | None     |
+| `user_memory`          | MemoryScopeConfig     | User-specific memory configuration                    | enabled  |
+| `app_memory`           | MemoryScopeConfig     | Application-wide memory (⚠️ experimental)             | disabled |
+| `search_response_format` | str                 | Search result format ("content" or "content_and_artifact") | "content" |
+
+**MemoryScopeConfig Parameters:**
+
+| Parameter             | Type  | Description                                      | Default                    |
+| --------------------- | ----- | ------------------------------------------------ | -------------------------- |
+| `enabled`             | bool  | Enable this memory scope                         | True (user), False (app)   |
+| `manage_instructions` | str   | AI instructions for when to save memories        | Built-in defaults          |
+| `search_instructions` | str   | AI instructions for when to search memories      | Built-in defaults          |
+| `schema`              | type  | Data schema for content validation               | str                        |
+| `actions_permitted`   | tuple | Allowed actions: ("create", "update", "delete")  | All actions                |
 
 ```python
-# Long-term memory configuration
+from langcrew.memory import LongTermMemoryConfig, MemoryScopeConfig
+from langgraph.store.base import IndexConfig
+
+# Production configuration with all parameters
 memory_config = MemoryConfig(
-    long_term={
-        "enabled": True,
-        "min_quality": 0.7       # Minimum quality threshold for storage
-    }
+    provider="postgres",
+    connection_string="postgresql://localhost/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app-prod",  # RECOMMENDED: Prevents data mixing
+        
+        # Vector search configuration
+        index=IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small"
+        ),
+        
+        # User memory (enabled by default)
+        user_memory=MemoryScopeConfig(
+            enabled=True,
+            manage_instructions="""Call this tool when user:
+            1. Expresses preferences (I like/love/prefer)
+            2. Shares personal info (job, location, hobbies)
+            3. Explicitly asks you to remember something
+            """,
+            search_instructions="""Call when you need to:
+            1. Recall user preferences or context
+            2. Provide personalized recommendations
+            """,
+            schema=str,
+            actions_permitted=("create", "update", "delete")
+        ),
+        
+        # App memory (experimental, disabled by default)
+        app_memory=MemoryScopeConfig(
+            enabled=False,  # ⚠️ Experimental feature
+            manage_instructions="Store application-wide insights...",
+            search_instructions="Search for common patterns..."
+        ),
+        
+        # Search result format
+        search_response_format="content"  # or "content_and_artifact"
+    )
 )
 ```
 
-### Entity Memory
+**Active Memory Triggers**:
 
-Tracks entities (people, organizations, concepts) across conversations using structured storage.
+The `manage_instructions` and `search_instructions` guide the agent on when to proactively save/retrieve memories:
 
-**Key Features:**
+- **Manage (Save)**: Triggers when users express preferences, share info, or correct previous data
+- **Search (Retrieve)**: Triggers when users ask about themselves or need personalized responses
 
-- Automatic entity recognition and updates
-- Relationship tracking between entities
-- Mention counting and recency tracking
-- Type-based entity organization
+Learn more: [Long-Term Memory Guide](/guides/memory/long-term/)
 
-```python
-# Entity memory configuration
-memory_config = MemoryConfig(
-    entity={
-        "enabled": True,
-    }
-)
-```
+**Custom Embedding Models:**
+
+For custom embedding models beyond OpenAI, refer to [LangGraph's IndexConfig documentation](https://langchain-ai.github.io/langgraph/how-tos/persistence_postgres/#semantic-search-using-embedding-similarity) for full configuration options.
 
 ## Storage Providers
 
-**✅ Tested Providers:**
+**✅ Production-Ready Providers:**
 
 - `memory` - In-memory storage (development/testing)
-- `postgresql` - PostgreSQL database (production)
 - `sqlite` - SQLite database (single-user/development)
+- `postgresql` - PostgreSQL database (production)
+- `mysql` - MySQL database (production)
 
 **⚠️ Experimental Providers:**
 
-- `redis` - Redis storage (not fully tested)
-- `mongodb` - MongoDB storage (not fully tested)
-- `mysql` - MySQL storage (not fully tested)
+- `redis` - Redis storage (experimental, not fully tested)
+- `mongodb` - MongoDB storage (experimental, not fully tested)
 
 ```python
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig, LongTermMemoryConfig
+
 # Production configuration with PostgreSQL
 memory_config = MemoryConfig(
     provider="postgresql",
-    connection_string="postgresql://user:pass@localhost:5432/memory_db"
+    connection_string="postgresql://user:pass@localhost:5432/memory_db",
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(enabled=True, app_id="my-app")
 )
 
 # Development configuration with SQLite
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///memory.db"
+    connection_string="sqlite:///memory.db",
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(enabled=True, app_id="my-app")
 )
 ```
 
@@ -149,18 +318,20 @@ memory_config = MemoryConfig(
 
 Memory integrates seamlessly with all langcrew components:
 
-- **[Agents](/concepts/agents)**: Agents inherit memory configuration for context-aware responses
-- **[Tasks](/concepts/tasks)**: Tasks maintain state across executions  
-- **[Crews](/concepts/crews)**: Crews share memory across team members
+- **[Agents](/concepts/agents)**: Agents get memory tools to save and retrieve information proactively
+- **[Tasks](/concepts/tasks)**: Tasks access memory through their assigned agent (task context is separate from memory)
+- **[Crews](/concepts/crews)**: Crews manage shared memory resources (checkpointer and store) for all agents
 
 ```python
 # Shared memory across crew
 from langcrew import Agent, Crew
-from langcrew.memory import MemoryConfig
+from langcrew.memory import MemoryConfig, ShortTermMemoryConfig, LongTermMemoryConfig
 
 memory_config = MemoryConfig(
     provider="sqlite",
-    connection_string="sqlite:///team_memory.db"
+    connection_string="sqlite:///team_memory.db",
+    short_term=ShortTermMemoryConfig(enabled=True),
+    long_term=LongTermMemoryConfig(enabled=True, app_id="my-team")
 )
 
 crew = Crew(
@@ -168,6 +339,11 @@ crew = Crew(
     memory=memory_config  # All agents share this memory
 )
 ```
+
+**How it works:**
+- **Crew**: Manages checkpointer (short-term) and store (long-term) instances
+- **Agent**: Gets memory tools (manage/search) automatically added to its toolset
+- **Task**: Accesses memory indirectly through its agent, doesn't manage memory itself
 
 ## When to Use Memory
 

@@ -1,0 +1,907 @@
+
+<html lang="zh-CN"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAgentKit - 开源 Agent 技术栈完整解决方案</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        body {
+            background: #0a0a0f;
+            overflow-x: hidden;
+        }
+        
+        /* Advanced Gradient Backgrounds */
+        .hero-gradient {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 25%, #4c1d95 50%, #5b21b6 75%, #6d28d9 100%);
+            position: relative;
+        }
+        
+        .hero-gradient::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 50%, rgba(168, 85, 247, 0.3) 0%, transparent 50%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+        
+        /* Dark Mesh Gradient Background - 修改为深色背景 */
+        .mesh-gradient {
+            background: #0f0f1a;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(217, 70, 239, 0.1) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, rgba(124, 58, 237, 0.1) 0px, transparent 50%);
+        }
+        
+        /* Dark Section Background - 深色区块背景 */
+        .dark-section {
+            background: #121218;
+            background-image: 
+                radial-gradient(at 50% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+        }
+        
+        /* Animated Grid */
+        .grid-background {
+            background-image: 
+                linear-gradient(rgba(139, 92, 246, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 92, 246, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 20s linear infinite;
+        }
+        
+        @keyframes gridMove {
+            0% { background-position: 0 0; }
+            100% { background-position: 50px 50px; }
+        }
+        
+        /* Floating Particles */
+        .particle {
+            position: absolute;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.8) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 15s infinite ease-in-out;
+        }
+        
+        .particle:nth-child(1) {
+            width: 4px;
+            height: 4px;
+            top: 20%;
+            left: 10%;
+            animation-delay: 0s;
+            animation-duration: 12s;
+        }
+        
+        .particle:nth-child(2) {
+            width: 6px;
+            height: 6px;
+            top: 60%;
+            left: 80%;
+            animation-delay: 2s;
+            animation-duration: 15s;
+        }
+        
+        .particle:nth-child(3) {
+            width: 3px;
+            height: 3px;
+            top: 40%;
+            left: 50%;
+            animation-delay: 4s;
+            animation-duration: 18s;
+        }
+        
+        .particle:nth-child(4) {
+            width: 5px;
+            height: 5px;
+            top: 80%;
+            left: 20%;
+            animation-delay: 1s;
+            animation-duration: 14s;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translate(0, 0) scale(1);
+                opacity: 0.3;
+            }
+            33% {
+                transform: translate(30px, -30px) scale(1.2);
+                opacity: 0.6;
+            }
+            66% {
+                transform: translate(-20px, 20px) scale(0.8);
+                opacity: 0.4;
+            }
+        }
+        
+        /* Premium Card Styles */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(168, 85, 247, 0.5);
+            box-shadow: 0 20px 60px 0 rgba(168, 85, 247, 0.3);
+            transform: translateY(-12px) scale(1.02);
+        }
+        
+        /* 移动端优化：减少悬浮效果 */
+        @media (max-width: 768px) {
+            .glass-card:hover {
+                transform: translateY(-4px) scale(1.01);
+            }
+        }
+        
+        /* Premium Gradient Text */
+        .gradient-text {
+            background: linear-gradient(135deg, #a855f7 0%, #d946ef 50%, #f0abfc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 200% auto;
+            animation: shimmer 3s linear infinite;
+        }
+        
+        @keyframes shimmer {
+            to {
+                background-position: 200% center;
+            }
+        }
+        
+        /* Glow Effects */
+        .glow {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.5),
+                        0 0 40px rgba(168, 85, 247, 0.3),
+                        0 0 60px rgba(168, 85, 247, 0.1);
+        }
+        
+        .glow-text {
+            text-shadow: 0 0 20px rgba(168, 85, 247, 0.8),
+                         0 0 40px rgba(168, 85, 247, 0.4);
+        }
+        
+        /* Button Animations */
+        .btn-premium {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .btn-premium::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-premium:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(168, 85, 247, 0.4);
+        }
+        
+        /* 移动端按钮优化 */
+        @media (max-width: 768px) {
+            .btn-premium:hover {
+                transform: translateY(-1px);
+            }
+        }
+        
+        /* Advanced Component Cards */
+        .component-card {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .component-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.1), transparent);
+            transition: left 0.6s;
+        }
+        
+        .component-card:hover::before {
+            left: 100%;
+        }
+        
+        /* Icon Glow Animation */
+        @keyframes iconGlow {
+            0%, 100% {
+                filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.5));
+            }
+            50% {
+                filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.8));
+            }
+        }
+        
+        .icon-glow {
+            animation: iconGlow 3s ease-in-out infinite;
+        }
+        
+        /* Tech Stack Flow */
+        .flow-arrow {
+            display: inline-block;
+            animation: flowMove 2s ease-in-out infinite;
+        }
+        
+        @keyframes flowMove {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(10px); }
+        }
+        
+        /* Scroll Reveal Animation */
+        .reveal {
+            opacity: 0;
+            transform: translateY(50px);
+            animation: reveal 0.8s ease-out forwards;
+        }
+        
+        @keyframes reveal {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Badge Styles */
+        .badge-premium {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(217, 70, 239, 0.2) 100%);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Code Block Style */
+        .code-block {
+            background: rgba(15, 15, 25, 0.8);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* 移动端响应式优化 */
+        @media (max-width: 768px) {
+            /* 减少动画性能消耗 */
+            .particle {
+                display: none;
+            }
+            
+            /* 优化间距 */
+            .section-padding {
+                padding-top: 3rem !important;
+                padding-bottom: 3rem !important;
+            }
+            
+            /* 文字大小调整 */
+            .mobile-title {
+                font-size: 2.5rem !important;
+                line-height: 1.2 !important;
+            }
+            
+            .mobile-subtitle {
+                font-size: 1.25rem !important;
+                line-height: 1.4 !important;
+            }
+            
+            .mobile-text {
+                font-size: 1rem !important;
+                line-height: 1.6 !important;
+            }
+            
+            /* 按钮优化 */
+            .mobile-btn {
+                padding: 1rem 1.5rem !important;
+                font-size: 1rem !important;
+            }
+            
+            /* 卡片间距优化 */
+            .mobile-card-padding {
+                padding: 1.5rem !important;
+            }
+        }
+        
+        /* 小屏幕优化 (iPhone SE等) */
+        @media (max-width: 375px) {
+            .mobile-title {
+                font-size: 2rem !important;
+            }
+            
+            .mobile-btn {
+                padding: 0.875rem 1.25rem !important;
+                font-size: 0.9rem !important;
+            }
+        }
+    </style>
+
+          <style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.bottom-6{bottom:1.5rem}.left-1\/2{left:50%}.z-10{z-index:10}.col-span-2{grid-column:span 2 / span 2}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:0.25rem}.mb-12{margin-bottom:3rem}.mb-2{margin-bottom:0.5rem}.mb-3{margin-bottom:0.75rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.mb-8{margin-bottom:2rem}.mr-1{margin-right:0.25rem}.mt-4{margin-top:1rem}.inline-block{display:inline-block}.flex{display:flex}.inline-flex{display:inline-flex}.grid{display:grid}.hidden{display:none}.h-10{height:2.5rem}.h-2{height:0.5rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.min-h-screen{min-height:100vh}.w-10{width:2.5rem}.w-2{width:0.5rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-full{width:100%}.max-w-2xl{max-width:42rem}.max-w-3xl{max-width:48rem}.max-w-4xl{max-width:56rem}.max-w-5xl{max-width:64rem}.max-w-6xl{max-width:72rem}.max-w-7xl{max-width:80rem}.max-w-xl{max-width:36rem}.flex-1{flex:1 1 0%}.flex-shrink-0{flex-shrink:0}.-translate-x-1\/2{--tw-translate-x:-50%;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.rotate-90{--tw-rotate:90deg;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.transform{transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}@keyframes bounce{0%, 100%{transform:translateY(-25%);animation-timing-function:cubic-bezier(0.8,0,1,1)}50%{transform:none;animation-timing-function:cubic-bezier(0,0,0.2,1)}}.animate-bounce{animation:bounce 1s infinite}@keyframes pulse{50%{opacity:.5}}.animate-pulse{animation:pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite}.grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-start{align-items:flex-start}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-4{gap:1rem}.gap-6{gap:1.5rem}.gap-8{gap:2rem}.space-y-2 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.break-all{word-break:break-all}.rounded-2xl{border-radius:1rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:0.5rem}.rounded-xl{border-radius:0.75rem}.border{border-width:1px}.border-2{border-width:2px}.border-t{border-top-width:1px}.border-blue-500\/30{border-color:rgb(59 130 246 / 0.3)}.border-green-500\/30{border-color:rgb(34 197 94 / 0.3)}.border-orange-500\/30{border-color:rgb(249 115 22 / 0.3)}.border-purple-500\/30{border-color:rgb(168 85 247 / 0.3)}.border-white\/10{border-color:rgb(255 255 255 / 0.1)}.bg-black\/60{background-color:rgb(0 0 0 / 0.6)}.bg-blue-500{--tw-bg-opacity:1;background-color:rgb(59 130 246 / var(--tw-bg-opacity, 1))}.bg-blue-500\/20{background-color:rgb(59 130 246 / 0.2)}.bg-cyan-500{--tw-bg-opacity:1;background-color:rgb(6 182 212 / var(--tw-bg-opacity, 1))}.bg-emerald-500{--tw-bg-opacity:1;background-color:rgb(16 185 129 / var(--tw-bg-opacity, 1))}.bg-green-500{--tw-bg-opacity:1;background-color:rgb(34 197 94 / var(--tw-bg-opacity, 1))}.bg-green-500\/20{background-color:rgb(34 197 94 / 0.2)}.bg-orange-500\/20{background-color:rgb(249 115 22 / 0.2)}.bg-pink-500{--tw-bg-opacity:1;background-color:rgb(236 72 153 / var(--tw-bg-opacity, 1))}.bg-purple-500{--tw-bg-opacity:1;background-color:rgb(168 85 247 / var(--tw-bg-opacity, 1))}.bg-purple-500\/20{background-color:rgb(168 85 247 / 0.2)}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-gradient-to-r{background-image:linear-gradient(to right, var(--tw-gradient-stops))}.from-purple-600{--tw-gradient-from:#9333ea var(--tw-gradient-from-position);--tw-gradient-to:rgb(147 51 234 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.to-pink-600{--tw-gradient-to:#db2777 var(--tw-gradient-to-position)}.p-3{padding:0.75rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.px-2{padding-left:0.5rem;padding-right:0.5rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.px-8{padding-left:2rem;padding-right:2rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-12{padding-top:3rem;padding-bottom:3rem}.py-16{padding-top:4rem;padding-bottom:4rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.pt-4{padding-top:1rem}.pt-6{padding-top:1.5rem}.text-left{text-align:left}.text-center{text-align:center}.font-mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-4xl{font-size:2.25rem;line-height:2.5rem}.text-5xl{font-size:3rem;line-height:1}.text-base{font-size:1rem;line-height:1.5rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.font-black{font-weight:900}.font-bold{font-weight:700}.font-light{font-weight:300}.font-medium{font-weight:500}.font-semibold{font-weight:600}.leading-relaxed{line-height:1.625}.tracking-wide{letter-spacing:0.025em}.text-blue-300{--tw-text-opacity:1;color:rgb(147 197 253 / var(--tw-text-opacity, 1))}.text-blue-400{--tw-text-opacity:1;color:rgb(96 165 250 / var(--tw-text-opacity, 1))}.text-gray-300{--tw-text-opacity:1;color:rgb(209 213 219 / var(--tw-text-opacity, 1))}.text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175 / var(--tw-text-opacity, 1))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128 / var(--tw-text-opacity, 1))}.text-green-300{--tw-text-opacity:1;color:rgb(134 239 172 / var(--tw-text-opacity, 1))}.text-green-400{--tw-text-opacity:1;color:rgb(74 222 128 / var(--tw-text-opacity, 1))}.text-orange-300{--tw-text-opacity:1;color:rgb(253 186 116 / var(--tw-text-opacity, 1))}.text-orange-400{--tw-text-opacity:1;color:rgb(251 146 60 / var(--tw-text-opacity, 1))}.text-purple-200{--tw-text-opacity:1;color:rgb(233 213 255 / var(--tw-text-opacity, 1))}.text-purple-300{--tw-text-opacity:1;color:rgb(216 180 254 / var(--tw-text-opacity, 1))}.text-purple-400{--tw-text-opacity:1;color:rgb(192 132 252 / var(--tw-text-opacity, 1))}.text-purple-900{--tw-text-opacity:1;color:rgb(88 28 135 / var(--tw-text-opacity, 1))}.text-red-500{--tw-text-opacity:1;color:rgb(239 68 68 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.opacity-30{opacity:0.3}.backdrop-blur-xl{--tw-backdrop-blur:blur(24px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-colors{transition-property:color, background-color, border-color, fill, stroke, -webkit-text-decoration-color;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-transform{transition-property:transform;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.duration-300{transition-duration:300ms}.duration-500{transition-duration:500ms}.hover\:scale-105:hover{--tw-scale-x:1.05;--tw-scale-y:1.05;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:border-blue-500\/60:hover{border-color:rgb(59 130 246 / 0.6)}.hover\:border-green-500\/60:hover{border-color:rgb(34 197 94 / 0.6)}.hover\:border-orange-500\/60:hover{border-color:rgb(249 115 22 / 0.6)}.hover\:border-purple-500\/50:hover{border-color:rgb(168 85 247 / 0.5)}.hover\:border-purple-500\/60:hover{border-color:rgb(168 85 247 / 0.6)}.hover\:text-purple-400:hover{--tw-text-opacity:1;color:rgb(192 132 252 / var(--tw-text-opacity, 1))}.group:hover .group-hover\:rotate-12{--tw-rotate:12deg;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.group:hover .group-hover\:scale-110{--tw-scale-x:1.1;--tw-scale-y:1.1;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.group:hover .group-hover\:scale-125{--tw-scale-x:1.25;--tw-scale-y:1.25;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.group:hover .group-hover\:text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}@media (min-width: 640px){.sm\:bottom-10{bottom:2.5rem}.sm\:mb-12{margin-bottom:3rem}.sm\:mb-16{margin-bottom:4rem}.sm\:mb-2{margin-bottom:0.5rem}.sm\:mb-20{margin-bottom:5rem}.sm\:mb-4{margin-bottom:1rem}.sm\:mb-6{margin-bottom:1.5rem}.sm\:mb-8{margin-bottom:2rem}.sm\:mr-2{margin-right:0.5rem}.sm\:mt-6{margin-top:1.5rem}.sm\:block{display:block}.sm\:inline{display:inline}.sm\:h-12{height:3rem}.sm\:h-5{height:1.25rem}.sm\:h-6{height:1.5rem}.sm\:h-7{height:1.75rem}.sm\:w-12{width:3rem}.sm\:w-5{width:1.25rem}.sm\:w-6{width:1.5rem}.sm\:w-7{width:1.75rem}.sm\:w-auto{width:auto}.sm\:rotate-0{--tw-rotate:0deg;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.sm\:flex-row{flex-direction:row}.sm\:items-center{align-items:center}.sm\:gap-12{gap:3rem}.sm\:gap-3{gap:0.75rem}.sm\:gap-4{gap:1rem}.sm\:gap-6{gap:1.5rem}.sm\:gap-8{gap:2rem}.sm\:space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.sm\:space-y-6 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem * var(--tw-space-y-reverse))}.sm\:rounded-2xl{border-radius:1rem}.sm\:rounded-3xl{border-radius:1.5rem}.sm\:p-4{padding:1rem}.sm\:p-6{padding:1.5rem}.sm\:p-8{padding:2rem}.sm\:px-10{padding-left:2.5rem;padding-right:2.5rem}.sm\:px-12{padding-left:3rem;padding-right:3rem}.sm\:px-3{padding-left:0.75rem;padding-right:0.75rem}.sm\:px-4{padding-left:1rem;padding-right:1rem}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}.sm\:px-8{padding-left:2rem;padding-right:2rem}.sm\:py-16{padding-top:4rem;padding-bottom:4rem}.sm\:py-2{padding-top:0.5rem;padding-bottom:0.5rem}.sm\:py-20{padding-top:5rem;padding-bottom:5rem}.sm\:py-24{padding-top:6rem;padding-bottom:6rem}.sm\:py-3{padding-top:0.75rem;padding-bottom:0.75rem}.sm\:py-4{padding-top:1rem;padding-bottom:1rem}.sm\:py-5{padding-top:1.25rem;padding-bottom:1.25rem}.sm\:py-6{padding-top:1.5rem;padding-bottom:1.5rem}.sm\:pt-6{padding-top:1.5rem}.sm\:pt-8{padding-top:2rem}.sm\:text-2xl{font-size:1.5rem;line-height:2rem}.sm\:text-3xl{font-size:1.875rem;line-height:2.25rem}.sm\:text-4xl{font-size:2.25rem;line-height:2.5rem}.sm\:text-5xl{font-size:3rem;line-height:1}.sm\:text-6xl{font-size:3.75rem;line-height:1}.sm\:text-base{font-size:1rem;line-height:1.5rem}.sm\:text-lg{font-size:1.125rem;line-height:1.75rem}.sm\:text-sm{font-size:0.875rem;line-height:1.25rem}.sm\:text-xl{font-size:1.25rem;line-height:1.75rem}}@media (min-width: 768px){.md\:grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.md\:grid-cols-5{grid-template-columns:repeat(5, minmax(0, 1fr))}.md\:flex-row{flex-direction:row}.md\:gap-10{gap:2.5rem}.md\:gap-8{gap:2rem}.md\:p-10{padding:2.5rem}.md\:p-12{padding:3rem}.md\:p-8{padding:2rem}.md\:py-32{padding-top:8rem;padding-bottom:8rem}.md\:text-left{text-align:left}.md\:text-2xl{font-size:1.5rem;line-height:2rem}.md\:text-3xl{font-size:1.875rem;line-height:2.25rem}.md\:text-5xl{font-size:3rem;line-height:1}.md\:text-6xl{font-size:3.75rem;line-height:1}.md\:text-7xl{font-size:4.5rem;line-height:1}.md\:text-base{font-size:1rem;line-height:1.5rem}.md\:text-lg{font-size:1.125rem;line-height:1.75rem}.md\:text-xl{font-size:1.25rem;line-height:1.75rem}}@media (min-width: 1024px){.lg\:grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.lg\:text-2xl{font-size:1.5rem;line-height:2rem}.lg\:text-4xl{font-size:2.25rem;line-height:2.5rem}.lg\:text-6xl{font-size:3.75rem;line-height:1}.lg\:text-8xl{font-size:6rem;line-height:1}.lg\:text-lg{font-size:1.125rem;line-height:1.75rem}}</style></head>
+<body class="text-white" style="zoom: 100%; margin: 0; min-height: 100vh; overflow-y: auto; background: #fafbfc;">
+    <!-- Hero Section with Advanced Effects -->
+    <section class="hero-gradient relative min-h-screen flex items-center justify-center overflow-hidden">
+        <!-- Animated Particles -->
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        
+        <!-- Grid Background -->
+        <div class="absolute inset-0 grid-background opacity-30"></div>
+        
+        <!-- Main Hero Content -->
+        <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center">
+            <!-- Badge -->
+            <div class="inline-flex items-center gap-2 sm:gap-3 badge-premium rounded-full px-4 sm:px-6 py-2 sm:py-3 mb-6 sm:mb-8 reveal text-xs sm:text-sm" style="animation-delay: 0.1s;">
+                <span class="font-semibold tracking-wide">🚀 联合发布</span>
+                <span class="text-purple-300 hidden sm:inline">·</span>
+                <span class="hidden sm:inline">开源中国 OSCHINA × 开源开发者/ISV</span>
+            </div>
+            
+            <!-- Main Title -->
+            <h1 class="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-4 sm:mb-6 reveal mobile-title" style="animation-delay: 0.2s;">
+                <span class="text-white glow-text">Open</span>
+                <span class="gradient-text">Agentkit</span>
+            </h1>
+            
+            <!-- Subtitle -->
+            <p class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-light mb-4 sm:mb-6 text-purple-200 reveal mobile-subtitle" style="animation-delay: 0.3s;">
+                完整的 Agent 技术栈闭环
+            </p>
+            
+            <p class="text-base sm:text-lg md:text-xl lg:text-2xl max-w-4xl mx-auto mb-8 sm:mb-12 text-gray-300 leading-relaxed reveal px-4 mobile-text" style="animation-delay: 0.4s;">
+                从框架到构建器，从运行时到部署调优<br>
+                为开源开发者打造的<span class="text-purple-300 font-semibold">一站式 AI Agent 开发解决方案</span>
+            </p>
+            
+            <!-- CTA Buttons -->
+            <div class="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-6 mb-12 sm:mb-16 reveal px-4" style="animation-delay: 0.5s;">
+                <a href="https://langcrew.ai/guides/quickstart" target="_blank" class="btn-premium bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 sm:px-10 py-3 sm:py-5 rounded-xl font-bold text-base sm:text-lg glow relative z-10 mobile-btn">
+                    <span class="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        快速开始
+                    </span>
+                </a>
+                <a href="https://langcrew.ai" target="_blank" class="btn-premium glass-card text-white px-6 sm:px-10 py-3 sm:py-5 rounded-xl font-bold text-base sm:text-lg relative z-10 mobile-btn">
+                    <span class="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                        查看文档
+                    </span>
+                </a>
+                <a href="https://github.com/01-ai/langcrew" target="_blank" class="btn-premium glass-card text-white px-6 sm:px-10 py-3 sm:py-5 rounded-xl font-bold text-base sm:text-lg relative z-10 mobile-btn">
+                    <span class="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path>
+                        </svg>
+                        GitHub
+                    </span>
+                </a>
+            </div>
+            
+            <!-- Tech Stack Flow Visualization -->
+            <div class="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-8 max-w-5xl mx-auto reveal" style="animation-delay: 0.6s;">
+                <div class="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-2 sm:gap-4 text-xs sm:text-sm font-mono">
+                    <div class="badge-premium px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold w-full sm:w-auto text-center">
+                        <span class="text-purple-300">🧱</span> Framework
+                    </div>
+                    <div class="flow-arrow text-purple-400 text-xl sm:text-2xl rotate-90 sm:rotate-0">→</div>
+                    <div class="badge-premium px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold w-full sm:w-auto text-center">
+                        <span class="text-blue-300">⚙️</span> Builder
+                    </div>
+                    <div class="flow-arrow text-purple-400 text-xl sm:text-2xl rotate-90 sm:rotate-0">→</div>
+                    <div class="badge-premium px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold w-full sm:w-auto text-center">
+                        <span class="text-green-300">💬</span> Runtime
+                    </div>
+                    <div class="flow-arrow text-purple-400 text-xl sm:text-2xl rotate-90 sm:rotate-0">→</div>
+                    <div class="badge-premium px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold w-full sm:w-auto text-center">
+                        <span class="text-orange-300">🧠</span> Studio
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scroll Indicator -->
+        <div class="absolute bottom-6 sm:bottom-10 left-1/2 transform -translate-x-1/2 animate-bounce hidden sm:block">
+            <svg class="w-6 h-6 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Components Section - 深色背景 -->
+    <section class="relative py-16 sm:py-24 md:py-32 px-4 mesh-gradient section-padding">
+        <div class="max-w-7xl mx-auto">
+            <!-- Section Header -->
+            <div class="text-center mb-12 sm:mb-20">
+                <h2 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-4 sm:mb-6 mobile-title">
+                    <span class="gradient-text">核心组件</span>
+                </h2>
+                <p class="text-base sm:text-lg md:text-xl text-gray-300 max-w-3xl mx-auto px-4 mobile-text">
+                    四大核心组件，构建完整的 Agent 开发生态系统
+                </p>
+            </div>
+            
+            <!-- Components Grid -->
+            <div class="grid lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
+                <!-- LangCrew Framework -->
+                <div class="glass-card component-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 group mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mb-4 sm:mb-6">
+                        <div class="text-4xl sm:text-5xl md:text-6xl icon-glow">🧱</div>
+                        <div class="flex-1">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-3">
+                                <h3 class="text-xl sm:text-2xl md:text-3xl font-bold text-white">OAK Framework <span class="text-purple-400">(LangCrew)</span></h3>
+                            </div>
+                            <div class="inline-block px-3 sm:px-4 py-1 rounded-full text-xs sm:text-sm font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                多 Agent 开发框架
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-300 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 leading-relaxed mobile-text min-h-[5rem] md:min-h-[4.5rem]">
+                        基于 <span class="text-purple-400 font-semibold">LangGraph</span> 构建的企业级多 Agent 开发框架，融合 CrewAI 的直观概念与生产级能力，提供开箱即用的 HITL、动态编排、事件驱动等核心机制，大幅降低 LangGraph 开发门槛。
+                    </p>
+                    
+                    <div class="flex flex-wrap gap-2 sm:gap-3">
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-purple-300">
+                            <span class="mr-1 sm:mr-2">🚀</span>降低门槛
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-purple-300">
+                            <span class="mr-1 sm:mr-2">🏢</span>企业级开源
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-purple-300">
+                            <span class="mr-1 sm:mr-2">🎯</span>开箱即用
+                        </span>
+                    </div>
+                </div>
+
+                <!-- OAK Builder -->
+                <div class="glass-card component-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 group mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mb-4 sm:mb-6">
+                        <div class="text-4xl sm:text-5xl md:text-6xl icon-glow">⚙️</div>
+                        <div class="flex-1">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-3">
+                                <h3 class="text-xl sm:text-2xl md:text-3xl font-bold text-white">OAK Builder</h3>
+                            </div>
+                            <div class="inline-block px-3 sm:px-4 py-1 rounded-full text-xs sm:text-sm font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                Agent-Builder 开源版
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-300 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 leading-relaxed mobile-text min-h-[5rem] md:min-h-[4.5rem]">
+                        <span class="text-blue-400 font-semibold">可视化画布</span> 构建多步骤 Agent 工作流，拖拽式节点编排实现复杂协作。支持类型化数据流设计、实时预览调试，可导出 SDK 代码直接部署，完成从设计到上线的完整闭环。
+                    </p>
+                    
+                    <div class="flex flex-wrap gap-2 sm:gap-3">
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-blue-300">
+                            <span class="mr-1 sm:mr-2">🎨</span>可视化构建
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-blue-300">
+                            <span class="mr-1 sm:mr-2">⚡</span>低代码开发
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-blue-300">
+                            <span class="mr-1 sm:mr-2">🚀</span>快速部署
+                        </span>
+                    </div>
+                </div>
+
+                <!-- OAK Runtime -->
+                <div class="glass-card component-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 group mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mb-4 sm:mb-6">
+                        <div class="text-4xl sm:text-5xl md:text-6xl icon-glow">📦</div>
+                        <div class="flex-1">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-3">
+                                <h3 class="text-xl sm:text-2xl md:text-3xl font-bold text-white">OAK Runtime</h3>
+                            </div>
+                            <div class="inline-block px-3 sm:px-4 py-1 rounded-full text-xs sm:text-sm font-semibold bg-green-500/20 text-green-300 border border-green-500/30">
+                                Agent 运行时环境
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-300 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 leading-relaxed mobile-text min-h-[5rem] md:min-h-[4.5rem]">
+                        为 Agent 提供 <span class="text-green-400 font-semibold">安全隔离的云端沙盒环境</span>，支持 AI 生成代码的可靠执行。通过 Python SDK 精准控制，跨平台支持 x86、Android 与 ARM64 架构，满足数据分析、代码执行、Agent Playground 等多样化场景需求。
+                    </p>
+                    
+                    <div class="flex flex-wrap gap-2 sm:gap-3">
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-green-300">
+                            <span class="mr-1 sm:mr-2">🔒</span>安全沙盒
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-green-300">
+                            <span class="mr-1 sm:mr-2">☁️</span>云端隔离
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-green-300">
+                            <span class="mr-1 sm:mr-2">🌐</span>多平台
+                        </span>
+                    </div>
+                </div>
+
+                <!-- OAK Studio -->
+                <div class="glass-card component-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 group mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mb-4 sm:mb-6">
+                        <div class="text-4xl sm:text-5xl md:text-6xl icon-glow">🧠</div>
+                        <div class="flex-1">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-3">
+                                <h3 class="text-xl sm:text-2xl md:text-3xl font-bold text-white">OAK Studio</h3>
+                            </div>
+                            <div class="inline-block px-3 sm:px-4 py-1 rounded-full text-xs sm:text-sm font-semibold bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                                企业级 PaaS 平台
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-300 text-sm sm:text-base md:text-lg mb-4 sm:mb-6 leading-relaxed mobile-text min-h-[5rem] md:min-h-[4.5rem]">
+                        覆盖 Agent 开发到运营全生命周期的 <span class="text-orange-400 font-semibold">企业级 PaaS 平台</span>。内置模板与工具库加速开发，基于 AgentOps 实现深度追踪与质量评估，支持从原型验证到生产环境的可靠部署与大规模扩展，赋能企业高效构建可信赖的自主 Agent 系统。
+                    </p>
+                    
+                    <div class="flex flex-wrap gap-2 sm:gap-3">
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-orange-300">
+                            <span class="mr-1 sm:mr-2">📦</span>模板工具库
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-orange-300">
+                            <span class="mr-1 sm:mr-2">🚀</span>企业部署
+                        </span>
+                        <span class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-orange-300">
+                            <span class="mr-1 sm:mr-2">📊</span>追踪评估
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section - 深色背景 -->
+    <section class="relative py-16 sm:py-24 md:py-32 px-4 dark-section section-padding">
+        <div class="max-w-7xl mx-auto">
+            <!-- Section Header -->
+            <div class="text-center mb-12 sm:mb-20">
+                <h2 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-4 sm:mb-6 mobile-title">
+                    <span class="text-white">为什么选择</span>
+                    <span class="gradient-text"> OpenAgentKit</span>
+                </h2>
+                <p class="text-base sm:text-lg md:text-xl text-gray-300 max-w-3xl mx-auto px-4 mobile-text">
+                    让智能体生态在开源世界中自由生长
+                </p>
+            </div>
+            
+            <!-- Features Grid -->
+            <div class="grid md:grid-cols-3 gap-6 sm:gap-8 md:gap-10">
+                <!-- Feature 1 -->
+                <div class="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 text-center group hover:scale-105 transition-all duration-500 mobile-card-padding">
+                    <div class="text-5xl sm:text-6xl md:text-7xl mb-6 sm:mb-8 inline-block icon-glow">🌱</div>
+                    <h3 class="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 text-white mobile-subtitle">
+                        开源开放<br>
+                        <span class="gradient-text">社区共建</span>
+                    </h3>
+                    <p class="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed mb-4 sm:mb-6 mobile-text">
+                        由零一万物联合开源中国发起，秉持"取之于开源，用之于开源"的理念。作为 OpenAI AgentKit 的开源平替，OAK 让每位开发者都能参与构建 Agent 基础设施。
+                    </p>
+                    <div class="flex justify-center gap-2">
+                        <div class="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                        <div class="w-2 h-2 bg-pink-500 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div>
+                        <div class="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div>
+                    </div>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 text-center group hover:scale-105 transition-all duration-500 mobile-card-padding" style="transition-delay: 0.1s;">
+                    <div class="text-5xl sm:text-6xl md:text-7xl mb-6 sm:mb-8 inline-block icon-glow">🌐</div>
+                    <h3 class="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 text-white mobile-subtitle">
+                        打破生态壁垒<br>
+                        <span class="gradient-text">实现 Agent 自由</span>
+                    </h3>
+                    <p class="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed mb-4 sm:mb-6 mobile-text">
+                        面向全模型、全平台的开放架构，兼容 OpenAI AgentKit 与 Claude Skills。从根本上打破生态绑定限制，让开发者自由选择最适合的技术栈与工具。
+                    </p>
+                    <div class="flex justify-center gap-2">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        <div class="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div>
+                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div>
+                    </div>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 text-center group hover:scale-105 transition-all duration-500 mobile-card-padding" style="transition-delay: 0.2s;">
+                    <div class="text-5xl sm:text-6xl md:text-7xl mb-6 sm:mb-8 inline-block icon-glow">🔄</div>
+                    <h3 class="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 text-white mobile-subtitle">
+                        开发运营闭环<br>
+                        <span class="gradient-text">全生命周期</span>
+                    </h3>
+                    <p class="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed mb-4 sm:mb-6 mobile-text">
+                        从 Framework 到 Builder、Runtime 再到 Studio，覆盖 Agent 开发、构建、运行与优化的完整链路。让开发者在开源环境获得类企业平台的完整体验。
+                    </p>
+                    <div class="flex justify-center gap-2">
+                        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div>
+                        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section - 深色背景 -->
+    <section class="relative py-16 sm:py-24 md:py-32 px-4 mesh-gradient section-padding">
+        <div class="max-w-6xl mx-auto">
+            <!-- Section Header -->
+            <div class="text-center mb-12 sm:mb-20">
+                <h2 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-4 sm:mb-6 mobile-title">
+                    <span class="gradient-text">技术架构</span>
+                </h2>
+                <p class="text-base sm:text-lg md:text-xl text-gray-300 px-4 mobile-text">
+                    四层架构设计，打造完整的端到端解决方案
+                </p>
+            </div>
+            
+            <!-- Architecture Layers -->
+            <div class="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 space-y-4 sm:space-y-6">
+                <!-- Layer 4 - Top -->
+                <div class="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 border-2 border-orange-500/30 hover:border-orange-500/60 transition-all duration-300 mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                        <div class="flex items-start sm:items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                            <div class="text-3xl sm:text-4xl md:text-5xl">🧠</div>
+                            <div class="flex-1">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                                    <h4 class="text-lg sm:text-xl md:text-2xl font-bold text-white">Studio Layer</h4>
+                                    <span class="badge-premium px-2 sm:px-3 py-1 rounded-lg text-xs font-bold text-orange-300">Layer 4</span>
+                                </div>
+                                <p class="text-gray-300 text-xs sm:text-sm md:text-base lg:text-lg mobile-text">OAK Studio · 可视化观测、部署与调优平台</p>
+                            </div>
+                        </div>
+                        <div class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-xs sm:text-sm text-orange-300 w-full sm:w-auto text-center">
+                            Agent DevOps
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center">
+                    <div class="text-2xl sm:text-3xl text-purple-400 flow-arrow">↑</div>
+                </div>
+                
+                <!-- Layer 3 -->
+                <div class="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 border-2 border-green-500/30 hover:border-green-500/60 transition-all duration-300 mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                        <div class="flex items-start sm:items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                            <div class="text-3xl sm:text-4xl md:text-5xl">📦</div>
+                            <div class="flex-1">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                                    <h4 class="text-lg sm:text-xl md:text-2xl font-bold text-white">Runtime Layer</h4>
+                                    <span class="badge-premium px-2 sm:px-3 py-1 rounded-lg text-xs font-bold text-green-300">Layer 3</span>
+                                </div>
+                                <p class="text-gray-300 text-xs sm:text-sm md:text-base lg:text-lg mobile-text">OAK Runtime · Agent 实时运行环境</p>
+                            </div>
+                        </div>
+                        <div class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-xs sm:text-sm text-green-300 w-full sm:w-auto text-center">
+                            Secure Sandbox
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center">
+                    <div class="text-2xl sm:text-3xl text-purple-400 flow-arrow">↑</div>
+                </div>
+                
+                <!-- Layer 2 -->
+                <div class="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 border-2 border-blue-500/30 hover:border-blue-500/60 transition-all duration-300 mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                        <div class="flex items-start sm:items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                            <div class="text-3xl sm:text-4xl md:text-5xl">⚙️</div>
+                            <div class="flex-1">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                                    <h4 class="text-lg sm:text-xl md:text-2xl font-bold text-white">Builder Layer</h4>
+                                    <span class="badge-premium px-2 sm:px-3 py-1 rounded-lg text-xs font-bold text-blue-300">Layer 2</span>
+                                </div>
+                                <p class="text-gray-300 text-xs sm:text-sm md:text-base lg:text-lg mobile-text">OAK Builder · Agent 构建与管理</p>
+                            </div>
+                        </div>
+                        <div class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-xs sm:text-sm text-blue-300 w-full sm:w-auto text-center">
+                            Visual Canvas
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center">
+                    <div class="text-2xl sm:text-3xl text-purple-400 flow-arrow">↑</div>
+                </div>
+                
+                <!-- Layer 1 - Base -->
+                <div class="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 border-2 border-purple-500/30 hover:border-purple-500/60 transition-all duration-300 mobile-card-padding">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                        <div class="flex items-start sm:items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                            <div class="text-3xl sm:text-4xl md:text-5xl">🧱</div>
+                            <div class="flex-1">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                                    <h4 class="text-lg sm:text-xl md:text-2xl font-bold text-white">Framework Layer</h4>
+                                    <span class="badge-premium px-2 sm:px-3 py-1 rounded-lg text-xs font-bold text-purple-300">Layer 1</span>
+                                </div>
+                                <p class="text-gray-300 text-xs sm:text-sm md:text-base lg:text-lg mobile-text">OAK Framework (LangCrew) · 多 Agent 系统开发</p>
+                            </div>
+                        </div>
+                        <div class="badge-premium px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-mono text-xs sm:text-sm text-purple-300 w-full sm:w-auto text-center">
+                            Agent Orchestration
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="relative py-16 sm:py-24 md:py-32 px-4 hero-gradient overflow-hidden section-padding">
+        <!-- Particles -->
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        
+        <div class="relative z-10 max-w-5xl mx-auto text-center">
+            <h2 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-6 sm:mb-8 glow-text mobile-title px-4">
+                开启 AI Agent 开发之旅
+            </h2>
+            
+            <p class="text-xl sm:text-2xl mb-3 sm:mb-4 text-purple-200 px-4 mobile-subtitle">
+                立即加入 OpenAgentKit 开源社区
+            </p>
+            
+            <p class="text-base sm:text-lg md:text-xl mb-8 sm:mb-12 text-gray-300 max-w-3xl mx-auto px-4 mobile-text">
+                与全球开发者一起探索、学习、贡献<br>
+                共同构建下一代 AI Agent 应用的未来
+            </p>
+            
+            <!-- Primary CTAs -->
+            <div class="flex flex-col sm:flex-row flex-wrap justify-center gap-4 sm:gap-6 mb-12 sm:mb-16 px-4">
+                <a href="https://langcrew.ai/guides/quickstart" target="_blank" class="btn-premium bg-white text-purple-900 px-8 sm:px-12 py-4 sm:py-6 rounded-xl font-bold text-lg sm:text-xl glow relative z-10 group mobile-btn">
+                    <span class="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
+                        <svg class="w-6 h-6 sm:w-7 sm:h-7 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        快速开始
+                    </span>
+                </a>
+                
+                <a href="https://langcrew.ai" target="_blank" class="btn-premium glass-card text-white px-8 sm:px-12 py-4 sm:py-6 rounded-xl font-bold text-lg sm:text-xl relative z-10 group mobile-btn">
+                    <span class="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
+                        <svg class="w-6 h-6 sm:w-7 sm:h-7 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                        查看文档
+                    </span>
+                </a>
+            </div>
+            
+            <!-- GitHub CTA -->
+            <div class="glass-card rounded-xl sm:rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto mb-8 sm:mb-12">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6">
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        <svg class="w-10 h-10 sm:w-12 sm:h-12 text-white flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div class="text-left">
+                            <p class="text-xs sm:text-sm text-gray-400">在 GitHub 上关注我们</p>
+                            <p class="text-lg sm:text-xl font-bold text-white font-mono break-all">01-ai/langcrew</p>
+                        </div>
+                    </div>
+                    <a href="https://github.com/01-ai/langcrew" target="_blank" class="btn-premium bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold flex items-center justify-center gap-2 sm:gap-3 group w-full sm:w-auto text-sm sm:text-base mobile-btn">
+                        <span>Star on GitHub</span>
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-125 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Partnership Badge -->
+            <div class="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-xl mx-auto backdrop-blur-xl">
+                <p class="text-xs sm:text-sm text-purple-300 mb-2 font-semibold tracking-wide">🤝 联合发布伙伴</p>
+                <p class="text-2xl sm:text-3xl font-bold text-white">开源中国 OSCHINA</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="relative border-t border-white/10 py-12 sm:py-16 px-4" style="background-color: #1e293b;">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-8 sm:gap-12 mb-8 sm:mb-12">
+                <!-- Brand Column -->
+                <div class="col-span-2">
+                    <h4 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
+                        <span class="text-white">OpenAgent</span><span class="gradient-text">Kit</span>
+                    </h4>
+                    <p class="text-gray-100 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
+                        为开源开发者打造的完整 AI Agent 开发技术栈。取之于开源，用之于开源。
+                    </p>
+                    <div class="flex gap-4">
+                        <a href="https://github.com/01-ai/langcrew" target="_blank" class="w-10 h-10 sm:w-12 sm:h-12 glass-card rounded-lg flex items-center justify-center hover:border-purple-500/50 transition-all group">
+                            <svg class="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                                <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Product Column -->
+                <div>
+                    <h5 class="text-white font-bold text-base sm:text-lg mb-3 sm:mb-4">产品</h5>
+                    <ul class="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                        <li><a href="https://langcrew.ai" class="text-gray-100 hover:text-purple-400 transition-colors">OAK Framework</a></li>
+                        <li><a href="https://studio.langcrew.ai/agent-builder" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">OAK Builder</a></li>
+                        <li><a href="https://langcrew.ai" class="text-gray-100 hover:text-purple-400 transition-colors">OAK Runtime</a></li>
+                        <li><a href="https://studio.langcrew.ai/templates" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">OAK Studio</a></li>
+                    </ul>
+                </div>
+                
+                <!-- Resources Column -->
+                <div>
+                    <h5 class="text-white font-bold text-base sm:text-lg mb-3 sm:mb-4">资源</h5>
+                    <ul class="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                        <li><a href="https://langcrew.ai" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">文档中心</a></li>
+                        <li><a href="https://langcrew.ai/guides/quickstart" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">快速开始</a></li>
+                        <li><a href="https://github.com/01-ai/langcrew" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">示例代码</a></li>
+                        <li><a href="https://github.com/01-ai/langcrew" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">社区讨论</a></li>
+                    </ul>
+                </div>
+                
+                <!-- About Column -->
+                <div>
+                    <h5 class="text-white font-bold text-base sm:text-lg mb-3 sm:mb-4">关于</h5>
+                    <ul class="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                        <li><a href="https://github.com/01-ai/langcrew" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">GitHub</a></li>
+                        <li><a href="https://github.com/01-ai/langcrew" target="_blank" class="text-gray-100 hover:text-purple-400 transition-colors">贡献指南</a></li>
+                        <li><a href="#" class="text-gray-100 hover:text-purple-400 transition-colors">开源中国</a></li>
+                        <li><a href="#" class="text-gray-100 hover:text-purple-400 transition-colors">联系我们</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Bottom Bar -->
+            <div class="pt-6 sm:pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-3 sm:gap-4">
+                <p class="text-gray-300 text-xs sm:text-sm text-center md:text-left">
+                    © 2024 OpenAgentKit. 开源项目 · MIT License
+                </p>
+                <div class="flex items-center gap-2 text-xs sm:text-sm">
+                    <span class="text-gray-300">Made with</span>
+                    <span class="text-red-500 animate-pulse">♥</span>
+                    <span class="text-gray-300">for Open Source Community</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+          
+
+<div id="inspector-shadow-host" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; pointer-events: none; z-index: 999999;"></div></body></html>

@@ -1,0 +1,282 @@
+---
+title: 快速开始
+description: 学习如何在langcrew应用程序中实现和使用安全护栏
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+安全护栏是 langcrew 中的安全和验证系统，确保数据质量、安全性和合规性。它们充当保护屏障，在处理前验证输入，在交付前验证输出。
+
+## 快速开始
+
+让我们在几分钟内为您的 langcrew 应用程序实现基本护栏。
+
+### 步骤1：导入所需模块
+
+```python
+from langcrew import Agent, Task, Crew
+from langcrew.guardrail import input_guard, output_guard, GuardrailError
+from langcrew.llm_factory import LLMFactory
+```
+
+### 步骤2：定义您的第一个护栏
+
+```python
+@input_guard
+def check_no_sensitive_info(data):
+    """防止处理敏感信息"""
+    content = str(data).lower()
+    
+    sensitive_patterns = ["password:", "api_key:", "secret:", "ssn:"]
+    for pattern in sensitive_patterns:
+        if pattern in content:
+            return False, f"包含敏感信息: {pattern}"
+    
+    return True, "未检测到敏感信息"
+
+@output_guard
+def check_output_quality(data):
+    """确保输出符合质量标准"""
+    output_str = str(data)
+    
+    if not output_str:
+        return False, "不允许空输出"
+    
+    if len(output_str) < 10:
+        return False, "输出太短（最少10个字符）"
+    
+    return True, "输出质量检查通过"
+```
+
+### 步骤3：将护栏应用于智能体
+
+```python
+# 创建 LLM
+llm = LLMFactory.create_llm({
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.3
+})
+
+# 创建带有护栏的智能体
+agent = Agent(
+    role="内容创作者",
+    goal="生成安全内容",
+    backstory="具有安全检查的专业内容创作者。",
+    llm=llm,
+    input_guards=[check_no_sensitive_info],
+    output_guards=[check_output_quality]
+)
+```
+
+### 步骤4：创建并执行任务
+
+```python
+# 创建任务
+task = Task(
+    description="撰写一篇关于人工智能的文章",
+    expected_output="一篇关于AI的优质文章",
+    agent=agent
+)
+
+# 创建团队并执行
+crew = Crew(agents=[agent], tasks=[task])
+
+try:
+    result = crew.kickoff()
+    print("✅ 任务成功完成")
+except GuardrailError as e:
+    print(f"❌ 护栏阻止执行: {e}")
+```
+
+## 创建护栏
+
+### 输入护栏
+
+输入护栏在数据到达AI智能体之前进行验证：
+
+```python
+@input_guard
+def check_input_length(data):
+    """限制输入长度以防止滥用"""
+    content = str(data)
+    max_length = 1000
+    
+    if len(content) > max_length:
+        return False, f"输入太长: {len(content)} > {max_length} 字符"
+    
+    return True, f"输入长度正常: {len(content)} 字符"
+
+@input_guard
+def check_language_support(data):
+    """检查输入语言是否受支持"""
+    content = str(data)
+    
+    # 简单的语言检测
+    non_latin_chars = sum(1 for char in content if ord(char) > 127)
+    total_chars = len(content)
+    
+    if total_chars > 0 and non_latin_chars / total_chars > 0.3:
+        return False, "不支持该语言"
+    
+    return True, "语言受支持"
+```
+
+### 输出护栏
+
+输出护栏在AI处理后验证内容：
+
+```python
+@output_guard
+def check_output_quality(data):
+    """确保输出符合质量标准"""
+    output_str = str(data)
+    
+    if not output_str:
+        return False, "不允许空输出"
+    
+    if len(output_str) < 10:
+        return False, "输出太短（最少10个字符）"
+    
+    # 检查占位符文本
+    placeholders = ["TODO", "FIXME", "[INSERT", "[PLACEHOLDER"]
+    for placeholder in placeholders:
+        if placeholder in output_str.upper():
+            return False, f"包含占位符文本: {placeholder}"
+    
+    return True, "输出质量检查通过"
+
+@output_guard
+def filter_profanity(data):
+    """过滤不当语言"""
+    inappropriate_words = ["垃圾", "废话", "糟糕"]
+    output_str = str(data).lower()
+    
+    for word in inappropriate_words:
+        if word in output_str:
+            return False, f"包含不当内容: {word}"
+    
+    return True, "内容适当"
+```
+
+## 应用护栏
+
+<Tabs>
+<TabItem label="智能体级别">
+
+将护栏应用于智能体执行的所有任务：
+
+```python
+agent = Agent(
+    role="内容创作者",
+    goal="生成安全内容",
+    llm=llm,
+    input_guards=[check_no_sensitive_info, check_input_length],
+    output_guards=[check_output_quality, filter_profanity]
+)
+```
+
+</TabItem>
+<TabItem label="任务级别">
+
+对单个任务应用特定护栏：
+
+```python
+task = Task(
+    description="生成关于技术的内容",
+    agent=agent,
+    input_guards=[check_input_length],  # 任务特定
+    output_guards=[check_output_quality]  # 任务特定
+)
+```
+
+</TabItem>
+<TabItem label="组合">
+
+分层智能体和任务护栏以实现全面保护：
+
+```python
+# 具有全局保护的智能体
+agent = Agent(
+    role="处理器",
+    goal="安全处理内容",
+    llm=llm,
+    input_guards=[check_no_sensitive_info],  # 全局
+    output_guards=[filter_profanity]  # 全局
+)
+
+# 具有额外保护的任务
+task = Task(
+    description="生成关于网络安全的内容",
+    agent=agent,
+    input_guards=[check_input_length],  # 任务特定
+    output_guards=[check_output_quality]  # 任务特定
+)
+```
+
+</TabItem>
+</Tabs>
+
+## 高级模式
+
+### 条件护栏
+
+根据上下文自适应的护栏：
+
+```python
+@input_guard
+def conditional_sensitive_check(data):
+    """基于上下文的条件敏感数据检查"""
+    content = str(data).lower()
+    
+    # 检查是否为安全相关任务
+    security_keywords = ["安全", "认证", "登录"]
+    is_security_task = any(keyword in content for keyword in security_keywords)
+    
+    if is_security_task:
+        # 对于安全任务，更严格
+        strict_patterns = ["密码:", "pwd:", "秘密:", "密钥:"]
+        for pattern in strict_patterns:
+            if pattern in content:
+                return False, f"安全任务包含敏感数据: {pattern}"
+    else:
+        # 对于非安全任务，更宽松
+        lenient_patterns = ["密码:", "pwd:"]
+        for pattern in lenient_patterns:
+            if pattern in content:
+                return False, f"包含敏感数据: {pattern}"
+    
+    return True, "条件检查通过"
+```
+
+### 速率限制
+
+实现速率限制以防止滥用：
+
+```python
+@input_guard
+def check_rate_limiting(data):
+    """简单的速率限制护栏"""
+    import time
+    
+    if not hasattr(check_rate_limiting, "_request_count"):
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = time.time()
+    
+    current_time = time.time()
+    
+    # 每分钟重置计数器
+    if current_time - check_rate_limiting._last_reset > 60:
+        check_rate_limiting._request_count = 0
+        check_rate_limiting._last_reset = current_time
+    
+    # 每分钟最多允许5个请求
+    max_requests = 5
+    check_rate_limiting._request_count += 1
+    
+    if check_rate_limiting._request_count > max_requests:
+        return False, f"超出速率限制: {check_rate_limiting._request_count} > {max_requests}"
+    
+    return True, f"速率限制正常: {check_rate_limiting._request_count}/{max_requests}"
+```
+

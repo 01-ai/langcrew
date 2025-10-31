@@ -220,7 +220,7 @@ class TestBasicWorkflow:
             goal=None,
             backstory=None,
             llm=mock_llm,
-            prompts={"execute": "Custom execute prompt"},
+            prompt="Custom execute prompt",
         )
         assert agent_custom.role is None
 
@@ -240,10 +240,7 @@ class TestBasicWorkflow:
             expected_output="Valid output",
             agent=agent,
         )
-        assert task.description == "Valid task description"
-
-        # Test that empty description raises error
-        with pytest.raises(ValueError, match="TaskSpec must have a description"):
+        with pytest.raises(ValueError, match="description is required"):
             Task(description="", expected_output="Valid output", agent=agent)
 
     @patch("langcrew.crew.Crew.invoke")
@@ -331,7 +328,7 @@ class TestWorkflowConfiguration:
         assert task.description == "Configured task"
         assert task.expected_output == "Configured output"
         assert task.agent == agent
-        assert task.context is None
+        assert task.context == []
 
     def test_crew_configuration_parameters(self) -> None:
         """Test various crew configuration parameters."""
@@ -357,7 +354,7 @@ class TestWorkflowValidation:
     """Test cases for workflow validation and error conditions."""
 
     def test_crew_with_no_agents(self) -> None:
-        """Test crew initialization with no agents."""
+        """Test crew initialization with no agents raises ValueError during handoff check."""
         mock_llm = Mock()
         agent = Agent(
             role="Test Agent",
@@ -368,10 +365,9 @@ class TestWorkflowValidation:
 
         task = Task(description="Test task", expected_output="Test output", agent=agent)
 
-        crew = Crew(agents=[], tasks=[task], verbose=False)
-
-        assert len(crew.agents) == 0
-        assert len(crew.tasks) == 1
+        # Creating crew with no agents should raise ValueError during handoff setup
+        with pytest.raises(ValueError, match="Cannot check for agent handoffs"):
+            Crew(agents=[], tasks=[task], verbose=False)
 
     def test_crew_with_no_tasks(self) -> None:
         """Test crew initialization with no tasks."""
@@ -411,5 +407,5 @@ class TestWorkflowValidation:
         )
 
         # Test that None description raises error
-        with pytest.raises(ValueError, match="TaskSpec must have a description"):
+        with pytest.raises(ValueError, match="description is required"):
             Task(description="", expected_output="Valid output", agent=agent)

@@ -1,5 +1,15 @@
 import { create } from 'zustand';
-import { TaskStage, AgentMode, PlanStep, FileItem, MessageChunk, SessionInfo, E2BFile, MessageItem } from '@/types';
+import {
+  TaskStage,
+  AgentMode,
+  PlanStep,
+  FileItem,
+  MessageChunk,
+  SessionInfo,
+  E2BFile,
+  MessageItem,
+  FileUploadConfig,
+} from '@/types';
 import { isFunction } from 'lodash-es';
 import { transformChunksToMessages } from '@/hooks/useChat/utils';
 import { devtools } from 'zustand/middleware';
@@ -47,6 +57,7 @@ interface AgentStore {
   chunks: MessageChunk[];
   setChunks: (chunks: MessageChunk[] | ((prev: MessageChunk[]) => MessageChunk[])) => void;
   addChunk: (chunk: MessageChunk) => void;
+  addChunks: (chunks: MessageChunk[]) => void;
   clearChunks: () => void;
 
   // 输入框加载状态
@@ -79,6 +90,23 @@ interface AgentStore {
   setAbortController: (controller: AbortController | null) => void;
 
   resetStore: () => void;
+
+  onToolsUpdate: (tools: any[]) => void;
+  setOnToolsUpdate: (onToolsUpdate: (tools: any[]) => void) => void;
+
+  // 文件上传配置
+  fileUploadConfig: FileUploadConfig;
+  setFileUploadConfig: (config: FileUploadConfig) => void;
+
+  // 发送者文件列表
+  senderFiles: FileItem[];
+  setSenderFiles: (file: FileItem[] | ((prev: FileItem[]) => FileItem[])) => void;
+
+  onChunks: (chunks: MessageChunk[]) => void;
+  setOnChunks: (onChunks: (chunks: MessageChunk[]) => void) => void;
+
+  onNewMessage: (message: MessageItem) => void;
+  setOnNewMessage: (onNewMessage: (message: MessageItem) => void) => void;
 }
 
 const useAgentStore = create<AgentStore, [['zustand/devtools', never]]>(
@@ -103,6 +131,8 @@ const useAgentStore = create<AgentStore, [['zustand/devtools', never]]>(
     extraHeaders: {},
     requestPrefix: '',
     abortController: null,
+    fileUploadConfig: {},
+    senderFiles: [],
     setSessionInfo: (sessionInfo?: SessionInfo) => set({ sessionInfo }),
     setMode: (mode: AgentMode) => set({ mode }),
 
@@ -111,7 +141,10 @@ const useAgentStore = create<AgentStore, [['zustand/devtools', never]]>(
     setPipelineMessages: (pipelineMessages: MessageItem[]) => set({ pipelineMessages }),
     setPipelineTargetMessage: (pipelineTargetMessage: any) =>
       set({ pipelineTargetMessage, workspaceVisible: true, fileViewerFile: undefined }),
-    setWorkspaceMessages: (workspaceMessages: any[]) => set({ workspaceMessages }),
+    setWorkspaceMessages: (workspaceMessages: any[]) => {
+      set({ workspaceMessages });
+      get().onToolsUpdate?.(workspaceMessages);
+    },
     setWorkspaceVisible: (workspaceVisible: boolean) => set({ workspaceVisible, fileViewerFile: undefined }),
 
     setFileViewerFile: (fileViewerFile?: E2BFile) => set({ fileViewerFile, workspaceVisible: false }),
@@ -123,8 +156,12 @@ const useAgentStore = create<AgentStore, [['zustand/devtools', never]]>(
       set({ pipelineMessages: newMessages, chunks: newChunks });
     },
     addChunk: (chunk: MessageChunk) => {
-      const newChunks = [...get().chunks, chunk];
-      const newMessages = transformChunksToMessages([chunk], get().pipelineMessages);
+      get().addChunks([chunk]);
+    },
+    addChunks: (chunks: MessageChunk[]) => {
+      get().onChunks?.(chunks);
+      const newChunks = [...get().chunks, ...chunks];
+      const newMessages = transformChunksToMessages(chunks, get().pipelineMessages);
       set({ pipelineMessages: newMessages, chunks: newChunks });
     },
     clearChunks: () => set({ chunks: [] }),
@@ -135,6 +172,13 @@ const useAgentStore = create<AgentStore, [['zustand/devtools', never]]>(
     setExtraHeaders: (extraHeaders: Record<string, string>) => set({ extraHeaders }),
     setRequestPrefix: (requestPrefix: string) => set({ requestPrefix }),
     setAbortController: (controller: AbortController | null) => set({ abortController: controller }),
+    setFileUploadConfig: (fileUploadConfig: FileUploadConfig) => set({ fileUploadConfig }),
+    setSenderFiles: (payload: FileItem[] | ((prev: FileItem[]) => FileItem[])) =>
+      set(({ senderFiles }) => ({
+        senderFiles: isFunction(payload) ? payload(senderFiles) : payload,
+      })),
+    setOnChunks: (onChunks: (chunks: MessageChunk[]) => void) => set({ onChunks }),
+    setOnNewMessage: (onNewMessage: (message: MessageItem) => void) => set({ onNewMessage }),
     resetStore: () => {
       get().abortController?.abort();
       set({
@@ -151,6 +195,7 @@ const useAgentStore = create<AgentStore, [['zustand/devtools', never]]>(
         workspaceMessages: [],
         abortController: null,
         workspaceVisible: false,
+        senderFiles: [],
       });
     },
   })),

@@ -516,8 +516,10 @@ class TestCreateContextHooks:
 
         pre_hook = create_context_hooks(context_config, user_pre_hook=user_pre_hook)
 
-        # Should return wrapped user hook when context is disabled
-        assert isinstance(pre_hook, RunnableLambda)
+        # Should return a ComposedHook containing the user hook
+        assert isinstance(pre_hook, ComposedHook)
+        assert len(pre_hook.hooks) == 1
+        assert isinstance(pre_hook.hooks[0], RunnableLambda)
 
     def test_create_with_both_hooks(self, mock_llm):
         """Test create_context_hooks with both context and user hooks."""

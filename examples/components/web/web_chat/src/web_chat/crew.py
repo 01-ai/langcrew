@@ -6,9 +6,8 @@ This module defines the chat agent and tasks for the web chat API.
 
 import os
 
-from langcrew.llm_factory import LLMFactory
-
 from langcrew import Agent, Crew, Task
+from langcrew.llm_factory import LLMFactory
 from langcrew.memory import IndexConfig, LongTermMemoryConfig, MemoryConfig
 from langcrew.web import ToolDisplayManager
 
@@ -143,7 +142,6 @@ class WebChatCrew:
 
     def crew(self) -> Crew:
         """Create and configure the crew"""
-        from urllib.parse import quote_plus
 
         return Crew(
             agents=[self.chat_agent()],

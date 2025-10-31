@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test script for Web Chat API
 
@@ -6,10 +5,11 @@ This script demonstrates how to interact with the Web Chat API programmatically.
 """
 
 import asyncio
-import aiohttp
 import json
 import sys
 from typing import Optional
+
+import aiohttp
 
 
 class WebChatAPIClient:
@@ -29,7 +29,7 @@ class WebChatAPIClient:
 
     async def health_check(self) -> dict:
         """Check if the API server is healthy"""
-        async with self.session.get(f"{self.base_url}/api/v1/health") as response:
+        async with self.session.get(f"{self.base_url}/health") as response:
             return await response.json()
 
     async def get_api_info(self) -> dict:
@@ -129,7 +129,7 @@ async def test_basic_conversation():
         try:
             info = await client.get_api_info()
             print(f"ℹ️  API Info: {info['api_version']}")
-            print(f"🔧 Available Tools: {len(info['supported_tools'])}")
+            print(f"🔧 Available Tools: {len(info['available_tools'])}")
         except Exception as e:
             print(f"⚠️  Could not get API info: {e}")
 

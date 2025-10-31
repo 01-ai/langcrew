@@ -31,15 +31,12 @@ class TestSetup:
     def test_project_structure(self):
         """Test that project structure is correct."""
         project_root = Path(__file__).parent.parent
-        src_dir = project_root / "src" / "langcrew"
+        src_dir = project_root / "langcrew"
         tests_dir = project_root / "tests"
 
         assert src_dir.exists(), "Source directory should exist"
         assert tests_dir.exists(), "Tests directory should exist"
         assert (tests_dir / "unit").exists(), "Unit tests directory should exist"
-        assert (tests_dir / "integration").exists(), (
-            "Integration tests directory should exist"
-        )
 
     def test_imports(self):
         """Test that basic imports work."""

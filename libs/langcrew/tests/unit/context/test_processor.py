@@ -179,12 +179,13 @@ class TestMessageProcessor:
 
         compressor = ToolCallCompressor(tools=["test_tool"], max_length=100)
 
-        # Should raise validation error
-        with pytest.raises(
-            ValueError,
-            match="AI message at index .* has tool_calls but no ToolMessage follows",
-        ):
-            self.processor.compress_earlier_tool_rounds(messages, compressor)
+        # The method will log an error but not raise an exception
+        # It will return empty rounds list and no compression will happen
+        result = self.processor.compress_earlier_tool_rounds(messages, compressor)
+        
+        # Should return original messages unchanged when no valid rounds found
+        assert len(result) == len(messages)
+        assert result == messages
 
 
 class TestToolCallCompressor:
@@ -213,7 +214,7 @@ class TestToolCallCompressor:
 
         # Content should be compressed
         assert len(result.content) <= 200
-        assert "[truncated]" in result.content or "TRUNCATED" in result.content
+        assert "omitted" in result.content
         # Tool call args should be compressed - check the actual content length
         args_content_len = len(str(result.tool_calls[0]["args"]["content"]))
         assert args_content_len <= 200
@@ -241,7 +242,7 @@ class TestToolCallCompressor:
 
         # Content should be compressed
         assert len(result.content) <= 300  # Allow for truncation message overhead
-        assert "[truncated]" in result.content or "TRUNCATED" in result.content
+        assert "omitted" in result.content
         assert result.tool_call_id == "1"  # Should preserve tool_call_id
 
     def test_compress_other_message_types(self, compressor):
@@ -261,7 +262,7 @@ class TestToolCallCompressor:
         result = compressor._truncate_safely(content, max_length=200)
 
         assert len(result) <= 200
-        assert "[truncated]" in result or "TRUNCATED" in result
+        assert "omitted" in result
         assert content[:25] in result  # Start part preserved
         assert content[-25:] in result  # End part preserved
 

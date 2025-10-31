@@ -1,28 +1,66 @@
-import os
-
-from crewai_tools import (
-    FileReadTool,
-    WebsiteSearchTool,
-)
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from langcrew import Agent, Crew, Task
 from langcrew.project import CrewBase, agent, crew, task
-from langcrew_tools.search.langchain_tools import WebSearchTool
-from langcrew.tools.converter import ToolConverter
-from dotenv import load_dotenv
+from langcrew.llm_factory import LLMFactory
+from langchain_community.utilities import GoogleSerperAPIWrapper
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_core.tools import Tool
+import logging
 
-load_dotenv()
+# Setup logging
+logger = logging.getLogger(__name__)
 
-web_search_tool = ToolConverter.convert_tool(WebsiteSearchTool())
-seper_dev_tool = WebSearchTool()
-file_read_tool = ToolConverter.convert_tool(
-    FileReadTool(
-        file_path="job_description_example.md",
-        description="A tool to read the job description example file.",
+
+# Create Serper search tool (replaces WebSearchTool)
+def _create_serper_search_tool() -> Tool:
+    """Create a web search tool based on Google Serper API"""
+    search = GoogleSerperAPIWrapper()
+
+    return Tool(
+        name="web_search",
+        description=(
+            "Perform web search to obtain the latest information related to the query. "
+            "Returns search results containing titles, URLs and snippets. "
+            "Input should be a search query string."
+        ),
+        func=search.run,
     )
-)
+
+
+# Create web fetch tool (replaces WebFetchTool)
+def _create_web_fetch_tool() -> Tool:
+    """Create a web content fetching tool based on WebBaseLoader"""
+
+    def fetch_url(url: str) -> str:
+        """Fetch webpage content and return as text"""
+        try:
+            loader = WebBaseLoader(web_paths=[url])
+            docs = loader.load()
+            if docs:
+                # Return page content, limit length to avoid excessive size
+                content = docs[0].page_content
+                if len(content) > 50000:
+                    content = content[:50000] + "\n\n[Content truncated...]"
+                return content
+            return "No content extracted from the webpage."
+        except Exception as e:
+            return f"Error fetching webpage: {str(e)}"
+
+    return Tool(
+        name="web_fetch",
+        description=(
+            "Crawl a web page and extract its content in text format. "
+            "Automatically filters out navigation, ads, and other irrelevant content. "
+            "Input should be a valid URL string."
+        ),
+        func=fetch_url,
+    )
+
+
+# Initialize tools
+web_search_tool = _create_serper_search_tool()
+web_fetch_tool = _create_web_fetch_tool()
 
 
 class ResearchRoleRequirements(BaseModel):
@@ -49,37 +87,43 @@ class JobPostingCrew:
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"
 
-    def _get_default_llm(self):
+    def _get_llm(self):
         """Get default LLM for agents"""
-        return ChatOpenAI(
-            model="gpt-4o-mini", temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")
+        return LLMFactory.create_llm(
+            {
+                "provider": "openai",
+                "model": "gpt-5-mini",
+            }
         )
 
     @agent
     def research_agent(self) -> Agent:
         return Agent(
             config=self.agents_config["research_agent"],
-            tools=[web_search_tool, seper_dev_tool],
-            llm=self._get_default_llm(),
+            tools=[web_search_tool, web_fetch_tool],
+            llm=self._get_llm(),
             verbose=True,
+            debug=True,
         )
 
     @agent
     def writer_agent(self) -> Agent:
         return Agent(
             config=self.agents_config["writer_agent"],
-            tools=[web_search_tool, seper_dev_tool, file_read_tool],
-            llm=self._get_default_llm(),
+            tools=[web_search_tool, web_fetch_tool],
+            llm=self._get_llm(),
             verbose=True,
+            debug=True,
         )
 
     @agent
     def review_agent(self) -> Agent:
         return Agent(
             config=self.agents_config["review_agent"],
-            tools=[web_search_tool, seper_dev_tool, file_read_tool],
-            llm=self._get_default_llm(),
+            tools=[web_search_tool, web_fetch_tool],
+            llm=self._get_llm(),
             verbose=True,
+            debug=True,
         )
 
     @task

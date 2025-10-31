@@ -119,7 +119,8 @@ class TestFetchIntegration:
             "LANGCREW_CRAWL4AI_SERVICE_URL", "http://localhost:11235"
         )
         assert fetch_tool.crawl4ai_service_url == expected_url
-        assert fetch_tool.filter_type == "llm"
+        # Source code falls back to 'pruning' when no API key is provided
+        assert fetch_tool.filter_type == "pruning"
         assert fetch_tool.timeout == 120
 
     def test_filter_type_fallback(self):
@@ -127,7 +128,7 @@ class TestFetchIntegration:
         # Create tool without API key
         fetch_tool = WebFetchTool(crawl4ai_llm_api_key=None, filter_type="llm")
 
-        # Verify it has fallback logic (will be tested in actual run)
-        assert fetch_tool.filter_type == "llm"  # Initial setting
+        # Source code automatically falls back to 'pruning' during initialization when no API key
+        assert fetch_tool.filter_type == "pruning"  # Falls back to pruning
 
-        # The actual fallback happens during execution, not initialization
+        # The fallback happens during initialization, not execution

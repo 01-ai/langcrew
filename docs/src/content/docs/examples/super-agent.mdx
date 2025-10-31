@@ -35,19 +35,13 @@ S3_GATEWAY=
 S3_REGION=
 
 # WebSearchTool Configuration
-LANGCREW_WEB_SEARCH_ENDPOINT=
-LANGCREW_WEB_SEARCH_API_KEY=
 
-# WebFetchTool Configuration
-LANGCREW_CRAWL4AI_SERVICE_URL=
+# WebSearchTool Configuration (required for web search functionality)
+SERPER_API_KEY=your_serper_api_key_here
 
-# ImageGenerationTool Configuration
-LANGCREW_IMAGE_GEN_API_KEY=
+# ImageGenerationTool Configuration (optional, for AI image generation)
+ARK_API_KEY=your_image_gen_api_key_here
 
-# Cloud Phone Automation Configuration
-AGENTBOX_API_KEY=
-AGENTBOX_TEMPLATE=
-AGENTBOX_TIMEOUT=1800
 ```
 
 ### Variable Descriptions
@@ -66,11 +60,7 @@ AGENTBOX_TIMEOUT=1800
 
 - **Image Generation Configuration**: For AI image generation functionality, requires configuring image generation service key
 
-- **Cloud Phone Automation Configuration**: For mobile device automation operations
-  - `AGENTBOX_API_KEY`: AgentBox cloud phone service API key
-  - `AGENTBOX_TEMPLATE`: Cloud phone template
-
-**Important Note**: `E2B_TEMPLATE` and `E2B_DOMAIN` must use the specified values above. These are dedicated sandbox environment configurations provided by 01 for the current demo. Please do not modify them.
+**Important Note**: All environment variables should be configured according to your own service accounts and requirements. The template file `.env.example` provides examples of required variables.
 
 ## Quick Start
 
@@ -96,7 +86,7 @@ cp .env.example .env
 docker-compose -f compose-super-agent.yaml up --build
 ```
 
-### Step 3: Access Services
+### Step 4: Access Services
 
 After startup is complete, you can access:
 - **Super Agent API**: http://localhost:8000
@@ -175,16 +165,6 @@ Content-Type: application/json
 - Support for user takeover control and manual intervention for login pages
 - Built-in error recovery and retry mechanisms to ensure stable task execution
 
-#### Cloud Phone Automation
-- Intelligent mobile device operation and app automation based on AgentBox
-- Complete Android device UI interaction and application management support
-- Intelligent screenshot and clickable element recognition, providing real-time visual context
-- Comprehensive mobile operation capabilities: tap, swipe, text input, key operations
-- Application lifecycle management: start apps, switch apps, get app lists
-- Support for complex mobile tasks: shopping, social, search, content browsing, etc.
-- Intelligent error handling and task recovery mechanisms
-- Support for user takeover control for handling verification codes, logins, and other sensitive operations
-
 #### Information Retrieval and Processing
 - Web search and content scraping
 - Multi-source information integration and verification
@@ -215,7 +195,7 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Search for 2024 artificial intelligence development trends and summarize key insights",
-    "session_id": "research_session"
+    "session_id": "a1b2c3d4e5f6g7h8"
   }'
 ```
 
@@ -225,7 +205,7 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Open the 12306 official website and help me check which high-speed trains from Beijing to Shanghai have available tickets after 3 PM the day after tomorrow",
-    "session_id": "automation_session"
+    "session_id": "b2c3d4e5f6g7h8i9"
   }'
 ```
 
@@ -235,17 +215,7 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Create a research report on AI technology development and save it as a markdown file",
-    "session_id": "document_session"
-  }'
-```
-
-### Cloud Phone Automation Tasks
-```bash
-curl -X POST "http://localhost:8000/api/v1/chat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Launch Taobao app, search for iPhone 15 Pro, check prices of the first three products and save screenshots",
-    "session_id": "shopping_session"
+    "session_id": "c3d4e5f6g7h8i9j0"
   }'
 ```
 
@@ -254,16 +224,10 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
 ```
 src/super_agent/
 ├── agent/
-│   ├── crew.py              # Main SuperAgentCrew class
-│   └── enhanced_crew.py     # Enhanced Crew implementation
-├── common/
-│   ├── session_state.py     # Session state management
-│   └── sandbox_config.py    # Sandbox configuration
+│   └── crew.py              # Main SuperAgentCrew class
 ├── config/
 │   ├── config.py           # Configuration class definitions
 │   └── prompt.py           # System prompts
-├── tool/
-│   └── cloud_phone_streaming_tool.py           # Custom tools
 ├── main.py                 # Direct execution entry point
 └── server.py              # FastAPI server
 ```
@@ -276,6 +240,5 @@ Super Agent is built entirely on the LangCrew framework, showcasing the framewor
 - **Tool Ecosystem**: Integrates LangCrew-Tools toolset
 - **Streaming Monitoring**: Real-time execution status and result streams
 - **Session Management**: Persistent context and state
-- **Human-AI Collaboration**: Built-in approval and interaction mechanisms
 
 Super Agent is a perfect demonstration of the LangCrew framework's capabilities, providing a complete reference implementation for building production-grade intelligent agent systems.

@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch
 
+from langchain_core.runnables.config import RunnableConfig
 import pytest
 
 from langcrew_tools.search import WebSearchInput, WebSearchTool
@@ -23,6 +24,7 @@ class TestWebSearchInput:
 
 class TestWebSearchTool:
     """Test WebSearchTool functionality."""
+    config=RunnableConfig(configurable={"thread_id": "test_thread_id"})
 
     def test_init_with_constructor_params(self):
         """Test initialization with constructor parameters."""
@@ -90,10 +92,11 @@ class TestWebSearchTool:
             }
         }
 
-        with patch("requests.post", return_value=mock_response) as mock_post:
-            results = await tool._arun(query="test query", query_num=10)
+        # Patch httpx.AsyncClient.post since the tool uses httpx for async requests
+        with patch("httpx.AsyncClient.post", return_value=mock_response) as mock_post:
+            results = await tool._arun(config=self.config, query="test query", query_num=10)
 
-            # Verify the request
+            # Verify the request was made
             mock_post.assert_called_once()
             call_args = mock_post.call_args
             assert call_args[1]["url"] == "https://api.example.com/search"
@@ -120,8 +123,8 @@ class TestWebSearchTool:
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"search_info": []}}
 
-        with patch("requests.post", return_value=mock_response) as mock_post:
-            await tool._arun(query="测试查询", query_num=5)
+        with patch("httpx.AsyncClient.post", return_value=mock_response) as mock_post:
+            await tool._arun(config=self.config, query="测试查询", query_num=5)
 
             # Verify retriever_source is set for Chinese
             call_args = mock_post.call_args
@@ -135,8 +138,8 @@ class TestWebSearchTool:
             api_key="test-api-key",
         )
 
-        with patch("requests.post", side_effect=Exception("Network error")):
-            results = await tool._arun(query="test query")
+        with patch("httpx.AsyncClient.post", side_effect=Exception("Network error")):
+            results = await tool._arun(config=self.config, query="test query")
             # Should return empty list on error
             assert results == []
 
@@ -152,8 +155,8 @@ class TestWebSearchTool:
         mock_response.status_code = 401
         mock_response.raise_for_status.side_effect = Exception("401 Unauthorized")
 
-        with patch("requests.post", return_value=mock_response):
-            results = await tool._arun(query="test query")
+        with patch("httpx.AsyncClient.post", return_value=mock_response):
+            results = await tool._arun(config=self.config, query="test query")
             # Should return empty list on auth error
             assert results == []
 
@@ -167,10 +170,10 @@ class TestWebSearchTool:
         expected_results = [{"title": "Test Result"}]
 
         with patch.object(tool, "_arun", return_value=expected_results) as mock_arun:
-            results = tool._run(query="test query", query_num=15)
+            results = tool._run(config=self.config, query="test query", query_num=15)
 
-            # Verify _arun was called with correct parameters
-            mock_arun.assert_called_once_with(query="test query", query_num=15)
+            # Verify _arun was called with correct parameters (config is passed as positional arg)
+            mock_arun.assert_called_once_with(self.config, query="test query", query_num=15)
             assert results == expected_results
 
     @pytest.mark.asyncio
@@ -182,8 +185,8 @@ class TestWebSearchTool:
             timeout=1,
         )
 
-        with patch("requests.post", side_effect=Exception("Timeout")):
-            results = await tool._arun(query="test query")
+        with patch("httpx.AsyncClient.post", side_effect=Exception("Timeout")):
+            results = await tool._arun(config=self.config, query="test query")
             # Should return empty list on timeout
             assert results == []
 
@@ -217,9 +220,9 @@ class TestWebSearchTool:
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"search_info": []}}
 
-        with patch("requests.post", return_value=mock_response):
+        with patch("httpx.AsyncClient.post", return_value=mock_response):
             # Test that _arun accepts brief parameter without raising exception
-            result = await tool._arun(query="test query", brief="测试搜索功能")
+            result = await tool._arun(config=self.config, query="test query", brief="测试搜索功能")
             # If no exception is raised, the **kwargs mechanism works correctly
             assert isinstance(result, list)
 

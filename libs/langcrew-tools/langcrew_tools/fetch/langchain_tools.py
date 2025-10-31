@@ -21,7 +21,7 @@ class WebFetchInput(BaseToolInput):
 
     url: str = Field(..., description="Target webpage URL to crawl")
     filter_type: Literal["llm", "pruning"] = Field(
-        default="llm",
+        default="pruning",
         description="Content filter type: 'llm' for LLM-based filtering or 'pruning' for threshold-based filtering",
     )
 
@@ -43,7 +43,7 @@ class WebFetchTool(ExternalCompletionBaseTool):
     # Configuration with best practice defaults
     timeout: int = Field(default=120)
     max_content_length: int = Field(default=128000)  # Optimized for LLM token limits
-    filter_type: Literal["llm", "pruning"] = Field(default="llm")
+    filter_type: Literal["llm", "pruning"] = Field(default="pruning")
     crawl4ai_service_url: str = Field(
         default="http://localhost:11235", description="Crawl4ai HTTP service URL"
     )
@@ -78,7 +78,7 @@ class WebFetchTool(ExternalCompletionBaseTool):
         Args:
             timeout: Request timeout in seconds (default: 120)
             max_content_length: Maximum content length before truncation (default: 128000)
-            filter_type: Content filter type: 'llm' or 'pruning' (default: 'llm', auto-fallback to 'pruning')
+            filter_type: Content filter type: 'llm' or 'pruning' (default: 'pruning')
             crawl4ai_service_url: Crawl4ai HTTP service URL (default: 'http://localhost:11235')
             crawl4ai_llm_provider: LLM provider for crawl4ai content filtering (default: 'openai/gpt-4o-mini')
             crawl4ai_llm_api_key: API key for crawl4ai LLM provider (default: uses OPENAI_API_KEY)
@@ -206,7 +206,6 @@ class WebFetchTool(ExternalCompletionBaseTool):
                 "params": {
                     "cache_mode": "bypass",
                     "excluded_tags": ["nav", "aside", "footer", "header"],
-                    "css_selector": 'main, article, .content, .post, .article, [role="main"]',
                     "exclude_external_links": True,
                     "exclude_social_media_links": True,
                     "remove_overlay_elements": True,

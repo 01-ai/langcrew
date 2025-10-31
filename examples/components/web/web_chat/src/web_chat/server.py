@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Web Chat API Server using LangCrew Web Components
 
@@ -14,7 +13,6 @@ import argparse
 import logging
 
 from fastapi.middleware.cors import CORSMiddleware
-
 from langcrew.web import create_server
 
 from .crew import WebChatCrew

@@ -1,210 +1,292 @@
 ---
 title: 长期记忆
-description: 跨会话的持久知识存储
+description: 用于跨会话学习的持久知识存储
 ---
 
-# 长期记忆
+长期记忆使用 LangGraph 的 Store 系统提供持久知识存储。它使智能体能够跨会话记住重要信息、随时间积累知识，并基于用户偏好和应用见解提供个性化体验。
 
-长期记忆使用LangGraph的Store系统提供持久知识存储。它跨会话存储重要信息，帮助代理随时间积累知识。
+## 快速开始
 
-## 概述
-
-长期记忆适用于：
-
-- **知识积累**跨多个会话
-- **从经验中学习**并存储见解
-- **跨会话连续性**重要事实
-- **质量过滤的信息**存储
-
-## 配置
-
-### 基本设置
+### 基本配置
 
 ```python
-from langcrew.memory import MemoryConfig
+from langcrew import Crew, Agent
+from langcrew.memory import MemoryConfig, LongTermMemoryConfig
 
+# 启用长期记忆
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///long_term.db",
-    long_term={
-        "enabled": True,
-        "min_quality": 0.7,  # 仅存储高质量信息
-    }
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app"  # 生产环境推荐
+    )
 )
+
+crew = Crew(agents=[agent], memory=memory_config)
 ```
 
 ### 配置参数
 
-| 参数 | 类型 | 描述 | 默认值 |
-|------|------|------|--------|
-| `enabled` | bool | 启用长期记忆 | True |
-| `min_quality` | float | 存储的最低质量阈值 (0.0-1.0) | 0.7 |
+| 参数                     | 类型                  | 描述                                     | 默认值     |
+| ------------------------ | --------------------- | ---------------------------------------- | ---------- |
+| `enabled`                | bool                  | 启用长期记忆                              | False      |
+| `provider`               | str \| None           | 存储提供商覆盖（None时继承全局配置）       | None       |
+| `connection_string`      | str \| None           | 连接字符串覆盖（None时继承全局配置）       | None       |
+| `app_id`                 | str \| None           | 应用标识符（生产环境强烈推荐）             | None       |
+| `index`                  | IndexConfig \| None   | 向量搜索配置                              | None       |
+| `user_memory`            | MemoryScopeConfig     | 用户特定记忆配置                          | 已启用     |
+| `app_memory`             | MemoryScopeConfig     | 应用范围记忆（⚠️ 实验性）                 | 已禁用     |
+| `search_response_format` | str                   | 搜索结果格式（"content" 或 "content_and_artifact"） | "content" |
 
-## 工作原理
+## 记忆范围
 
-### 基于质量的存储
+长期记忆在两个范围内运作：
 
-长期记忆只存储满足质量阈值的信息：
+### 用户记忆（默认：启用）
+
+存储个人用户偏好、信息和上下文：
 
 ```python
-from langcrew import Crew
-from langcrew.memory import MemoryConfig
+from langcrew.memory import MemoryScopeConfig
+from langgraph.store.base import IndexConfig
 
 memory_config = MemoryConfig(
-    provider="sqlite",
-    connection_string="sqlite:///knowledge.db",
-    long_term={
-        "enabled": True,
-        "min_quality": 0.8,  # 高质量阈值
-    }
+    provider="postgres",
+    connection_string="postgresql://localhost/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app-prod",
+        user_memory=MemoryScopeConfig(
+            enabled=True,
+            manage_instructions="""在以下情况保存记忆：
+            1. 用户表达偏好（我喜欢/爱/更喜欢）
+            2. 用户分享个人信息（工作、位置、爱好）
+            3. 用户明确要求记住某事
+            """,
+            search_instructions="""在以下情况搜索：
+            1. 需要回忆用户偏好或上下文
+            2. 提供个性化推荐
+            """
+        )
+    )
 )
 
 crew = Crew(agents=[agent], memory=memory_config)
 
-# 高质量信息被存储
+# 用户偏好自动被记住
 crew.kickoff(
-    inputs={"user_input": "公司年收入5000万美元，增长25%"},
-    thread_id="business_analysis"
+    inputs={"user_input": "我是素食主义者，喜欢意大利菜"},
+    thread_id="user_alice"
 )
 
-# 低质量信息可能被过滤
+# 后续会话 - 智能体回忆偏好
 crew.kickoff(
-    inputs={"user_input": "也许今天天气不错"},
-    thread_id="casual_chat"
+    inputs={"user_input": "推荐一家餐厅"},
+    thread_id="user_alice_new_session"  # 不同线程，记住用户
 )
 ```
 
-### 知识组织
+### 应用记忆（默认：禁用，⚠️ 实验性）
 
-长期记忆通过以下方式组织知识：
-
-- **代理命名空间**：每个代理有自己的知识空间
-- **任务类别**：按任务类型分组知识
-- **质量评分**：按重要性和准确性加权
-- **时间戳**：跟踪时近性和更新
-
-## 使用示例
-
-### 知识管理系统
+存储所有用户共享的应用级见解：
 
 ```python
-from langcrew import Agent, Crew
-from langcrew.memory import MemoryConfig
-
-# 为知识管理配置
 memory_config = MemoryConfig(
-    provider="postgresql",
-    connection_string="postgresql://user:pass@localhost:5432/knowledge_db",
-    long_term={
-        "enabled": True,
-        "min_quality": 0.8,  # 知识库高质量
-    }
-)
-
-knowledge_agent = Agent(
-    role="知识管理员",
-    goal="构建和维护组织知识",
-    backstory="您积累并组织重要信息以供将来参考"
-)
-
-crew = Crew(agents=[knowledge_agent], memory=memory_config)
-
-# 存储重要公司信息
-sessions = [
-    ("company_info", "我们公司成立于2020年，专门从事AI解决方案"),
-    ("product_info", "我们有三个主要产品：ChatBot Pro、Analytics Suite和API Gateway"),
-    ("team_info", "工程团队有15名开发人员，分布在前端、后端和ML领域"),
-]
-
-for session_id, info in sessions:
-    crew.kickoff(
-        inputs={"user_input": info},
-        thread_id=session_id
+    provider="postgres",
+    connection_string="postgresql://localhost/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="saas-app-v1",
+        app_memory=MemoryScopeConfig(
+            enabled=True,  # ⚠️ 实验性
+            manage_instructions="仅存储应用级模式和见解",
+            search_instructions="搜索常见模式以改善协助"
+        )
     )
-
-# 查询积累的知识
-result = crew.kickoff(
-    inputs={"user_input": "告诉我关于我们公司和产品的信息"},
-    thread_id="knowledge_query"
 )
 ```
 
-## 内存管理
+**⚠️ 重要**：应用记忆是实验性的，应仔细监控以确保仅存储聚合见解，而不是个人用户数据。
 
-### 搜索长期记忆
+## 向量搜索集成
 
-```python
-# 在长期记忆中搜索
-results = crew.search_memory(
-    query="销售目标",
-    memory_type="long_term",
-    limit=5
-)
-
-for result in results:
-    print(f"质量: {result['quality']}")
-    print(f"内容: {result['content']}")
-    print(f"任务: {result['task']}")
-    print(f"代理: {result['agent']}")
-```
-
-### 保存任务结果
+启用语义搜索以获得更好的记忆检索：
 
 ```python
-# 手动保存高质量结果
-crew.long_term_memory.save_task_result(
-    task="market_analysis",
-    result="Q3市场分析显示我们目标细分市场增长15%",
-    quality=0.9,
-    learnings=["市场时机至关重要", "客户反馈推动采用"],
-    agent="market_analyst"
-)
-```
-
-## 最佳实践
-
-### 质量阈值策略
-
-```python
-# 根据用例调整质量阈值
-quality_strategies = {
-    "research": 0.9,        # 研究的极高质量
-    "business_intel": 0.8,  # 业务决策的高质量
-    "general_knowledge": 0.7, # 一般用途的标准质量
-    "casual_learning": 0.6,  # 探索性学习的较低阈值
-}
+from langgraph.store.base import IndexConfig
 
 memory_config = MemoryConfig(
-    long_term={
-        "enabled": True,
-        "min_quality": quality_strategies["business_intel"]
-    }
+    provider="postgres",
+    connection_string="postgresql://localhost/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app",
+        index=IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small"
+        )
+    )
 )
 ```
 
-## 与其他内存类型集成
+**支持的嵌入模型：**
+- `openai:text-embedding-3-small` (1536 维)
+- `openai:text-embedding-3-large` (3072 维)
+- `openai:text-embedding-ada-002` (1536 维)
+- 自定义模型（参见 [LangGraph IndexConfig 文档](https://langchain-ai.github.io/langgraph/how-tos/persistence_postgres/#semantic-search-using-embedding-similarity)）
 
-长期记忆与短期记忆和实体记忆协同工作：
+## 使用 app_id 的应用隔离
+
+当多个应用共享同一数据库时，`app_id` 参数提供命名空间隔离：
 
 ```python
-# 全面的内存配置
+# 应用 1
+memory_config_app1 = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://shared-db/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="chatbot-v1"  # 隔离的命名空间
+    )
+)
+
+# 应用 2（相同数据库，不同命名空间）
+memory_config_app2 = MemoryConfig(
+    provider="postgres",
+    connection_string="postgresql://shared-db/memory",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="assistant-v1"  # 不同的隔离命名空间
+    )
+)
+```
+
+**数据隔离：**
+- **有 app_id**：应用 1 中的用户 "alice" 与应用 2 中的用户 "alice" 完全分离
+- **无 app_id**：所有应用共享相同的用户命名空间（不推荐用于生产环境）
+
+## 使用场景
+
+### 个性化助手
+
+```python
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///assistant.db",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="personal-assistant"
+    )
+)
+
+assistant = Agent(
+    role="个人助手",
+    goal="基于用户偏好提供个性化协助",
+    backstory="您记住用户偏好并提供量身定制的推荐"
+)
+
+crew = Crew(agents=[assistant], memory=memory_config)
+
+# 首次交互
+crew.kickoff(
+    inputs={"user_input": "我更喜欢早上开会，讨厌星期一"},
+    thread_id="user_123_session_1"
+)
+
+# 之后 - 智能体记住偏好
+crew.kickoff(
+    inputs={"user_input": "安排团队会议"},
+    thread_id="user_123_session_2"
+)
+# 智能体会建议星期二到星期五的早上
+```
+
+### 客户关系管理
+
+```python
 memory_config = MemoryConfig(
     provider="postgresql",
-    connection_string="postgresql://...",
-    short_term={"enabled": True, "max_history": 20},    # 近期上下文
-    long_term={"enabled": True, "min_quality": 0.8},    # 重要知识
-    entity={"enabled": True}                            # 实体关系
+    connection_string="postgresql://localhost/crm",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="crm-system",
+        index=IndexConfig(
+            dims=1536,
+            embed="openai:text-embedding-3-small"
+        )
+    )
 )
 
-# 代理受益于所有内存类型：
-# - 短期：提供即时上下文
-# - 长期：提供积累知识
-# - 实体：结构化实体关系
+crm_agent = Agent(
+    role="客户成功经理",
+    goal="建立持久的客户关系",
+    backstory="您记住客户历史、偏好和过往互动"
+)
+
+crew = Crew(agents=[crm_agent], memory=memory_config)
 ```
+
+## 存储提供商
+
+长期记忆支持所有 LangCrew 存储提供商：
+
+### SQLite（开发/单用户）
+
+```python
+memory_config = MemoryConfig(
+    provider="sqlite",
+    connection_string="sqlite:///long_term.db",
+    long_term=LongTermMemoryConfig(enabled=True, app_id="my-app")
+)
+```
+
+### PostgreSQL（生产）
+
+```python
+memory_config = MemoryConfig(
+    provider="postgresql",
+    connection_string="postgresql://user:pass@localhost:5432/memory_db",
+    long_term=LongTermMemoryConfig(
+        enabled=True,
+        app_id="my-app-prod",
+        index=IndexConfig(dims=1536, embed="openai:text-embedding-3-small")
+    )
+)
+```
+
+### MySQL（生产）
+
+```python
+memory_config = MemoryConfig(
+    provider="mysql",
+    connection_string="mysql://user:pass@localhost:3306/memory_db",
+    long_term=LongTermMemoryConfig(enabled=True, app_id="my-app")
+)
+```
+
+## 故障排除
+
+### 记忆未持久化
+
+- 验证 long_term 配置中 `enabled: True`
+- 检查数据库连接和权限
+- 确保 store 正确配置
+
+### 搜索找不到记忆
+
+- 验证 `index` 配置已设置语义搜索
+- 检查嵌入模型是否可访问
+- 确保记忆包含相关内容
+
+### 应用隔离问题
+
+- 生产环境始终设置 `app_id`
+- 为每个应用使用唯一的 `app_id`
+- 验证 `app_id` 在会话之间保持一致
 
 ## 下一步
 
-- **[实体记忆](/zh/guides/memory/entity)** - 跟踪实体和关系
-- **[短期记忆](/zh/guides/memory/short-term)** - 基于会话的对话历史
+- **[短期记忆](/zh/guides/memory/short-term)** - 基于会话的上下文
 - **[存储配置](/zh/guides/memory/storage)** - 配置存储后端
 - **[内存概念](/zh/concepts/memory)** - 理解内存架构

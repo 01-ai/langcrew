@@ -10,12 +10,15 @@ Quick demonstration of LangCrew's Human-in-the-Loop capabilities.
 ## Run the Demo
 
 ```bash
-# Set your OpenAI API key
-export OPENAI_API_KEY=your_api_key_here
-
 # Run directly from the HITL example directory
 cd examples/components/hitl
-uv run hitl_example.py
+
+# For configuration examples only (no API key needed)
+uv run hitl_demo
+
+# For full demonstrations including live workflows
+export OPENAI_API_KEY=your_api_key_here
+uv run hitl_demo
 ```
 
 ## What You'll See
@@ -27,11 +30,9 @@ uv run hitl_example.py
 
 ## Prerequisites
 
-- Python 3.8+
-- OpenAI API key (for workflow demonstrations)
+- Python 3.11+
 - LangCrew framework installed
-
-The core HITL configuration examples run without API keys.
+- OpenAI API key (optional - required only for live workflow demonstrations)
 
 ## Full Documentation
 
@@ -40,6 +41,4 @@ For complete HITL documentation, concepts, and implementation guides, see:
 - **[HITL Concepts](/concepts/hitl)** - Understanding HITL architecture
 - **[HITL Quick Start](/guides/hitl/getting-started)** - 5-minute tutorial
 - **[Complete Configuration Guide](/guides/hitl/configuration)** - Detailed implementation
-- **[Advanced Usage](/guides/hitl/advanced-usage)** - Complex scenarios and patterns
-- **[Production Deployment](/guides/hitl/production)** - Scale for production
 - **[LangCrew Documentation](../../../docs/)** - Full framework documentation

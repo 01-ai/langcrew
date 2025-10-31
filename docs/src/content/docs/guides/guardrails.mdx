@@ -185,8 +185,8 @@ Apply specific guardrails to individual tasks:
 task = Task(
     description="Generate content about technology",
     agent=agent,
-    input_guards=[check_content_category],  # Task-specific
-    output_guards=[check_output_format]
+    input_guards=[check_input_length],  # Task-specific
+    output_guards=[check_output_quality]  # Task-specific
 )
 ```
 

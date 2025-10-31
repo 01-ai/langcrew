@@ -38,6 +38,7 @@ class LLMFactory:
                 max_tokens=config.get("max_tokens", DEFAULT_MAX_TOKENS),
                 max_retries=config.get("max_retries", 10),
                 request_timeout=config.get("request_timeout", 60.0),
+                openai_proxy=proxy,
             )
 
         elif provider == "anthropic":
@@ -95,6 +96,28 @@ class LLMFactory:
                     tools_modifier=tools_modifier,
                     message_modifier=message_modifier,
                 )
+            return llm
+
+        elif provider == "anthropic_bedrock":
+            from .llm import ChatAnthropicBedrock
+
+            logger.info(f"Creating Anthropic Bedrock client for model: {model_name}")
+
+            # Create ChatAnthropicBedrock with the configured settings
+            # Note: ChatAnthropic natively supports prompt caching via cache_control
+            # in messages, so we don't need to apply additional decorators
+            llm = ChatAnthropicBedrock(
+                model=model_name,
+                temperature=temperature,
+                max_tokens=config.get("max_tokens", DEFAULT_MAX_TOKENS),
+                timeout=config.get("timeout", 180.0),
+                region_name=config.get("region", "us-east-1"),
+                anthropic_proxy=proxy,
+            )
+
+            logger.info(
+                f"Successfully created Anthropic Bedrock client with model: {model_name}"
+            )
             return llm
 
         elif provider == "dashscope":

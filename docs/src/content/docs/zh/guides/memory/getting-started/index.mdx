@@ -43,13 +43,13 @@ crew = Crew(
 ```python
 # 第一次对话
 result1 = crew.kickoff(
-    inputs={"user_input": "我叫Alice，喜欢吃披萨"},
+    inputs={"user_input": "我叫Alice，喜欢吃披萨"}
     thread_id="conversation_1"
 )
 
 # 稍后的对话 - 代理记住Alice
 result2 = crew.kickoff(
-    inputs={"user_input": "我喜欢什么食物？"},
+    inputs={"user_input": "我喜欢什么食物？"}
     thread_id="conversation_1"  # 相同的thread ID
 )
 
@@ -65,16 +65,15 @@ from langcrew.memory import MemoryConfig
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///my_memory.db",
-    short_term={"enabled": True, "max_history": 20},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    short_term={"enabled": True}
+    long_term={"enabled": True}
 )
 
 crew = Crew(agents=[agent], memory=memory_config)
 
 # 内存在程序重启后保持
 result = crew.kickoff(
-    inputs={"user_input": "记住我在TechCorp工作"},
+    inputs={"user_input": "记住我在TechCorp工作"}
     thread_id="user_alice"
 )
 ```
@@ -90,7 +89,7 @@ result = crew.kickoff(
 memory_config = MemoryConfig(
     short_term={
         "enabled": True,
-        "max_history": 15,  # 保留最后15轮对话
+         # 保留最后15轮对话
     }
 )
 
@@ -107,7 +106,7 @@ crew = Crew(agents=[agent], memory=memory_config)
 memory_config = MemoryConfig(
     long_term={
         "enabled": True,
-        "min_quality": 0.8,  # 仅存储高质量信息
+         # 仅存储高质量信息
     }
 )
 
@@ -115,25 +114,6 @@ memory_config = MemoryConfig(
 crew = Crew(agents=[agent], memory=memory_config)
 ```
 
-### 实体记忆
-
-跟踪人员、组织和概念：
-
-```python
-# 配置实体记忆
-memory_config = MemoryConfig(
-    entity={"enabled": True}
-)
-
-# 代理记住实体及其关系
-crew = Crew(agents=[agent], memory=memory_config)
-
-# 示例：代理将记住"Alice在TechCorp工作"
-result = crew.kickoff(
-    inputs={"user_input": "Alice是TechCorp的CEO"},
-    thread_id="business_context"
-)
-```
 
 ## 内存搜索
 
@@ -159,9 +139,8 @@ for result in results:
 ```python
 memory_config = MemoryConfig(
     provider="memory",  # 快速，无持久化
-    short_term={"enabled": True, "max_history": 10},
-    long_term={"enabled": True},
-    entity={"enabled": True}
+    short_term={"enabled": True}
+    long_term={"enabled": True}
 )
 ```
 
@@ -171,9 +150,8 @@ memory_config = MemoryConfig(
 memory_config = MemoryConfig(
     provider="postgresql",
     connection_string="postgresql://user:pass@localhost:5432/memory_db",
-    short_term={"enabled": True, "max_history": 50},
-    long_term={"enabled": True, "min_quality": 0.8},
-    entity={"enabled": True}
+    short_term={"enabled": True}
+    long_term={"enabled": True}
 )
 ```
 
@@ -183,9 +161,8 @@ memory_config = MemoryConfig(
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///development.db",
-    short_term={"enabled": True, "max_history": 30},
-    long_term={"enabled": True, "min_quality": 0.7},
-    entity={"enabled": True}
+    short_term={"enabled": True}
+    long_term={"enabled": True}
 )
 ```
 
@@ -198,8 +175,7 @@ memory_config = MemoryConfig(
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///customer_service.db",
-    short_term={"enabled": True, "max_history": 20},
-    entity={"enabled": True}  # 记住客户详情
+    short_term={"enabled": True}
 )
 
 service_agent = Agent(
@@ -212,7 +188,7 @@ crew = Crew(agents=[service_agent], memory=memory_config)
 
 # 每个客户有自己的线程
 result = crew.kickoff(
-    inputs={"user_input": "我需要帮助处理我的订单"},
+    inputs={"user_input": "我需要帮助处理我的订单"}
     thread_id=f"customer_{customer_id}"
 )
 ```
@@ -224,8 +200,7 @@ result = crew.kickoff(
 memory_config = MemoryConfig(
     provider="sqlite",
     connection_string="sqlite:///learning.db",
-    long_term={"enabled": True, "min_quality": 0.8},  # 存储学习内容
-    entity={"enabled": True}  # 跟踪概念和主题
+    long_term={"enabled": True},  # 存储学习内容
 )
 
 tutor = Agent(
@@ -241,7 +216,6 @@ crew = Crew(agents=[tutor], memory=memory_config)
 
 - **[短期记忆](/zh/guides/memory/short-term)** - 深入了解对话历史
 - **[长期记忆](/zh/guides/memory/long-term)** - 持久知识存储
-- **[实体记忆](/zh/guides/memory/entity)** - 跟踪实体和关系
 - **[存储配置](/zh/guides/memory/storage)** - 配置不同的存储后端
 
 ## 故障排除
@@ -254,8 +228,7 @@ crew = Crew(agents=[tutor], memory=memory_config)
 
 ### 内存使用量高
 
-- 减少短期记忆中的`max_history`
-- 提高长期记忆中的`min_quality`阈值
+- 使用数据库提供商的连接池
 - 考虑使用SQLite/PostgreSQL而不是内存模式
 
 ### 性能慢

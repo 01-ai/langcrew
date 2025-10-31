@@ -29,7 +29,7 @@ This project implements **3 different MCP transport methods**:
 
 ### Prerequisites
 - Python 3.11+
-- OpenAI API access (uses GPT-4o by default)
+- OpenAI API access (uses gpt-4o-mini by default)
 
 ### Installation
 ```bash
