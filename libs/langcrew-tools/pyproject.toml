@@ -28,7 +28,7 @@ dependencies = [
     "pydantic>=2.7.4",
     # LangChain framework and components
     "langchain>=0.3.27",
-    "langchain-core>=0.3.72",
+    "langchain-core>=0.3.81",
     "langchain-text-splitters>=0.3.9",
     "langcrew>=0.1.0",
     "langgraph>=0.6.0",
