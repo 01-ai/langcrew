@@ -1,0 +1,125 @@
+.staff-section {
+  width: 100%;
+  margin-top: 20px;
+  margin-bottom: 40px;
+  h2 {
+    color: #000;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 24px;
+  }
+}
+
+.staff-card-wrapper {
+  min-height: 300px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 21px;
+}
+
+.staff-card {
+  min-width: 310px;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid #f3f3f3;
+  outline: 1px solid transparent;
+  background: #fff;
+  padding: 24px;
+  line-height: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+  &:hover {
+    border-color: #91b1ff;
+    box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.04);
+  }
+  &.active {
+    border: 1px solid #a3beff;
+    outline-color: #a3beff;
+    box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.16);
+  }
+}
+
+.staff-card-header {
+  img {
+    width: 72px;
+    height: 72px;
+  }
+
+  h3 {
+    color: #000;
+    font-size: 20px;
+    font-weight: 600;
+  }
+}
+
+.staff-card-label {
+  padding: 2px 8px 2px 6px;
+  border-radius: 11px;
+  border: 1px solid #eaeaea;
+  color: #999;
+  font-size: 12px;
+  img {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.staff-card-desc {
+  min-height: 48px;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.staff-card-area {
+  border-radius: 12px;
+  background: #f6fafe;
+  padding: 12px;
+  flex: 1;
+  ul {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    grid-auto-flow: dense;
+    li {
+      white-space: nowrap;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      line-height: 1;
+      padding-left: 12px;
+      display: inline-block;
+      width: fit-content;
+      &:has(> span:only-child) {
+        grid-column: span 2;
+      }
+      position: relative;
+      &::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        background: #000;
+        border-radius: 5px;
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 4px;
+      }
+    }
+  }
+}
+
+.staff-area-hd {
+  color: #456cff;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.staff-more {
+  width: 100%;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.5);
+
+  text-align: center;
+  font-size: 20px;
+}

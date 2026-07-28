@@ -1,43 +1,175 @@
 .agentx-sender {
   .ant-sender {
-    border-radius: 24px;
-    border-color: #e1e1e1;
-    box-shadow: 0px 4px 20px 0px rgba(0, 0, 0, 0.08);
+    // Match design spec (Frame 1597879883.svg)
+    min-height: 100px;
+    // NOTE: Ant Sender has its own defaults; force overrides for exact shape.
+    border-radius: 28px !important;
+    border: 1px solid #e9e9e9;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.04) !important;
+    background: #fff !important;
+    overflow: hidden;
+    box-sizing: border-box;
+
+    // Ant Sender uses a pseudo-element for focus/outline in some versions.
+    // Keep it perfectly aligned with the container radius/border to match the SVG shape.
+    &:after {
+      border-radius: 28px !important;
+      border: 0 none !important;
+      box-shadow: inset 0 0 0 1px #e9e9e9 !important;
+      box-sizing: border-box;
+    }
+
+    .ant-sender-header {
+      // Remove header spacing so attachment pills align with the 12 px Figma inset.
+      padding: 0 !important;
+      margin: 0 !important;
+      border-bottom: 0 none;
+    }
+
+    .ant-sender-header-content {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
 
     .ant-sender-input {
-      font-size: 16px;
+      font-size: 16px !important;
+      line-height: 24px !important;
+      // Remove Ant default padding around the textarea (was 4px in UI).
+      padding: 0 !important;
+    }
+
+    // Grow long inputs up to 340 px, then scroll internally.
+    .ant-sender-input textarea {
+      max-height: 340px !important;
+      overflow-y: auto !important;
+      resize: none !important;
+      padding: 0 !important;
+      background: transparent !important;
+      color: #000 !important;
+
+      // Match placeholder in Figma
+      &::placeholder {
+        color: #999;
+      }
     }
 
     .ant-sender-content {
-      padding: 20px 24px 16px;
+      // Frame 1597879883: placeholder starts at (x=20,y=16)
+      padding: 16px 20px 0 !important;
     }
 
     .ant-sender-footer {
-      padding: 0 20px 20px;
+      padding: 0 20px 12px !important;
+    }
+
+    &.agentx-sender-container--single-line {
+      min-height: 56px;
+      position: relative;
+
+      .ant-sender-content {
+        min-height: 56px;
+        padding: 16px 64px 16px 56px !important;
+        box-sizing: border-box;
+      }
+
+      .ant-sender-footer {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 10px;
+        z-index: 1;
+        padding: 0 !important;
+        pointer-events: none;
+      }
+
+      .agentx-sender-footer {
+        margin-left: 0 !important;
+        pointer-events: none;
+      }
+
+      .agentx-sender-footer__left,
+      .agentx-sender-footer__right {
+        pointer-events: auto;
+      }
     }
 
     .ant-sender-actions-btn {
-      background: #000;
+      // Figma "send": dark gradient + border + inset shadows
+      width: 36px !important;
+      height: 36px !important;
+      border-radius: 18px !important;
+      background: linear-gradient(180deg, #333333 0%, #222222 100%) !important;
+      border: 1px solid #000 !important;
+      box-shadow: inset 0px -1.5px 1px rgba(0, 0, 0, 1), inset 0px 1.5px 1px rgba(255, 255, 255, 0.25) !important;
 
       &:hover {
-        background: rgba(0, 0, 0, 0.7);
+        background: linear-gradient(180deg, rgba(51, 51, 51, 0.92) 0%, rgba(34, 34, 34, 0.92) 100%) !important;
+      }
+    }
+
+    // Ensure icons/text in send button are white (SVG shows white arrow)
+    .agentx-send-btn {
+      color: #fff !important;
+      background: linear-gradient(180deg, #333333 0%, #222222 100%) !important;
+      border: 1px solid #000 !important;
+      box-shadow: inset 0px -1.5px 1px rgba(0, 0, 0, 1), inset 0px 1.5px 1px rgba(255, 255, 255, 0.25) !important;
+      // Avoid any perceived animation when toggling enabled/disabled (AntD buttons add transitions by default).
+      transition: none !important;
+
+      &:hover {
+        background: linear-gradient(180deg, rgba(51, 51, 51, 0.92) 0%, rgba(34, 34, 34, 0.92) 100%) !important;
+      }
+
+      .ant-btn-icon {
+        color: #fff !important;
+        transition: none !important;
+
+        svg {
+          transition: none !important;
+        }
+      }
+    }
+
+    // Ensure disabled state is consistent even when using Ant Button directly (e.g. Stop button).
+    .agentx-send-btn:disabled,
+    .agentx-send-btn.ant-btn-disabled {
+      // Disabled state uses the full "grey send" SVG (includes its own background/border/shadow).
+      // Keep the button chrome transparent to avoid double background/border.
+      background: transparent !important;
+      border: 0 none !important;
+      box-shadow: none !important;
+      color: rgba(255, 255, 255, 0.7) !important;
+      padding: 0 !important;
+      transition: none !important;
+
+      &:hover {
+        opacity: 1;
+      }
+
+      .ant-btn-icon {
+        // Ensure the SVG can occupy the full 36x36 button area.
+        width: 36px !important;
+        height: 36px !important;
+        line-height: 0 !important;
+        color: rgba(255, 255, 255, 0.7) !important;
+        transition: none !important;
+
+        svg {
+          width: 36px !important;
+          height: 36px !important;
+          display: block;
+          transition: none !important;
+        }
       }
     }
 
     .ant-sender-actions-btn-disabled {
-      background: rgba(0, 0, 0, 0.7);
-      color: rgba(255, 255, 255, 0.7);
+      background: rgba(227, 227, 227, 0.7) !important;
+      border: 1px solid rgba(207, 207, 207, 0.7) !important;
+      color: rgba(255, 255, 255, 0.7) !important;
 
       &:hover {
         opacity: 0.4;
-      }
-    }
-
-    .ant-btn-variant-solid {
-      background: #000;
-
-      &:hover {
-        background: rgba(0, 0, 0, 0.7);
       }
     }
 
@@ -51,14 +183,599 @@
     }
 
     &:focus-within {
-      border-color: #d9d9d9;
-      box-shadow: 0px 4px 20px 0px rgba(0, 0, 0, 0.08);
+      border-color: #e9e9e9 !important;
+      // box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.04) !important;
 
       &:after {
         border-width: 1px;
+        border-color: #e9e9e9 !important;
+        border-radius: 28px !important;
+      }
+    }
+
+    // Frame 1597879883: left "+" is icon-only without border/background
+    .ant-btn-text.ant-btn-circle {
+      border: 0 none;
+      box-shadow: none;
+      background: transparent;
+
+      &:hover,
+      &:active,
+      &:focus {
+        border: 0 none;
+        box-shadow: none;
+        background: rgba(0, 0, 0, 0.04) !important;
       }
     }
   }
+
+  &.agentx-sender--drag-active {
+    .ant-sender {
+      border-color: #1677ff !important;
+      background: #f5faff !important;
+
+      &:after {
+        box-shadow: inset 0 0 0 1px #1677ff !important;
+      }
+    }
+  }
+}
+
+// Progress bar should sit on top of the input box (not inside it).
+// Reserve space so it doesn't overlap chat content, and inset it so input corners remain visible.
+.agentx-sender-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.agentx-sender-wrap--with-top {
+  padding-top: 56px; // same as top bar height
+}
+
+.agentx-sender-wrap__top-addon {
+  position: absolute;
+  top: 0;
+  left: 28px; // align with input corner radius end
+  right: 28px;
+  z-index: 2;
+}
+
+.agentx-tool-btn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent !important;
+  border: 0 none !important;
+  box-shadow: none !important;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+
+  &.agentx-tool-btn--icon-only {
+    // Figma: 44w = 12(left) + 20(icon) + 12(right)
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  &:hover,
+  &:active,
+  &:focus {
+    border: 0 none !important;
+    box-shadow: none !important;
+    background: rgba(0, 0, 0, 0.04) !important;
+  }
+}
+
+.agentx-ppt-btn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #fff !important;
+  border: 1px solid #ededed !important;
+  box-shadow: none !important;
+  font-size: 14px;
+  color: #000 !important;
+
+  &.agentx-ppt-btn--icon-only {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  &:hover,
+  &:active,
+  &:focus {
+    border: 1px solid #ededed !important;
+    background: #f5f5f5 !important;
+    color: #000 !important;
+  }
+
+  svg {
+    width: 16px !important;
+    height: 16px !important;
+
+    * {
+      fill: #000 !important;
+    }
+
+    [stroke] {
+      stroke: #000 !important;
+    }
+  }
+
+  .anticon,
+  .ant-btn-icon {
+    font-size: 16px !important;
+    width: 20px !important;
+    height: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+.agentx-ppt-tooltip {
+  max-width: none !important;
+
+  .ant-tooltip-inner {
+    background-color: #000 !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    line-height: 16px !important;
+    color: #fff !important;
+    box-shadow: 0px 2px 12px rgba(0, 0, 0, 0.2) !important;
+    width: max-content !important;
+    max-width: none !important;
+  }
+
+  .ant-tooltip-arrow:before {
+    background-color: #000 !important;
+  }
+}
+
+.agentx-selected-scene {
+  border: 0 none !important;
+  box-shadow: none !important;
+  // Figma "Create Picture": text button (no pill background), blue text
+  background: transparent !important;
+  color: #0285ff !important;
+
+  // Make the selected tool icon inherit the same blue as the text.
+  // Some SVGs ship with hardcoded fill/stroke, so we force them to use currentColor here.
+  .agentx-selected-scene__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    // Prefer fill-only coloring to avoid making icons look "bold".
+    // Only color stroke if the SVG explicitly uses stroke-based paths.
+    svg * {
+      fill: currentColor !important;
+    }
+
+    svg [stroke] {
+      stroke: currentColor !important;
+    }
+  }
+
+  .agentx-selected-scene__close {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
+
+    &:hover {
+      background: rgba(2, 133, 255, 0.1);
+    }
+  }
+
+  &:hover,
+  &:active,
+  &:focus {
+    border: 0 none !important;
+    box-shadow: none !important;
+    background: #e6f3ff !important;
+    color: #0285ff !important;
+  }
+}
+
+.agentx-selected-kb-list {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.agentx-selected-kb {
+  border: 0 none !important;
+  box-shadow: none !important;
+  // Knowledge base label.
+  background: transparent !important;
+  color: #0285ff !important;
+  border-radius: 18px !important;
+  max-width: 200px;
+  transition: all 0.2s;
+
+  &:hover,
+  &:active,
+  &:focus {
+    border: 0 none !important;
+    box-shadow: none !important;
+    background: #e6f3ff !important;
+    color: #0285ff !important;
+  }
+}
+
+.agentx-selected-kb__close-inner {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(2, 133, 255, 0.1);
+  }
+}
+
+.agentx-selected-kb__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.agentx-selected-kb__text {
+  display: inline-block;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentx-tool-menu {
+  padding: 8px !important;
+  border-radius: 16px !important;
+  box-shadow: 0px 8px 32px 0 rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  min-width: 220px;
+
+  // Match Figma option list spacing:
+  // - row gap: 16px
+  // - icon size: 20px
+  // - icon/text gap: 8px
+  .ant-dropdown-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .ant-dropdown-menu-item {
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    margin: 0;
+    gap: 8px;
+  }
+
+  .ant-dropdown-menu-item-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ant-dropdown-menu-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  .ant-dropdown-menu-item-selected {
+    background: #e8f3ff !important;
+    color: #1677ff !important;
+
+    .ant-dropdown-menu-title-content {
+      color: #1677ff !important;
+    }
+  }
+
+  .ant-dropdown-menu-title-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    font-size: 14px;
+    line-height: 16px;
+    font-weight: 400;
+    color: #000;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+  }
+}
+
+.agentx-quick-actions-popover {
+
+  // Figma (node 27083:41664): radius=16px. Ant Popover has multiple wrappers;
+  // ensure ALL layers clip to the same radius so the visible corners are correct.
+  // NOTE: In our current Ant build, the visible surface is `.ant-popover-container`
+  // (no `.ant-popover-inner` exists). Keep both for compatibility across versions.
+  .ant-popover-container,
+  .ant-popover-inner {
+    // Figma frame (node 27284:2054): 180w with 8px side padding and 7px vertical padding.
+    // Use min-width so long popover content can expand instead of wrapping unnecessarily.
+    min-width: 180px;
+    box-sizing: border-box;
+    border-radius: 16px !important;
+    overflow: hidden; // clip inner content so corners don't look square
+    padding: 7px 8px !important;
+    background: #fff;
+    border: 1px solid #eaeaea;
+    box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.12);
+  }
+
+  .ant-popover-inner-content {
+    border-radius: 16px !important;
+    overflow: hidden;
+  }
+}
+
+.agentx-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+.agentx-quick-actions-item {
+  width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px; // Figma: icon/text gap is 8px
+  border: 0 none;
+  outline: none;
+  background: transparent;
+  color: #000;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: left;
+  transition: background 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #f6f6f8;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.agentx-quick-actions-divider {
+  height: 1px;
+  width: 100%;
+  background: #eaeaea;
+  margin: 8px 0 10px; // Figma: 8px above and 10px below the divider line
+}
+
+.agentx-quick-actions-icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.agentx-model-menu {
+  // Frame 1597880231: container
+  padding: 4px !important;
+  border-radius: 16px !important;
+  border: 1px solid #eaeaea !important;
+  background: #fff !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.12) !important;
+  // Width is set dynamically (auto-fit longest model name). Keep a safe minimum.
+  min-width: 268px;
+  width: 100%;
+  max-height: 340px;
+  overflow: auto;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+
+  .ant-dropdown-menu-item {
+    padding: 0 !important; // The label controls its own padding and height.
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .ant-dropdown-menu-item:hover {
+    background: transparent !important;
+  }
+}
+
+.agentx-model-option {
+  height: 52px;
+  padding: 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  &.is-selected {
+    background: #f6f6f8;
+
+    &:hover {
+      background: #f6f6f8;
+    }
+  }
+}
+
+.agentx-model-option__text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agentx-model-option__title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 500;
+  color: #000;
+}
+
+.agentx-model-option__feature {
+  flex: 0 0 auto;
+}
+
+.agentx-model-option__icon {
+  width: 16px;
+  height: 16px;
+  background: transparent !important;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.agentx-model-option__icon--text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 16px;
+}
+
+.agentx-model-option__name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentx-model-option__desc {
+  font-size: 12px;
+  line-height: 16px;
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentx-model-option__check {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+
+  img {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+}
+
+.agentx-model-trigger {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 20px;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  cursor: pointer;
+  width: fit-content;
+  transition: all 0.2s;
+
+  &:hover:not(.is-disabled) {
+    background: #f0f0f2;
+  }
+}
+
+.agentx-model-trigger__content {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agentx-model-trigger__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.agentx-model-trigger__icon--text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 16px;
+}
+
+.agentx-model-trigger__name {
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 500;
+  color: #000;
+  white-space: nowrap;
+}
+
+.agentx-model-trigger__caret {
+  width: 9px;
+  height: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.agentx-model-trigger__empty-icon {
+  font-size: 18px;
+  opacity: 0.45;
 }
 
 .agentx-mcp {
@@ -68,11 +785,120 @@
     }
   }
 
-  .ant-tabs-top > .ant-tabs-nav {
+  .ant-tabs-top>.ant-tabs-nav {
     margin: 0;
   }
 
-  .ant-tabs-top > .ant-tabs-nav::before {
+  .ant-tabs-top>.ant-tabs-nav::before {
     border-bottom: none;
+  }
+}
+
+.agentx-file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 12px 0;
+}
+
+.agentx-file-item {
+  position: relative;
+
+  .agentx-file-close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 16px;
+    height: 16px;
+    background: #000;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: opacity 0.2s;
+    font-size: 10px;
+
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+}
+
+.agentx-file-thumbnail {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.agentx-file-card {
+  width: 272px;
+  height: 56px;
+  border-radius: 16px;
+  border: 1px solid #eaeaea;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  padding: 11px;
+  gap: 8px;
+
+  .agentx-file-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .agentx-file-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    .agentx-file-name {
+      font-size: 14px;
+      line-height: 1.4;
+      color: #000;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .agentx-file-size {
+      font-size: 10px;
+      line-height: 12px;
+      color: rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+
+.agentx-replay-button {
+  border: 1px solid #000 !important;
+  background: linear-gradient(180deg, #333 0%, #222 100%) !important;
+  box-shadow: 0 -1.5px 1px 0 #000 inset, 0 1.5px 1px 0 rgba(255, 255, 255, 0.25) inset !important;
+
+  &:hover {
+    background: linear-gradient(180deg, rgba(51, 51, 51, 0.92) 0%, rgba(34, 34, 34, 0.92) 100%) !important;
+    border: 1px solid #000 !important;
+    box-shadow: 0 -1.5px 1px 0 #000 inset, 0 1.5px 1px 0 rgba(255, 255, 255, 0.25) inset !important;
   }
 }

@@ -3,19 +3,19 @@ import { resolve } from 'path';
 
 export default defineConfig({
   test: {
-    // test environment
+    // Test Environment
     environment: 'jsdom',
-    // test file matching pattern
+    // Test File Matching Mode
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
-    // test coverage configuration
+    // Test Coverage Configuration
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'src/**/*.d.ts', 'src/**/*.test.{js,jsx,ts,tsx}', 'src/**/*.spec.{js,jsx,ts,tsx}'],
     },
-    // global test settings
+    // Global testing settings
     globals: true,
-    // test timeout
+    // Test timeout
     testTimeout: 5000,
   },
   resolve: {

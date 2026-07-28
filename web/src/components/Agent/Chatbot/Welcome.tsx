@@ -1,14 +1,15 @@
 import { Welcome } from '@ant-design/x';
 import React from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const WelcomeContainer: React.FC = () => {
+  const { t } = useTranslation();
   return (
     <div className="flex">
       <Welcome
         variant="borderless"
-        icon="https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*s5sNRo5LjfQAAAAAAAAAAAAADgCCAQ/fmt.webp"
-        title="Welcome to LangCrew"
-        description="Provide the agent with a mission."
+        title={t('welcome.title')}
+        description={t('welcome.description')}
         styles={{
           title: {
             fontSize: '48px',

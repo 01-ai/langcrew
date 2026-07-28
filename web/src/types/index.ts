@@ -1,6 +1,8 @@
-import { FileReaderProps } from '@/components/Infra/FileReader';
-import { UploadFile } from 'antd';
-import { AxiosRequestHeaders } from 'axios';
+import { FC } from 'react';
+import { WidgetData } from './widget';
+
+export * from './agentx';
+export * from './widget';
 
 export enum TaskStage {
   Pending,
@@ -28,7 +30,23 @@ export interface MessageItem {
   id?: string;
   role: 'user' | 'assistant';
   messages: MessageChunk[];
-  trace_id?: string;
+  trace_id?: string | null;
+}
+
+export interface ReferenceCardMetadata {
+  type?: string;
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  payload?: Record<string, unknown>;
+  [key: string]: any;
+}
+
+export type MessageReferenceMetadata = ReferenceCardMetadata | ReferenceCardMetadata[];
+
+export interface MessageMetadata<TReference = MessageReferenceMetadata> {
+  reference?: TReference;
+  [key: string]: any;
 }
 
 export interface MessageChunk {
@@ -39,28 +57,31 @@ export interface MessageChunk {
   step_id?: string;
   timestamp?: number;
   /**
-   * Indicates this batch of chunks is complete when followed by user input or finish_reason
+   * There's a user input behind, or...finish_reason，Mark this.chunkIt's complete.
    */
   isFinish?: boolean;
   /**
-   * No more user input after this point
+   * No user input for the next one
    */
   isLast?: boolean;
   /**
-   * Fake message sent but not yet returned, showing loading state
+   * False message. Send it back.loading
    */
   loading?: boolean;
   detail?: {
     attachments?: E2BFile[];
     files?: FileItem[];
+    metadata?: MessageMetadata;
     [key: string]: any;
   };
+  metadata?: MessageMetadata;
 
   is_llm_message?: boolean;
   session_id?: string;
   task_id?: string;
+  trace_id?: string | null;
 
-  trace_id?: string;
+  field_name?: string;
 }
 
 export interface TaskCreateChunk extends MessageChunk {
@@ -69,7 +90,7 @@ export interface TaskCreateChunk extends MessageChunk {
   result: any;
 }
 
-// Plan before processing
+// Pre-processedplan
 export interface EventPlanChunk extends MessageChunk {
   type: 'plan';
   content: string;
@@ -77,7 +98,7 @@ export interface EventPlanChunk extends MessageChunk {
     steps: PlanStep[];
   };
 }
-// Plan after processing
+// After processingplan
 export interface MessagePlanChunk extends MessageChunk {
   type: 'plan';
   content: string;
@@ -101,7 +122,7 @@ export interface PlanUpdateChunk extends MessageChunk {
   };
 }
 
-// File upload
+// Uploading of files
 export interface FileItem {
   uid: string;
   status: 'done' | 'uploading' | 'error';
@@ -110,40 +131,60 @@ export interface FileItem {
   url?: string;
   size?: number;
   type?: string;
+  originFileObj?: File;
 }
 
-// Tool calls before and after processing
+export interface SenderFilesConfig {
+  maxLength: number;
+  accept?: string;
+  onRemove?: (file?: FileItem) => void;
+  beforeUpload?: (fileList: File[], file: File) => boolean;
+  Button?: FC<any> | null;
+}
+
+// Tool call before and after processing
 export interface MessageToolChunk extends MessageChunk {
   type: string;
   content: string;
   title?: string;
-  // Display name of the tool on the page, defaults to "tool" if not provided
+  // The name of the display on the page of the tool, if not, is displayedtool
   display_name?: string;
   detail?: {
     tool?: string;
     action?: string;
     action_content?: string;
     // detail_content?: string;
-    // Tool parameters
+    // Tool Parameters
     param?: {
-      // tool id
+      // Toolid
       tool_id?: string;
+      [key: string]: any;
     };
-    // Tool output
+    // Tool Output
     result?: {
-      // tool_call.detail.param.tool_id one-to-one correspondence
+      // and tool_call.detail.param.tool_id - One-on-one.
       tool_use_id?: string;
+      artifact?: any;
       content?: string;
-      content_type?: string; // Content type, such as 'text/plain', 'text/markdown', 'application/json', etc.
+      content_type?: string; // Type of content, e.g. 'text/plain', 'text/markdown', 'application/json' Wait.
       image_url?: string;
       sandbox_url?: string;
+      auth_info?: CloudPhoneAuthInfo;
+      // New LangChain ToolMessage envelope fields
+      additional_kwargs?: Record<string, any>;
+      response_metadata?: Record<string, any>;
+      type?: string;
+      name?: string;
+      id?: string | null;
+      tool_call_id?: string;
+      status?: string;
     };
     status?: TaskStatus;
     run_id?: string;
   };
 }
 
-// FileReader type
+// FileReaderType
 export interface FileReaderChunk extends MessageChunk {
   detail: {
     uid: string;
@@ -167,19 +208,20 @@ export interface KnowledgeBaseItem {
   index_name: string;
   name: string;
   knowledge_id: string;
-  description: string;
+  knowledge_type: string;
+  description: string | null;
   create_time: string;
   update_time: string;
   create_user: string;
-  doc_cnt: any;
-  task_cnt: any;
-  is_public: boolean;
-  is_editable: boolean;
-  knowledge_type: string;
-  sync_period: string;
-  sync_next_time: string;
+  doc_cnt?: number | null;
+  task_cnt?: number | null;
+  member_cnt?: number | null;
+  is_editable?: boolean;
+  is_public?: boolean;
   role: string;
-  member_cnt: any;
+  sync_next_time: string;
+  sync_period: string;
+  visible_range: number;
 }
 
 // MCP
@@ -190,19 +232,21 @@ export interface MCPToolItem {
   brief_introduction: string;
   details: string;
   need_config: boolean;
-  agent_tool_id?: string;
+  agent_tool_id: string;
+  type: 'MCP' | 'API' | 'SANDBOX' | 'builtin' | 'workflow';
   status?: 'ACTIVE' | 'COMING' | 'INACTIVE';
   ext: {
     name_en: string;
-    brief_introduction_en: string;
+    desc_en: string;
   };
+  config?: any;
 
   // id: string | number;
   // name?: string;
   // icon?: string;
   // details?: string;
 
-  // // Below are security sandbox properties
+  // // Here's the security box.
   // agent_tool_id?: string;
   // tool_type?: 'SANDBOX';
   // tool_name?: string;
@@ -247,14 +291,51 @@ export interface SessionInfo {
   title: string;
   /**
    * ACTIVE: Normal
-   * ARCHIVED: Cannot continue conversation
-   * INEXECUTIVE: Currently executing
+   * ARCHIVED: We can't continue the conversation.
+   * INEXECUTIVE: Under implementation
    */
   status: 'ACTIVE' | 'ARCHIVED' | 'INEXECUTIVE';
-  kb_info: KbInfo;
-  agent_tool_info: AgentToolInfo;
-  create_time: string;
-  update_time: string;
+  agent_tool_info?: AgentToolInfo;
+  /**
+   * Superworkers.ID（Could be an empty string)
+   */
+  super_employee_id?: string;
+  /**
+   * Session mode (backend down, probably empty string)
+   */
+  mode?: string;
+  /**
+   * Wind Control Configuration (possibly for null）
+   */
+  guardrail_config?: any | null;
+  /**
+   * Knowledge base search configuration (possibly as null）
+   */
+  knowledge_query_request?: KnowledgeQueryRequest | null;
+  create_time?: string;
+  update_time?: string;
+  /**
+   * User-selected model information for replay
+   * Format:{ "id": "model-id", "model_display_name": "Model Name" }
+   * optional fields, not available if not configured
+   */
+  model?: {
+    id: string;
+    model_display_name: string;
+  };
+  general_agent_mode?: string;
+}
+
+export interface KnowledgeQueryRequest {
+  knowledge_ids: string[];
+  kb_names: string[] | null;
+  kb_descriptions: string[] | null;
+  query: string | null;
+  topK: number;
+  query_type: number;
+  weight: number;
+  rerank: boolean;
+  score: number;
 }
 
 export interface KbInfo {
@@ -276,12 +357,17 @@ export interface E2BFile {
   url: string;
   size: number;
   content_type: string;
-  show_user: 0 | 1;
+  show_user?: 0 | 1;
+  last_modified?: string;
 }
 
 export interface ServiceDeployContent {
   success?: boolean;
+  preview_url?: string;
   domain_url?: string;
+  website_name?: string;
+  service_name?: string;
+  message?: string;
 }
 
 export interface EventErrorChunk {
@@ -289,15 +375,7 @@ export interface EventErrorChunk {
   message?: string;
 }
 
-export interface SessionInitChunk extends MessageChunk {
-  type: 'session_init';
-  detail: {
-    session_id: string;
-    title: string;
-  };
-}
-
-export interface AntdUploadFile extends File {
+export interface AntdUploadFile {
   uid: string;
   name: string;
   size: number;
@@ -311,7 +389,7 @@ export interface FormFieldSchema {
   enum?: string[];
   required?: boolean;
   format?: 'email' | 'url' | 'date' | 'date-time' | 'phone' | 'color' | 'time';
-  pattern?: string; // Regular expression pattern
+  pattern?: string; // Regular expression mode
   minLength?: number;
   maxLength?: number;
   minimum?: number;
@@ -321,7 +399,7 @@ export interface FormFieldSchema {
     type: 'string' | 'number' | 'boolean';
     enum?: string[];
   };
-  // Multi-select related fields
+  // Multiple selection of relevant fields
   multiselect?: boolean;
   minSelections?: number;
   maxSelections?: number;
@@ -335,19 +413,53 @@ export interface FormSchema {
   description?: string;
 }
 
+export interface CloudPhoneAuthInfo {
+  instance_no: string;
+  access_key: string;
+  access_secret_key: string;
+  user_id: string;
+  expire_time: string;
+}
+
+export type UserInputQuestionType = 'text' | 'single_select' | 'multi_select' | 'approval';
+
+export type HitlApprovalDecision = { type: 'approve' } | { type: 'reject'; message?: string };
+
+export interface HitlApprovalResumeContent {
+  decisions: HitlApprovalDecision[];
+}
+
+export interface HitlActionRequest {
+  name: string;
+  args?: Record<string, any>;
+  description?: string;
+}
+
+export interface HitlReviewConfig {
+  action_name: string;
+  allowed_decisions: Array<HitlApprovalDecision['type']>;
+}
+
 export interface UserInputChunk extends MessageChunk {
   type: 'user_input';
   content: string;
   detail?: {
     options?: string[];
     interrupt_data: {
-      type: 'user_input' | 'take_over_browser' | 'take_over_phone' | 'dynamic_form';
+      type?: 'user_input' | 'take_over_browser' | 'take_over_phone' | 'dynamic_form';
       suggested_user_action?: 'take_over_browser' | 'take_over_phone' | 'fill_form';
-      question: string;
+      question_type?: UserInputQuestionType;
+      question?: string;
+      options?: string[];
+      action_requests?: HitlActionRequest[];
+      review_configs?: HitlReviewConfig[];
       form_schema?: FormSchema;
       intervention_info?: {
+        scene: 'phone' | 'browser';
         intervention_url?: string;
+        auth_info?: CloudPhoneAuthInfo;
       };
+      [key: string]: any;
     };
   };
 }
@@ -363,7 +475,7 @@ export interface FinishReasonChunk extends MessageChunk {
 
 export interface InnerMessageChunk extends MessageChunk {
   role: 'inner_message';
-  type: 'config';
+  type: 'config' | 'client_tool_result';
   detail: {
     session_id?: string;
     sandbox_id?: string;
@@ -375,11 +487,68 @@ export interface InnerMessageChunk extends MessageChunk {
   };
 }
 
-// 文件上传配置
-export interface FileUploadConfig {
-  accept?: string; // 允许的文件类型，如 "image/*,.pdf,.doc,.docx"
-  maxSize?: number; // 最大文件大小（字节）
-  maxCount?: number; // 最大文件数量
-  multiple?: boolean; // 是否支持多文件上传
-  customUploadRequest?: (file: File) => Promise<string>;
+// =============== ChatKit Type definition and processing function ===============
+export interface ChatkitWidgetChunkDetail {
+  // type: 'thread.created' | 'thread.item.added' | 'thread.item.updated' | 'thread.item.done';
+  // event_type?: 'added' | 'done';
+  type?: 'added' | 'done' | 'updated' | 'removed' | 'replaced' | 'update';
+  update_type?: 'streaming_text_delta' | 'component_updated' | 'root_updated';
+  item_id?: string;
+  widget?: WidgetData;
+  copy_text?: string;
+  langcrew_task?: string;
+
+  component_id?: string;
+  delta?: string;
+  done?: boolean;
+
+  // thread?: any;
+  // item?: any;
+  // update?: {
+  //   type: string;
+  //   content_index?: number;
+  //   delta?: string;
+  //   content?: any;
+  // };
+}
+
+export interface JsxJson {
+  type: string;
+  key?: string;
+  children?: JsxJson[];
+  [key: string]: any;
+}
+
+export interface ClientToolCallChunk extends MessageChunk {
+  type: 'client_tool_call';
+  detail: {
+    call_id: string;
+    name: string;
+    arguments: any;
+    status: string;
+    wait_for_result?: boolean;
+  };
+}
+
+// Model Chooser Related Type
+export interface ModelItem {
+  id: string;
+  model_display_name: string;
+  icon: string;
+  is_default?: number; // 0 or 1，1Express Default Selection
+  ext?: {
+    name?: string;
+    name_en?: string;
+    feature?: string;
+    feature_en?: string;
+    desc?: string;
+    desc_en?: string;
+  };
+}
+
+export interface WidgetComponent {
+  id?: string;
+  value?: string;
+  children?: WidgetComponent[];
+  [key: string]: any;
 }

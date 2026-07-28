@@ -6,8 +6,9 @@ import InputOutputDetailRenderer from '@/components/Infra/InputOutputDetailRende
 const CodeInterpreterDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
   const input = message.detail?.param?.code;
   const inputLanguage = message.detail?.param?.language || 'python';
-  const output = message.detail?.result?.content || getTranslation('code.interpreter.execution.result.placeholder');
-  const outputLanguage = message.detail?.result?.content_type || 'plaintext';
+  const result = message.detail?.result;
+  const output = result?.artifact?.content ?? result?.content ?? getTranslation('code.interpreter.execution.result.placeholder');
+  const outputLanguage = result?.artifact?.content_type ?? result?.content_type ?? 'plaintext';
 
   return (
     <InputOutputDetailRenderer

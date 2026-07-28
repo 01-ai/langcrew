@@ -9,65 +9,65 @@ export const isJsonString = (str: string) => {
 
 
 /**
- * Parse partial JSON string, supporting incomplete JSON data
+ * Parsing SectionJSONStrings, support incompleteJSONData
  * 
- * This function can handle streaming data or partially transmitted JSON strings, parsing the transmitted parts even when JSON is incomplete.
- * Particularly suitable for real-time data streams, WebSocket messages, or chunked transmission scenarios.
+ * This function handles current data or partial transmissionsJSONString, evenJSONIncomplete can also parse the transferred part.
+ * Especially for real-time data flows,WebSocketMessage or segmented transmission scene.
  * 
- * @param str JSON string to parse, can be complete or incomplete JSON
- * @returns Parsed object, returns empty object if input is empty or parsing fails
+ * @param str It's a parse.JSONString, which can be completeJSONOr incomplete.JSON
+ * @returns Parsed object returns empty object if input is empty or the resolution failed
  * 
  * @example
- * // Complete JSON
+ * // CompleteJSON
  * parsePartialJson('{"name": "John", "age": 30}') // { name: "John", age: 30 }
  * 
- * // Partial JSON
+ * // PartJSON
  * parsePartialJson('{"name": "John", "age": 30, "hobbies": [') // { name: "John", age: 30, hobbies: [] }
  * 
- * // Empty input
+ * // Empty Input
  * parsePartialJson(null) // {}
  * parsePartialJson('') // {}
  */
 export const parsePartialJson = (str: string | null | undefined): Record<string, any> => {
-  // Handle null values or empty strings
+  // Deal with empty values or empty strings
   if (str === null || str === undefined || str.trim() === '') {
     return {};
   }
 
   try {
-    // First try standard JSON parsing
+    // First try the standard.JSONParsing
     return JSON.parse(str);
   } catch (error) {
-    // If standard parsing fails, use custom partial JSON parser
+    // If standard resolution fails, use custom partJSONParser
     return parseIncompleteJson(str);
   }
 };
 
 /**
- * Parse incomplete JSON string
+ * Parsing incompleteJSONString
  * 
- * Uses recursive descent parser to handle partial JSON data, can correctly parse:
- * - Incomplete key-value pairs
- * - Nested objects and arrays
- * - Various data types (strings, numbers, booleans, null, etc.)
- * - Escape characters
+ * Use the Recursive Decreasing Parsor to handle the portionJSONData that can be correctly deciphered:
+ * - Incomplete key pair
+ * - Embedded objects and arrays
+ * - Various data types (strings, numbers, booleans,nullWait
+ * - Conversion
  * 
- * @param str Incomplete JSON string
- * @returns Parsed object
+ * @param str Incomplete.JSONString
+ * @returns Parsed Object
  */
 const parseIncompleteJson = (str: string): Record<string, any> => {
   const result: Record<string, any> = {};
 
-  // Remove leading and trailing whitespace
+  // Remove the blank character at the beginning and end
   const trimmed = str.trim();
 
-  // If not starting with {, return empty object
+  // If it wasn't for me, { Start, return empty object
   if (!trimmed.startsWith('{')) {
     return result;
   }
 
-  // Use recursive descent parser to parse character by character
-  let pos = 1; // Skip the opening {
+  // Character-by-character resolution using the Recursive Decline Resolutionr
+  let pos = 1; // Skip the beginning {
 
   while (pos < trimmed.length) {
     // Skip whitespace characters
@@ -77,7 +77,7 @@ const parseIncompleteJson = (str: string): Record<string, any> => {
 
     if (pos >= trimmed.length) break;
 
-    // Parse key (must be a string)
+    // Parsing Key (must be a string)
     if (trimmed[pos] !== '"') break;
 
     const keyStart = pos + 1;
@@ -85,16 +85,16 @@ const parseIncompleteJson = (str: string): Record<string, any> => {
     if (pos === -1) break;
 
     const key = trimmed.slice(keyStart, pos);
-    pos++; // Skip the closing quote
+    pos++; // Skip the end quote
 
-    // Skip colon and whitespace characters
+    // Skip colon and blank characters
     while (pos < trimmed.length && (trimmed[pos] === ':' || /\s/.test(trimmed[pos]))) {
       pos++;
     }
 
     if (pos >= trimmed.length) break;
 
-    // Parse value (can be any type)
+    // Parsing value (can be of any type)
     const valueResult = parseValueAt(trimmed, pos);
     result[key] = valueResult.value;
     pos = valueResult.pos;
@@ -109,11 +109,11 @@ const parseIncompleteJson = (str: string): Record<string, any> => {
 };
 
 /**
- * Find the end position of a string, correctly handling escape characters
+ * Finds end of string, corrects transliteration
  * 
- * @param str String to search
- * @param start Start position (should be the position of the quote)
- * @returns Position of the closing quote, returns -1 if not found
+ * @param str String to search for
+ * @param start Start position (should be the quotation mark)
+ * @returns Ends the quotation sign position, returns if not found-1
  */
 const findStringEnd = (str: string, start: number): number => {
   let escapeNext = false;
@@ -140,13 +140,13 @@ const findStringEnd = (str: string, start: number): number => {
 };
 
 /**
- * Parse value at specified position
+ * Parsing the value of the given position
  * 
- * Parse according to value type (string, array, object, number, boolean, etc.)
+ * Corresponding resolution by type of value (string, array, object, number, boolean, etc.)
  * 
  * @param str String to parse
- * @param start Position to start parsing
- * @returns Object containing parsed value and next position
+ * @param start Start Parsing Location
+ * @returns Object with parsed values and next position
  */
 const parseValueAt = (str: string, start: number): { value: any; pos: number } => {
   // Skip whitespace characters
@@ -160,11 +160,11 @@ const parseValueAt = (str: string, start: number): { value: any; pos: number } =
 
   const char = str[start];
 
-  // Parse string
+  // Parsing Strings
   if (char === '"') {
     const end = findStringEnd(str, start);
     if (end === -1) {
-      // Incomplete string (no closing quote)
+      // Incomplete string (no end quote)
       const stringValue = str.slice(start + 1);
       return {
         value:
@@ -180,7 +180,7 @@ const parseValueAt = (str: string, start: number): { value: any; pos: number } =
       };
     }
 
-    // Complete string
+    // Full String
     const stringValue = str.slice(start + 1, end);
     return {
       value:
@@ -196,19 +196,19 @@ const parseValueAt = (str: string, start: number): { value: any; pos: number } =
     };
   }
 
-  // Parse array
+  // Parsing arrays
   if (char === '[') {
     const arrayResult = parseArrayAt(str, start);
     return { value: arrayResult.value, pos: arrayResult.pos };
   }
 
-  // Parse object
+  // Parsing Object
   if (char === '{') {
     const objectResult = parseObjectAt(str, start);
     return { value: objectResult.value, pos: objectResult.pos };
   }
 
-  // Parse other values (numbers, booleans, null, etc.)
+  // Parsing other values (number, boolean, value)nullWait
   let end = start;
   while (end < str.length && str[end] !== ',' && str[end] !== '}' && str[end] !== ']') {
     end++;
@@ -220,12 +220,12 @@ const parseValueAt = (str: string, start: number): { value: any; pos: number } =
     return { value: undefined, pos: end };
   }
 
-  // Handle numbers
+  // Processing numbers
   if (/^-?\d+(?:\.\d+)?$/.test(valueStr)) {
     return { value: parseFloat(valueStr), pos: end };
   }
 
-  // Handle booleans
+  // Handle Boolean Values
   if (valueStr === 'true') {
     return { value: true, pos: end };
   }
@@ -233,12 +233,12 @@ const parseValueAt = (str: string, start: number): { value: any; pos: number } =
     return { value: false, pos: end };
   }
 
-  // Handle null
+  // Processingnull
   if (valueStr === 'null') {
     return { value: null, pos: end };
   }
 
-  // Handle undefined
+  // Processingundefined
   if (valueStr === 'undefined') {
     return { value: undefined, pos: end };
   }
@@ -247,22 +247,22 @@ const parseValueAt = (str: string, start: number): { value: any; pos: number } =
 };
 
 /**
- * Parse array
+ * Parsing arrays
  * 
- * Parse array starting with [, supports:
+ * Parsing to [ , in support of:
  * - Empty array []
- * - Arrays containing various types of elements
- * - Incomplete arrays (e.g., ["item1", "item2")
+ * - Numerical arrays containing various types of elements
+ * - Incomplete arrays (e. g.) ["item1", "item2"）
  * 
- * Note: Even if the array is incomplete, it returns the parsed elements, empty array returns [] instead of undefined
+ * Note: Even if the array is incomplete, the parsed elements return, and the empty array returns [] Not undefined
  * 
  * @param str String to parse
- * @param start Position where array starts (position of [)
- * @returns Object containing parsed array and next position
+ * @param start Location of array start (in %2)[ )
+ * @returns Object containing the parsed array and next position
  */
 const parseArrayAt = (str: string, start: number): { value: any[]; pos: number } => {
   const result: any[] = [];
-  let pos = start + 1; // Skip the opening [
+  let pos = start + 1; // Skip the beginning [
 
   while (pos < str.length) {
     // Skip whitespace characters
@@ -272,13 +272,13 @@ const parseArrayAt = (str: string, start: number): { value: any[]; pos: number }
 
     if (pos >= str.length) break;
 
-    // Check if reached end of array
+    // Check to reach the end of the array
     if (str[pos] === ']') {
-      // If array is empty, return empty array instead of undefined
+      // If the array is empty, return the empty array instead ofundefined
       return { value: result, pos: pos + 1 };
     }
 
-    // Parse array element
+    // Parsing array elements
     const elementResult = parseValueAt(str, pos);
     result.push(elementResult.value);
     pos = elementResult.pos;
@@ -289,25 +289,25 @@ const parseArrayAt = (str: string, start: number): { value: any[]; pos: number }
     }
   }
 
-  // If array is not closed, also return parsed elements (might be empty array)
+  // If arrays do not end, also return the parsed elements (possibly empty arrays)
   return { value: result, pos: str.length };
 };
 
 /**
- * Parse nested object
+ * Parsing embedded objects
  * 
- * Parse object starting with {, supports:
- * - Empty object {}
- * - Objects containing various types of values
- * - Incomplete objects (e.g., {"name": "John", "age": 30)
+ * Parsing to { The first object, supports:
+ * - Empty objects {}
+ * - Objects with various types of values
+ * - Incomplete object (e.g. {"name": "John", "age": 30）
  * 
  * @param str String to parse
- * @param start Position where object starts (position of {)
- * @returns Object containing parsed object and next position
+ * @param start Position of object to start ({ )
+ * @returns Object with the object after the resolution and the object at the next location
  */
 const parseObjectAt = (str: string, start: number): { value: Record<string, any>; pos: number } => {
   const result: Record<string, any> = {};
-  let pos = start + 1; // Skip the opening {
+  let pos = start + 1; // Skip the beginning {
 
   while (pos < str.length) {
     // Skip whitespace characters
@@ -317,12 +317,12 @@ const parseObjectAt = (str: string, start: number): { value: Record<string, any>
 
     if (pos >= str.length) break;
 
-    // Check if reached end of object
+    // Check to reach the end of the object
     if (str[pos] === '}') {
       return { value: result, pos: pos + 1 };
     }
 
-    // Parse key (must be a string)
+    // Parsing Key (must be a string)
     if (str[pos] !== '"') break;
 
     const keyStart = pos + 1;
@@ -330,16 +330,16 @@ const parseObjectAt = (str: string, start: number): { value: Record<string, any>
     if (pos === -1) break;
 
     const key = str.slice(keyStart, pos);
-    pos++; // Skip the closing quote
+    pos++; // Skip the end quote
 
-    // Skip colon and whitespace characters
+    // Skip colon and blank characters
     while (pos < str.length && (str[pos] === ':' || /\s/.test(str[pos]))) {
       pos++;
     }
 
     if (pos >= str.length) break;
 
-    // Parse value (can be any type)
+    // Parsing value (can be of any type)
     const valueResult = parseValueAt(str, pos);
     result[key] = valueResult.value;
     pos = valueResult.pos;
@@ -354,27 +354,27 @@ const parseObjectAt = (str: string, start: number): { value: Record<string, any>
 };
 
 /**
- * Parse value string (compatible with old version, deprecated)
+ * Parsing values string (compatible with old version, abandoned)
  * 
- * @deprecated This function has been replaced by parseValueAt, kept for backward compatibility
+ * @deprecated This function has been parseValueAt Alternative, retain for backward compatibility
  * @param valueStr Value string to parse
- * @returns Parsed value
+ * @returns Parsing Value
  */
 const parseValue = (valueStr: string): any => {
   if (valueStr === '' || valueStr === 'undefined') {
     return undefined;
   }
 
-  // Handle string
+  // Process Strings
   if (valueStr.startsWith('"')) {
-    let stringValue = valueStr.slice(1); // Remove opening quote
+    let stringValue = valueStr.slice(1); // Remove the opening quote
 
-    // If ends with quote, remove closing quote
+    // If ending with quotation marks, remove quote marks at the end
     if (stringValue.endsWith('"')) {
       stringValue = stringValue.slice(0, -1);
     }
 
-    // Handle escape characters
+    // Process transliteration characters
     return stringValue
       .replace(/\\"/g, '"')
       .replace(/\\\\/g, '\\')
@@ -383,22 +383,22 @@ const parseValue = (valueStr: string): any => {
       .replace(/\\t/g, '\t');
   }
 
-  // 处理数组
+  // Process arrays
   if (valueStr.startsWith('[')) {
     return parsePartialArray(valueStr);
   }
 
-  // 处理对象
+  // Process Objects
   if (valueStr.startsWith('{')) {
     return parsePartialJson(valueStr);
   }
 
-  // Handle numbers
+  // Processing numbers
   if (/^-?\d+(?:\.\d+)?$/.test(valueStr)) {
     return parseFloat(valueStr);
   }
 
-  // Handle booleans
+  // Handle Boolean Values
   if (valueStr === 'true') {
     return true;
   }
@@ -406,34 +406,34 @@ const parseValue = (valueStr: string): any => {
     return false;
   }
 
-  // Handle null
+  // Processingnull
   if (valueStr === 'null') {
     return null;
   }
 
-  // Default return undefined
+  // Default Returnundefined
   return undefined;
 };
 
 /**
- * Parse partial array (compatible with old version, deprecated)
+ * Parsing Part arrays (compatible with old version, abandoned)
  * 
- * @deprecated This function has been replaced by parseArrayAt, kept for backward compatibility
- * @param str Array string to parse
- * @returns Parsed array
+ * @deprecated This function has been parseArrayAt Alternative, retain for backward compatibility
+ * @param str Cluster string to parse
+ * @returns Arrays after parsing
  */
 const parsePartialArray = (str: string): any[] => {
   const result: any[] = [];
 
-  // Remove opening [
+  // Remove the beginning [
   const content = str.slice(1).trim();
 
-  // If array is empty or incomplete, return undefined
+  // If array is empty or incomplete, returnundefined
   if (content === '' || content.startsWith(']')) {
     return undefined as any;
   }
 
-  // Use state machine to parse array elements
+  // Use status machine to resolve array elements
   let i = 0;
   let currentElement = '';
   let inString = false;
@@ -477,7 +477,7 @@ const parsePartialArray = (str: string): any[] => {
       bracketDepth--;
       currentElement += char;
     } else if (char === ',' && !inString && braceDepth === 0 && bracketDepth === 0) {
-      // Handle current element
+      // Process current elements
       const element = currentElement.trim();
       if (element !== '') {
         result.push(parseValue(element));
@@ -490,7 +490,7 @@ const parsePartialArray = (str: string): any[] => {
     i++;
   }
 
-  // Handle last element
+  // Process the last element
   const element = currentElement.trim();
   if (element !== '' && !element.endsWith(']')) {
     result.push(parseValue(element));

@@ -173,7 +173,7 @@ const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   };
 
   return (
-    <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="w-full p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
       {schema.title && <h3 className="text-lg font-semibold text-gray-900 mb-2">{schema.title}</h3>}
       {schema.description && <p className="text-sm text-gray-600 mb-6 leading-relaxed">{schema.description}</p>}
 

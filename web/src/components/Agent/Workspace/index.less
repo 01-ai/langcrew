@@ -1,20 +1,57 @@
 .agentx-controller {
   .ant-slider {
-    .ant-slider-track {
-      background-color: #2051c9;
-      border-radius: 2px;
+    margin: 0;
+    // AntD v6 uses CSS-in-JS; avoid overriding `transform` (it controls X centering).
+    // Use the `translate` property to adjust vertical centering without breaking AntD's transform.
+    padding: 6px 0;
+    width: 100%;
+    
+    .ant-slider-rail {
+      background-color: #EAEAEA;
+      height: 4px;
+      top: 50%;
+      translate: 0 -50%;
     }
 
-    .ant-slider-handle::after {
-      background-color: #2051c9;
-      outline: 2px solid #ffffff;
-      box-shadow: 0px 1px 12px rgba(0, 0, 0, 0.25);
+    .ant-slider-track {
+      background-color: #2781FF;
+      height: 4px;
+      border-radius: 4px;
+      top: 50%;
+      translate: 0 -50%;
+    }
+
+    .ant-slider-handle {
+      width: 12px;
+      height: 12px;
+      top: 50%;
+      margin-top: 0;
+      translate: 0 -50%;
+
+      &::after {
+        width: 12px;
+        height: 12px;
+        background-color: #2781FF;
+        outline: 2px solid #ffffff;
+        box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.2);
+        inset-inline-start: 0;
+        inset-block-start: 0;
+      }
+
+      &:hover, &:focus {
+        &::after {
+          width: 14px;
+          height: 14px;
+          margin-top: -1px;
+          margin-left: -1px;
+        }
+      }
     }
   }
 
   .ant-badge.ant-badge-status .ant-badge-status-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   .ant-badge.ant-badge-status .ant-badge-status-default {

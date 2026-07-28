@@ -1,0 +1,76 @@
+.agentx-two-column {
+  /**
+   * Layout requirements:
+   * - left padding: 0 (gap handled by margin)
+   * - right padding: 12px
+   * - chat column: up to 760px
+   * - gap between columns: at least 20px
+   * - small widths: workspace width == chat width
+   * - once chat hits 760px: only gap + workspace width increase
+   */
+  padding-left: 0;
+  padding-right: 12px;
+
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+
+  /* Base tokens */
+  --agentx-gap-min: 20px;
+  --agentx-chat-max: 760px;
+
+  /**
+   * When viewport is small:
+   *   base = (100% - 2 * gapMin) / 2  => chat == workspace
+   * When viewport is large enough:
+   *   base caps at chatMax
+   *   extra = 100% - (2*chatMax + 2*gapMin)
+   *   extra is split between (gap growth) and (workspace growth)
+   *   workspace should grow faster than gap
+   */
+  --agentx-base: min(var(--agentx-chat-max), calc((100% - 2 * var(--agentx-gap-min)) / 2));
+  --agentx-extra: max(0px, calc(100% - (2 * var(--agentx-chat-max) + 2 * var(--agentx-gap-min))));
+  /* Growth split for extra width once chat hits max width */
+  --agentx-gap-grow-share: 0.125; /* 12.5% of extra goes to EACH gap (total 25%) */
+  --agentx-workspace-grow-share: calc(1 - 2 * var(--agentx-gap-grow-share)); /* remaining goes to workspace */
+  --agentx-gap: calc(var(--agentx-gap-min) + (var(--agentx-extra) * var(--agentx-gap-grow-share)));
+
+  column-gap: var(--agentx-gap);
+}
+
+.agentx-single-column {
+  /* Workspace hidden: keep left spacing consistent and cap chat width at 760px */
+  padding-left: 20px;
+  padding-right: 12px;
+
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  justify-content: center;
+}
+
+.agentx-chat-single {
+  /* Centered, responsive up to 760px */
+  flex: 0 1 760px;
+  width: min(100%, 760px);
+  max-width: 760px;
+  min-width: 0;
+  height: 100%;
+}
+
+.agentx-chat-column {
+  flex: 0 0 var(--agentx-base);
+  min-width: 0;
+  height: 100%;
+  margin-left: var(--agentx-gap);
+}
+
+.agentx-right-column {
+  flex: 0 0 calc(var(--agentx-base) + (var(--agentx-extra) * var(--agentx-workspace-grow-share)));
+  min-width: 0;
+  height: 100%;
+}
+
+

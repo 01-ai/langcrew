@@ -1,86 +1,112 @@
-import { Input, InputRef, Modal, message } from 'antd';
+import { App, Input, InputRef, message } from 'antd';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { getLanguage, getTranslation, useTranslation } from '@/hooks/useTranslation';
-import { mockData } from './useChat/mock';
-import { useChunksProcessor } from './useChunksProcessor';
-import { useAgentStore } from '@/store';
-import { shareApi } from '@/services/api';
+import { getTranslation, useTranslation } from '@/hooks/useTranslation';
+import { useChunksUISync } from './useChunksUISync';
+import { useAgentStore, useAgentStoreApi, useRequestClient } from '@/store';
 import { SessionInfo } from '@/types';
-import { XStream } from '@ant-design/x';
+import { XStream } from '@ant-design/x-sdk';
 import { isJsonString } from '@/utils/json';
 
 const REPLAY_INTERVAL = 300;
+const STREAMING_INTERVAL = 10; // Fluid playspace
+const buttonStyle = {
+  width: 76,
+  height: 36,
+};
 
 const useReplay = (replayId: string, needPassword: boolean, defaultPassword: string = '') => {
   const { t } = useTranslation();
+  const { modal } = App.useApp();
+  const storeApi = useAgentStoreApi();
+  const requestClient = useRequestClient();
 
-  // display loading when there is no data
+  // Show when data is not availableloading
   const [loading, setLoading] = useState<boolean>(true);
 
-  // whether the loading is complete
+  // Load finished
   const [loaded, setLoaded] = useState<boolean>(false);
 
-  // whether it is playing
+  // Whether to play
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
-  // error information
+  // Error message
   const [error, setError] = useState<string>('');
 
-  // value of the password input box
+  // The value of the password input box
   const passwordRef = useRef<string>(defaultPassword);
 
-  // password input box's ref, used to autoFocus
+  // Password input boxref，ForautoFocus
   const inputRef = useRef<InputRef>(null);
 
-  // original chunks
-  const [originalChunks, setOriginalChunks] = useState<any[]>([]);
+  const waitTimeRef = useRef<number>(REPLAY_INTERVAL);
 
-  // new status: whether to re-enter the password
+  // Originalchunks
+  // const [originalChunks, setOriginalChunks] = useState<any[]>([]);
+  const originalChunks = useRef<any[]>([]);
+
+  // Add State: Whether or not to re-enter password
   const [needRetryPassword, setNeedRetryPassword] = useState<boolean>(false);
 
-  // use chunks in the global store
+  // Use global store Medium chunks
   const { chunks } = useAgentStore();
-  useChunksProcessor(chunks);
+  useChunksUISync(chunks);
 
   const playInterval = useRef<NodeJS.Timeout | null>(null);
 
   const end = useCallback(() => {
-    if (playInterval.current) {
-      clearInterval(playInterval.current);
+    if (loaded) {
+      if (playInterval.current) {
+        clearTimeout(playInterval.current);
+      }
+      setIsPlaying(false);
+      storeApi.getState().setChunks([...originalChunks.current]);
+    } else {
+      waitTimeRef.current = 0;
     }
-    setIsPlaying(false);
-    useAgentStore.getState().setChunks([...originalChunks]);
-  }, [originalChunks]);
+  }, [loaded, storeApi]);
 
   const start = useCallback(() => {
-    useAgentStore.getState().setChunks([]);
-    useAgentStore.getState().setFileViewerFile(undefined);
-    useAgentStore.getState().setPipelineTargetMessage(undefined);
-    // useAgentStore.getState().setWorkspaceVisible(false);
+    storeApi.getState().setChunks([]);
+    storeApi.getState().setFileViewerFile(undefined);
+    storeApi.getState().setPipelineTargetMessage(undefined);
+    storeApi.getState().setWorkspaceVisible(false);
     let index = 0;
     if (playInterval.current) {
-      clearInterval(playInterval.current);
+      clearTimeout(playInterval.current);
     }
     setIsPlaying(true);
-    playInterval.current = setInterval(() => {
-      if (index < originalChunks.length) {
-        useAgentStore.getState().addChunk(originalChunks[index]);
+
+    const playNextChunk = () => {
+      if (index < originalChunks.current.length) {
+        storeApi.getState().addChunk(originalChunks.current[index]);
         index++;
+
+        // According to the nextchunkType Settings Interval
+        const nextInterval =
+          index < originalChunks.current.length && originalChunks.current[index].type === 'text'
+            ? STREAMING_INTERVAL
+            : REPLAY_INTERVAL;
+        playInterval.current = setTimeout(playNextChunk, nextInterval);
       } else {
-        clearInterval(playInterval.current);
         setIsPlaying(false);
       }
-    }, REPLAY_INTERVAL);
+    };
+
+    // Start playing firstchunk
+    playNextChunk();
+
     return () => {
-      clearInterval(playInterval.current);
+      if (playInterval.current) {
+        clearTimeout(playInterval.current);
+      }
       setIsPlaying(false);
     };
-  }, [originalChunks]);
+  }, [storeApi]);
 
-  // get share details - remove the dependency on askPassword
+  // Get share details - Remove Right askPassword Dependency
   const getShareChatDetail = useCallback(async () => {
     const params: any = {};
-    // if password is needed, add password
+    // Add password if you need it
     if (needPassword) {
       params.encrypt = true;
       params.password = passwordRef.current;
@@ -88,18 +114,17 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
     setLoading(true);
 
     try {
-      const response = await fetch(
-        `${useAgentStore.getState().requestPrefix}/api/v1/sessions/share/${replayId}?${new URLSearchParams(
-          params,
-        ).toString()}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            language: getLanguage(),
-          },
-        },
-      );
+      storeApi.getState().setChunks([]);
+      storeApi.getState().abortController?.abort();
+      const abortController = new AbortController();
+      storeApi.getState().setAbortController(abortController);
+      const response = await fetch(`/app/api/v1/sessions/share/${replayId}?${new URLSearchParams(params).toString()}`, {
+        method: 'GET',
+        headers: requestClient.getCommonRequestHeaders({
+          'Content-Type': 'application/json',
+        }),
+        signal: abortController.signal,
+      });
       if (!response.ok) {
         setError(response.statusText);
         setLoading(false);
@@ -115,34 +140,45 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
           const chunkData = isJsonString(chunk.data) ? JSON.parse(chunk.data) : null;
           if (chunkData) {
             if (chunkData.type === 'replay_session') {
-              useAgentStore
+              storeApi
                 .getState()
                 .setSessionInfo({ title: chunkData.content, status: 'ARCHIVED' } as unknown as SessionInfo);
               continue;
             }
             if (chunkData.type === 'password_error') {
               message.error(getTranslation('error.password.incorrect'));
-              // set the status of needing to re-enter the password, instead of directly calling askPassword
+              // Setup requires re-entry of password status, not direct call askPassword
               setNeedRetryPassword(true);
               setLoading(false);
               return;
             }
-            useAgentStore.getState().addChunk(chunkData);
+            if (chunkData.type === 'all') {
+              const allMessages = chunkData.messages || [];
+              originalChunks.current = allMessages;
+
+              setLoaded(true);
+              start();
+              return;
+            }
+
+            storeApi.getState().addChunk(chunkData);
             chunks.push(chunkData);
           }
-          await new Promise((resolve) => setTimeout(resolve, REPLAY_INTERVAL));
+          const waitTime = waitTimeRef.current; // chunkData.type === 'text' ? waitTimeRef.current : REPLAY_INTERVAL;
+
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
         }
-        setOriginalChunks(chunks);
+        originalChunks.current = chunks;
         setLoaded(true);
         setIsPlaying(false);
       } catch (error) {
-        // if AbortError, it means the user interrupted the request
+        // If AbortError，Indicates that the user has voluntarily interrupted the request and does not need to show errors
         if (error.name === 'AbortError') {
-          console.error('Request was aborted by user');
+          console.log('Request was aborted by user');
           return;
         }
-        // other errors are handled normally
-        useAgentStore.getState().addChunk({
+        // Other errors are handled properly
+        storeApi.getState().addChunk({
           id: Date.now().toString(),
           role: 'assistant',
           type: 'error',
@@ -152,14 +188,26 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
       return;
     } catch (error) {
       setLoading(false);
-      setError('Failed to get share detail');
+      setError(t('share.fetch_failed'));
       console.error('Failed to get share detail:', error);
     }
-  }, [needPassword, replayId]);
+  }, [needPassword, replayId, requestClient, start, storeApi, t]);
 
-  const askPassword = useCallback(async () => {
-    const modal = await Modal.confirm({
+  useEffect(() => {
+    return () => {
+      storeApi.getState().resetStore();
+    };
+  }, [storeApi]);
+
+  const askPassword = useCallback(() => {
+    modal.confirm({
       title: t('share.authentication'),
+      centered: true,
+      cancelButtonProps: { style: buttonStyle },
+      okButtonProps: {
+        type: 'primary',
+        style: buttonStyle,
+      },
       content: (
         <Input.Password
           placeholder={t('share.password')}
@@ -172,7 +220,6 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
           onPressEnter={() => {
             setNeedRetryPassword(false);
             getShareChatDetail();
-            modal.destroy();
           }}
           required
         />
@@ -180,7 +227,6 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
       onOk: () => {
         setNeedRetryPassword(false);
         getShareChatDetail();
-        modal.destroy();
       },
       onCancel: () => {
         setLoading(false);
@@ -192,9 +238,9 @@ const useReplay = (replayId: string, needPassword: boolean, defaultPassword: str
         }
       },
     });
-  }, [getShareChatDetail, t]);
+  }, [getShareChatDetail, modal, t]);
 
-  // listen to the status of needing to re-enter the password
+  // The listening needs to re-enter the password status
   useEffect(() => {
     if (needRetryPassword) {
       askPassword();

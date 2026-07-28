@@ -1,9 +1,4 @@
-import React from "react";
-
-type LinkElementProps = React.DetailedHTMLProps<
-  React.AnchorHTMLAttributes<HTMLAnchorElement>,
-  HTMLAnchorElement
->;
+type LinkElementProps = React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>;
 
 const LinkElement: React.FC<LinkElementProps> = ({ href, children }) => {
   return (
