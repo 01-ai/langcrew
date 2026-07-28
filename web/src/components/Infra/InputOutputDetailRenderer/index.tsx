@@ -31,7 +31,7 @@ const InputOutputDetailRenderer: React.FC<InputOutputDetailRendererProps> = ({
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
             <span className="text-sm font-medium text-gray-700">{inputLabel}</span>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-h-0">
             <Code language={inputLanguage as any} code={input} isDiff={false} />
           </div>
         </div>
@@ -43,7 +43,7 @@ const InputOutputDetailRenderer: React.FC<InputOutputDetailRendererProps> = ({
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
             <span className="text-sm font-medium text-gray-700">{outputLabel}</span>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-h-0">
             <Code language={outputLanguage as any} code={output} isDiff={false} />
           </div>
         </div>

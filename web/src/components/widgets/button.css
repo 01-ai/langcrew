@@ -1,0 +1,532 @@
+.shrink {
+  flex-shrink: 1;
+}
+
+[data-w-component='button'] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--button-gap);
+  flex-shrink: 0;
+  height: var(--button-size);
+  padding: 0 var(--button-gutter);
+  border-radius: var(--button-radius);
+  border: none;
+  cursor: pointer;
+  font-size: var(--button-font-size);
+  font-weight: var(--button-font-weight);
+  line-height: 1;
+  transition-duration: var(--transition-duration-basic);
+  transition-property: opacity, color, background-color, border-color, box-shadow;
+  transition-timing-function: var(--transition-ease-basic);
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 0;
+}
+
+[data-w-component='button']:where([data-block]) {
+  width: 100%;
+}
+
+/* Button sizes */
+[data-w-component='button']:where([data-size='3xs']) {
+  --button-size: var(--control-size-3xs);
+  --button-gutter: var(--control-gutter-sm);
+  --button-font-size: var(--control-font-size-sm);
+  --button-icon-size: var(--control-icon-size-sm);
+  --button-gap: var(--button-gap-sm);
+  --button-radius: var(--control-radius-sm);
+}
+
+[data-w-component='button']:where([data-size='2xs']) {
+  --button-size: var(--control-size-2xs);
+  --button-gutter: var(--control-gutter-sm);
+  --button-font-size: var(--control-font-size-sm);
+  --button-icon-size: var(--control-icon-size-sm);
+  --button-gap: var(--button-gap-sm);
+  --button-radius: var(--control-radius-sm);
+}
+
+[data-w-component='button']:where([data-size='xs']) {
+  --button-size: var(--control-size-xs);
+  --button-gutter: var(--control-gutter-sm);
+  --button-font-size: var(--control-font-size-sm);
+  --button-icon-size: var(--control-icon-size-sm);
+  --button-gap: var(--button-gap-sm);
+  --button-radius: var(--control-radius-sm);
+}
+
+[data-w-component='button']:where([data-size='sm']) {
+  --button-size: var(--control-size-sm);
+  --button-gutter: var(--control-gutter-sm);
+  --button-font-size: var(--control-font-size-sm);
+  --button-icon-size: var(--control-icon-size-sm);
+  --button-gap: var(--button-gap-sm);
+  --button-radius: var(--control-radius-sm);
+}
+
+[data-w-component='button']:where([data-size='md']) {
+  --button-size: var(--control-size-md);
+  --button-gutter: var(--control-gutter-md);
+  --button-font-size: var(--control-font-size-md);
+  --button-icon-size: var(--control-icon-size-md);
+  --button-gap: var(--button-gap-md);
+  --button-radius: var(--control-radius-md);
+}
+
+[data-w-component='button']:where([data-size='lg']) {
+  --button-size: var(--control-size-lg);
+  --button-gutter: var(--control-gutter-md);
+  --button-font-size: var(--control-font-size-md);
+  --button-icon-size: var(--control-icon-size-md);
+  --button-gap: var(--button-gap-lg);
+  --button-radius: var(--control-radius-md);
+}
+
+[data-w-component='button']:where([data-size='xl']) {
+  --button-size: var(--control-size-xl);
+  --button-gutter: var(--control-gutter-lg);
+  --button-font-size: var(--control-font-size-lg);
+  --button-icon-size: var(--control-icon-size-lg);
+  --button-gap: var(--button-gap-lg);
+  --button-radius: var(--control-radius-lg);
+}
+
+[data-w-component='button']:where([data-size='2xl']) {
+  --button-size: var(--control-size-2xl);
+  --button-gutter: var(--control-gutter-lg);
+  --button-font-size: var(--control-font-size-lg);
+  --button-icon-size: var(--control-icon-size-lg);
+  --button-gap: var(--button-gap-lg);
+  --button-radius: var(--control-radius-lg);
+}
+
+[data-w-component='button']:where([data-size='3xl']) {
+  --button-size: var(--control-size-3xl);
+  --button-gutter: var(--control-gutter-lg);
+  --button-font-size: var(--control-font-size-lg);
+  --button-icon-size: var(--control-icon-size-lg);
+  --button-gap: var(--button-gap-lg);
+  --button-radius: var(--control-radius-lg);
+}
+
+/* Button pill shape */
+[data-w-component='button']:where([data-pill]) {
+  --button-radius: var(--radius-full);
+  padding: 0 calc(var(--button-gutter) * var(--control-gutter-pill-scaling));
+}
+
+/* Button uniform size (square) */
+[data-w-component='button']:where([data-uniform]) {
+  width: var(--button-size);
+  padding: 0;
+}
+
+/* Button background layers */
+[data-w-component='button']:before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  border-radius: inherit;
+  content: '';
+  transition-duration: var(--transition-duration-basic);
+  transition-property: opacity, background-color, transform, box-shadow, border-color;
+  transition-timing-function: var(--transition-ease-basic);
+  will-change: transform;
+  z-index: -1;
+}
+
+/* Ripple effect layer */
+[data-w-component='button']:after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+  transition-duration: var(--transition-duration-basic);
+  transition-property: transform;
+  transition-timing-function: var(--transition-ease-basic);
+  will-change: transform;
+  z-index: 0;
+}
+
+/* Button inner content */
+.w-button-inner {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.15s ease 0.1s;
+  z-index: 1;
+}
+
+/* Button icon base */
+.w-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+/* Disabled state */
+[data-w-component='button']:disabled,
+[data-w-component='button']:where([aria-disabled='true']) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ====================
+   SOLID VARIANT COLORS
+   ==================== */
+
+/* Solid Primary */
+[data-w-component='button'][data-variant='solid']:where([data-color='primary']) {
+  --button-background-color: var(--color-background-primary-solid);
+  --button-background-color-hover: var(--color-background-primary-solid-hover);
+  --button-background-color-active: var(--color-background-primary-solid-active);
+  --button-text-color: var(--color-text-primary-solid);
+}
+
+/* Solid Secondary */
+[data-w-component='button'][data-variant='solid']:where([data-color='secondary']) {
+  --button-background-color: var(--color-background-secondary-solid);
+  --button-background-color-hover: var(--color-background-secondary-solid-hover);
+  --button-background-color-active: var(--color-background-secondary-solid-active);
+  --button-text-color: var(--color-text-secondary-solid);
+}
+
+/* Solid Info */
+[data-w-component='button'][data-variant='solid']:where([data-color='info']) {
+  --button-background-color: var(--color-background-info-solid);
+  --button-background-color-hover: var(--color-background-info-solid-hover);
+  --button-background-color-active: var(--color-background-info-solid-active);
+  --button-text-color: var(--color-text-info-solid);
+}
+
+/* Solid Success */
+[data-w-component='button'][data-variant='solid']:where([data-color='success']) {
+  --button-background-color: var(--color-background-success-solid);
+  --button-background-color-hover: var(--color-background-success-solid-hover);
+  --button-background-color-active: var(--color-background-success-solid-active);
+  --button-text-color: var(--color-text-success-solid);
+}
+
+/* Solid Warning */
+[data-w-component='button'][data-variant='solid']:where([data-color='warning']) {
+  --button-background-color: var(--color-background-warning-solid);
+  --button-background-color-hover: var(--color-background-warning-solid-hover);
+  --button-background-color-active: var(--color-background-warning-solid-active);
+  --button-text-color: var(--color-text-warning-solid);
+}
+
+/* Solid Caution */
+[data-w-component='button'][data-variant='solid']:where([data-color='caution']) {
+  --button-background-color: var(--color-background-caution-solid);
+  --button-background-color-hover: var(--color-background-caution-solid-hover);
+  --button-background-color-active: var(--color-background-caution-solid-active);
+  --button-text-color: var(--color-text-caution-solid);
+}
+
+/* Solid Danger */
+[data-w-component='button'][data-variant='solid']:where([data-color='danger']) {
+  --button-background-color: var(--color-background-danger-solid);
+  --button-background-color-hover: var(--color-background-danger-solid-hover);
+  --button-background-color-active: var(--color-background-danger-solid-active);
+  --button-text-color: var(--color-text-danger-solid);
+}
+
+/* Solid Discovery */
+[data-w-component='button'][data-variant='solid']:where([data-color='discovery']) {
+  --button-background-color: var(--color-background-discovery-solid);
+  --button-background-color-hover: var(--color-background-discovery-solid-hover);
+  --button-background-color-active: var(--color-background-discovery-solid-active);
+  --button-text-color: var(--color-text-discovery-solid);
+}
+
+/* Solid variant base */
+[data-w-component='button'][data-variant='solid'] {
+  color: var(--button-text-color);
+}
+
+[data-w-component='button'][data-variant='solid']:before {
+  background-color: var(--button-background-color);
+}
+
+[data-w-component='button'][data-variant='solid']:hover:not(:disabled):not([aria-disabled='true']):before {
+  background-color: var(--button-background-color-hover);
+}
+
+[data-w-component='button'][data-variant='solid']:active:not(:disabled):not([aria-disabled='true']):before {
+  background-color: var(--button-background-color-active);
+}
+
+/* ====================
+   SOFT VARIANT COLORS
+   ==================== */
+
+/* Soft variant base */
+[data-w-component='button'][data-variant='soft'] {
+  color: var(--button-text-color);
+}
+
+[data-w-component='button'][data-variant='soft']:before {
+  background-color: var(--button-background-soft-color);
+}
+
+[data-w-component='button'][data-variant='soft']:hover:not(:disabled):not([aria-disabled='true']):before {
+  background-color: var(--button-background-soft-color-hover);
+}
+
+/* Soft Primary */
+[data-w-component='button'][data-variant='soft']:where([data-color='primary']) {
+  --button-text-color: var(--color-text-primary-solid);
+  --button-background-soft-color: var(--color-background-primary-soft);
+  --button-background-soft-color-hover: var(--color-background-primary-soft-hover);
+}
+
+/* Soft Secondary */
+[data-w-component='button'][data-variant='soft']:where([data-color='secondary']) {
+  --button-text-color: var(--color-text-secondary-soft);
+  --button-background-soft-color: var(--color-background-secondary-soft);
+  --button-background-soft-color-hover: var(--color-background-secondary-soft-hover);
+}
+
+/* Soft Info */
+[data-w-component='button'][data-variant='soft']:where([data-color='info']) {
+  --button-text-color: var(--color-text-info-soft);
+  --button-background-soft-color: var(--color-background-info-soft);
+  --button-background-soft-color-hover: var(--color-background-info-soft-hover);
+}
+
+/* Soft Success */
+[data-w-component='button'][data-variant='soft']:where([data-color='success']) {
+  --button-text-color: var(--color-text-success-soft);
+  --button-background-soft-color: var(--color-background-success-soft);
+  --button-background-soft-color-hover: var(--color-background-success-soft-hover);
+}
+
+/* Soft Warning */
+[data-w-component='button'][data-variant='soft']:where([data-color='warning']) {
+  --button-text-color: var(--color-text-warning-soft);
+  --button-background-soft-color: var(--color-background-warning-soft);
+  --button-background-soft-color-hover: var(--color-background-warning-soft-hover);
+}
+
+/* Soft Caution */
+[data-w-component='button'][data-variant='soft']:where([data-color='caution']) {
+  --button-text-color: var(--color-text-caution-soft);
+  --button-background-soft-color: var(--color-background-caution-soft);
+  --button-background-soft-color-hover: var(--color-background-caution-soft-hover);
+}
+
+/* Soft Danger */
+[data-w-component='button'][data-variant='soft']:where([data-color='danger']) {
+  --button-text-color: var(--color-text-danger-soft);
+  --button-background-soft-color: var(--color-background-danger-soft);
+  --button-background-soft-color-hover: var(--color-background-danger-soft-hover);
+}
+
+/* Soft Discovery */
+[data-w-component='button'][data-variant='soft']:where([data-color='discovery']) {
+  --button-text-color: var(--color-text-discovery-soft);
+  --button-background-soft-color: var(--color-background-discovery-soft);
+  --button-background-soft-color-hover: var(--color-background-discovery-soft-hover);
+}
+
+/* ====================
+   OUTLINE VARIANT COLORS
+   ==================== */
+
+/* Outline variant base */
+[data-w-component='button'][data-variant='outline'] {
+  --button-ring-offset: -1px;
+  color: var(--button-text-color);
+}
+
+[data-w-component='button'][data-variant='outline']:before {
+  background-color: transparent;
+  box-shadow: 0 0 0 1px var(--button-border-color) inset;
+}
+
+[data-w-component='button'][data-variant='outline']:hover:not(:disabled):not([aria-disabled='true']):before {
+  box-shadow: 0 0 0 1px var(--button-border-color-hover) inset;
+  background-color: var(--button-background-outline-hover);
+}
+
+/* Outline Primary */
+[data-w-component='button'][data-variant='outline']:where([data-color='primary']) {
+  --button-text-color: var(--color-text-primary-outline);
+  --button-border-color: var(--color-border-primary-outline);
+  --button-border-color-hover: var(--color-border-primary-outline-hover);
+  --button-background-outline-hover: var(--color-background-primary-outline-hover);
+}
+
+/* Outline Secondary */
+[data-w-component='button'][data-variant='outline']:where([data-color='secondary']) {
+  --button-text-color: var(--color-text-secondary-outline);
+  --button-border-color: var(--color-border-secondary-outline);
+  --button-border-color-hover: var(--color-border-secondary-outline-hover);
+  --button-background-outline-hover: var(--color-background-secondary-outline-hover);
+}
+
+/* Outline Info */
+[data-w-component='button'][data-variant='outline']:where([data-color='info']) {
+  --button-text-color: var(--color-text-info-outline);
+  --button-border-color: var(--color-border-info-outline);
+  --button-border-color-hover: var(--color-border-info-outline-hover);
+  --button-background-outline-hover: var(--color-background-info-outline-hover);
+}
+
+/* Outline Success */
+[data-w-component='button'][data-variant='outline']:where([data-color='success']) {
+  --button-text-color: var(--color-text-success-outline);
+  --button-border-color: var(--color-border-success-outline);
+  --button-border-color-hover: var(--color-border-success-outline-hover);
+  --button-background-outline-hover: var(--color-background-success-outline-hover);
+}
+
+/* Outline Warning */
+[data-w-component='button'][data-variant='outline']:where([data-color='warning']) {
+  --button-text-color: var(--color-text-warning-outline);
+  --button-border-color: var(--color-border-warning-outline);
+  --button-border-color-hover: var(--color-border-warning-outline-hover);
+  --button-background-outline-hover: var(--color-background-warning-outline-hover);
+}
+
+/* Outline Caution */
+[data-w-component='button'][data-variant='outline']:where([data-color='caution']) {
+  --button-text-color: var(--color-text-caution-outline);
+  --button-border-color: var(--color-border-caution-outline);
+  --button-border-color-hover: var(--color-border-caution-outline-hover);
+  --button-background-outline-hover: var(--color-background-caution-outline-hover);
+}
+
+/* Outline Danger */
+[data-w-component='button'][data-variant='outline']:where([data-color='danger']) {
+  --button-text-color: var(--color-text-danger-outline);
+  --button-border-color: var(--color-border-danger-outline);
+  --button-border-color-hover: var(--color-border-danger-outline-hover);
+  --button-background-outline-hover: var(--color-background-danger-outline-hover);
+}
+
+/* Outline Discovery */
+[data-w-component='button'][data-variant='outline']:where([data-color='discovery']) {
+  --button-text-color: var(--color-text-discovery-outline);
+  --button-border-color: var(--color-border-discovery-outline);
+  --button-border-color-hover: var(--color-border-discovery-outline-hover);
+  --button-background-outline-hover: var(--color-background-discovery-outline-hover);
+}
+
+/* ====================
+   GHOST VARIANT COLORS
+   ==================== */
+
+/* Ghost variant base */
+[data-w-component='button'][data-variant='ghost'] {
+  color: var(--button-text-color);
+}
+
+[data-w-component='button'][data-variant='ghost']:before {
+  background-color: transparent;
+}
+
+[data-w-component='button'][data-variant='ghost']:hover:not(:disabled):not([aria-disabled='true']):before {
+  background-color: var(--button-background-ghost-hover);
+}
+
+/* Ghost Primary */
+[data-w-component='button'][data-variant='ghost']:where([data-color='primary']) {
+  --button-text-color: var(--color-text-primary-ghost);
+  --button-background-ghost-hover: var(--color-background-primary-ghost-hover);
+}
+
+/* Ghost Secondary */
+[data-w-component='button'][data-variant='ghost']:where([data-color='secondary']) {
+  --button-text-color: var(--color-text-secondary-ghost);
+  --button-background-ghost-hover: var(--color-background-secondary-ghost-hover);
+}
+
+/* Ghost Info */
+[data-w-component='button'][data-variant='ghost']:where([data-color='info']) {
+  --button-text-color: var(--color-text-info-ghost);
+  --button-background-ghost-hover: var(--color-background-info-ghost-hover);
+}
+
+/* Ghost Success */
+[data-w-component='button'][data-variant='ghost']:where([data-color='success']) {
+  --button-text-color: var(--color-text-success-ghost);
+  --button-background-ghost-hover: var(--color-background-success-ghost-hover);
+}
+
+/* Ghost Warning */
+[data-w-component='button'][data-variant='ghost']:where([data-color='warning']) {
+  --button-text-color: var(--color-text-warning-ghost);
+  --button-background-ghost-hover: var(--color-background-warning-ghost-hover);
+}
+
+/* Ghost Caution */
+[data-w-component='button'][data-variant='ghost']:where([data-color='caution']) {
+  --button-text-color: var(--color-text-caution-ghost);
+  --button-background-ghost-hover: var(--color-background-caution-ghost-hover);
+}
+
+/* Ghost Danger */
+[data-w-component='button'][data-variant='ghost']:where([data-color='danger']) {
+  --button-text-color: var(--color-text-danger-ghost);
+  --button-background-ghost-hover: var(--color-background-danger-ghost-hover);
+}
+
+/* Ghost Discovery */
+[data-w-component='button'][data-variant='ghost']:where([data-color='discovery']) {
+  --button-text-color: var(--color-text-discovery-ghost);
+  --button-background-ghost-hover: var(--color-background-discovery-ghost-hover);
+}
+
+/* ====================
+   ICON SIZE SUPPORT
+   ==================== */
+
+[data-w-component='button'][data-icon-size='sm'] .w-button-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  font-size: 0.875rem;
+}
+
+[data-w-component='button'][data-icon-size='md'] .w-button-icon {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+}
+
+[data-w-component='button'][data-icon-size='lg'] .w-button-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 1.25rem;
+}
+
+[data-w-component='button'][data-icon-size='xl'] .w-button-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 1.5rem;
+}
+
+[data-w-component='button'][data-icon-size='2xl'] .w-button-icon {
+  width: 2rem;
+  height: 2rem;
+  font-size: 2rem;
+}

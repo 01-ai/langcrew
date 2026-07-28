@@ -3,41 +3,46 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import Code from '../Code';
 import Markdown from '../Markdown';
+import VirtualMarkdown from '../VirtualMarkdown';
 import CSVViewer from '../CSVViewer';
+import { getContentStats } from '@/utils/markdownBlockParser';
+import { FILE_CONTENT_SUPPORT_CONTENT_TYPES, FILE_CONTENT_SUPPORT_FILE_TYPES } from '@/utils/filePreview';
 
 interface FileContentRenderProps {
   /**
-   * file extension
+   * File Extension
    */
   fileExtension?: string;
 
   /**
-   * content type (MIME type)
+   * Content Type (MIME type)
    */
   contentType?: string;
 
   /**
-   * file content
+   * Contents of the document
    */
   fileContent?: string;
   /**
-   * old file content
+   * Text of old documents
    */
   oldFileContent?: string;
 
   /**
-   * whether it is a difference file
+   * Whether or not to be a discrepancy document
    */
   isDiff?: boolean;
 }
 
-// supported file types (based on extension)
-export const fileContentSupportFileTypes = ['html', 'md', 'csv'];
+// Supported file type (based on extension)
+export const fileContentSupportFileTypes = [...FILE_CONTENT_SUPPORT_FILE_TYPES];
 
-// supported content types (based on MIME type)
-export const fileContentSupportContentTypes = ['text/html', 'text/markdown', 'text/csv'];
+// Type of content supported (based on MIME type）
+export const fileContentSupportContentTypes = [...FILE_CONTENT_SUPPORT_CONTENT_TYPES];
 
 const fileTypeToLanguage = {
+  html: 'html',
+  htm: 'html',
   md: 'markdown',
   markdown: 'markdown',
   py: 'python',
@@ -57,6 +62,22 @@ const fileTypeToLanguage = {
   sql: 'sql',
 };
 
+const srcDocBaseTag = '<base href="about:srcdoc" />';
+
+const injectSrcDocBaseTag = (html: string) => {
+  if (!html) return html;
+
+  if (/<head(\s[^>]*)?>/i.test(html)) {
+    return html.replace(/<head(\s[^>]*)?>/i, (match) => `${match}${srcDocBaseTag}`);
+  }
+
+  if (/<html(\s[^>]*)?>/i.test(html)) {
+    return html.replace(/<html(\s[^>]*)?>/i, (match) => `${match}<head>${srcDocBaseTag}</head>`);
+  }
+
+  return `${srcDocBaseTag}${html}`;
+};
+
 const FileContentRender: React.FC<FileContentRenderProps> = ({
   fileExtension = '',
   contentType = '',
@@ -67,7 +88,7 @@ const FileContentRender: React.FC<FileContentRenderProps> = ({
   const [previewType, setPreviewType] = useState<'preview' | 'raw'>('preview');
   const { t } = useTranslation();
 
-  // extract file type from contentType
+  // From contentType Type of file to extract from
   const getTypeFromContentType = (ct: string) => {
     if (ct.includes('text/markdown') || ct.includes('markdown')) return 'md';
     if (ct.includes('text/html') || ct.includes('html')) return 'html';
@@ -81,11 +102,29 @@ const FileContentRender: React.FC<FileContentRenderProps> = ({
   const language =
     (fileTypeToLanguage[detectedType as keyof typeof fileTypeToLanguage] as any) || detectedType || 'plaintext';
 
+  // Check if virtual scroll is needed (only for Markdown）
+  const markdownStats = useMemo(() => {
+    if (detectedType === 'md' && fileContent) {
+      return getContentStats(fileContent);
+    }
+    return null;
+  }, [detectedType, fileContent]);
+
+  const htmlPreviewContent = useMemo(() => {
+    if (!['html', 'htm'].includes(detectedType)) return fileContent;
+
+    return injectSrcDocBaseTag(fileContent);
+  }, [detectedType, fileContent]);
+
   const renderPreview = () => {
-    if (detectedType === 'html') {
-      return <iframe srcDoc={fileContent} className="w-full h-full" />;
+    if (['html', 'htm'].includes(detectedType)) {
+      return <iframe srcDoc={htmlPreviewContent} className="w-full h-full" />;
     }
     if (detectedType === 'md') {
+      // Select render by file size
+      if (markdownStats?.shouldUseVirtual) {
+        return <VirtualMarkdown content={fileContent} className="w-full h-full" />;
+      }
       return <Markdown content={fileContent} className="w-full h-full" />;
     }
     if (detectedType === 'csv') {
@@ -93,7 +132,7 @@ const FileContentRender: React.FC<FileContentRenderProps> = ({
     }
   };
 
-  // check if supported preview mode (based on detected type)
+  // Check if preview mode is supported (based on detected type)
   const supportsPreview =
     fileContentSupportFileTypes.includes(detectedType) || fileContentSupportContentTypes.includes(contentType);
 
@@ -105,11 +144,11 @@ const FileContentRender: React.FC<FileContentRenderProps> = ({
     <div className="w-full h-full flex flex-col">
       <div className="p-2">
         <Radio.Group value={previewType} onChange={(e) => setPreviewType(e.target.value)}>
-          <Radio.Button value="preview">{t('code.preview')}</Radio.Button>
           <Radio.Button value="raw">{t('code.raw')}</Radio.Button>
+          <Radio.Button value="preview">{t('code.preview')}</Radio.Button>
         </Radio.Group>
       </div>
-      <div className="flex-1 p-3 overflow-auto">
+      <div className="flex-1 p-3 overflow-auto pt-0">
         {previewType === 'preview' ? (
           renderPreview()
         ) : (

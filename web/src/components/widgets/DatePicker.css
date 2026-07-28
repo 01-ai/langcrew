@@ -1,0 +1,34 @@
+[data-w-component='date-picker'] {
+  height: var(--select-control-size);
+  cursor: pointer;
+}
+
+[data-w-component='date-picker'] .ant-picker {
+  height: var(--select-control-size);
+  padding: 0 var(--select-control-gutter);
+  border-radius: var(--select-control-radius);
+  font-size: var(--select-control-font-size);
+  font-weight: var(--select-control-font-weight);
+  line-height: var(--font-text-md-line-height);
+}
+
+[data-w-component='date-picker'] .ant-picker .ant-picker-input > input {
+  font-size: var(--select-control-font-size);
+}
+
+[data-w-component='date-picker'][data-variant='solid'] .ant-picker-outlined {
+  border-color: transparent;
+}
+
+[data-w-component='date-picker'][data-variant='soft'] .ant-picker-outlined {
+  border-color: transparent;
+  background-color: var(--select-control-background-color);
+}
+
+[data-w-component='date-picker'][data-variant='ghost'] .ant-picker-outlined {
+  border-color: transparent;
+}
+[data-w-component='date-picker'][data-variant='ghost']:hover .ant-picker-outlined {
+  background-color: var(--select-control-background-color);
+}
+

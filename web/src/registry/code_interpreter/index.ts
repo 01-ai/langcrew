@@ -3,7 +3,7 @@ import CodeInterpreterDetailRenderer from './CodeInterpreterDetailRenderer';
 import { ToolIconCode } from '../common/icons';
 
 registry.registerMessageType({
-  type: 'code_interpreter',
+  type: ['code_interpreter', 'python_executor'],
   detailRenderer: CodeInterpreterDetailRenderer,
   icon: ToolIconCode,
 });

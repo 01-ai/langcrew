@@ -1,0 +1,39 @@
+[data-w-component='select'] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--select-control-gap);
+  flex-shrink: 0;
+  height: var(--select-control-size);
+  border-radius: var(--select-control-radius);
+  cursor: pointer;
+  font-size: var(--select-control-font-size);
+  font-weight: var(--select-control-font-weight);
+  line-height: var(--font-text-md-line-height);
+  text-align: left;
+  transition-duration: var(--transition-duration-basic);
+  transition-property: color;
+  transition-timing-function: var(--transition-ease-basic);
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 0 0 1px var(--select-control-border-color) inset;
+  background-color: var(--select-control-background-color);
+}
+
+[data-w-component='select'] .ant-select-single:not(.ant-select-customize-input) .ant-select-selector {
+  padding: 0 var(--select-control-gutter);
+}
+
+[data-w-component='select'][data-variant='outline'] {
+  --select-border-focus-color: var(--input-outline-border-color-focus);
+  --select-control-border-color: var(--input-outline-border-color);
+  --select-control-ring-offset: -1px;
+}
+
+/* ghost variant */
+[data-w-component='select'][data-variant='ghost']:hover {
+  background-color: var(--select-control-background-color);
+}

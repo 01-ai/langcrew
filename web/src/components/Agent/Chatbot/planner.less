@@ -1,0 +1,97 @@
+.planner {
+  .ant-thought-chain,
+  .ant-thought-chain-node,
+  .ant-thought-chain-node-header,
+  .ant-thought-chain-node-content-box {
+    background: transparent !important;
+  }
+
+  /* Backward-compatible selectors for older ThoughtChain DOM (`ant-thought-chain-item-*`) */
+  .ant-thought-chain-item-index-icon {
+    display: none !important;
+  }
+
+  .ant-thought-chain-node-index-icon,
+  .ant-thought-chain-node-icon,
+  .ant-thought-chain-node-collapse-icon {
+    display: none !important;
+  }
+
+  .ant-thought-chain-node-header {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .ant-thought-chain-node-title {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+  }
+
+  .planner-step-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .planner-step-title-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 20px;
+    margin-top: 1px;
+  }
+
+  .planner-step-title-text {
+    color: #000;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .planner-step-expand-icon {
+    color: #000;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Tighten vertical rhythm to match design */
+  .ant-thought-chain-node {
+    padding-block: 6px;
+  }
+
+  /* Sub description text */
+  .ant-thought-chain-node-content-box {
+    font-size: 13px;
+    line-height: 18px;
+    color: rgba(0, 0, 0, 0.65);
+  }
+
+  /* Make the main connector line dashed */
+  .ant-thought-chain-node-tail,
+  .ant-thought-chain-item-tail {
+    background-color: transparent !important;
+    border-inline-start: 1px dashed #eaeaea !important;
+    border-left: 1px dashed #eaeaea !important;
+  }
+}
+
+.ant-thought-chain-node {
+  &:not(:last-child) {
+    .agentx-plan-step-content {
+      position: relative;
+      &::before {
+        content: '';
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        bottom: -24px;
+        border-left: 1px dashed #dddddd;
+      }
+    }
+  }
+}

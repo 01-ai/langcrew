@@ -1,35 +1,89 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import baseAxios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  AxiosError,
+  InternalAxiosRequestConfig,
+} from 'axios';
+import { getTranslation } from '@/hooks/useTranslation';
 import { message } from 'antd';
 import { getLanguage } from '@/hooks/useTranslation';
 
-// 请求配置接口
+// Request Configure Interface
 export interface RequestConfig extends AxiosRequestConfig {
-  showError?: boolean; // 是否显示错误提示
-  showLoading?: boolean; // 是否显示加载状态
+  showError?: boolean; // Whether to show the error hint
+  showLoading?: boolean; // Whether to show load state
+  /** Example level extra request header from the caller AgentStore.requestConfig Import */
+  extraHeaders?: Record<string, string>;
 }
 
-// 响应数据接口
+// Response data interface
 export interface ApiResponse<T = any> {
   code: number;
   data: T;
   message: string;
 }
 
-// 创建 axios 实例
-const request: AxiosInstance = axios.create({
-  //   baseURL: '', // 基础 URL
-  timeout: 30000, // 请求超时时间
+// Create axios Example
+export const axios: AxiosInstance = baseAxios.create({
+  //   baseURL: '', // Foundation URL
+  timeout: 30000, // Request timeout
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // 携带 cookies
+  withCredentials: true, // Carry cookies
 });
 
-// 请求拦截器
-request.interceptors.request.use(
+export const getCommonRequestHeaders = (
+  additionalHeaders?: Record<string, string>,
+  instanceExtraHeaders?: Record<string, string>,
+): Record<string, string> => ({
+  'csrf-token': getCsrfToken() || '',
+  language: getLanguage(),
+  'accept-language': getLanguage(),
+  ...instanceExtraHeaders,
+  ...additionalHeaders,
+});
+
+export const buildAxiosRequestConfig = (
+  extraHeaders?: Record<string, string>,
+  config?: RequestConfig,
+): RequestConfig => {
+  if (!extraHeaders || Object.keys(extraHeaders).length === 0) {
+    return config ?? {};
+  }
+  return { ...config, extraHeaders };
+};
+
+export const getCsrfToken = () => {
+  let csrfToken = localStorage.getItem('auth-token');
+  if (process.env.NODE_ENV === 'development' && !csrfToken) {
+    csrfToken = 'JWT_EXAMPLE';
+  }
+  return csrfToken;
+};
+
+// Request interceptor.
+axios.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 设置 headers
+    // Add CSRF token
+    let csrfToken = localStorage.getItem('auth-token');
+
+    if (process.env.NODE_ENV === 'development' && !csrfToken) {
+      csrfToken = getCsrfToken();
+    }
+
+    // Settings headers
+    config.headers.set('csrf-token', csrfToken);
     config.headers.set('language', getLanguage());
+    config.headers.set('accept-language', getLanguage());
+
+    const instanceExtraHeaders = (config as RequestConfig).extraHeaders;
+    if (instanceExtraHeaders) {
+      Object.entries(instanceExtraHeaders).forEach(([key, value]) => {
+        config.headers.set(key, value);
+      });
+    }
 
     return config;
   },
@@ -39,16 +93,27 @@ request.interceptors.request.use(
   },
 );
 
-// 响应拦截器
-request.interceptors.response.use(
+// Response interceptor
+axios.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const { data, config } = response;
 
-    console.log('response', response);
-
-    // 如果响应是流数据（如 SSE），直接返回
+    // If the response is stream data (e.g.) SSE），Go straight back.
     if (response.headers['content-type']?.includes('text/event-stream')) {
       return response;
+    }
+
+    // Processing business errors
+    if (data.code !== 200 && data.code !== 0) {
+      const errorMessage = data.message || getTranslation('request.failed');
+
+      // Whether to show the error hint based on configuration
+      const showError = (config as RequestConfig).showError !== false;
+      if (showError) {
+        message.error(errorMessage);
+      }
+
+      return Promise.reject(new Error(errorMessage));
     }
 
     return response;
@@ -58,43 +123,43 @@ request.interceptors.response.use(
 
     console.error('Response error:', error);
 
-    let errorMessage = '网络错误';
+    let errorMessage = getTranslation('request.network_error');
 
     if (response) {
-      // 服务器返回错误状态码
+      // Server returns the error status code
       switch (response.status) {
         case 400:
-          errorMessage = '请求参数错误';
+          errorMessage = getTranslation('request.bad_request');
           break;
         case 401:
-          errorMessage = '未授权，请重新登录';
-          // 可以在这里处理登录跳转
+          errorMessage = getTranslation('request.unauthorized');
+          // You can handle login jumps here.
           break;
         case 403:
-          errorMessage = '拒绝访问';
+          errorMessage = getTranslation('request.forbidden');
           break;
         case 404:
-          errorMessage = '请求的资源不存在';
+          errorMessage = getTranslation('request.not_found');
           break;
         case 500:
-          errorMessage = '服务器内部错误';
+          errorMessage = getTranslation('request.server_error');
           break;
         case 502:
-          errorMessage = '网关错误';
+          errorMessage = getTranslation('request.bad_gateway');
           break;
         case 503:
-          errorMessage = '服务不可用';
+          errorMessage = getTranslation('request.service_unavailable');
           break;
         default:
-          errorMessage = `请求失败 (${response.status})`;
+          errorMessage = getTranslation('request.failed_with_status', { status: response.status });
       }
     } else if (error.code === 'ECONNABORTED') {
-      errorMessage = '请求超时';
+      errorMessage = getTranslation('request.timeout');
     } else if (error.message) {
       errorMessage = error.message;
     }
 
-    // 根据配置决定是否显示错误提示
+    // Whether to show the error hint based on configuration
     const showError = (config as RequestConfig)?.showError !== false;
     if (showError) {
       message.error(errorMessage);
@@ -104,35 +169,4 @@ request.interceptors.response.use(
   },
 );
 
-// 封装通用请求方法
-export const http = {
-  // GET 请求
-  get<T = any>(url: string, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return request.get(url, config).then((response) => response.data);
-  },
-
-  // POST 请求
-  post<T = any>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return request.post(url, data, config).then((response) => response.data);
-  },
-
-  // PUT 请求
-  put<T = any>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return request.put(url, data, config).then((response) => response.data);
-  },
-
-  // DELETE 请求
-  delete<T = any>(url: string, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return request.delete(url, config).then((response) => response.data);
-  },
-
-  // PATCH 请求
-  patch<T = any>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return request.patch(url, data, config).then((response) => response.data);
-  },
-
-  // 原始 axios 实例（用于特殊需求）
-  request,
-};
-
-export default http;
+export default axios;

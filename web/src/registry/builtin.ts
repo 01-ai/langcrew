@@ -1,56 +1,61 @@
 import './text';
+import './reasoning';
 import './live_status';
 import './plan';
 
 import './error';
-// web search
+// Web Search
 import './web_search';
 
-// run command
+// Execute the command.
 import './run_command';
-// delete file
+// Delete File
 import './delete_file';
 
-// service deploy
-import './service_deploy';
-// code interpreter
+// Code Interpreter
 import './code_interpreter';
 
-// user input
+// User Input
 import './user_input';
 
-// finish reason
+// Reason for completion
 import './finish_reason';
 
-// file parser(added 2025-07-09)
+// File Parsing(added 2025-07-09)
 import './file_parser';
 
-// image parser(added 2025-07-14)
+// Picture Parsing(added 2025-07-14)
 import './image_parser';
 
-// image generation(added 2025-07-15)
+// Picture Generation(added 2025-07-15)
 import './image_generation';
 
-// message to user(added 2025-01-27)
-import './message_to_user';
+// User notification message (added 2025-01-27).
+import './message_notify_user';
 
-// SQL execute(added 2025-07-18)
+// SQL execution (added 2025-07-18).
 import './mysql';
 
-// browser(added 2025-07-18)
+// Browser(added 2025-07-18)
 import './browser';
 
-// phone(added 2025-07-18)
+// Cell phone.(added 2025-07-18)
 import './phone';
 
-// result is Markdown(added 2025-07-25)
+// Markdown result (added 2025-07-25).
 import './markdown_result';
 
-// file diff(added 2025-07-25)
+// File diff (added 2025-07-25).
 import './file_diff';
 
-// vector search(added 2025-07-31)
+// Website delivery(added 2025-12-29)
+import './website_delivery';
+
+// Vector Search(added 2025-07-31)
 import './milvus_qa_search';
 
-// Claude skill(added 2025-10-23)
+// Claude skill (added 2025-10-23).
 import './claude_skill';
+
+// chatkit(added 2025-10-31)
+import './widget';

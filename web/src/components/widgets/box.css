@@ -1,0 +1,42 @@
+[data-w-direction='row'] > :not([data-w-has-width]) {
+  /* min-width: 0; */
+}
+
+/* Box auto-spacing: first child resets margin */
+:where([data-w-direction='col'][data-w-auto-spacing]) > [data-w-component]:first-child {
+  margin-block-start: 0;
+}
+
+:where([data-w-direction='row'][data-w-auto-spacing]) > [data-w-component]:first-child {
+  margin-inline-start: 0;
+}
+
+/* Box auto-spacing: non-first children get spacing */
+:where([data-w-direction='col'][data-w-auto-spacing]) > [data-w-component]:not(:first-child) {
+  margin-block-start: calc(var(--spacing) * 4);
+}
+
+:where([data-w-direction='row'][data-w-auto-spacing]) > [data-w-component]:not(:first-child) {
+  margin-inline-start: calc(var(--spacing) * 4);
+}
+
+/* Flush the box to negate parent padding */
+ [data-w-direction=col]>[data-w-flush]:first-child {
+  margin-block-start: calc(-1 * var(--w-box-gutter-block-start));
+}
+ [data-w-direction=col]>[data-w-flush] {
+  margin-inline: calc(-1 * var(--w-box-gutter-inline-start)) calc(-1 * var(--w-box-gutter-inline-end));
+}
+
+[data-w-direction=row]>[data-w-flush]:first-child {
+  margin-inline-start: calc(-1 * var(--w-box-gutter-inline-start));
+}
+
+[data-w-direction=row]>[data-w-flush] {
+  margin-block: calc(-1 * var(--w-box-gutter-block-start));
+}
+
+/* Center the content of the box */
+[data-w-align=center] {
+  align-items: center;
+}

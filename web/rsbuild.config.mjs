@@ -3,13 +3,19 @@ import { pluginReact } from '@rsbuild/plugin-react';
 import { pluginLess } from '@rsbuild/plugin-less';
 import { pluginSvgr } from '@rsbuild/plugin-svgr';
 import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill';
+import { basename } from 'path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
 
+  // Show actual loads .env Documentation
+  if (env.filePaths && env.filePaths.length > 0) {
+    const envFiles = env.filePaths.map((filePath) => basename(filePath)).join(', ');
+    console.log('📄 Loaded env files:', envFiles);
+  }
+
   // first try process.env.AGENT_API_HOST from docker environment, then try env.parsed.AGENT_API_HOST from .env file
-  // finally use http://localhost:8000 as default
-  const AGENT_API_HOST = process.env.AGENT_API_HOST || env.parsed.AGENT_API_HOST || 'http://localhost:8000';
+  const AGENT_API_HOST = process.env.AGENT_API_HOST || env.parsed?.AGENT_API_HOST;
 
   return {
     plugins: [
@@ -42,7 +48,7 @@ export default defineConfig(({ mode }) => {
       compress: false,
       port: 3600,
       proxy: {
-        '/api/': {
+        '/app/api/': {
           target: AGENT_API_HOST,
           changeOrigin: true,
         },

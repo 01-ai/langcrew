@@ -1,7 +1,7 @@
-// message type registration mechanism
-// support to register the left brief renderer (briefRenderer) and the right detail renderer (detailRenderer) for each message type
-// if not registered, use the default renderer
-// the container component can get the corresponding rendering component through type
+// Message type registration mechanism
+// Supports the registration of left-hand summary rendering components for each message type (briefRenderer）and right-hand details rendering component (detailRenderer）
+// Use default rendering component if not registered
+// The packaging component can be made available by type Get Correlation Rendering Component
 
 import { MessageChunk, MessageToolChunk } from '@/types';
 import DefaultBriefRenderer from './default/DefaultBriefRenderer';
@@ -9,47 +9,50 @@ import DefaultDetailRenderer from './default/DefaultDetailRenderer';
 import { ToolIconDefault } from './common/icons';
 import { CustomIconComponentProps } from '@ant-design/icons/lib/components/Icon';
 
-// ===================== interface definition =====================
+// ===================== Interface definition =====================
 
 /**
- * the props type of the left message list rendering component
- * @property message message data
- * @property withIcon whether to show the icon
- * @property hasUserInput whether there is user input
+ * Render component of the left message list props Type
+ * @property message Message Data
+ * @property withIcon Whether to show icons
+ * @property hasUserInput User input available
+ * @property send Send Message Method
  */
 export interface BriefRendererProps {
   message: MessageChunk;
   withIcon?: boolean;
   hasUserInput?: boolean;
+  send?: (content: string) => void;
+  stopped?: boolean;
 }
 
 /**
- * the props type of the brief renderer for tool type message
- * inherit from BriefRendererProps, but the message type is more specific
+ * A short rendering component for tooltype messages props Type
+ * Inherited by BriefRendererProps，But... message Type more specific
  */
 export interface ToolBriefRendererProps extends BriefRendererProps {
   message: MessageToolChunk;
 }
 
 /**
- * the props type of the detail renderer for the right detail area
- * @property message message data
- * @property isRealTime whether it is real-time update
+ * Rendering component for right-detailed area props Type
+ * @property message Message Data
+ * @property isRealTime Update on a Real Time
  */
 export interface DetailRendererProps {
   message: MessageChunk;
   isRealTime?: boolean;
 }
 
-// message type matcher - support string, array and regular expression
+// Message Type Matcher - Support string, array and regular expression
 export type MessageTypeMatcher = string | string[] | RegExp;
 
 /**
- * the registration configuration for a single message type
- * @property type the unique identifier for the message type, support string, string array or regular expression
- * @property briefRenderer the left message list rendering component (optional)
- * @property detailRenderer the right detail area rendering component (optional)
- * @property icon the icon component for the message type (optional)
+ * Registration Configuration for Single Message Type
+ * @property type Message type unique identification, which supports string, string array or regular expression
+ * @property briefRenderer Rendering component of the left message list (optional)
+ * @property detailRenderer Right Details Area Rendering Component (optional)
+ * @property icon Icon component for message type (optional)
  */
 export interface MessageTypeConfig {
   type: MessageTypeMatcher;
@@ -58,69 +61,69 @@ export interface MessageTypeConfig {
   icon?: React.ComponentType<CustomIconComponentProps>;
 }
 
-// ===================== implementation of the registration table =====================
+// ===================== Registration form achieved =====================
 
 /**
- * the message type registration table, support registration and get rendering component and icon
+ * Message type registration form to support registration and retrieval of rendering components and icons
  *
- * features:
- * - support three types of matching: string, array and regular expression
- * - automatically fallback to the default rendering component
- * - singleton mode, global shared
- * - type-safe component registration and get
+ * Functional characteristics:
+ * - Supports three types of matching string, array and regular expression
+ * - Autoreverse to the default rendering component
+ * - Single case, global sharing
+ * - Type secure component registration and acquisition
  */
 class MessageTypeRegistry {
   private stringTypes: Map<string, MessageTypeConfig> = new Map();
   private patternTypes: Array<{ pattern: RegExp; config: MessageTypeConfig }> = [];
   private arrayTypes: Array<{ types: string[]; config: MessageTypeConfig }> = [];
 
-  // default rendering component
+  // Default Rendering Component
   private defaultBriefRenderer: React.ComponentType<BriefRendererProps> = DefaultBriefRenderer;
   private defaultDetailRenderer: React.ComponentType<DetailRendererProps> = DefaultDetailRenderer;
   private defaultIcon: React.ComponentType<CustomIconComponentProps> = ToolIconDefault;
 
   /**
-   * register a message type
-   * @param config the message type configuration
+   * Register a message type
+   * @param config Message Type Configuration
    */
   public registerMessageType(config: MessageTypeConfig): void {
     const { type } = config;
 
     if (typeof type === 'string') {
-      // string type: directly register to Map
+      // String type: Register directly to Map Medium
       if (this.stringTypes.has(type)) {
-        console.warn(`[MessageTypeRegistry] type '${type}' is already registered, will be overridden`);
+        console.warn(`[MessageTypeRegistry] type '${type}' Registered, will be overwritten`);
       }
       this.stringTypes.set(type, config);
     } else if (Array.isArray(type)) {
-      // array type: register to array configuration
+      // Numeric type: Registered in array configuration
       this.arrayTypes.push({ types: type, config });
     } else if (type instanceof RegExp) {
-      // regular expression type: register to pattern configuration
+      // Regular expression type: Registered in mode configuration
       this.patternTypes.push({ pattern: type, config });
     }
   }
 
   /**
-   * get the message type configuration
-   * @param type the message type
-   * @returns the matching configuration or undefined
+   * Can not open message
+   * @param type Message Type
+   * @returns Matching configuration or undefined
    */
   public getMessageType(type: string): MessageTypeConfig | undefined {
-    // 1. first check the exact match
+    // 1. Check for exact match first.
     const exactMatch = this.stringTypes.get(type);
     if (exactMatch) {
       return exactMatch;
     }
 
-    // 2. check the array match
+    // 2. Check array matching
     for (const { types, config } of this.arrayTypes) {
       if (types.includes(type)) {
         return config;
       }
     }
 
-    // 3. check the regular expression match
+    // 3. Check regular match
     for (const { pattern, config } of this.patternTypes) {
       if (pattern.test(type)) {
         return config;
@@ -131,9 +134,9 @@ class MessageTypeRegistry {
   }
 
   /**
-   * get the left message list rendering component
-   * @param type the message type
-   * @returns the corresponding rendering component or the default component
+   * Fetch Left Message List render component
+   * @param type Message Type
+   * @returns Corresponding rendering component or default component
    */
   public getBriefRenderer(type: string): React.ComponentType<BriefRendererProps> {
     const config = this.getMessageType(type);
@@ -141,9 +144,9 @@ class MessageTypeRegistry {
   }
 
   /**
-   * get the right detail area rendering component
-   * @param type the message type
-   * @returns the corresponding rendering component or the default component
+   * Fetch Right Details Area render component
+   * @param type Message Type
+   * @returns Corresponding rendering component or default component
    */
   public getDetailRenderer(type: string): React.ComponentType<DetailRendererProps> {
     const config = this.getMessageType(type);
@@ -151,9 +154,9 @@ class MessageTypeRegistry {
   }
 
   /**
-   * get the icon component for the message type
-   * @param type the message type
-   * @returns the corresponding icon component or the default icon
+   * Icon component for fetching message type
+   * @param type Message Type
+   * @returns Corresponding icon component or default icon
    */
   public getToolIcon(type: string): React.ComponentType<CustomIconComponentProps> {
     const config = this.getMessageType(type);
@@ -161,33 +164,33 @@ class MessageTypeRegistry {
   }
 }
 
-// singleton export
+// Single Export
 const registry = new MessageTypeRegistry();
 
-// the component library finally needs to export this singleton, so that other components can import this singleton, and then use the registerMessageType method of this singleton to register message types
+// The assembly library will end with this single case so that the other components can pass. import Import this single case, then use this single case registerMessageType Method to register message type
 export default registry;
 
-// ===================== usage example =====================
+// ===================== Use Example =====================
 /**
- * message type registration mechanism usage guide
+ * Guide to the use of the information type registration mechanism
  * 
- * 1. basic usage - register simple message types
+ * 1. Basic use - Register Simple Message Type
  * ```typescript
- * // define custom rendering component
+ * // Define custom rendering component
  * const SearchBrief: React.FC<BriefRendererProps> = ({ message }) => (
  *   <div className="search-brief">
- *     <span>🔍 search: {message.content}</span>
+ *     <span>🔍 Search: {message.content}</span>
  *   </div>
  * );
  * 
  * const SearchDetail: React.FC<DetailRendererProps> = ({ message }) => (
  *   <div className="search-detail">
- *     <h3>search result</h3>
+ *     <h3>Search Results</h3>
  *     <pre>{JSON.stringify(message.detail, null, 2)}</pre>
  *   </div>
  * );
  * 
- * // register message type
+ * // Register Message Type
  * import registry from './registry';
  * registry.registerMessageType({
  *   type: 'web_search',
@@ -196,16 +199,16 @@ export default registry;
  * });
  * ```
  * 
- * 2. advanced usage - support multiple matching ways
+ * 2. Advanced use - Support multiple matching methods
  * ```typescript
- * // string array matching - multiple types use the same rendering component
+ * // String array matching - Multiple types use the same rendering component
  * registry.registerMessageType({
  *   type: ['file_read', 'file_write', 'file_delete'],
  *   briefRenderer: FileOperationBrief,
  *   detailRenderer: FileOperationDetail,
  * });
  * 
- * // regular expression matching - dynamic type matching
+ * // Regular expression matching - Dynamic type matching
  * registry.registerMessageType({
  *   type: /^browser_/,
  *   briefRenderer: BrowserToolBrief,
@@ -214,9 +217,9 @@ export default registry;
  * });
  * ```
  * 
- * 3. use in container component
+ * 3. Use in container assemblies
  * ```typescript
- * // left message list rendering
+ * // Rendering left message list
  * const MessageList: React.FC<{ messages: MessageChunk[] }> = ({ messages }) => {
  *   return (
  *     <div className="message-list">
@@ -234,7 +237,7 @@ export default registry;
  *   );
  * };
  * 
- * // right detail area rendering
+ * // Rendering area details on right
  * const MessageDetail: React.FC<{ message?: MessageChunk }> = ({ message }) => {
  *   if (!message) return null;
  *   
@@ -247,9 +250,9 @@ export default registry;
  * };
  * ```
  * 
- * 4. special handling for tool type
+ * 4. Tool type special handling
  * ```typescript
- * // tool type message needs special handling
+ * // Tooltype messages need special handling
  * const ToolMessage: React.FC<{ message: MessageToolChunk }> = ({ message }) => {
  *   const ToolBriefRenderer = registry.getBriefRenderer(message.type);
  *   const ToolIcon = registry.getToolIcon(message.type);
@@ -263,47 +266,47 @@ export default registry;
  * };
  * ```
  * 
- * 5. file organization suggestion
+ * 5. Documentation organization recommendations
  * ```
  * src/registry/
- * ├── index.ts                    # main registration table
- * ├── default/                    # default rendering component
- * ├── text/                       # text type
- * │   ├── index.ts               # registration logic
- * │   ├── TextBriefRenderer.tsx  # brief rendering
- * │   └── TextDetailRenderer.tsx # detail rendering
- * ├── web_search/                # search type
+ * ├── index.ts                    # Main registration form
+ * ├── default/                    # Default Rendering Component
+ * ├── text/                       # Text Type
+ * │   ├── index.ts               # Registration Logic
+ * │   ├── TextBriefRenderer.tsx  # Short Rendering
+ * │   └── TextDetailRenderer.tsx # Details Rendering
+ * ├── web_search/                # Search Type
  * │   ├── index.ts
  * │   ├── WebSearchBriefRenderer.tsx
  * │   └── WebSearchDetailRenderer.tsx
- * └── common/                    # common component
+ * └── common/                    # Public Component
  *     ├── icons.tsx
  *     └── MessageBrief.tsx
  * ```
  * 
- * 6. best practices for type safety
+ * 6. Best practices in type security
  * ```typescript
- * // define specific props interface for specific tool type
+ * // Define specific to a specific tool type props Interface
  * interface WebSearchBriefProps extends BriefRendererProps {
  *   message: MessageChunk & { type: 'web_search' };
  * }
  * 
  * const WebSearchBrief: React.FC<WebSearchBriefProps> = ({ message }) => {
- *   // the type of message is safe here
- *   return <div>搜索: {message.query}</div>;
+ *   // Here. message The type is safe.
+ *   return <div>Search: {message.query}</div>;
  * };
  * ```
  * 
- * 7. error handling and debugging
+ * 7. Error-processing and debugging
  * ```typescript
- * // check if the message type is registered
+ * // Check if the message type is registered
  * const isRegistered = (type: string): boolean => {
  *   return !!registry.getMessageType(type);
  * };
  * 
- * // get all registered types
+ * // Get all registered types
  * const getRegisteredTypes = (): string[] => {
- *   // note: here we need to extend registry to support this feature
+ *   // Note: This needs to be expanded. registry Support this function
  *   return Array.from(registry.stringTypes.keys());
  * };
  * ```

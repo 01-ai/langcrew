@@ -2,10 +2,11 @@ import React from 'react';
 import { ToolIconCircle, ToolIconPhone, ToolIconArrow, ToolIconPhone2 } from './icons';
 import eventBus from '@/utils/eventBus';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAgentStore } from '@/store';
 
 const PhoneHIL = ({ userInputable = true }: { userInputable?: boolean }) => {
   const { t } = useTranslation();
-
+  const instanceId = useAgentStore((s) => s.instanceId);
   return (
     <>
       <div className="flex justify-between items-center bg-[#FFEDC9] rounded-2xl px-3 py-1.5 text-[#FF8800]">
@@ -41,7 +42,7 @@ const PhoneHIL = ({ userInputable = true }: { userInputable?: boolean }) => {
         `}
           onClick={() => {
             if (userInputable) {
-              eventBus.emit('user_input_click', t('task.user_input.continue.button'));
+              eventBus.emit(`call_send_${instanceId}`, { content: t('task.user_input.continue.button') });
             }
           }}
         >

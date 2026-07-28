@@ -1,1 +1,10 @@
 export { default as CustomIcon } from './CustomIcon';
+export { default as FileUpload } from './FileUpload';
+export { default as FileList } from './FileList';
+export { default as KnowledgeBaseModal } from './KnowledgeBaseModal';
+export { default as MCPToolModal } from './MCPToolModal';
+export { default as ModelSelector } from './ModelSelector';
+export { default as SenderOptionsFields } from './SenderOptionsFields';
+export { default as SenderFooter } from './SenderFooter';
+export { default as SenderQuickActions } from './SenderQuickActions';
+export { default as DeepResearchFooter } from './DeepResearchFooter';

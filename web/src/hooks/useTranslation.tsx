@@ -1,15 +1,59 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { resources } from '@/config/resources';
 
+// Defines the configured language (with corresponding) JSON (language of the document)
+const CONFIGURED_LANGUAGES = ['zh', 'en', 'ru', 'kk'] as const;
+
+// Define Default fallback Languages
+const DEFAULT_LANGUAGE = 'en';
+
+/**
+ * Standardized language code
+ * Convert common language code variants to standard format
+ */
+const normalizeLangCode = (lang: string): string => {
+  const lowerLang = lang.toLowerCase();
+
+  // Deal with common variants
+  const mapping: Record<string, string> = {
+    'zh-cn': 'zh',
+    'zh-tw': 'zh',
+    'zh-hk': 'zh',
+    'en-us': 'en',
+    'en-gb': 'en',
+    'ru-ru': 'ru',
+    'kk-kz': 'kk',
+    'ja-jp': 'ja',
+    'ko-kr': 'ko',
+    'es-es': 'es',
+    'fr-fr': 'fr',
+    'de-de': 'de',
+  };
+
+  return mapping[lowerLang] || lang;
+};
+
 /**
  * tool function to change language setting
  * @param lang new language code
  */
 export const changeLanguage = (lang: string) => {
-  localStorage.setItem('i18nextLng', lang);
+  const normalizedLang = normalizeLangCode(lang);
+  localStorage.setItem('i18nextLng', normalizedLang);
+
+  // If the language package does not exist, give a hint
+  if (!resources[normalizedLang]) {
+    console.info(`Language "${normalizedLang}" will use English (${DEFAULT_LANGUAGE}) as fallback.`);
+  }
+
   // trigger custom event to notify all useTranslation Hook instances
   window.dispatchEvent(new CustomEvent('languageChanged'));
 };
+
+export interface UseTranslationReturn {
+  t: (key: string, options?: Record<string, string | number | boolean>) => string;
+  language: string;
+}
 
 /**
  * custom useTranslation Hook
@@ -18,9 +62,9 @@ export const changeLanguage = (lang: string) => {
  * replace with:
  * import { useTranslation } from '@/hooks/useTranslation';
  */
-const useTranslation = () => {
+const useTranslation = (): UseTranslationReturn => {
   // cache current language, avoid accessing localStorage every time
-  const [language, setLanguage] = useState<'zh' | 'en'>(() => {
+  const [language, setLanguage] = useState<string>(() => {
     return getLanguage();
   });
 
@@ -28,7 +72,7 @@ const useTranslation = () => {
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'i18nextLng' && e.newValue) {
-        setLanguage(e.newValue as 'zh' | 'en');
+        setLanguage(e.newValue);
       }
     };
 
@@ -52,14 +96,24 @@ const useTranslation = () => {
     };
   }, [language]);
 
-  // cache current language pack
+  // cache current language pack with fallback to English
   const currentLangPack = useMemo(() => {
-    return resources[language] || {};
+    // First try to get a user-selected language package
+    const langPack = resources[language];
+
+    // If the language package exists, go straight back.
+    if (langPack) {
+      return langPack;
+    }
+
+    // If not,fallback To English
+    console.warn(`Language pack for "${language}" not found, falling back to "${DEFAULT_LANGUAGE}"`);
+    return resources[DEFAULT_LANGUAGE] || {};
   }, [language]);
 
   // use useCallback to cache t function, avoid re-creating every time
   const t = useCallback(
-    (key: string, options?: Record<string, any>) => {
+    (key: string, options?: Record<string, string | number | boolean>): string => {
       let message = currentLangPack[key] || key;
 
       // Replace template variables if options are provided
@@ -85,9 +139,12 @@ const useTranslation = () => {
   );
 };
 
-export const getTranslation = (key: string, options?: Record<string, any>) => {
+export const getTranslation = (key: string, options?: Record<string, string | number | boolean>): string => {
   const language = getLanguage();
-  let message = resources[language][key] || key;
+
+  // Try to get translation in the specified language, if not available, in English fallback
+  const langPack = resources[language] || resources[DEFAULT_LANGUAGE] || {};
+  let message = langPack[key] || key;
 
   // Replace template variables if options are provided
   if (options) {
@@ -105,25 +162,27 @@ export const getTranslation = (key: string, options?: Record<string, any>) => {
  * check if the value is valid
  * if valid, return it
  * otherwise return the default value, and set the default value to localStorage
- * @returns 'zh' | 'en' | 'ru'
+ * @returns current language code (string)
  */
-export const getLanguage = (): 'zh' | 'en' => {
+export const getLanguage = (): string => {
   const langInStorage = localStorage.getItem('i18nextLng');
-  if (['zh', 'en', 'ru'].includes(langInStorage)) {
-    return langInStorage as 'zh' | 'en';
+
+  // If localStorage Value
+  if (langInStorage) {
+    // Standardized handling of common non-standard values
+    const normalizedLang = normalizeLangCode(langInStorage);
+
+    // Update if the standardized value differs from the original value localStorage
+    if (normalizedLang !== langInStorage) {
+      localStorage.setItem('i18nextLng', normalizedLang);
+    }
+
+    return normalizedLang;
   }
-  // compatible with non-standard values
-  if (langInStorage === 'zh-CN') {
-    localStorage.setItem('i18nextLng', 'zh');
-    return 'zh';
-  }
-  // compatible with non-standard values
-  if (langInStorage === 'en-US') {
-    localStorage.setItem('i18nextLng', 'en');
-    return 'en';
-  }
-  localStorage.setItem('i18nextLng', 'en');
-  return 'en';
+
+  // If settings are not available, use default language
+  localStorage.setItem('i18nextLng', DEFAULT_LANGUAGE);
+  return DEFAULT_LANGUAGE;
 };
 
 export { useTranslation };

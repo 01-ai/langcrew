@@ -3,6 +3,8 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import en from './en.json';
 import zh from './zh.json';
+import kk from './kk.json';
+import ru from './ru.json';
 
 i18n
   .use(LanguageDetector)
@@ -25,6 +27,16 @@ i18n
       zh: {
         translation: {
           ...zh,
+        },
+      },
+      kk: {
+        translation: {
+          ...kk,
+        },
+      },
+      ru: {
+        translation: {
+          ...ru,
         },
       },
     },

@@ -6,12 +6,14 @@
 # Node Modules
 node_modules
 
+# Lib
+lib
+
 # Build
 dist
+agentx
 
 # IDE
 .vscode/*
 !.vscode/extensions.json
 .idea
-
-agentx
