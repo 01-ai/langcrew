@@ -1,11 +1,11 @@
 import React, { FC } from 'react';
 import { Image, ImageProps } from 'antd';
-import type { GroupConsumerProps } from 'rc-image/lib/PreviewGroup';
+import { PreviewGroupProps } from 'antd/es/image/PreviewGroup';
 
 interface ImageViewerProps extends ImageProps {
   srcs?: string[];
   group?: boolean;
-  groupOptions?: GroupConsumerProps;
+  groupOptions?: PreviewGroupProps;
 }
 
 const ImageViewer: FC<ImageViewerProps> = ({ groupOptions, group, srcs, ...props }) => {

@@ -31,13 +31,14 @@ const Mermaid: React.FC<MermaidProps> = memo(({ processing, text }) => {
       'sankey',
     ] as (keyof MermaidConfig)[];
 
-    return types?.reduce((config, type) => {
+    const config: Record<string, unknown> = {};
+    types.forEach((type) => {
       config[type] = {
         useWidth: 748,
         useMaxWidth: true,
       };
-      return config;
-    }, {} as MermaidConfig);
+    });
+    return config as MermaidConfig;
   }, []);
 
   const getRandomInteger = (min: number, max: number) => {

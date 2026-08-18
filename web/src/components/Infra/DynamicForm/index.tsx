@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Form, Input, Select, Switch, InputNumber, DatePicker, message } from 'antd';
+import type { Rule } from 'antd/es/form';
 import { FormSchema, FormFieldSchema } from '@/types';
 import { useTranslation } from '@/hooks/useTranslation';
 import FormField from './FormField';
@@ -64,103 +65,96 @@ const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
 
     // Helper function to check if a property exists and is not null/undefined
     const hasProperty = (value: any) => value !== undefined && value !== null;
+    const rules: Rule[] = [
+      { required: isRequired, message: t('form.validation.required', { field: cleanTitle }) },
+      // Only apply min/max length validation for string types
+      ...(fieldSchema.type === 'string' && hasProperty(fieldSchema.minLength)
+        ? [{ min: fieldSchema.minLength, message: t('form.validation.minLength', { min: fieldSchema.minLength }) }]
+        : []),
+      ...(fieldSchema.type === 'string' && hasProperty(fieldSchema.maxLength)
+        ? [{ max: fieldSchema.maxLength, message: t('form.validation.maxLength', { max: fieldSchema.maxLength }) }]
+        : []),
+      ...(fieldSchema.type === 'number' && (hasProperty(fieldSchema.minimum) || hasProperty(fieldSchema.maximum))
+        ? [
+            {
+              validator: (_, value) => {
+                if (value === undefined || value === null || value === '') {
+                  return Promise.resolve();
+                }
+                const numValue = Number(value);
+                if (isNaN(numValue)) {
+                  return Promise.reject(new Error(t('form.validation.validNumber')));
+                }
+                if (hasProperty(fieldSchema.minimum) && numValue < fieldSchema.minimum) {
+                  return Promise.reject(new Error(t('form.validation.minValue', { min: fieldSchema.minimum })));
+                }
+                if (hasProperty(fieldSchema.maximum) && numValue > fieldSchema.maximum) {
+                  return Promise.reject(new Error(t('form.validation.maxValue', { max: fieldSchema.maximum })));
+                }
+                return Promise.resolve();
+              },
+            },
+          ]
+        : []),
+      ...(hasProperty(fieldSchema.format) && fieldSchema.format === 'email'
+        ? [{ type: 'email' as const, message: t('form.validation.validEmail') }]
+        : []),
+      ...(hasProperty(fieldSchema.format) && fieldSchema.format === 'url'
+        ? [{ type: 'url' as const, message: t('form.validation.validUrl') }]
+        : []),
+      // Phone number validation
+      ...(hasProperty(fieldSchema.format) && fieldSchema.format === 'phone'
+        ? [
+            {
+              validator: (_, value) => {
+                if (value === undefined || value === null || value === '') {
+                  return Promise.resolve();
+                }
+                // If custom regex is provided, use it
+                if (hasProperty(fieldSchema.pattern)) {
+                  const regex = new RegExp(fieldSchema.pattern);
+                  if (!regex.test(value)) {
+                    return Promise.reject(new Error(t('form.validation.validPhone')));
+                  }
+                }
+                return Promise.resolve();
+              },
+            },
+          ]
+        : []),
+      // Multi-select field validation
+      ...(fieldSchema.type === 'multiselect' &&
+      (hasProperty(fieldSchema.minSelections) || hasProperty(fieldSchema.maxSelections))
+        ? [
+            {
+              validator: (_, value) => {
+                const selections = value === undefined || value === null ? [] : value;
+                if (!Array.isArray(selections)) {
+                  return Promise.reject(new Error(t('form.validation.validOptions')));
+                }
+                if (hasProperty(fieldSchema.minSelections) && selections.length < fieldSchema.minSelections) {
+                  return Promise.reject(
+                    new Error(t('form.validation.minSelections', { min: fieldSchema.minSelections })),
+                  );
+                }
+                if (hasProperty(fieldSchema.maxSelections) && selections.length > fieldSchema.maxSelections) {
+                  return Promise.reject(
+                    new Error(t('form.validation.maxSelections', { max: fieldSchema.maxSelections })),
+                  );
+                }
+                return Promise.resolve();
+              },
+            },
+          ]
+        : []),
+    ];
 
     return (
       <Form.Item
         key={fieldName}
         name={fieldName}
         label={cleanTitle}
-        rules={[
-          { required: isRequired, message: t('form.validation.required', { field: cleanTitle }) },
-          // Only apply min/max length validation for string types
-          ...(fieldSchema.type === 'string' && hasProperty(fieldSchema.minLength)
-            ? [{ min: fieldSchema.minLength, message: t('form.validation.minLength', { min: fieldSchema.minLength }) }]
-            : []),
-          ...(fieldSchema.type === 'string' && hasProperty(fieldSchema.maxLength)
-            ? [{ max: fieldSchema.maxLength, message: t('form.validation.maxLength', { max: fieldSchema.maxLength }) }]
-            : []),
-          ...(fieldSchema.type === 'number' && (hasProperty(fieldSchema.minimum) || hasProperty(fieldSchema.maximum))
-            ? [
-                {
-                  validator: (_, value) => {
-                    if (value === undefined || value === null || value === '') {
-                      return Promise.resolve();
-                    }
-                    const numValue = Number(value);
-                    if (isNaN(numValue)) {
-                      return Promise.reject(new Error(t('form.validation.validNumber')));
-                    }
-                    if (hasProperty(fieldSchema.minimum) && numValue < fieldSchema.minimum) {
-                      return Promise.reject(new Error(t('form.validation.minValue', { min: fieldSchema.minimum })));
-                    }
-                    if (hasProperty(fieldSchema.maximum) && numValue > fieldSchema.maximum) {
-                      return Promise.reject(new Error(t('form.validation.maxValue', { max: fieldSchema.maximum })));
-                    }
-                    return Promise.resolve();
-                  },
-                },
-              ]
-            : []),
-          ...(hasProperty(fieldSchema.format) && fieldSchema.format === 'email'
-            ? [{ type: 'email', message: t('form.validation.validEmail') }]
-            : []),
-          ...(hasProperty(fieldSchema.format) && fieldSchema.format === 'url'
-            ? [{ type: 'url', message: t('form.validation.validUrl') }]
-            : []),
-          // Phone number validation
-          ...(hasProperty(fieldSchema.format) && fieldSchema.format === 'phone'
-            ? [
-                {
-                  validator: (_, value) => {
-                    if (value === undefined || value === null || value === '') {
-                      return Promise.resolve();
-                    }
-                    // If custom regex is provided, use it
-                    if (hasProperty(fieldSchema.pattern)) {
-                      const regex = new RegExp(fieldSchema.pattern);
-                      if (!regex.test(value)) {
-                        return Promise.reject(new Error(t('form.validation.validPhone')));
-                      }
-                    } else {
-                      // Use default Chinese phone number regex
-                      const phoneRegex = /^1[3-9]\d{9}$/;
-                      if (!phoneRegex.test(value)) {
-                        return Promise.reject(new Error(t('form.validation.validPhone')));
-                      }
-                    }
-                    return Promise.resolve();
-                  },
-                },
-              ]
-            : []),
-          // Multi-select field validation
-          ...(fieldSchema.type === 'multiselect' &&
-          (hasProperty(fieldSchema.minSelections) || hasProperty(fieldSchema.maxSelections))
-            ? [
-                {
-                  validator: (_, value) => {
-                    if (value === undefined || value === null) {
-                      value = [];
-                    }
-                    if (!Array.isArray(value)) {
-                      return Promise.reject(new Error(t('form.validation.validOptions')));
-                    }
-                    if (hasProperty(fieldSchema.minSelections) && value.length < fieldSchema.minSelections) {
-                      return Promise.reject(
-                        new Error(t('form.validation.minSelections', { min: fieldSchema.minSelections })),
-                      );
-                    }
-                    if (hasProperty(fieldSchema.maxSelections) && value.length > fieldSchema.maxSelections) {
-                      return Promise.reject(
-                        new Error(t('form.validation.maxSelections', { max: fieldSchema.maxSelections })),
-                      );
-                    }
-                    return Promise.resolve();
-                  },
-                },
-              ]
-            : []),
-        ]}
+        rules={rules}
         tooltip={fieldSchema.description}
       >
         <FormField
@@ -173,7 +167,7 @@ const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   };
 
   return (
-    <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="w-full p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
       {schema.title && <h3 className="text-lg font-semibold text-gray-900 mb-2">{schema.title}</h3>}
       {schema.description && <p className="text-sm text-gray-600 mb-6 leading-relaxed">{schema.description}</p>}
 

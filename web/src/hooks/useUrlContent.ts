@@ -8,7 +8,7 @@ export interface UrlContentState {
   error: string | null;
 }
 
-// file type detection configuration
+// File type detection config
 const FILE_SIGNATURES = {
   // Office documents
   docx: [0x50, 0x4b, 0x03, 0x04], // DOCX (ZIP based)
@@ -18,23 +18,23 @@ const FILE_SIGNATURES = {
   // PDF
   pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
 
-  // compressed files
+  // Archives
   zip: [0x50, 0x4b, 0x03, 0x04], // ZIP
   rar: [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07], // RAR
   gz: [0x1f, 0x8b], // GZIP
 };
 
 /**
- * detect the file type of ArrayBuffer
+ * Detect file type from ArrayBuffer
  * @param buffer ArrayBuffer
- * @returns file type string
+ * @returns File type string
  */
 const detectFileType = (buffer: ArrayBuffer): string => {
   const uint8Array = new Uint8Array(buffer);
 
-  // for ZIP files (docx, xlsx, pptx), further differentiation is needed
+  // ZIP-based files (docx/xlsx/pptx) need further disambiguation
   if (matchesSignature(uint8Array, FILE_SIGNATURES.zip)) {
-    // check the content of the ZIP file to differentiate the Office document type
+    // Inspect ZIP contents to distinguish Office types
     const zipContent = new TextDecoder().decode(uint8Array);
     if (zipContent.includes('ppt/presentation.xml')) return 'pptx';
     if (zipContent.includes('word/document.xml')) return 'docx';
@@ -50,10 +50,10 @@ const detectFileType = (buffer: ArrayBuffer): string => {
 };
 
 /**
- * check if the byte array matches the file signature
- * @param uint8Array byte array
- * @param signature file signature
- * @returns whether it matches
+ * Check whether a byte array matches a file signature
+ * @param uint8Array Byte array
+ * @param signature File signature
+ * @returns Whether it matches
  */
 const matchesSignature = (uint8Array: Uint8Array, signature: number[]): boolean => {
   if (signature.length === 0) return false;
@@ -68,45 +68,55 @@ const matchesSignature = (uint8Array: Uint8Array, signature: number[]): boolean 
 };
 
 /**
- * cache URL content
+ * Cache URL content
  */
 const cache = new Map<string, string>();
 
 /**
- * cache URL file type
+ * Cache URL file type
  */
 const cacheFileType = new Map<string, string>();
 
 /**
- * cache blobUrl
+ * Cache PDF blobs instead of object URLs. Object URLs belong to the component
+ * instance that creates them and may be revoked when that instance unmounts.
  */
-const cacheBlobUrl = new Map<string, string>();
+const cacheBlob = new Map<string, Blob>();
 
 /**
- * check if the text contains garbled text
+ * Check whether text contains garbled characters
  */
 const hasGarbledText = (text: string): boolean => {
-  // check if it contains common garbled characters
+  // Check for common garbled-character patterns
   const garbledPatterns = [
     /[\uFFFD]/g, // Unicode replacement character
-    /[\u007F-\u009F]/g, // control characters
-    /[\uFFFE\uFFFF]/g, // Unicode BOM related
+    /[\u007F-\u009F]/g, // Control characters
+    /[\uFFFE\uFFFF]/g, // Unicode BOM-related
   ];
 
   return garbledPatterns.some((pattern) => pattern.test(text));
 };
 
 /**
- * check if the text contains valid Chinese characters
+ * Check whether text contains valid CJK characters
  */
 const hasValidChineseText = (text: string): boolean => {
-  // check if it contains Chinese characters
+  // Check for CJK characters
   const chinesePattern = /[\u4e00-\u9fa5]/;
   return chinesePattern.test(text);
 };
 
 /**
- * try different encoding formats to decode the text
+ * Check whether text contains Cyrillic letters (e.g. Russian, Kazakh)
+ */
+const hasCyrillicText = (text: string): boolean => {
+  // Cyrillic range: U+0400–U+04FF
+  const cyrillicPattern = /[\u0400-\u04FF]/;
+  return cyrillicPattern.test(text);
+};
+
+/**
+ * Try decoding text with multiple encodings
  */
 const tryDecodeWithDifferentEncodings = async (arrayBuffer: ArrayBuffer): Promise<string> => {
   const encodings = ['utf-8', 'gbk', 'gb2312', 'big5', 'shift-jis'];
@@ -118,28 +128,41 @@ const tryDecodeWithDifferentEncodings = async (arrayBuffer: ArrayBuffer): Promis
       const decoder = new TextDecoder(encoding);
       const text = decoder.decode(arrayBuffer);
 
-      // check if the decoding is successful
+      // Check whether decoding succeeded
       if (text.length > 0 && !hasGarbledText(text)) {
         let score = 0;
 
-        // if it contains Chinese, calculate the Chinese quality score
+        // Score CJK quality when present
         if (hasValidChineseText(text)) {
           const chineseChars = text.match(/[\u4e00-\u9fa5]/g);
           if (chineseChars) {
-            score += chineseChars.length * 10; // the more Chinese characters, the higher the score
+            score += chineseChars.length * 10; // More CJK chars => higher score
           }
         }
 
-        // check if it contains common CSV separators and line breaks
+        // Prefer UTF-8 when Cyrillic is present
+        if (hasCyrillicText(text)) {
+          const cyrillicChars = text.match(/[\u0400-\u04FF]/g);
+          if (cyrillicChars) {
+            // Cyrillic should decode as UTF-8
+            if (encoding === 'utf-8') {
+              score += cyrillicChars.length * 100; // Strongly prefer UTF-8
+            } else {
+              score += cyrillicChars.length; // Other encodings score low
+            }
+          }
+        }
+
+        // Check for common CSV separators and newlines
         if (text.includes(',') || text.includes('\n')) {
           score += 5;
         }
 
-        // check if it contains common CSV content (numbers, letters, etc.)
+        // Check for typical CSV content (digits, letters, etc.)
         const alphanumericCount = (text.match(/[a-zA-Z0-9]/g) || []).length;
         score += alphanumericCount;
 
-        // if the score of this encoding is higher, update the best result
+        // Keep the highest-scoring decode result
         if (score > bestScore) {
           bestScore = score;
           bestResult = text;
@@ -151,21 +174,21 @@ const tryDecodeWithDifferentEncodings = async (arrayBuffer: ArrayBuffer): Promis
     }
   }
 
-  // if a good result is found, return it
+  // Return the best successful decode
   if (bestResult) {
     return bestResult;
   }
 
-  // if all encodings fail, use UTF-8 as a backup
+  // Fall back to UTF-8 if all encodings fail
   const decoder = new TextDecoder('utf-8');
   return decoder.decode(arrayBuffer);
 };
 
 /**
- * hook to get content from URL
- * @param url URL to get content
- * @param options configuration options
- * @returns object containing data, loading status, and error information, as well as a method to manually get content
+ * Hook to fetch content from a URL
+ * @param url URL to fetch
+ * @param options Options
+ * @returns Data, loading/error state, and a manual fetch method
  */
 export const useUrlContent = ({ url, contentType }: { url: string | null; contentType?: string }) => {
   // state
@@ -177,15 +200,16 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
     error: null,
   });
 
-  // get content
+  // Fetch content
   const fetchContent = useCallback(
     async (targetUrl?: string) => {
-      // if the cache exists, return the cached content
+      // Return cached content when available
       if (cache.has(targetUrl)) {
+        const cachedBlob = cacheBlob.get(targetUrl);
         setState({
           data: cache.get(targetUrl),
           fileType: cacheFileType.get(targetUrl) || '',
-          blobUrl: cacheBlobUrl.get(targetUrl) || '',
+          blobUrl: cachedBlob ? URL.createObjectURL(cachedBlob) : '',
           loading: false,
           error: null,
         });
@@ -199,68 +223,81 @@ export const useUrlContent = ({ url, contentType }: { url: string | null; conten
         loading: true,
         error: null,
       });
-      // if the cache does not exist, request the URL content
-      const response = await fetch(targetUrl);
-      if (response.ok) {
-        // get the encoding information of the response
-        const contentTypeHeader = contentType || response.headers.get('content-type') || '';
-        const arrayBuffer = await response.arrayBuffer();
 
-        // detect the file type through ArrayBuffer
-        const detectedType = detectFileType(arrayBuffer);
-        console.log('Detected file type:', detectedType);
+      try {
+        // Fetch URL content when not cached
+        const response = await fetch(targetUrl);
+        if (response.ok) {
+          // Read response encoding from content-type
+          const contentTypeHeader = contentType || response.headers.get('content-type') || '';
+          const arrayBuffer = await response.arrayBuffer();
 
-        // for CSV files, use more intelligent encoding processing
-        let text: string;
-        if (contentTypeHeader.includes('text/csv') || targetUrl?.endsWith('.csv')) {
-          // use ArrayBuffer to process encoding
-          // const arrayBuffer = await response.arrayBuffer();
-          text = await tryDecodeWithDifferentEncodings(arrayBuffer);
+          // Detect file type from ArrayBuffer
+          const detectedType = detectFileType(arrayBuffer);
+
+          // Use smarter encoding handling for CSV
+          let text: string;
+          if (contentTypeHeader.includes('text/csv') || targetUrl?.endsWith('.csv')) {
+            // Decode via ArrayBuffer
+            // const arrayBuffer = await response.arrayBuffer();
+            text = await tryDecodeWithDifferentEncodings(arrayBuffer);
+          } else {
+            // text = await response.text();
+            const decoder = new TextDecoder('utf-8');
+            text = decoder.decode(arrayBuffer);
+          }
+
+          let blobUrl = '';
+          if (detectedType === 'pdf') {
+            const blob = new Blob([arrayBuffer], { type: contentTypeHeader || 'application/pdf' });
+            blobUrl = URL.createObjectURL(blob);
+            cacheBlob.set(targetUrl, blob);
+          }
+
+          // Cache content
+          cache.set(targetUrl, text);
+          // Cache file type
+          cacheFileType.set(targetUrl, detectedType);
+
+          // Update state
+          setState({
+            data: text,
+            fileType: detectedType,
+            blobUrl,
+            loading: false,
+            error: null,
+          });
         } else {
-          // text = await response.text();
-          const decoder = new TextDecoder('utf-8');
-          text = decoder.decode(arrayBuffer);
+          // Update state
+          setState({
+            data: null,
+            fileType: '',
+            blobUrl: '',
+            loading: false,
+            error: `HTTP error: ${response.status} ${response.statusText}`,
+          });
         }
-
-        let blobUrl = '';
-        if (detectedType === 'pdf') {
-          const blob = new Blob([arrayBuffer], { type: contentType || '' });
-          blobUrl = URL.createObjectURL(blob);
-          // cache blobUrl
-          cacheBlobUrl.set(targetUrl, blobUrl);
-        }
-
-        // cache content
-        cache.set(targetUrl, text);
-        // cache file type
-        cacheFileType.set(targetUrl, detectedType);
-
-        // set state
-        setState({
-          data: text,
-          fileType: detectedType,
-          blobUrl,
-          loading: false,
-          error: null,
-        });
-      } else {
-        // set state
+      } catch (error) {
+        // Catch all errors (network, decode, etc.)
+        console.error('Failed to fetch content:', error);
         setState({
           data: null,
           fileType: '',
           blobUrl: '',
           loading: false,
-          error: `HTTP错误: ${response.status} ${response.statusText}`,
+          error: error instanceof Error ? error.message : 'Failed to load file',
         });
       }
     },
     [contentType],
   );
 
-  // automatically get content
+  // Auto-fetch content
   useEffect(() => {
     if (url) {
-      fetchContent(encodeURI(url));
+      // Keep signed URL untouched. Re-encoding may turn `%` into `%25`
+      // and break OSS signature validation for preview requests.
+      fetchContent(url);
     }
   }, [url, fetchContent]);
 

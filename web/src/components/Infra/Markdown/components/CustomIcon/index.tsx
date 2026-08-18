@@ -6,7 +6,7 @@ import classNames from 'classnames';
 import { copySvg } from './svgs';
 
 interface SvgMap {
-  [key: string]: () => React.ReactElement;
+  [key: string]: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
 const svgMap: SvgMap = {

@@ -1,9 +1,11 @@
-import { CaretRightOutlined, StepForwardOutlined } from '@ant-design/icons';
-import { Button, Space } from 'antd';
+import { StepForwardOutlined } from '@ant-design/icons';
+import { Button, ConfigProvider, Space } from 'antd';
 import React, { useCallback } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAgentStore } from '@/store';
 import useReplay from '@/hooks/useReplay';
+import RestartIcon from '@/assets/svg/sender/restart.svg?react';
+import './index.less';
 
 const SenderContainer: React.FC = () => {
   const { shareId, sharePassword } = useAgentStore();
@@ -11,45 +13,77 @@ const SenderContainer: React.FC = () => {
 
   const { isPlaying, start, end, loaded } = useReplay(shareId.slice(2), shareId.startsWith('e-'), sharePassword);
 
-  // handle jump to end
+  // Jump to the end
   const handleJumpToEnd = useCallback(() => {
     end();
   }, [end]);
 
-  // handle restart from the beginning
+  // Restart from the beginning
   const handleRestart = useCallback(() => {
     start();
   }, [start]);
 
   return (
-    <div className="flex items-center gap-6 bg-white rounded-xl py-3 px-4 w-full border border-[#d9d9d9] shadow-[0_1px_2px_0_rgba(0,_0,_0,_0.03),_0_1px_6px_-1px_rgba(0,_0,_0,_0.02),_0_2px_4px_0_rgba(0,_0,_0,_0.02)]">
-      <div className="flex-1 flex items-center gap-2">
+    <div className="flex justify-between items-center w-full h-14 pl-5 pr-3 py-2.5 relative bg-gradient-to-r from-[#F6F6F8] to-white rounded-[28px] shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)] outline outline-1 outline-offset-[-1px] outline-gray-200">
+      <div className="flex justify-start items-center color-black text-sm font-normal leading-4">
         {isPlaying ? t('task.replay.replaying') : loaded ? t('task.replay.finished') : ''}
       </div>
       <Space>
-        {isPlaying ? (
-          <Button
-            shape="round"
-            color="default"
-            variant="solid"
-            icon={<StepForwardOutlined />}
-            onClick={handleJumpToEnd}
-            disabled={!loaded}
-          >
-            {t('sender.replay.end')}
-          </Button>
-        ) : (
-          <Button
-            shape="round"
-            color="primary"
-            variant="solid"
-            icon={<CaretRightOutlined />}
-            onClick={handleRestart}
-            disabled={!loaded}
-          >
-            {t('sender.replay.restart')}
-          </Button>
-        )}
+        <ConfigProvider
+          theme={{
+            components: {
+              Button: {
+                // Button gradient from #333 to #222
+                colorPrimary: '#333333 !important',
+                colorPrimaryHover: '#222222 !important',
+                colorPrimaryActive: '#111111 !important',
+                // Text color
+                colorText: '#ffffff !important',
+                colorTextLightSolid: '#ffffff !important',
+                // Border
+                colorBorder: '#000000 !important',
+                colorPrimaryBorder: '#000000 !important',
+                lineWidth: 1,
+                // Radius
+                borderRadius: 18,
+                // Font
+                fontSize: 14,
+                lineHeight: 1.43,
+                fontWeight: 500,
+                // Size
+                controlHeight: 36,
+                paddingContentHorizontal: 16,
+                // Shadow
+                defaultShadow: 'inset 0 -1.5px 1px #000, inset 0 1.5px 1px #ffffff1e',
+                primaryShadow: 'inset 0 -1.5px 1px #000, inset 0 1.5px 1px #ffffff1e',
+              },
+            },
+          }}
+        >
+          {isPlaying ? (
+            <Button
+              shape="round"
+              color="default"
+              variant="solid"
+              icon={<StepForwardOutlined />}
+              onClick={handleJumpToEnd}
+              className="agentx-replay-button"
+            >
+              {t('sender.replay.end')}
+            </Button>
+          ) : (
+            <Button
+              shape="round"
+              color="primary"
+              variant="solid"
+              icon={<RestartIcon />}
+              onClick={handleRestart}
+              className="agentx-replay-button"
+            >
+              {t('sender.replay.restart')}
+            </Button>
+          )}
+        </ConfigProvider>
       </Space>
     </div>
   );

@@ -16,7 +16,7 @@ import {
 } from './svgs';
 
 interface SvgMap {
-  [key: string]: () => React.ReactElement;
+  [key: string]: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
 const svgMap: SvgMap = {

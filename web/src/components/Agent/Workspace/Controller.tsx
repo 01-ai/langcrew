@@ -8,16 +8,16 @@ import { useTranslation } from '@/hooks/useTranslation';
 import './index.less';
 
 const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> = ({ onRealTimeChange }) => {
-  // current displayed step
+  // Currently displayed
   const [step, setStep] = useState(0);
   const { t } = useTranslation();
 
   const { senderSending, workspaceMessages, pipelineTargetMessage, setPipelineTargetMessage } = useAgentStore();
 
-  // total steps
+  // Total steps
   const totalSteps = useMemo(() => workspaceMessages.length, [workspaceMessages]);
 
-  // if pipelineTargetMessage is empty or the number of steps in sending is equal to the total number of steps, it is considered to be real-time
+  // Treat as live when there is no target message or the current step is the last one
   const isRealTime = useMemo(
     () => !pipelineTargetMessage || (senderSending && step === totalSteps),
     [pipelineTargetMessage, senderSending, step, totalSteps],
@@ -31,7 +31,7 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     onRealTimeChange(!showRealTime);
   }, [showRealTime, onRealTimeChange]);
 
-  // manually jump to the specified step, at this time, pipelineTargetMessage needs to be set
+  // Manual seek also updates pipelineTargetMessage
   const manualToStep = useCallback(
     (step: number) => {
       setStep(step);
@@ -40,7 +40,7 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     [setPipelineTargetMessage, workspaceMessages],
   );
 
-  // handle the previous step
+  // Step backward
   const handlePreStep = useCallback(() => {
     const currentStep = step - 1;
     if (currentStep > 0) {
@@ -48,12 +48,12 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     }
   }, [manualToStep, step]);
 
-  // handle the next step
+  // Step forward
   const handleNextStep = useCallback(() => {
     manualToStep(step + 1 < totalSteps ? step + 1 : totalSteps);
   }, [manualToStep, step, totalSteps]);
 
-  // handle step change
+  // Handle step changes
   const handleStepChange = useCallback(
     (value) => {
       if (value !== 0) {
@@ -63,20 +63,20 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
     [manualToStep],
   );
 
-  // return to real-time
+  // Return to live mode
   const returnToRealTime = useCallback(() => {
     setStep(totalSteps);
     setPipelineTargetMessage(null);
   }, [setPipelineTargetMessage, totalSteps]);
 
-  // if the current is real-time, when the number of steps changes, jump to the total number of steps
+  // Stay on the latest step while in live mode
   useEffect(() => {
     if (isRealTime) {
       setStep(totalSteps);
     }
   }, [isRealTime, totalSteps]);
 
-  // if pipelineTargetMessage changes, jump to the corresponding step
+  // Jump to the matching step when pipelineTargetMessage changes
   useEffect(() => {
     if (pipelineTargetMessage) {
       setStep(workspaceMessages.findIndex((message) => message.id === pipelineTargetMessage.id) + 1);
@@ -84,7 +84,7 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
   }, [pipelineTargetMessage, workspaceMessages]);
 
   return (
-    <div className="agentx-controller relative flex w-full gap-[12px] px-[18px] py-2">
+    <div className="agentx-controller relative flex items-center w-full gap-[8px] px-4 h-[52px]">
       {!isRealTime && step !== totalSteps && (
         <div
           className="absolute left-1/2 top-[-36px] z-10 -translate-x-1/2 -translate-y-1/2 py-3 px-5 font-medium rounded-full bg-[#fff] shadow-[0px_2px_20px_0px_rgba(0,_0,_0,_0.12)] cursor-pointer flex items-center gap-[4px]"
@@ -95,29 +95,36 @@ const Controller: React.FC<{ onRealTimeChange: (isRealTime: boolean) => void }> 
         </div>
       )}
 
-      <div className="flex items-center gap-[4px]">
+      <div className="flex items-center gap-[4px] flex-shrink-0">
         <Button
-          type="link"
-          icon={<CustomIcon type="stepBackward" />}
-          style={{ width: 20, padding: 0, fontSize: '20px', color: '#000' }}
+          type="text"
+          icon={<CustomIcon type="stepBackward" style={{ fontSize: 20 }} />}
+          className="!flex !items-center !justify-center !w-5 !h-5 !p-0 !text-black hover:!bg-black/5"
           onClick={handlePreStep}
         />
         <Button
-          type="link"
-          icon={<CustomIcon type="stepForward" />}
-          style={{ width: 20, padding: 0, fontSize: '20px', color: '#000' }}
+          type="text"
+          icon={<CustomIcon type="stepForward" style={{ fontSize: 20 }} />}
+          className="!flex !items-center !justify-center !w-5 !h-5 !p-0 !text-black hover:!bg-black/5"
           onClick={handleNextStep}
         />
       </div>
 
-      <div className="flex-1">
-        {totalSteps <= 1 && <Slider min={0} max={totalSteps} value={step} onChange={handleStepChange} />}
-        {totalSteps > 1 && <Slider min={1} max={totalSteps} value={step} onChange={handleStepChange} />}
+      <div className="flex-1 px-2 flex items-center">
+        {totalSteps <= 1 && (
+          <Slider className="w-full" min={0} max={totalSteps} value={step} onChange={handleStepChange} tooltip={{ open: false }} />
+        )}
+        {totalSteps > 1 && (
+          <Slider className="w-full" min={1} max={totalSteps} value={step} onChange={handleStepChange} tooltip={{ open: false }} />
+        )}
       </div>
 
-      <div className="flex items-center gap-[8px]">
-        <Badge status={isRealTime && senderSending ? 'success' : 'default'} />
-        <span>{t('workspace.controller.real-time')}</span>
+      <div className="flex items-center gap-[6px] flex-shrink-0">
+        <div className="flex items-center gap-[4px]">
+          <Badge status={isRealTime && senderSending ? 'success' : 'default'} className="scale-75" />
+          <span className="text-sm text-black">{t('workspace.controller.real-time')}</span>
+        </div>
+        <div className="w-2 h-2 rounded-full bg-[#00C10A]" />
       </div>
     </div>
   );

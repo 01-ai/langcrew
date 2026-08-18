@@ -1,56 +1,64 @@
 import './text';
+import './reasoning';
 import './live_status';
 import './plan';
 
 import './error';
-// web search
+// Web search
 import './web_search';
 
-// run command
+// Run a command
 import './run_command';
-// delete file
+// Delete a file
 import './delete_file';
 
-// service deploy
-import './service_deploy';
-// code interpreter
+// Code interpreter
 import './code_interpreter';
 
-// user input
+// User input
 import './user_input';
 
-// finish reason
+// Finish reason
 import './finish_reason';
 
-// file parser(added 2025-07-09)
+// File parse (added 2025-07-09)
 import './file_parser';
 
-// image parser(added 2025-07-14)
+// Image parsing (added 2025-07-14)
 import './image_parser';
 
-// image generation(added 2025-07-15)
+// Image generation (added 2025-07-15)
 import './image_generation';
 
-// message to user(added 2025-01-27)
+// User-facing notice; message_to_user is canonical, old protocol kept for compatibility.
 import './message_to_user';
+import './message_notify_user';
 
-// SQL execute(added 2025-07-18)
+// SQL execution (added 2025-07-18)
 import './mysql';
 
-// browser(added 2025-07-18)
+// Browser (added 2025-07-18)
 import './browser';
 
-// phone(added 2025-07-18)
+// Phone (added 2025-07-18)
 import './phone';
 
-// result is Markdown(added 2025-07-25)
+// Result is Markdown (added 2025-07-25)
 import './markdown_result';
 
-// file diff(added 2025-07-25)
+// File diff (added 2025-07-25)
 import './file_diff';
 
-// vector search(added 2025-07-31)
+// Website delivery (added 2025-12-29)
+import './website_delivery';
+// Service deploy
+import './service_deploy';
+
+// Vector search (added 2025-07-31)
 import './milvus_qa_search';
 
-// Claude skill(added 2025-10-23)
+// Claude skills (added 2025-10-23)
 import './claude_skill';
+
+// chatkit(added 2025-10-31)
+import './widget';

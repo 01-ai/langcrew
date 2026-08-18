@@ -1,101 +1,41 @@
+@layer properties, theme, base, antd, components, utilities;
+
 @import 'tailwindcss';
+@import 'tw-animate-css';
 @config '../tailwind.config.js';
 
-/* @font-face {
-  font-family: HarmonyOS Sans;
-  src: url('./assets/fonts/HarmonyOS_Sans.ttf');
-} */
+@import './style/antd-overrides.css';
 
+* {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+html,
 body {
-  margin: 0px !important;
-  overflow: auto;
-  background: #000;
-  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-div,
-span,
-p,
-a,
-ul,
-li,
-label,
-textarea,
-input,
-button,
-th,
-td,
-h1,
-h2,
-h3,
-h4 {
-  border: 0;
-  background: transparent;
+.square-checkbox .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #000000;
+  border-color: #000000;
 }
 
-.planner {
-  .ant-thought-chain-item-header::before {
-    width: 0px !important;
-    background-color: #fff !important;
-    border-left: 1px;
-    border-color: #d1d5db;
-    border-style: dashed;
-  }
-
-  .ant-thought-chain .ant-thought-chain-item-pending-pending .ant-thought-chain-item-icon {
-    background-color: #fff !important;
-  }
-
-  .planner-item .ant-thought-chain-item .ant-thought-chain-item-header::before {
-    display: none !important;
-  }
-
-  .ant-thought-chain.ant-thought-chain-middle
-    .ant-thought-chain-item
-    .ant-thought-chain-item-content
-    .ant-thought-chain-item-content-box {
-    max-width: 100%;
-  }
-
-  .ant-thought-chain.ant-thought-chain-middle {
-    .ant-thought-chain-item {
-      .ant-thought-chain-item-header {
-        .ant-thought-chain-item-header-box {
-          .ant-thought-chain-item-title {
-            font-size: 16px;
-          }
-          .ant-thought-chain-item-desc {
-            font-size: 16px;
-          }
-        }
-      }
-    }
-  }
-
-  .ant-thought-chain-item-icon {
-    height: 20px !important;
-    width: 20px !important;
-    margin-top: 5px;
-    margin-left: 3px;
-  }
-}
-
-.ant-attachment-list-card {
-  background-color: #fff;
-  border: 1px solid #ededed;
+.square-checkbox .ant-checkbox-indeterminate .ant-checkbox-inner::after {
+  background-color: #000000;
 }
 
 .active {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.26) 25%,
-    rgba(255, 255, 255, 0.85) 37%,
-    rgba(255, 255, 255, 0.26) 63%
-  );
-  background-size: 400% 100%;
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0) 20%,
+      rgba(255, 255, 255, 1) 35%,
+      rgba(255, 255, 255, 1) 45%,
+      rgba(255, 255, 255, 0) 65%);
+  background-size: 300% 100%;
   animation-name: active;
-  animation-duration: 1.4s;
-  animation-timing-function: ease;
+  animation-duration: 0.9s;
+  animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
 
@@ -103,8 +43,84 @@ h4 {
   0% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0 50%;
+  }
+}
+
+/* 抄的gemini的样式 */
+.agentx-sender-container {
+  /* WebKit 浏览器滚动条样式 (Chrome, Safari, Edge) */
+
+  /* 滚动条轨道和角落基础样式 */
+  ::-webkit-scrollbar,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+    /* 透明背景 */
+    height: 12px;
+    /* 水平滚动条高度 */
+    width: 12px;
+    /* 垂直滚动条宽度 */
+  }
+
+  /* 滚动条滑块默认样式 */
+  ::-webkit-scrollbar-thumb {
+    background: content-box transparent;
+    /* 默认透明，不可见 */
+    border: 2px solid transparent;
+    /* 透明边框创造内边距效果 */
+    border-radius: 9999px;
+    /* 完全圆润的滑块 */
+    min-height: 48px;
+    /* 最小高度，确保易于点击 */
+    min-width: 48px;
+    /* 最小宽度，确保易于点击 */
+  }
+
+  /* 为不支持标准 scrollbar-color 的浏览器优化性能 */
+  @supports not (scrollbar-color: auto) {
+    :hover {
+      will-change: scrollbar-color;
+      /* 提前通知浏览器滚动条颜色将改变 */
+    }
+  }
+
+  /* 容器悬停时显示滚动条滑块 */
+  :hover::-webkit-scrollbar-thumb {
+    background: content-box #dde3ea;
+    /* 浅灰色滑块 */
+  }
+
+  /* 滑块激活或悬停时的样式 */
+  ::-webkit-scrollbar-thumb:active,
+  ::-webkit-scrollbar-thumb:hover {
+    background: content-box #c4c7c5;
+    /* 深灰色滑块，提供明显的交互反馈 */
+  }
+
+  /* 隐藏滚动条两端的箭头按钮 */
+  ::-webkit-scrollbar-button {
+    height: 0;
+    width: 0;
+  }
+
+  /* 标准 CSS 滚动条样式（Firefox 及不支持 ::-webkit-scrollbar 的浏览器） */
+  @supports not (selector(::-webkit-scrollbar)) {
+    * {
+      scrollbar-color: transparent transparent;
+      /* 默认透明滚动条 */
+      scrollbar-gutter: auto;
+      /* 自动处理滚动条占位 */
+      scrollbar-width: thin;
+      /* 细滚动条 */
+    }
+
+    /* 悬停时显示滚动条 */
+    *:hover {
+      scrollbar-color: #dde3ea transparent;
+      /* 浅灰色滑块，透明轨道 */
+    }
   }
 }
 
@@ -118,13 +134,15 @@ h4 {
 }
 
 .chat-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent; /* 默认透明 */
+  background: transparent;
+  /* 默认透明 */
   border-radius: 6px;
   transition: background-color 0.3s ease;
 }
 
 .chat-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1); /* 悬停时显示 */
+  background: rgba(0, 0, 0, 0.1);
+  /* 悬停时显示 */
 }
 
 .chat-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -136,27 +154,18 @@ h4 {
 }
 
 /* 附件列表卡片样式 */
-.ant-attachment-list-card {
-  padding: 12px 46px 12px 12px;
-  border-radius: 12px;
-  border-color: #ededed;
-}
-.ant-attachment-list-card.ant-attachment-list-card-type-preview {
-  padding-right: 12px;
-}
-.ant-attachment-list-card:hover {
-  background-color: #0000000a;
-}
 .ant-attachment-list-card-type-overview .ant-attachment-list-card-icon {
-  font-size: 36px;
+  font-size: 32px;
   padding-top: 0;
 }
+
 .ant-attachment-list-card .ant-attachment-list-card-name {
   line-height: 20px;
   font-size: 14px;
 }
+
 .ant-attachment-list-card-type-overview .ant-attachment-list-card-desc {
-  line-height: 14px;
+  line-height: 12px;
   font-size: 10px;
 }
 
@@ -170,4 +179,10 @@ h4 {
     min-height: 87vh !important;
     padding: 24px !important;
   }
+}
+
+
+
+.ant-thought-chain .ant-thought-chain-node-content {
+  margin-bottom: 0;
 }

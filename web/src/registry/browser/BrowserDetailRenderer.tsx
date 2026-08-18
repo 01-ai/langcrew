@@ -5,17 +5,19 @@ import ImageDetailRenderer from '../common/ImageDetailRenderer';
 import { Spin } from 'antd';
 
 const BrowserDetailRenderer: React.FC<DetailRendererProps> = ({ message, isRealTime }) => {
-  const sandboxUrl = message?.detail?.param?.sandbox_url || message?.detail?.result?.sandbox_url;
+  const { shareId } = useAgentStore();
+  const result = message?.detail?.result;
+  const sandboxUrl = message?.detail?.param?.sandbox_url || result?.sandbox_url || result?.artifact?.sandbox_url;
 
-  // use useMemo to cache iframe, only when sandbox_url changes
+  // Memoize the iframe; recreate only when sandbox_url changes
   const iframeElement = useMemo(() => {
-    if (!useAgentStore.getState().shareId && sandboxUrl) {
+    if (!shareId && sandboxUrl) {
       return <iframe key={sandboxUrl} src={sandboxUrl} className="w-full h-full" />;
     }
     return null;
-  }, [sandboxUrl]);
+  }, [sandboxUrl, shareId]);
 
-  const showSandbox = !useAgentStore.getState().shareId && isRealTime && sandboxUrl && !message?.isFinish;
+  const showSandbox = !shareId && isRealTime && sandboxUrl && !message?.isFinish;
 
   if (showSandbox) {
     return <div className="w-full h-full">{iframeElement}</div>;
@@ -29,7 +31,7 @@ const BrowserDetailRenderer: React.FC<DetailRendererProps> = ({ message, isRealT
     );
   }
 
-  return <ImageDetailRenderer imageUrl={message?.detail?.result?.image_url} />;
+  return <ImageDetailRenderer imageUrl={result?.image_url || result?.artifact?.image_url} />;
 };
 
 export default BrowserDetailRenderer;

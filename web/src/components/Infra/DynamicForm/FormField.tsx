@@ -127,7 +127,8 @@ const FormField: React.FC<FormFieldProps> = ({ fieldSchema, value, onChange }) =
         />
       );
 
-    case 'number':
+    case 'number': {
+      const numberFormat = (fieldSchema as unknown as { format?: string }).format;
       return (
         <InputNumber
           className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
@@ -136,9 +137,10 @@ const FormField: React.FC<FormFieldProps> = ({ fieldSchema, value, onChange }) =
           placeholder={t('form.placeholder.input', { field: cleanTitle })}
           min={hasProperty(fieldSchema.minimum) ? fieldSchema.minimum : undefined}
           max={hasProperty(fieldSchema.maximum) ? fieldSchema.maximum : undefined}
-          precision={hasProperty(fieldSchema.format) && fieldSchema.format === 'currency' ? 2 : undefined}
+          precision={numberFormat === 'currency' ? 2 : undefined}
         />
       );
+    }
 
     case 'boolean':
       return (

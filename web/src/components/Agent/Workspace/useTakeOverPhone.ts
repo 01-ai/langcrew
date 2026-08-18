@@ -1,48 +1,70 @@
 import { isPhoneHIL } from '@/registry/common/useHumanInTheLoop';
 import { useAgentStore } from '@/store';
-import { InnerMessageChunk } from '@/types';
+import { CloudPhoneAuthInfo, InnerMessageChunk, UserInputChunk } from '@/types';
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
 
 const useTakeOverPhone = (isRealTime: boolean) => {
   const { pipelineMessages, sessionInfo, chunks } = useAgentStore();
 
-  const innerMessage = useMemo(() => {
-    return chunks.findLast((item) => {
-      const m = item as InnerMessageChunk;
+  const authInfo: CloudPhoneAuthInfo | null = useMemo(() => {
+    // New protocol: auth_info on the chunk
+    const authChunk = chunks.findLast((item) => {
+      const userInputChunk = item as UserInputChunk;
       return (
-        m.role === 'inner_message' &&
-        m.detail?.access_key &&
-        m.detail?.access_secret_key &&
-        m.detail?.instance_no &&
-        m.detail?.user_id &&
-        dayjs(m.detail?.expire_time).isAfter(dayjs())
+        userInputChunk.detail?.interrupt_data?.intervention_info?.auth_info &&
+        dayjs(userInputChunk.detail?.interrupt_data?.intervention_info?.auth_info.expire_time).isAfter(dayjs())
       );
     });
+    if (authChunk) {
+      return authChunk?.detail?.interrupt_data?.intervention_info?.auth_info;
+    }
+    // Legacy protocol: nested inner_message
+    const innerMessageChunk = chunks.findLast((item) => {
+      const chunk = item as InnerMessageChunk;
+      return (
+        chunk.role === 'inner_message' &&
+        chunk.detail?.access_key &&
+        chunk.detail?.access_secret_key &&
+        chunk.detail?.instance_no &&
+        chunk.detail?.user_id &&
+        dayjs(chunk.detail?.expire_time).isAfter(dayjs())
+      );
+    });
+    if (innerMessageChunk) {
+      return {
+        instance_no: innerMessageChunk.detail?.instance_no,
+        access_key: innerMessageChunk.detail?.access_key,
+        access_secret_key: innerMessageChunk.detail?.access_secret_key,
+        user_id: innerMessageChunk.detail?.user_id,
+        expire_time: innerMessageChunk.detail?.expire_time,
+      } as CloudPhoneAuthInfo;
+    }
+    return null;
   }, [chunks]);
 
   const needTakeOverPhone = useMemo(() => {
     if (sessionInfo?.status === 'ARCHIVED') {
       return false;
     }
-    if (!innerMessage) {
+    if (!authInfo) {
       return false;
     }
-    // find the last message
+    // Find the last message
     const lastMessage = pipelineMessages[pipelineMessages.length - 1];
-    // if the last message is assistant, then it may need user operation
+    // An assistant tail message may require HITL
     if (lastMessage?.role === 'assistant') {
-      // find the message with type user_input in the last message
+      // Find a user_input chunk in the last message
       const userInputMessage = lastMessage.messages.find((item) => isPhoneHIL(item));
-      // if found, then need user operation
+      // HITL is required when a user_input chunk is present
       if (userInputMessage && isRealTime) {
         return true;
       }
     }
     return false;
-  }, [sessionInfo?.status, innerMessage, pipelineMessages, isRealTime]);
+  }, [sessionInfo?.status, authInfo, pipelineMessages, isRealTime]);
 
-  return { needTakeOverPhone, innerMessage };
+  return { needTakeOverPhone, authInfo, canTakeOverPhone: !!authInfo };
 };
 
 export default useTakeOverPhone;

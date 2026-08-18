@@ -1,282 +1,225 @@
-import { EventErrorChunk, FileItem, KnowledgeBaseItem, MCPToolItem, MessageChunk, UserInputChunk } from '@/types';
-import { useCallback, useEffect, useRef } from 'react';
+import {
+  FileItem,
+  HitlApprovalResumeContent,
+  KnowledgeBaseItem,
+  Mention,
+  MessageMetadata,
+  ModelItem,
+} from '@/types';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
-import { XStream } from '@ant-design/x';
-import { useAgentStore } from '@/store';
-import { useChunksProcessor } from '../useChunksProcessor';
-import { sessionApi } from '@/services/api';
-import { isJsonString } from '@/utils/json';
-
+import { useAgentStore, useAgentStoreApi, useRequestClient } from '@/store';
+import { useChunksUISync } from '../useChunksUISync';
 import eventBus from '@/utils/eventBus';
-import { getLanguage } from '../useTranslation';
-import { message } from 'antd';
+import { useChunkParser } from './core/useChunkParser';
+import { useSSEHandler } from './core/useSSEHandler';
+import { useSend } from './core/useSend';
+import { useSendContinue } from './core/useSendContinue';
+import { useSessionManager } from './core/useSessionManager';
+import { useSessionInfoPoller } from './core/useSessionInfoPoller';
+import { useNetworkRecovery } from './network/useNetworkRecovery';
+
+export type SendContent = string | boolean | string[] | HitlApprovalResumeContent;
 
 export interface SendOptions {
+  type?: 'user_message' | 'custom_action' | 'client_tool_result';
+  params?: any;
   content: string;
+  resumeContent?: SendContent;
   files?: FileItem[];
-  mcpTools?: MCPToolItem[];
   knowledgeBases?: KnowledgeBaseItem[];
+  models?: ModelItem[];
+  mode?: string;
+  generalAgentMode?: string;
+  options?: Record<string, any>;
+  metadata?: MessageMetadata;
+  mentions?: Mention[];
 }
-
-const DEBOUNCE_TIME = 16;
 
 interface UseChatReturn {
   /**
-   * send message
+   * Send a message
    */
   send: (options: SendOptions) => Promise<void>;
 
   /**
-   * stop task, directly call the stop interface, instead of disconnecting sse
+   * Stop the task via the stop API instead of aborting SSE
    */
   stop: () => void;
 }
 
 /**
- * call function using hook
- * read data using store
+ * Call functions via the hook
+ * Read data from the store
  */
-const useChat = (): UseChatReturn => {
+const useChat = (_basePath: string, _agentId: string, sessionId: string): UseChatReturn => {
+  const storeApi = useAgentStoreApi();
+  const requestClient = useRequestClient();
+  const { instanceId } = storeApi.getState();
+  const requestConfig = useAgentStore((state) => state.requestConfig);
+  const enableSendContinue = Boolean(
+    requestConfig?.capabilities?.sessionRest ?? requestConfig?.adapter?.capabilities?.sessionRest,
+  );
+
+  const runAfterSend = useRef<() => void>(() => {});
+
   // stores
-  const { chunks } = useAgentStore();
+  const chunks = storeApi.getState().chunks;
 
   // states
 
-  // use chunks from global store
-  useChunksProcessor(chunks);
+  // Use chunks from the global store
+  useChunksUISync(chunks);
 
-  const debounceTimer = useRef<number>(0);
-  const pendingChunks = useRef<MessageChunk[]>([]);
+  // refs
 
-  const addPendingChunks = useCallback(() => {
-    if (pendingChunks.current.length === 0) {
-      return;
-    }
-    useAgentStore.getState().addChunks(pendingChunks.current);
-    pendingChunks.current = [];
-  }, []);
+  // Retry timer
+  const retryTimerRef = useRef<number | null>(null);
 
-  // functions
+  // Chunk batch timer
+  const debounceTimerRef = useRef<number>(0);
 
-  /**
-   * immutable function
-   */
-  const handleChunk = useCallback((chunk: string) => {
-    if (!isJsonString(chunk)) {
-      console.error('handleChunk chunk is not json string', chunk);
-      return;
-    }
-    const data = JSON.parse(chunk) as MessageChunk;
+  // Keep the last user message
+  const currentMessageRef = useRef<string>('');
+  // Keep the latest sessionId in a ref to avoid stale closures
+  const sessionIdRef = useRef<string>(sessionId);
+  const sendRef = useRef<((options: SendOptions) => Promise<void>) | null>(null);
 
-    // if send returns user message, it means the return of add_message, at this time, senderLoading needs to be set to false
-    if (data.role === 'user') {
-      // filter out chunks with loading true
-      useAgentStore.getState().setChunks(useAgentStore.getState().chunks.filter((chunk) => !chunk.loading));
-      // set senderLoading to false, allow sending new message
-      useAgentStore.getState().setSenderLoading(false);
-      // here we don't return, because there is still addChunk
-    }
+  // Parse chunks with useChunkParser
+  const { handleChunk, addPendingChunks, pendingChunks } = useChunkParser({
+    storeApi,
+    currentMessageRef,
+  });
 
-    if ((data as EventErrorChunk).code === 4102) {
-      useAgentStore.getState().addChunk({
-        id: Date.now().toString(),
-        role: 'assistant',
-        type: 'error',
-        content: (data as EventErrorChunk).message || 'Session is archived',
-      });
-      useAgentStore.getState().setSessionInfo({
-        ...useAgentStore.getState().sessionInfo,
-        status: 'ARCHIVED',
-      });
-      return;
-    }
-    if (data.type === 'session_init') {
-      const {
-        detail: { session_id, title },
-      } = data;
-
-      useAgentStore.getState().setSessionInfo({
-        session_id,
-        title,
-      } as any);
-
-      return;
-    }
-    pendingChunks.current.push(data);
-  }, []);
+  const { markCreated, startIfPending, stop: stopSessionInfoPoll } = useSessionInfoPoller({
+    sessionIdRef,
+    storeApi,
+  });
 
   /**
-   * immutable function
+   * Stable functions
    */
   const onSendComplete = useCallback(() => {
-    if (useAgentStore.getState().senderSending) {
-      useAgentStore.getState().setSenderSending(false);
+    storeApi.getState().setStopped(true);
+    // If senderSending is true, set it to false
+    if (storeApi.getState().senderSending) {
+      storeApi.getState().setSenderSending(false);
     }
-    // if senderStopping is true, set to false
-    if (useAgentStore.getState().senderStopping) {
-      useAgentStore.getState().setSenderStopping(false);
+    // If senderStopping is true, set it to false
+    if (storeApi.getState().senderStopping) {
+      storeApi.getState().setSenderStopping(false);
     }
-  }, []);
+    // Clear the retry timer if present
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    runAfterSend.current();
+    runAfterSend.current = () => {};
+    void startIfPending();
+  }, [storeApi, startIfPending]);
 
-  /**
-   * immutable function
-   */
-  const handleResponse = useCallback(
-    async (response: Response, onTimeout: () => void, onComplete: () => void) => {
-      if (!debounceTimer.current) {
-        debounceTimer.current = window.setInterval(() => {
-          addPendingChunks();
-          debounceTimer.current = 0;
-        }, DEBOUNCE_TIME);
-      }
-      for await (const chunk of XStream({
-        readableStream: response.body,
-      })) {
-        handleChunk(chunk.data);
-      }
-      onComplete();
-      if (debounceTimer.current) {
-        window.clearInterval(debounceTimer.current);
-        debounceTimer.current = 0;
-        addPendingChunks();
-      }
-    },
-    [addPendingChunks, handleChunk],
-  );
+  // Handle SSE with useSSEHandler
+  const { handleResponse } = useSSEHandler({
+    storeApi,
+    debounceTimerRef,
+    retryTimerRef,
+    handleChunk,
+    addPendingChunks,
+    enableSendContinue,
+  });
 
-  const send = useCallback(
-    async ({ content, files = [], mcpTools = [], knowledgeBases = [] }: SendOptions) => {
-      const sessionId = useAgentStore.getState().sessionInfo?.session_id;
+  const { sendContinue } = useSendContinue({
+    sessionIdRef,
+    storeApi,
+    retryTimerRef,
+    handleResponse,
+    onSendComplete,
+    enableSendContinue,
+  });
 
-      if (useAgentStore.getState().senderSending) {
-        useAgentStore.getState().setSenderLoading(true);
-        try {
-          useAgentStore.getState().addChunk({
-            id: Date.now().toString(),
-            role: 'user',
-            type: 'text',
-            content,
-            loading: true,
-            timestamp: Date.now(),
-          });
-          await sessionApi.addNewMessage(sessionId, content);
-        } catch (error) {
-          console.error('Failed to add new message:', error);
-          useAgentStore.getState().setSenderLoading(false);
-        }
-        return;
-      }
+  useSessionManager({
+    sessionId,
+    sessionIdRef,
+    storeApi,
+    debounceTimerRef,
+    retryTimerRef,
+    pendingChunksRef: pendingChunks,
+    sendContinue,
+    sendRef,
+    enableSendContinue,
+    onCleanupPreviousSession: stopSessionInfoPoll,
+  });
 
-      useAgentStore.getState().setSenderLoading(true);
+  const { send } = useSend({
+    sessionIdRef,
+    currentMessageRef,
+    retryTimerRef,
+    storeApi,
+    handleResponse,
+    sendContinue,
+    onSendComplete,
+    enableSendContinue,
+    markSessionCreated: markCreated,
+  });
 
-      try {
-        const pipelineMessages = useAgentStore.getState().pipelineMessages;
-        // get the last user_input message
-        const userInputChunk = pipelineMessages[pipelineMessages.length - 1]?.messages?.find(
-          (msg) => msg.type === 'user_input',
-        ) as UserInputChunk;
-        const previousMessage = pipelineMessages[pipelineMessages.length - 2]?.messages?.[0];
+  sendRef.current = send;
 
-        // add user message to chunks
-        useAgentStore.getState().addChunk({
-          // user message
-          // message id
-          id: 'fake-' + Date.now().toString(),
-          // message type
-          type: 'text',
-          // message role
-          role: 'user',
-          // user input message
-          content,
-          timestamp: Date.now(),
-          detail: {
-            attachments: files.map((item) => ({
-              filename: item.name,
-              path: item.key,
-              url: item.url,
-              size: item.size,
-              content_type: item.type,
-              show_user: 1,
-            })),
-          },
-        });
-
-        useAgentStore.getState().abortController?.abort();
-        const abortController = new AbortController();
-        useAgentStore.getState().setAbortController(abortController);
-        useAgentStore.getState().setSenderSending(true);
-        const response = await fetch(`${useAgentStore.getState().requestPrefix}/api/v1/chat`, {
-          headers: {
-            accept: 'text/event-stream',
-            'Content-Type': 'application/json',
-            language: getLanguage(),
-          },
-          body: JSON.stringify({
-            session_id: sessionId,
-            message: content,
-            files,
-            // if userInputChunk exists, assign the detail.interrupt_data of userInputChunk to the body
-            ...(userInputChunk?.detail?.interrupt_data
-              ? {
-                  interrupt_data: {
-                    ...userInputChunk.detail.interrupt_data,
-                    content: previousMessage?.content,
-                    files: previousMessage?.detail?.attachments || previousMessage?.detail?.files,
-                  },
-                }
-              : {}),
-          }),
-          method: 'POST',
-          signal: abortController.signal,
-        });
-        useAgentStore.getState().setSenderLoading(false);
-
-        if (!response.ok) {
-          useAgentStore.getState().addChunk({
-            id: Date.now().toString(),
-            role: 'assistant',
-            type: 'error',
-            content: 'Failed to fetch',
-          });
-          throw new Error('Failed to fetch');
-        }
-        // removeFakeChunks();
-
-        handleResponse(response, () => {}, onSendComplete);
-      } catch (error) {
-        useAgentStore.getState().setSenderLoading(false);
-        // if AbortError, it means the user主动中断了请求，不需要显示错误
-        if (error.name === 'AbortError') {
-          console.error('Request was aborted by user');
-          return;
-        }
-
-        console.error('Send error:', error);
-
-        message.error(error.message);
-        onSendComplete();
-      }
-    },
-    [handleResponse, onSendComplete],
-  );
+  useNetworkRecovery({
+    storeApi,
+    retryTimerRef,
+    sendContinue,
+    enableSendContinue,
+  });
 
   const stop = useCallback(() => {
-    const sessionId = useAgentStore.getState().sessionInfo?.session_id;
-    useAgentStore.getState().setSenderStopping(true);
-    sessionApi.stopTask(sessionId);
-  }, []);
+    stopSessionInfoPoll();
+    const state = storeApi.getState();
+    const currentSessionId =
+      sessionIdRef.current || state.sessionInfo?.session_id || '';
+    if (currentSessionId) {
+      void requestClient.session.stopTask(currentSessionId).catch(() => {
+        // Local abort still stops rendering if the stop request fails.
+      });
+    }
+    state.abortController?.abort();
+    state.setStopped(true);
+  }, [storeApi, requestClient, stopSessionInfoPoll]);
 
   // effects
 
+  // Update ids in refs
+  // useLayoutEffect updates the ref before other effects
+  // Keep instance params current before send/stop
+  useLayoutEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
   useEffect(() => {
-    const handleUserInputClick = (option: string) => {
-      send({ content: option });
-    };
-    eventBus.on('user_input_click', handleUserInputClick);
     return () => {
-      eventBus.off('user_input_click', handleUserInputClick);
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     };
-  }, [send]);
+  }, []);
+
+  useEffect(() => {
+    const callSend = (option: SendOptions) => {
+      // Defer send if already sending
+      if (storeApi.getState().senderSending) {
+        runAfterSend.current = () => {
+          send(option);
+        };
+      } else {
+        send(option);
+      }
+    };
+    eventBus.on(`call_send_${instanceId}`, callSend);
+    return () => {
+      eventBus.off(`call_send_${instanceId}`, callSend);
+    };
+  }, [send, instanceId, storeApi]);
 
   // returns
 

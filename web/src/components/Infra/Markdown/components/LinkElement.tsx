@@ -1,13 +1,10 @@
-import React from "react";
+import React from 'react';
 
-type LinkElementProps = React.DetailedHTMLProps<
-  React.AnchorHTMLAttributes<HTMLAnchorElement>,
-  HTMLAnchorElement
->;
+type LinkElementProps = React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>;
 
 const LinkElement: React.FC<LinkElementProps> = ({ href, children }) => {
   return (
-    <a href={href} target="_blank">
+    <a href={href} target="_blank" rel="noreferrer">
       {children}
     </a>
   );

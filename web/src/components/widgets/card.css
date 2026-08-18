@@ -1,0 +1,30 @@
+[data-w-component='card'] {
+  --smoothing-background-color: var(--color-surface-elevated);
+  overflow: hidden;
+  width: 560px;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-3xl);
+  background-color: var(--color-surface-elevated);
+  transition-duration: 0.6s;
+  transition-property: opacity, box-shadow;
+  transition-timing-function: ease;
+  will-change: opacity;
+}
+
+[data-w-component='card'][data-size='sm'] {
+  width: 360px;
+}
+
+[data-w-component='card'][data-size='md'] {
+  width: 440px;
+}
+
+[data-w-component='card'][data-size='lg'] {
+  width: 560px;
+}
+
+[data-w-component='card'][data-size='full'] {
+  width: 100%;
+}
+

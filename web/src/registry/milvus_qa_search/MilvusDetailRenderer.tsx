@@ -10,12 +10,21 @@ import { useTranslation } from '@/hooks/useTranslation';
 const MilvusDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => {
   const { t } = useTranslation();
   const { content } = useToolContent(message as unknown as MessageToolChunk);
+
+  if (typeof content === 'object') {
+    return (
+      <div className="w-full h-full overflow-y-auto p-2">
+        <Markdown content={JSON.stringify(content)} />
+      </div>
+    );
+  }
+
   const list = content?.split('\n\n');
 
   // const markdown = list?.reduce((acc, cur) => {
   //   if (isJsonString(cur)) {
   //     const json = JSON.parse(cur);
-  //     // 遍历json的key
+  //     // Walk JSON keys
   //     for (const key in json) {
   //       acc += `## ${key}\n\n${json[key]}\n\n`;
   //     }

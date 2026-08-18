@@ -46,10 +46,6 @@ export default defineConfig(({ mode }) => {
           target: AGENT_API_HOST,
           changeOrigin: true,
         },
-        '/popai': {
-          target: AGENT_API_HOST,
-          changeOrigin: true,
-        },
       },
       output: {
         minify: true,

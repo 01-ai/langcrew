@@ -2,21 +2,21 @@ import { useAgentStore } from '@/store';
 import { MessageChunk, UserInputChunk } from '@/types';
 
 /**
- * check if the message is a phone HIL message
- * @param message message
- * @returns whether the message is a phone HIL message
+ * Whether the message is cloud-phone HIL
+ * @param message Message
+ * @returns Whether this is a cloud-phone HIL message
  */
 export const isPhoneHIL = (message: MessageChunk) =>
-  (message.type === 'message_to_user' &&
+  (message.type === 'message_notify_user' &&
     message.detail?.scene === 'phone' &&
     message.detail?.intent_type === 'asking_user') ||
   (message.type === 'user_input' &&
     (message as UserInputChunk).detail?.interrupt_data?.suggested_user_action === 'take_over_phone');
 
 /**
- * check if the message is a browser HIL message
- * @param message message
- * @returns whether the message is a browser HIL message
+ * Whether the message is take-over-browser HIL
+ * @param message Message
+ * @returns Whether this is a take-over-browser HIL message
  */
 export const isBrowserHIL = (message: MessageChunk) =>
   (message.detail?.interrupt_data?.type === 'take_over_browser' ||
@@ -26,53 +26,53 @@ export const isBrowserHIL = (message: MessageChunk) =>
 const useHumanInTheLoop = (message: MessageChunk) => {
   const { sessionInfo } = useAgentStore();
 
-  // whether the session is active
-  const sessionActive = sessionInfo.status !== 'ARCHIVED';
+  // Whether the session is valid
+  const sessionActive = sessionInfo?.status !== 'ARCHIVED';
 
-  // whether the user can operate
+  // Whether the user can interact
   const userInputable = sessionActive && message.isLast;
 
-  // the message to take over the browser
+  // Take-over-browser message
   const isTakeOverBrowserMessage = isBrowserHIL(message);
 
-  // whether to show the take over browser (the last message)
+  // Show take-over-browser (last message batch)
   const showTakeOverBrowser = isTakeOverBrowserMessage && message.isLast;
 
-  // the message to take over the phone
+  // Take-over-phone message
   const isTakeOverPhoneMessage = isPhoneHIL(message);
 
-  // whether to show the take over phone (the last message)
+  // Show take-over-phone (last message)
   const showTakeOverPhone = isTakeOverPhoneMessage && message.isLast;
 
-  // the message with options
+  // Message with options
   const isOptionMessage = message?.detail?.options?.length > 0;
-  // whether to show the option container (not the message to take over the browser and the message to take over the phone)
+  // Show options (not take-over-browser/phone)
   const showOptionContainer = !isTakeOverBrowserMessage && !isTakeOverPhoneMessage && isOptionMessage;
 
   return {
     /**
-     * whether to show the take over browser
-     * 1. the message to take over the browser
-     * 2. the last message
+     * Whether to show take-over-browser
+     * 1. Is a take-over-browser message
+     * 2. Is the last message batch
      */
     showTakeOverBrowser,
     /**
-     * whether to show the take over phone
-     * 1. the message to take over the phone
-     * 2. the last message
+     * Whether to show take-over-phone
+     * 1. Is a take-over-phone message
+     * 2. Is the last message batch
      */
     showTakeOverPhone,
     /**
-     * whether to show the option container
-     * 1. not the message to take over the browser and the message to take over the phone
-     * 2. has options
-     * 3. whether to show the option container (the last message)
+     * Whether to show options
+     * 1. Not a take-over-browser or take-over-phone message
+     * 2. Has options
+     * 3. Always shown; only the last batch is clickable
      */
     showOptionContainer,
     /**
-     * whether the user can operate
-     * 1. the session is active
-     * 2. the last message
+     * Whether the user can interact
+     * 1. Session is still valid
+     * 2. Is the last message batch
      */
     userInputable,
   };

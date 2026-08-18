@@ -9,17 +9,20 @@ const PhoneDetailRenderer: React.FC<DetailRendererProps> = ({ message, isRealTim
   const { content } = useToolContent(message as unknown as MessageToolChunk);
   const data = isJsonString(content) ? JSON.parse(content) : {};
 
-  const imageUrl = data.current_state?.screenshot_url;
+  // 2026-03-18: data-shape update requested by Bu Wei
+  const imageUrl = data.current_state?.screenshot_url || message?.detail?.result?.artifact?.screenshot_url;
 
   return (
-    <div className="w-full h-full flex justify-center items-center">
-      <CloudPhone
-        phoneRender={() => (
-          <div className="w-full h-full flex justify-center items-center bg-black">
-            <img src={imageUrl} className="max-w-full max-h-full w-full h-full object-contain" />
-          </div>
-        )}
-      />
+    <div className="w-full h-full overflow-auto">
+      <div className="w-full min-h-full flex justify-center items-center">
+        <CloudPhone
+          phoneRender={() => (
+            <div className="w-full h-full flex justify-center items-center bg-black">
+              <img src={imageUrl} className="max-w-full max-h-full w-full h-full object-contain" />
+            </div>
+          )}
+        />
+      </div>
     </div>
   );
 };

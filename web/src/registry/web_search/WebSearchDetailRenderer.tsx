@@ -10,14 +10,14 @@ const WebSearchDetailRenderer: React.FC<DetailRendererProps> = ({ message }) => 
 
   const data = isJsonString(content) ? JSON.parse(content) : [];
 
-  const list = data.map((item: WebSearchResultItem) => ({
+  const list = data?.map((item: WebSearchResultItem) => ({
     link: item.metadata.url,
     title: item.title,
     description: item.metadata.snippet,
     icon: item.metadata.favicon,
   }));
 
-  return <Search data={list} />;
+  return <Search data={list || []} />;
 };
 
 export default WebSearchDetailRenderer;

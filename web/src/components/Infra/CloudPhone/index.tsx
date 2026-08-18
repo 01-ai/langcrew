@@ -5,41 +5,43 @@ import { isFunction, set } from 'lodash-es';
 import phoneBgTopUrl from '@/assets/svg/phone-bg-top.svg';
 import phoneBgBottomUrl from '@/assets/svg/phone-bg-bottom.svg';
 import phoneHighlightUrl from '@/assets/png/phone-highlight.png';
+import { CloudPhoneAuthInfo } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
 
-// dynamically load NzCp SDK
+// Load the NzCp SDK on demand
 const loadNzCpSDK = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // check if NzCp already exists
+    // Reuse NzCp if it is already loaded
     if (typeof window !== 'undefined' && (window as any).NzCp) {
       resolve();
       return;
     }
 
-    // check if the script already exists
+    // Check whether the script tag already exists
     const existingScript = document.querySelector('script[src*="NZsdk.min.2.8.1.js"]');
     if (existingScript) {
-      // if the script already exists, wait for it to load
+      // Wait for an existing script to finish loading
       existingScript.addEventListener('load', () => resolve());
       existingScript.addEventListener('error', reject);
       return;
     }
 
-    // dynamically create script tag
+    // Inject the script tag
     const script = document.createElement('script');
     script.src = '/NZsdk.min.2.8.1.js';
     script.async = true;
 
     script.onload = () => {
-      // check if NzCp successfully loads
+      // Confirm NzCp loaded
       if (typeof window !== 'undefined' && (window as any).NzCp) {
         resolve();
       } else {
-        reject(new Error('NzCp SDK load failed'));
+        reject(new Error('Failed to load NzCp SDK'));
       }
     };
 
     script.onerror = () => {
-      reject(new Error('NzCp SDK script load failed'));
+      reject(new Error('Failed to load NzCp SDK script'));
     };
 
     document.head.appendChild(script);
@@ -51,10 +53,7 @@ interface CloudPhoneProps {
   needHumanIntervention?: boolean;
   phoneRender?: () => React.ReactNode;
   onUnbindPhone?: () => void;
-  accessKey?: string;
-  accessSecretKey?: string;
-  instanceNo?: string;
-  userId?: string;
+  authInfo?: CloudPhoneAuthInfo;
 }
 
 const CloudPhone: React.FC<CloudPhoneProps> = ({
@@ -62,33 +61,46 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
   needHumanIntervention = false,
   phoneRender,
   onUnbindPhone,
-  accessKey,
-  accessSecretKey,
-  instanceNo,
-  userId,
+  authInfo,
 }) => {
+  const { t } = useTranslation();
   const sdkIns = useRef<any>(null);
+  const isStarting = useRef<boolean>(false);
   const [phoneErrorCode, setPhoneErrorCode] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
   const [needHighlight, setNeedHighlight] = useState<boolean>(needHumanIntervention);
+  const {
+    user_id: userId,
+    instance_no: instanceNo,
+    access_key: accessKey,
+    access_secret_key: accessSecretKey,
+  } = authInfo || {};
 
   const handlePhoneStart = useCallback(async () => {
+    if (isStarting.current || !userId || !instanceNo) return;
+    isStarting.current = true;
+    setLoading(true);
+
     try {
-      // dynamically load NzCp SDK
+      // Load the NzCp SDK on demand
       try {
         await loadNzCpSDK();
       } catch (error) {
-        console.error('NzCp SDK fail to load:', error);
-        message.error('SDK fail to load');
+        console.error('[CloudPhone] NzCp SDK fail to load:', error);
+        message.error(t('cloudphone.sdk.load_failed'));
+        isStarting.current = false;
         return;
       }
 
-      // check if NzCp exists
+      // Ensure NzCp is available
       if (typeof window === 'undefined' || !(window as any).NzCp) {
-        console.error('NzCp not found');
-        message.error('SDK not found');
+        console.error('[CloudPhone] NzCp not found');
+        message.error(t('cloudphone.sdk.not_found'));
+        isStarting.current = false;
         return;
       }
 
+      console.info('Starting CloudPhone with:', { userId, instanceNo });
       sdkIns.current = new (window as any).NzCp();
       const param = {
         userId,
@@ -97,34 +109,48 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
         isShowPausedDialog: false,
       };
       const callbacks = {
-        onInitFail: (code) => {
-          console.info('Cloud phone initialization failed:' + code);
-        },
-        onStartFail: (code) => {
-          console.info('Cloud phone link failed:' + code);
-        },
-        // onStartSuccess: () => {
-        //   // 链接成功
-        //   setLoading(false);
-        // },
-        onError: (code) => {
+        onInitFail: (code: any) => {
+          console.error('[CloudPhone] init failed:', code);
           setPhoneErrorCode(code);
-          console.info('Cloud phone error:' + code);
+          setLoading(false);
+          isStarting.current = false;
+        },
+        onStartFail: (code: any) => {
+          console.error('[CloudPhone] start failed:', code);
+          setPhoneErrorCode(code);
+          setLoading(false);
+          isStarting.current = false;
+        },
+        onStartSuccess: () => {
+          console.info('[CloudPhone] connected');
+          setLoading(false);
+          isStarting.current = false;
+        },
+        onError: (code: any) => {
+          setPhoneErrorCode(code);
+          console.error('[CloudPhone] error:', code);
+          setLoading(false);
+          isStarting.current = false;
         },
       };
       const initRet = sdkIns.current.init(param, callbacks);
       if (!initRet) {
-        console.info('Cloud phone initialization failed');
+        console.error('[CloudPhone] init returned false');
+        setLoading(false);
+        isStarting.current = false;
         return;
       }
       sdkIns.current.start(accessKey, accessSecretKey);
     } catch (error) {
       console.info(error);
+      setLoading(false);
+      isStarting.current = false;
     }
-  }, [accessKey, accessSecretKey, instanceNo, userId]);
+  }, [accessKey, accessSecretKey, instanceNo, t, userId]);
 
   const handlePhoneStop = () => {
     if (sdkIns.current) {
+      console.info('[CloudPhone] Destroying SDK instance');
       sdkIns.current?.destroy?.();
       sdkIns.current = null;
     }
@@ -156,7 +182,7 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
     return () => {
       handlePhoneStop();
     };
-  }, [handlePhoneStart, phoneRender]);
+  }, [userId, instanceNo, phoneRender]);
 
   useEffect(() => {
     if (needHumanIntervention) {
@@ -171,7 +197,7 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
       }`}
     >
       {disabled && <div className="absolute top-0 left-0 z-10 w-full h-full"></div>}
-      {/* highlight */}
+      {/* Highlight */}
       {needHighlight && (
         <div
           className={`absolute top-0 left-0 z-2 w-full h-[548px] max-2xl:h-[414px] bg-top bg-no-repeat bg-[length:100%_100%] animate-fade-in-out`}
@@ -179,12 +205,12 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
           onMouseEnter={() => setNeedHighlight(false)}
         ></div>
       )}
-      {/* top background */}
+      {/* Top background */}
       <div
         className="absolute top-0 left-0 z-0 w-full h-full bg-top bg-no-repeat bg-[length:100%_auto]"
         style={{ backgroundImage: `url(${phoneBgTopUrl})` }}
       ></div>
-      {/* bottom background */}
+      {/* Bottom background */}
       <div
         className="absolute bottom-0 left-0 z-0 flex items-end w-full h-full pb-[20px] max-2xl:pb-[18px] bg-bottom bg-no-repeat bg-[length:100%_auto]"
         style={{ backgroundImage: `url(${phoneBgBottomUrl})` }}
@@ -216,13 +242,13 @@ const CloudPhone: React.FC<CloudPhoneProps> = ({
           </div>
         </div>
       </div>
-      {/* cloud phone */}
-      <div className="relative flex justify-center items-center w-[292px] max-2xl:w-[219px] h-[520px] max-2xl:h-[390px] overflow-hidden rounded-[36px] max-2xl:rounded-[28px] bg-[#fff]">
+      {/* Cloud phone */}
+      <div className="relative flex justify-center items-center w-[292px] max-2xl:w-[219px] h-[520px] max-2xl:h-[390px] overflow-hidden rounded-[36px] max-2xl:rounded-[28px] bg-[#000]">
         {isFunction(phoneRender) ? (
           phoneRender()
         ) : (
           <>
-            <Spin />
+            {loading && <Spin />}
             {phoneErrorCode !== 0 && (
               <div className="absolute top-1/2 pt-[24px] text-[#999999]">Error Code {phoneErrorCode}</div>
             )}

@@ -1,7 +1,7 @@
 import React from 'react';
 import classNames from 'classnames';
 import { isEmpty } from 'lodash-es';
-import { App } from 'antd';
+import { message } from 'antd';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface QuoteInfoItem {
@@ -16,7 +16,6 @@ interface SupElementProps {
 
 const SupElement: React.FC<SupElementProps> = ({ quoteInfoList, children }) => {
   const { t } = useTranslation();
-  const { message } = App.useApp();
 
   const childrenValue = Array.isArray(children) ? children[0] : null;
   const childrenStringValue = typeof childrenValue === 'string' ? childrenValue : '';

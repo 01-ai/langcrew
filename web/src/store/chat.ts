@@ -8,24 +8,24 @@ interface RequiredAction {
 
 interface ChatState {
   /**
-   * 格式化过的消息列表，用于展示在左侧消息列表区域
+   * Formatted messages for the left message list
    */
   messages: MessageItem[];
   setMessages: (messages: MessageItem[]) => void;
   /**
-   * 是否需要用户操作，比如发送“继续”，或者点击“继续”按钮
+   * Whether user action is required, e.g. send or click Continue
    */
   requiredAction: RequiredAction | null;
   setRequiredAction: (requiredAction: RequiredAction | null) => void;
 
   /**
-   * 有内容的消息列表，用于展示在右侧详情区域
+   * Messages with content, shown in the right detail pane
    */
   detailList: MessageChunk[];
   setDetailList: (detailList: MessageChunk[]) => void;
 
   /**
-   * 最新plan, 展示在页面右下角
+   * Latest plan, shown at the bottom-right
    */
   latestPlan: PlanStep[];
   setLatestPlan: (latestPlan: PlanStep[]) => void;

@@ -1,0 +1,3 @@
+[data-w-direction='col'][data-w-auto-spacing] > [data-w-component='text'] + [data-w-component='text'] {
+  margin-block-start: calc(var(--spacing) * 0);
+}

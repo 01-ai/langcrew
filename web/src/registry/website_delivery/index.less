@@ -1,0 +1,49 @@
+.website-delivery-tree.ant-tree.ant-tree-directory {
+  .ant-tree-treenode-selected {
+    background-color: transparent;
+    .ant-tree-node-content-wrapper {
+      &:before {
+        background-color: transparent;
+      }
+      .ant-tree-title {
+        background-color: #f6f6f8;
+      }
+    }
+  }
+  .ant-tree-switcher.ant-tree-switcher-noop {
+    &::before {
+      background-color: transparent;
+    }
+  }
+
+  .ant-tree-node-content-wrapper {
+    padding: 0;
+    color: #000;
+    &:hover {
+      color: #000;
+      &::before {
+        background-color: transparent;
+      }
+      .ant-tree-title {
+        background-color: #f6f6f8;
+      }
+    }
+    .ant-tree-title {
+      position: relative;
+      background-color: transparent; // 直接设置背景色
+      padding: 4px 8px;
+      border-radius: 4px;
+
+      //   &::before {
+      //     content: '';
+      //     display: block;
+      //     position: absolute;
+      //     top: 0;
+      //     left: 0;
+      //     width: 100%;
+      //     height: 100%;
+      //     background-color: #f6f6f8;
+      //   }
+    }
+  }
+}

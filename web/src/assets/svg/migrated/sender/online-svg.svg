@@ -1,0 +1,19 @@
+<svg width="1em" height="1em" viewBox="0 0 20 20" fill="none">
+    <g clip-path="url(#clip0_10894_15080)">
+      <path
+        d="M10 19C14.9706 19 19 14.9706 19 10C19 5.02944 14.9706 1 10 1C5.02944 1 1 5.02944 1 10C1 14.9706 5.02944 19 10 19Z"
+        stroke="currentColor"
+        stroke-width="1.8"
+      />
+      <path
+        d="M1 10H19M10 1C11.657 1 13 5.03 13 10C13 14.97 11.657 19 10 19C8.343 19 7 14.97 7 10C7 5.03 8.343 1 10 1Z"
+        stroke="currentColor"
+        stroke-width="1.8"
+      />
+    </g>
+    <defs>
+      <clip-path id="clip0_10894_15080">
+        <rect width="20" height="20" fill="white" />
+      </clip-path>
+    </defs>
+  </svg>

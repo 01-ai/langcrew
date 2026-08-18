@@ -1,0 +1,380 @@
+import {
+  ClientToolCallChunk,
+  EventErrorChunk,
+  FileItem,
+  KnowledgeBaseItem,
+  MCPToolItem,
+  MessageChunk,
+  MessageItem,
+  MessagePlanChunk,
+  PlanStep,
+  UserInputChunk,
+} from '@/types';
+import { useCallback, useEffect, useRef } from 'react';
+
+import { XStream } from '@ant-design/x';
+import { useAgentStoreApi } from '@/store';
+import { useChunksProcessor } from '../useChunksProcessor';
+import { sessionApi } from '@/services/api';
+import { isJsonString } from '@/utils/json';
+
+import eventBus from '@/utils/eventBus';
+import { getLanguage } from '../useTranslation';
+import { message } from 'antd';
+import { executeClientToolCall } from '@/sdk';
+import { request } from '@/services/request';
+import { isPlanChunk } from './utils';
+
+/**
+ * 在消息中查找包含 interrupt_data 的 chunk
+ * 支持在顶层 messages 和 plan step children 中查找
+ * @param messageItem 消息项
+ * @returns 包含 interrupt_data 的 chunk，如果没有找到则返回 undefined
+ */
+const findInterruptDataChunk = (messageItem: MessageItem | undefined): MessageChunk | undefined => {
+  if (!messageItem?.messages) return undefined;
+
+  // 首先在顶层 messages 中查找
+  const directChunk = messageItem.messages.find((msg) => msg.detail?.interrupt_data);
+  if (directChunk) return directChunk;
+
+  // 在 plan step children 中查找
+  for (const msg of messageItem.messages) {
+    if (isPlanChunk(msg)) {
+      const planChunk = msg as MessagePlanChunk;
+      for (const step of planChunk.children || []) {
+        const childChunk = (step as PlanStep).children?.find((child) => child.detail?.interrupt_data);
+        if (childChunk) return childChunk;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+export interface SendOptions {
+  type?: 'user_message' | 'custom_action' | 'client_tool_result';
+  params?: any;
+  content: string;
+  files?: FileItem[];
+  mcpTools?: MCPToolItem[];
+  knowledgeBases?: KnowledgeBaseItem[];
+}
+
+const DEBOUNCE_TIME = 16;
+
+interface UseChatReturn {
+  /**
+   * send message
+   */
+  send: (options: SendOptions) => Promise<void>;
+
+  /**
+   * stop task, directly call the stop interface, instead of disconnecting sse
+   */
+  stop: () => void;
+}
+
+/**
+ * call function using hook
+ * read data using store
+ */
+const useChat = (): UseChatReturn => {
+  const storeApi = useAgentStoreApi();
+  const displayMode = storeApi.getState().displayMode;
+  // stores
+  const chunks = storeApi.getState().chunks;
+
+  // states
+
+  // refs
+
+  const currentMessageRef = useRef<string>('');
+
+  // use chunks from global store
+  useChunksProcessor(chunks);
+
+  const debounceTimer = useRef<number>(0);
+  const pendingChunks = useRef<MessageChunk[]>([]);
+
+  const addPendingChunks = useCallback(() => {
+    if (pendingChunks.current.length === 0) {
+      return;
+    }
+    storeApi.getState().addChunks(pendingChunks.current);
+    pendingChunks.current = [];
+  }, [storeApi]);
+
+  // functions
+
+  /**
+   * immutable function
+   */
+  const handleChunk = useCallback(
+    async (chunk: string) => {
+      if (!isJsonString(chunk)) {
+        console.error('handleChunk chunk is not json string', chunk);
+        return;
+      }
+      const data = JSON.parse(chunk) as MessageChunk;
+
+      // if send returns user message, it means the return of add_message, at this time, senderLoading needs to be set to false
+      if (data.role === 'user') {
+        // filter out chunks with loading true
+        storeApi.getState().setChunks(storeApi.getState().chunks.filter((chunk) => !chunk.loading));
+        // set senderLoading to false, allow sending new message
+        storeApi.getState().setSenderLoading(false);
+        // here we don't return, because there is still addChunk
+      }
+
+      if ((data as EventErrorChunk).code === 4102) {
+        if (displayMode === 'embedded') {
+          storeApi.getState().resetStore();
+          eventBus.emit(`call_send_${displayMode}`, {
+            content: currentMessageRef.current,
+          });
+          return;
+        }
+        storeApi.getState().addChunk({
+          id: Date.now().toString(),
+          role: 'assistant',
+          type: 'error',
+          content: (data as EventErrorChunk).message || 'Session is archived',
+        });
+        storeApi.getState().setSessionInfo({
+          ...storeApi.getState().sessionInfo,
+          status: 'ARCHIVED',
+        });
+        return;
+      }
+      if (data.type === 'session_init') {
+        const {
+          detail: { session_id, title },
+        } = data;
+
+        storeApi.getState().setSessionInfo({
+          session_id,
+          title,
+        } as any);
+
+        return;
+      }
+      if (data.type === 'client_tool_call') {
+        console.log('client_tool_call', data);
+        const result = await executeClientToolCall(data as ClientToolCallChunk);
+        console.log('client_tool_result', result);
+        if (data.detail.wait_for_result) {
+          eventBus.emit(`call_send_${displayMode}`, {
+            type: 'client_tool_result',
+            params: {
+              call_id: data.detail.call_id,
+              status: result.success ? 'completed' : 'failed',
+              output: result.data,
+            },
+          });
+        }
+        return;
+      }
+      pendingChunks.current.push(data);
+    },
+    [storeApi, displayMode],
+  );
+
+  /**
+   * immutable function
+   */
+  const onSendComplete = useCallback(() => {
+    if (storeApi.getState().senderSending) {
+      storeApi.getState().setSenderSending(false);
+    }
+    // if senderStopping is true, set to false
+    if (storeApi.getState().senderStopping) {
+      storeApi.getState().setSenderStopping(false);
+    }
+  }, [storeApi]);
+
+  /**
+   * immutable function
+   */
+  const handleResponse = useCallback(
+    async (response: Response, onTimeout: () => void, onComplete: () => void) => {
+      if (!debounceTimer.current) {
+        debounceTimer.current = window.setInterval(() => {
+          addPendingChunks();
+          debounceTimer.current = 0;
+        }, DEBOUNCE_TIME);
+      }
+      try {
+        for await (const chunk of XStream({
+          readableStream: response.body,
+        })) {
+          handleChunk(chunk.data);
+        }
+      } finally {
+        // clear debounce timer
+        if (debounceTimer.current) {
+          window.clearInterval(debounceTimer.current);
+          debounceTimer.current = 0;
+        }
+        // force flush all pending chunks, ensure no data is lost
+        addPendingChunks();
+        onComplete();
+      }
+    },
+    [addPendingChunks, handleChunk],
+  );
+
+  const send = useCallback(
+    async ({ content, files = [], mcpTools = [], knowledgeBases = [], type, params }: SendOptions) => {
+      const isSendMessage = !!content;
+      console.log('send', { content, files, mcpTools, knowledgeBases, type, params }, 'isSendMessage', isSendMessage);
+      const sessionId = storeApi.getState().sessionInfo?.session_id;
+
+      if (storeApi.getState().senderSending && isSendMessage) {
+        storeApi.getState().setSenderLoading(true);
+        try {
+          storeApi.getState().addChunk({
+            id: Date.now().toString(),
+            role: 'user',
+            type: 'text',
+            content,
+            loading: true,
+            timestamp: Date.now(),
+          });
+          await sessionApi.addNewMessage(sessionId, content);
+        } catch (error) {
+          console.error('Failed to add new message:', error);
+          storeApi.getState().setSenderLoading(false);
+        }
+        return;
+      }
+
+      storeApi.getState().setSenderLoading(true);
+
+      try {
+        const pipelineMessages = storeApi.getState().pipelineMessages;
+        // find the interrupt_data chunk in the last message item
+        const interruptDataChunk = findInterruptDataChunk(pipelineMessages[pipelineMessages.length - 1]);
+        const previousMessage = pipelineMessages[pipelineMessages.length - 2]?.messages?.[0];
+
+        if (isSendMessage) {
+          currentMessageRef.current = content;
+          // add user message to chunks
+          storeApi.getState().addChunk({
+            // user message
+            // message id
+            id: 'fake-' + Date.now().toString(),
+            // message type
+            type: 'text',
+            // message role
+            role: 'user',
+            // user input message
+            content,
+            timestamp: Date.now(),
+            detail: {
+              attachments: files.map((item) => ({
+                filename: item.name,
+                path: item.key,
+                url: item.url,
+                size: item.size,
+                content_type: item.type,
+                show_user: 1,
+              })),
+            },
+          });
+        }
+
+        storeApi.getState().abortController?.abort();
+        const abortController = new AbortController();
+        storeApi.getState().setAbortController(abortController);
+        storeApi.getState().setSenderSending(true);
+
+        const response = await fetch(`${request.defaults.baseURL}/api/v1/chat`, {
+          headers: {
+            accept: 'text/event-stream',
+            'Content-Type': 'application/json',
+            language: getLanguage(),
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            // if a chunk with interrupt_data exists, assign the detail.interrupt_data of userInputChunk to the body
+            ...(interruptDataChunk?.detail?.interrupt_data
+              ? {
+                  interrupt_data: {
+                    ...interruptDataChunk.detail.interrupt_data,
+                    content: previousMessage?.content,
+                    files: previousMessage?.detail?.attachments || previousMessage?.detail?.files,
+                  },
+                }
+              : {}),
+            ...(!isSendMessage
+              ? {
+                  type,
+                  params,
+                }
+              : {
+                  message: content,
+                  files,
+                }),
+          }),
+          method: 'POST',
+          signal: abortController.signal,
+        });
+        storeApi.getState().setSenderLoading(false);
+
+        if (!response.ok) {
+          storeApi.getState().addChunk({
+            id: Date.now().toString(),
+            role: 'assistant',
+            type: 'error',
+            content: 'Failed to fetch',
+          });
+          throw new Error('Failed to fetch');
+        }
+        // removeFakeChunks();
+
+        handleResponse(response, () => {}, onSendComplete);
+      } catch (error) {
+        storeApi.getState().setSenderLoading(false);
+        // if AbortError, it means the user主动中断了请求，不需要显示错误
+        if (error.name === 'AbortError') {
+          console.error('Request was aborted by user');
+          return;
+        }
+
+        console.error('Send error:', error);
+
+        message.error(error.message);
+        onSendComplete();
+      }
+    },
+    [handleResponse, onSendComplete, storeApi],
+  );
+
+  const stop = useCallback(() => {
+    const sessionId = storeApi.getState().sessionInfo?.session_id;
+    storeApi.getState().setSenderStopping(true);
+    sessionApi.stopTask(sessionId);
+  }, [storeApi]);
+
+  // effects
+
+  useEffect(() => {
+    const callSend = (option: SendOptions) => {
+      send(option);
+    };
+    eventBus.on(`call_send_${displayMode}`, callSend);
+    return () => {
+      eventBus.off(`call_send_${displayMode}`, callSend);
+    };
+  }, [send, displayMode]);
+
+  // returns
+
+  return {
+    send,
+    stop,
+  };
+};
+
+export default useChat;

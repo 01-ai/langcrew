@@ -1,7 +1,6 @@
 import { SessionInfo } from '@/types';
 import http, { ApiResponse } from './request';
-import { useAgentStore } from '@/store';
-import { getLanguage } from '@/hooks/useTranslation';
+import useAgentStore from '@/store/agent';
 
 // Session related interfaces
 export interface SessionData {
@@ -35,13 +34,13 @@ export interface SendMessageParams {
 // Session API
 export const sessionApi = {
   stopTask: (sessionId: string): Promise<any> => {
-    return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/chat/stop`, {
+    return http.post(`/api/v1/chat/stop`, {
       session_id: sessionId,
     });
   },
 
   addNewMessage: (sessionId: string, message: string): Promise<any> => {
-    return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/update_task`, {
+    return http.post(`/api/v1/update_task`, {
       session_id: sessionId,
       message,
     });
@@ -58,7 +57,7 @@ export interface SecurityTokenResponse {
 export const cloudPhoneApi = {
   // Get security token
   getSecurityToken: (): Promise<ApiResponse<SecurityTokenResponse>> => {
-    return http.post(`${useAgentStore.getState().requestPrefix}/api/v1/instance/security-token`, {});
+    return http.post(`/api/v1/instance/security-token`, {});
   },
 };
 
@@ -80,7 +79,7 @@ export interface ShareDetailResponse {
 export const shareApi = {
   // Get share details
   getDetail: (params: ShareDetailParams): Promise<ApiResponse<ShareDetailResponse>> => {
-    return http.get(`${useAgentStore.getState().requestPrefix}/api/v1/sessions/share/${params.shareId}`, {
+    return http.get(`/api/v1/sessions/share/${params.shareId}`, {
       params,
     });
   },

@@ -20,7 +20,10 @@ import LiElement from './components/LiElement';
 import SectionElement from './components/SectionElement';
 import TableElement from './components/TableElement';
 import LinkElement from './components/LinkElement';
+import CitationElement from './components/CitationElement';
 import SupElement from './components/SupElement';
+import type { CitationSource } from '@/types';
+import { transformCitationSyntax } from '@/features/citation/utils/citation';
 
 import './index.less';
 
@@ -29,24 +32,33 @@ interface MarkdownProps {
   className?: string;
   processing?: boolean;
   onCopied?: (copy: string) => void;
+  citations?: CitationSource[];
+  onCitationOpen?: (source: CitationSource | CitationSource[]) => void;
 }
 
-const Markdown: React.FC<MarkdownProps> = ({ content = '', className = '', processing, onCopied }) => {
+const Markdown: React.FC<MarkdownProps> = ({
+  content = '',
+  className = '',
+  processing,
+  onCopied,
+  citations,
+  onCitationOpen,
+}) => {
   const transformContent = (content: string) => {
     const pattern = /(\n|^)([-*]|[\d]\.)[^\n]*\n/g;
     const replacement = `$1$&`;
     return content.replace(pattern, replacement);
   };
 
-  // a string that starts with $, non-alphabetic characters in the middle, and all digits, is recognized as a dollar symbol
+  // Treat $ + digits (not followed by a letter) as a dollar amount, not math
   const escapeDollarNumber = (text: string) => {
     return text?.replace(/(\$\d+[^a-zA-Z])/g, '\\$1');
   };
 
   const escapeBrackets = (text: string) => {
-    // handle code blocks and mathematical formulas
+    // Handle code blocks and math
     const pattern = /(```[\s\S]*?```|`.*?`)|\\\[([\s\S]*?[^\\])\\\]|\\\((.*?)\\\)/g;
-    let result = text.replace(pattern, (match, codeBlock, squareBracket, roundBracket) => {
+    const result = text.replace(pattern, (match, codeBlock, squareBracket, roundBracket) => {
       if (codeBlock) {
         return codeBlock;
       } else if (squareBracket) {
@@ -57,24 +69,53 @@ const Markdown: React.FC<MarkdownProps> = ({ content = '', className = '', proce
       return match;
     });
 
-    // handle punctuation after URL
-    // add a space after the URL to prevent punctuation being included in the link
-    result = result.replace(
-      /(https?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+)/g,
-      '$1 ',
-    );
+    // Trailing punctuation after URLs used to be absorbed into the link.
+    // The previous regex also inserted extra spaces into filenames such as
+    // "2024-2025年一线城市房价变化折线图.png". Leave it commented until a safer pattern exists.
+    // Add a trailing space so trailing punctuation is not part of the URL
+    // result = result.replace(
+    //   /(https?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+)/g,
+    //   '$1 ',
+    // );
 
     return result;
   };
 
+  const escapeNonHtmlAngleBrackets = (text: string) => {
+    const htmlTagPattern =
+      /^\/?\s*[a-z][a-z0-9-]*(?:\s+[a-zA-Z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?$/;
+    const pattern = /(```[\s\S]*?```|`[^`\n]*`)|<([^>\n]+)>/g;
+
+    return text.replace(pattern, (match, codeBlock, angleContent) => {
+      if (codeBlock) {
+        return codeBlock;
+      }
+
+      if (!angleContent) {
+        return match;
+      }
+
+      const candidate = angleContent.trim();
+      if (candidate.startsWith('!') || candidate.startsWith('?') || htmlTagPattern.test(candidate)) {
+        return match;
+      }
+
+      return `&lt;${angleContent}&gt;`;
+    });
+  };
+
   const escapedContent = useMemo(() => {
-    return transformContent(escapeBrackets(escapeDollarNumber(content)));
+    return transformContent(
+      transformCitationSyntax(escapeNonHtmlAngleBrackets(escapeBrackets(escapeDollarNumber(content)))),
+    );
   }, [content]);
+
+  if (!content) return null;
 
   return (
     <div
       className={classNames({
-        'message-content-text': true,
+        'markdown-content-text': true,
         [className]: !!className,
       })}
     >
@@ -90,11 +131,12 @@ const Markdown: React.FC<MarkdownProps> = ({ content = '', className = '', proce
         ]}
         rehypePlugins={[
           RehypeRaw as any,
-          //RehypeSanitize: prevent script injection, default using github.com way. Reference: https://github.com/rehypejs/rehype-sanitize
+          // rehype-sanitize: GitHub-style sanitization. https://github.com/rehypejs/rehype-sanitize
           [
             RehypeSanitize,
             {
               ...defaultSchema,
+              tagNames: [...(defaultSchema.tagNames || []), 'citation'],
               attributes: {
                 ...defaultSchema.attributes,
                 '*': [['className', /^language-./, 'math-inline', 'math-display', 'katex']],
@@ -127,7 +169,10 @@ const Markdown: React.FC<MarkdownProps> = ({ content = '', className = '', proce
           table: (code) => <TableElement {...code} />,
           a: (code) => <LinkElement {...code} />,
           sup: (code) => <SupElement {...code} />,
-        }}
+          citation: (code) => (
+            <CitationElement {...code} citations={citations} onOpen={onCitationOpen} />
+          ),
+        } as any}
       >
         {escapedContent}
       </ReactMarkdown>

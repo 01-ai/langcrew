@@ -1,0 +1,28 @@
+/* Image Component */
+[data-w-component='image'] {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+/* Image sizing rules for row layouts */
+[data-w-direction='row'] > [data-w-component='image']:not([data-w-has-width][data-w-has-height]) {
+  aspect-ratio: 1;
+}
+
+[data-w-direction='row'] > [data-w-component='image']:not([data-w-has-width], [data-w-has-height]) {
+  width: 40px;
+}
+
+[data-w-direction='col'] > [data-w-component='image']:not([data-w-has-width][data-w-has-height]) {
+  aspect-ratio: 16 / 9;
+}
+
+[data-w-direction='col'] > [data-w-component='image'][data-w-flush]:first-child,
+[data-w-direction='col'] > [data-w-component='image'][data-w-flush]:first-child img,
+[data-w-direction='col'] > [data-w-component='image'][data-w-flush]:first-child > div {
+  border-end-end-radius: 0;
+  border-end-start-radius: 0;
+}

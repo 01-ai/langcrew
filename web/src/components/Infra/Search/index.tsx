@@ -32,7 +32,7 @@ const Search: FC<SearchProps> = ({ data, ...props }) => {
                 rel="noreferrer"
                 className="search-title font-medium"
               >
-                {!item.icon && <img src={`https://www.google.com/s2/favicons?domain=${item.link}&sz=32`} />}
+                {!item.icon && <SearchIcon aria-hidden />}
                 {typeof item.icon === 'string' && item.icon && <img src={item.icon} alt="" />}
                 {typeof item.icon !== 'string' && item.icon}
                 {item.title}

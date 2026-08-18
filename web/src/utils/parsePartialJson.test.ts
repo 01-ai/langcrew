@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parsePartialJson } from './json';
 
-// 参考JSON: '{"name": "John", "age": 30, hobbies: ["reading", "traveling"], children: [{"name": "Tom", "age": 10}, {"name": "Jerry", "age": 8}]}'
+// Reference JSON: '{"name": "John", "age": 30, hobbies: ["reading", "traveling"], children: [{"name": "Tom", "age": 10}, {"name": "Jerry", "age": 8}]}'
 
 describe('parsePartialJson', () => {
-  describe('边界情况', () => {
+  describe('edge cases', () => {
     it('null', () => {
       const json = null as any;
       const result = parsePartialJson(json);
@@ -17,33 +17,33 @@ describe('parsePartialJson', () => {
       expect(result).toEqual({});
     });
 
-    it('空字符串', () => {
+    it('empty string', () => {
       const json = '';
       const result = parsePartialJson(json);
       expect(result).toEqual({});
     });
 
-    it('空白字符串', () => {
+    it('whitespace string', () => {
       const json = '   ';
       const result = parsePartialJson(json);
       expect(result).toEqual({});
     });
 
-    it('非JSON格式字符串', () => {
+    it('non-JSON string', () => {
       const json = 'hello world';
       const result = parsePartialJson(json);
       expect(result).toEqual({});
     });
   });
 
-  describe('完整JSON解析', () => {
-    it('简单对象', () => {
+  describe('complete JSON parse', () => {
+    it('simple object', () => {
       const json = '{"name": "John", "age": 30}';
       const result = parsePartialJson(json);
       expect(result).toEqual({ name: 'John', age: 30 });
     });
 
-    it('复杂嵌套对象', () => {
+    it('complex nested object', () => {
       const json =
         '{"name": "John", "age": 30, "hobbies": ["reading", "traveling"], "children": [{"name": "Tom", "age": 10}, {"name": "Jerry", "age": 8}]}';
       const result = parsePartialJson(json);
@@ -58,7 +58,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含特殊字符的字符串', () => {
+    it('string with special characters', () => {
       const json = '{"message": "Hello, \\"world\\"!", "path": "C:\\\\Users\\\\John"}';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -67,7 +67,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含数字类型', () => {
+    it('includes a number', () => {
       const json = '{"count": 42, "price": 99.99, "active": true, "data": null}';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -79,20 +79,20 @@ describe('parsePartialJson', () => {
     });
   });
 
-  describe('部分JSON解析 - 基础情况', () => {
-    it('只有开头大括号', () => {
+  describe('partial JSON parse - basics', () => {
+    it('only an opening brace', () => {
       const json = '{';
       const result = parsePartialJson(json);
       expect(result).toEqual({});
     });
 
-    it('开头带引号', () => {
+    it('starts with a quote', () => {
       const json = '{"';
       const result = parsePartialJson(json);
       expect(result).toEqual({});
     });
 
-    it('半截key', () => {
+    it('truncated key', () => {
       const json = '{"na';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -100,7 +100,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('完整key但没有引号', () => {
+    it('complete key without quotes', () => {
       const json = '{"name';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -108,7 +108,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('完整key和引号', () => {
+    it('complete key and quotes', () => {
       const json = '{"name"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -116,7 +116,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('完整key和冒号', () => {
+    it('complete key and colon', () => {
       const json = '{"name":';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -124,7 +124,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('完整key和冒号和引号', () => {
+    it('complete key, colon, and quote', () => {
       const json = '{"name": "';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -132,7 +132,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('半截字符串值', () => {
+    it('truncated string value', () => {
       const json = '{"name": "Jo';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -140,7 +140,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('完整字符串值但没有结束引号', () => {
+    it('complete string value without a closing quote', () => {
       const json = '{"name": "John';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -148,7 +148,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('完整字符串值', () => {
+    it('complete string value', () => {
       const json = '{"name": "John"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -156,7 +156,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('完整字符串值和逗号', () => {
+    it('complete string value and comma', () => {
       const json = '{"name": "John",';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -165,8 +165,8 @@ describe('parsePartialJson', () => {
     });
   });
 
-  describe('部分JSON解析 - 多个属性', () => {
-    it('第一个属性完整，第二个属性开始', () => {
+  describe('partial JSON parse - multiple properties', () => {
+    it('first property complete, second starting', () => {
       const json = '{"name": "John", "age';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -175,7 +175,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('第一个属性完整，第二个属性半截', () => {
+    it('first property complete, second truncated', () => {
       const json = '{"name": "John", "age": 3';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -184,7 +184,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('两个完整属性', () => {
+    it('two complete properties', () => {
       const json = '{"name": "John", "age": 30';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -193,7 +193,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('两个完整属性和逗号', () => {
+    it('two complete properties and a comma', () => {
       const json = '{"name": "John", "age": 30,';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -202,7 +202,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('三个属性，第三个不完整', () => {
+    it('three properties, the third incomplete', () => {
       const json = '{"name": "John", "age": 30, "city": "New';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -213,8 +213,8 @@ describe('parsePartialJson', () => {
     });
   });
 
-  describe('部分JSON解析 - 数组和嵌套对象', () => {
-    it('包含数组的开始', () => {
+  describe('partial JSON parse - arrays and nested objects', () => {
+    it('start of an array', () => {
       const json = '{"hobbies": [';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -222,7 +222,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含数组的第一个元素', () => {
+    it('first array element', () => {
       const json = '{"hobbies": ["reading"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -230,7 +230,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含数组的多个元素', () => {
+    it('array with multiple elements', () => {
       const json = '{"hobbies": ["reading", "traveling"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -238,7 +238,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含嵌套对象的开始', () => {
+    it('start of a nested object', () => {
       const json = '{"children": [{"name": "Tom"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -246,7 +246,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含嵌套对象的完整属性', () => {
+    it('complete property with a nested object', () => {
       const json = '{"children": [{"name": "Tom", "age": 10';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -254,7 +254,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含多个嵌套对象', () => {
+    it('multiple nested objects', () => {
       const json = '{"children": [{"name": "Tom", "age": 10}, {"name": "Jerry"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -263,8 +263,8 @@ describe('parsePartialJson', () => {
     });
   });
 
-  describe('部分JSON解析 - 复杂场景', () => {
-    it('流式数据模拟 - 第1步', () => {
+  describe('partial JSON parse - complex', () => {
+    it('streaming simulation - step 1', () => {
       const json = '{"name": "John", "age": 30, "hobbies": [';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -274,7 +274,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('流式数据模拟 - 第2步', () => {
+    it('streaming simulation - step 2', () => {
       const json = '{"name": "John", "age": 30, "hobbies": ["reading"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -284,7 +284,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('流式数据模拟 - 第3步', () => {
+    it('streaming simulation - step 3', () => {
       const json = '{"name": "John", "age": 30, "hobbies": ["reading", "traveling"], "children": [';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -295,7 +295,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('流式数据模拟 - 第4步', () => {
+    it('streaming simulation - step 4', () => {
       const json = '{"name": "John", "age": 30, "hobbies": ["reading", "traveling"], "children": [{"name": "Tom"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -306,7 +306,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('流式数据模拟 - 第5步', () => {
+    it('streaming simulation - step 5', () => {
       const json =
         '{"name": "John", "age": 30, "hobbies": ["reading", "traveling"], "children": [{"name": "Tom", "age": 10';
       const result = parsePartialJson(json);
@@ -319,8 +319,8 @@ describe('parsePartialJson', () => {
     });
   });
 
-  describe('特殊字符和转义', () => {
-    it('包含转义引号的字符串', () => {
+  describe('special characters and escapes', () => {
+    it('string with escaped quotes', () => {
       const json = '{"message": "Hello, \\"world\\"!"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -328,7 +328,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含反斜杠的字符串', () => {
+    it('string with backslashes', () => {
       const json = '{"path": "C:\\\\Users\\\\John"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -336,7 +336,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('包含换行符的字符串', () => {
+    it('string with newlines', () => {
       const json = '{"text": "Line 1\\nLine 2"';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -345,8 +345,8 @@ describe('parsePartialJson', () => {
     });
   });
 
-  describe('数据类型处理', () => {
-    it('数字类型', () => {
+  describe('data types', () => {
+    it('number', () => {
       const json = '{"count": 42, "price": 99.99';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -355,7 +355,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('布尔类型', () => {
+    it('boolean', () => {
       const json = '{"active": true, "enabled": false';
       const result = parsePartialJson(json);
       expect(result).toEqual({
@@ -364,7 +364,7 @@ describe('parsePartialJson', () => {
       });
     });
 
-    it('null值', () => {
+    it('null value', () => {
       const json = '{"data": null, "value": undefined';
       const result = parsePartialJson(json);
       expect(result).toEqual({

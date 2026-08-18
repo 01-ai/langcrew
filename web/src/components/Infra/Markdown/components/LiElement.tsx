@@ -28,10 +28,10 @@ const LiElement: React.FC<LiElementProps> = ({ children, className, ...props }) 
     return () => observer.disconnect();
   }, []);
 
-  // check if it is a task list item
+  // Detect task-list items
   const isTaskListItem = className?.includes('task-list-item');
 
-  // filter out non-standard DOM attributes
+  // Strip non-standard DOM props
   const { ordered, ...domProps } = props;
 
   return (

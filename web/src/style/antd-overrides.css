@@ -1,0 +1,28 @@
+/**
+ * Ant Design 全局 CSS 补丁。
+ * 仅放 Design Token（src/theme/index.ts）映射不到的内部变量 / 选择器覆盖。
+ * 升级 antd 时优先复查此文件。
+ */
+
+ @layer components {
+  /*
+   * antd 6.2.1 的 default outlined/dashed 把 --ant-btn-text-color-hover
+   * 错绑到 defaultHoverBorderColor，导致 defaultHoverColor 主题 token 无效。
+   * 这里按主题意图强制 hover/active 文字保持黑色；primary 仍用白色。
+   */
+  .ant-btn {
+    --ant-btn-text-color-hover: #000;
+    --ant-btn-text-color-active: #000;
+
+    &.ant-btn-primary,
+    &.ant-btn-color-primary {
+      --ant-btn-text-color-hover: #fff;
+      --ant-btn-text-color-active: #fff;
+    }
+  }
+
+  .ant-btn-color-default {
+    --ant-btn-text-color-hover: #000;
+    --ant-btn-text-color-active: #000;
+  }
+}

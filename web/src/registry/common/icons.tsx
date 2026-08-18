@@ -1,4 +1,4 @@
-import Icon, { ToolOutlined } from '@ant-design/icons';
+import Icon from '@ant-design/icons';
 import type { GetProps } from 'antd';
 
 import PhoneSvg from '@/assets/svg/tools/phone.svg?react';
@@ -13,13 +13,14 @@ import TaskErrorSvg from '@/assets/svg/tools/task-error.svg?react';
 import CircleSvg from '@/assets/svg/tools/circle.svg?react';
 import ArrowSvg from '@/assets/svg/tools/arrow.svg?react';
 import Phone2Svg from '@/assets/svg/tools/phone2.svg?react';
+import DefaultSvg from '@/assets/svg/tools/default.svg?react';
 import React from 'react';
 
-type CustomIconComponentProps = GetProps<typeof Icon>;
+type CustomIconComponentProps = Partial<GetProps<typeof Icon>>;
 
 export const ToolIconPhone = (props: CustomIconComponentProps) => <Icon component={PhoneSvg} {...props} />;
 
-export const ToolIconDefault = (props: CustomIconComponentProps) => <ToolOutlined {...props} />;
+export const ToolIconDefault = (props: CustomIconComponentProps) => <Icon component={DefaultSvg} {...props} />;
 
 export const ToolIconEmpty = (props: CustomIconComponentProps) => <Icon component={EmptySvg} {...props} />;
 
