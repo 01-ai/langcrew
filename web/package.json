@@ -4,6 +4,10 @@
   "description": "Langcrew UI Library",
   "type": "module",
   "author": "01.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/01-ai/langcrew"
+  },
   "module": "./agentx/index.js",
   "types": "./agentx/index.d.ts",
   "files": [
