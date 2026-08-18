@@ -22,10 +22,12 @@ jobs:
         with:
           version: 9
 
+      # Node 24 ships npm 11.5+, required for Trusted Publisher OIDC.
+      # Do not set registry-url: setup-node would write an empty _authToken
+      # and npm would skip OIDC, failing the publish with E404.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
+          node-version: 24
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
@@ -41,3 +43,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test -- --run
       - run: pnpm publish --no-git-checks --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ''
