@@ -29,7 +29,8 @@ This project implements **3 different MCP transport methods**:
 
 ### Prerequisites
 - Python 3.11+
-- OpenAI API access (uses gpt-4o-mini by default)
+- OpenAI API access for the agent demos (uses gpt-4o-mini by default)
+- The Parallel Search example below needs only internet access, with no API keys or LLM
 
 ### Installation
 ```bash
@@ -53,6 +54,33 @@ python src/mcp/main.py
 ```
 
 ## Demo Examples
+
+### Parallel Search and Fetch (Streamable HTTP)
+
+From `examples/components/mcp`, run:
+
+```bash
+uv run parallel_search.py "LangCrew MCP tools"
+uv run parallel_search.py "LangCrew MCP tools" \
+  --fetch-url https://github.com/01-ai/langcrew
+```
+
+This example loads `web_search` and `web_fetch` through LangCrew's
+`MCPToolAdapter.from_servers` and invokes the resulting LangChain tools directly.
+It prints search sources and excerpts as JSON; `--fetch-url` also extracts excerpts
+from a URL you choose. Neither a `.env` file nor a model API key is needed.
+
+`parallel_search.py` contains the reusable `PARALLEL_SERVERS` configuration for
+`https://search.parallel.ai/mcp`, using `streamable_http` and a project User-Agent.
+You can pass it as `mcp_servers=PARALLEL_SERVERS` to a LangCrew `Agent`; model
+inference then requires your usual LLM configuration and may incur separate costs.
+The direct example reuses one session ID across its search and fetch calls.
+
+The [Parallel Search MCP documentation](https://docs.parallel.ai/integrations/mcp/search-mcp)
+describes the anonymous free tier and its lower rate limits. Requests can fail
+when the service is unavailable or rate limited; the example lets those errors
+surface instead of silently returning an empty result. Existing agent demos are
+unchanged.
 
 ### 📊 **Calculator Demo (STDIO)**
 ```python
