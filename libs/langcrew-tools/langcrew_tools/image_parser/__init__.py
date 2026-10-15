@@ -29,7 +29,7 @@ Environment Variables:
     VISION_TIMEOUT: Request timeout in seconds
     VISION_MAX_TOKENS: Maximum tokens for response
     VISION_TEMPERATURE: Temperature for model responses
-    VISION_MAX_IMAGE_SIZE: Maximum image size in bytes
+    VISION_MAX_IMAGE_RESOLUTION: Maximum image dimension (default: 1024)
 """
 
 from .langchain_tools import ImageParserTool

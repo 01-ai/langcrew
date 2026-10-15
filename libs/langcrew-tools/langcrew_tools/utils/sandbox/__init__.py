@@ -1,3 +1,4 @@
+from .async_sandbox import AsyncSandbox
 from .base_sandbox import (
     SANDBOX_ID_KEY,
     SandboxMixin,
@@ -7,6 +8,7 @@ from .base_sandbox import (
 from .s3_integration import sandbox_s3_toolkit
 
 __all__ = [
+    "AsyncSandbox",
     "SandboxMixin",
     "sandbox_s3_toolkit",
     "create_sandbox_source_by_session_id",

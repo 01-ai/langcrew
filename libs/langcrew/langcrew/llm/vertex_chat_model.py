@@ -1,44 +1,53 @@
-from typing import Any, Dict, List, Optional
-
 import logging
-from pydantic import Field
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
-from google import genai
+from typing import Any
 
+from google import genai
+from google.genai.types import HttpOptions
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import Field
+
+from ..utils import extract_text_content
 
 logger = logging.getLogger(__name__)
 
 
 class VertexAIChat(BaseChatModel):
-    """基于 Google GenAI (Vertex) 的 LangChain ChatModel 封装。
+    """LangChain ChatModel wrapper for Google GenAI (Vertex).
 
-    参数:
-    - name: 模型名称，例如 "gemini-2.5-flash"
-    - api_key: API Key
+    Args:
+        name: Model name, e.g., "gemini-2.5-flash"
+        api_key: API Key
+        proxy: Optional HTTP/HTTPS proxy URL, e.g., "http://proxy.example.com:8080"
+        timeout: Optional timeout in seconds for HTTP requests
     """
 
     name: str = Field(..., description="Vertex/GenAI model name")
     api_key: str = Field(..., description="API key for Google GenAI")
+    proxy: str | None = Field(default=None, description="HTTP/HTTPS proxy URL")
+    timeout: float = Field(default=180.0, description="Timeout in seconds for HTTP requests")
 
-    # 识别参数用于 LangSmith/Tracing
+    # Identifying parameters for LangSmith/Tracing
     @property
-    def _identifying_params(self) -> Dict[str, Any]:
-        return {"model_name": self.name, "vertexai": True}
+    def _identifying_params(self) -> dict[str, Any]:
+        params = {"model_name": self.name, "vertexai": True}
+        if self.proxy:
+            params["proxy"] = self.proxy
+        return params
 
-    # 唯一标识模型类型的字符串
+    # String that uniquely identifies the model type
     @property
     def _llm_type(self) -> str:  # noqa: D401
         return "vertex-ai-chat"
 
-    def _messages_to_prompt(self, messages: List[BaseMessage]) -> str:
-        """将消息列表转换为字符串提示。
+    def _messages_to_prompt(self, messages: list[BaseMessage]) -> str:
+        """Convert message list to string prompt.
 
-        使用简单的 role: content 连接，保持清晰可读。
+        Uses simple role: content concatenation for clarity and readability.
         """
-        # 将不同角色的消息按顺序串接成一个文本提示
-        parts: List[str] = []
+        # Concatenate messages of different roles in order into a text prompt
+        parts: list[str] = []
         for msg in messages:
             role = "user"
             if isinstance(msg, SystemMessage):
@@ -47,19 +56,19 @@ class VertexAIChat(BaseChatModel):
                 role = "assistant"
             elif isinstance(msg, HumanMessage):
                 role = "user"
-            content = msg.content if isinstance(msg.content, str) else str(msg.content)
+            content = extract_text_content(msg.content)
             parts.append(f"{role}: {content}")
         return "\n".join(parts)
 
-    def _apply_stop_tokens(self, text: str, stop: Optional[List[str]]) -> str:
-        """应用 stop tokens；按 LangChain 约定将 stop 字符串包含在输出中。
+    def _apply_stop_tokens(self, text: str, stop: list[str] | None) -> str:
+        """Apply stop tokens; include stop string in output per LangChain convention.
 
-        找到最早出现的 stop，并保留该 stop。
+        Find the earliest occurring stop token and retain it.
         """
         if not stop:
             return text
-        earliest_idx: Optional[int] = None
-        chosen: Optional[str] = None
+        earliest_idx: int | None = None
+        chosen: str | None = None
         for token in stop:
             idx = text.find(token)
             if idx != -1 and (earliest_idx is None or idx < earliest_idx):
@@ -71,34 +80,54 @@ class VertexAIChat(BaseChatModel):
 
     def _generate(
         self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
         run_manager: Any = None,  # CallbackManagerForLLMRun | None
         **kwargs: Any,
     ) -> ChatResult:
-        """同步生成实现，调用 google.genai 的 generate_content。
+        """Synchronous generation implementation, calls google.genai's generate_content.
 
-        将 LangChain 的消息转换成字符串，调用 GenAI，同步返回 AIMessage。
+        Converts LangChain messages to string, calls GenAI, and synchronously returns AIMessage.
         """
         prompt = self._messages_to_prompt(messages)
 
-        # 便于排查问题
+        # For troubleshooting purposes
         logger.info(
-            "VertexAIChat invoking model=%s via Vertex=%s",
+            "VertexAIChat invoking model=%s via Vertex=%s, proxy=%s",
             self.name,
             True,
+            self.proxy or "None",
         )
 
-        # 每次调用时按需创建客户端，确保线程安全与简单性
+        # Prepare HTTP options with proxy and timeout
+        client_args: dict[str, Any] = {}
+        
+        if self.proxy:
+            # httpx expects proxies as a dict mapping protocol to URL
+            client_args["proxies"] = {
+                "http://": self.proxy,
+                "https://": self.proxy,
+            }
+        
+        # Always set timeout
+        client_args["timeout"] = self.timeout
+        
+        http_options = HttpOptions(client_args=client_args) if client_args else None
+
+        # Create client on-demand for each call to ensure thread safety and simplicity
         api_key_value = self.api_key
-        with genai.Client(vertexai=True, api_key=api_key_value) as client:
+        with genai.Client(
+            vertexai=True, 
+            api_key=api_key_value,
+            http_options=http_options,
+        ) as client:
             res = client.models.generate_content(model=self.name, contents=prompt)
             output_text: str = getattr(res, "text", "") or ""
 
-        # 应用 stop 规则
+        # Apply stop rules
         output_text = self._apply_stop_tokens(output_text, stop)
 
-        # 构造 LangChain 的返回结构
+        # Construct LangChain return structure
         ai_message = AIMessage(
             content=output_text,
             response_metadata={"model_name": self.name},

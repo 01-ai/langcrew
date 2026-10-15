@@ -1,7 +1,7 @@
 """Code interpreter tool for executing Python code safely."""
 
-import base64
 import logging
+import shlex
 from typing import ClassVar
 
 from langchain_core.tools import BaseTool
@@ -50,9 +50,9 @@ class CodeInterpreterTool(BaseTool, SandboxMixin):
 
     def _escape_code_for_shell(self, code: str) -> str:
         """Escape Python code for shell execution."""
-        # Base64 encode to avoid shell escaping issues
-        encoded = base64.b64encode(code.encode()).decode()
-        return f"python3 -c \"import base64; exec(base64.b64decode('{encoded}').decode())\""
+        # Use shlex.quote to safely pass code to python3 -c
+        quoted_code = shlex.quote(code)
+        return f"python3 -c {quoted_code}"
 
     def _run(self, code: str, timeout: int = 30, **kwargs) -> str:
         """Execute the provided Python code."""

@@ -1,11 +1,10 @@
 import asyncio
 import re
 
-from agentbox import AsyncSandbox
 from bs4 import BeautifulSoup
 
 from ..utils.s3.base_s3_client import AsyncS3Client
-from ..utils.sandbox import sandbox_s3_toolkit
+from ..utils.sandbox import AsyncSandbox, sandbox_s3_toolkit
 
 
 async def fix_content(
@@ -14,12 +13,12 @@ async def fix_content(
     """help llm check and fix generated content"""
     lower_file_path = file_path.lower()
     if lower_file_path.endswith((".html", ".htm", ".md", ".markdown")):
-        return await fix_image_src(sandbox, s3, file_path, content)
+        return await _fix_image_src(sandbox, s3, file_path, content)
 
     return content
 
 
-async def fix_image_src(
+async def _fix_image_src(
     sandbox: AsyncSandbox, s3: AsyncS3Client, file_path: str, content: str
 ) -> str:
     """
@@ -354,83 +353,21 @@ def is_text_file(data: bytes | bytearray) -> bool:
     return not is_binary_file(data)
 
 
-def get_file_type_hint(data: bytes | bytearray) -> str:
+def is_forbidden_binary_file(path: str) -> bool:
     """
-    Get a hint about the file type based on content analysis.
-
-    Args:
-        data: File content as bytes or bytearray
-
-    Returns:
-        str: File type hint
+    Check if the file path has a binary extension that is forbidden for direct writing.
     """
-    if not data:
-        return "empty"
-
-    if isinstance(data, bytes):
-        data = bytearray(data)
-
-    # Check for specific file signatures
-    signatures = {
-        b"\x7fELF": "ELF executable",
-        b"MZ": "Windows executable",
-        b"PK\x03\x04": "ZIP archive",
-        b"PK\x05\x06": "ZIP archive (empty)",
-        b"PK\x07\x08": "ZIP archive (spanned)",
-        b"\x1f\x8b": "GZIP archive",
-        b"\x89PNG\r\n\x1a\n": "PNG image",
-        b"GIF87a": "GIF image",
-        b"GIF89a": "GIF image",
-        b"\xff\xd8\xff": "JPEG image",
-        b"%PDF": "PDF document",
-        b"\x00\x00\x01\x00": "ICO icon",
-        b"\x00\x00\x02\x00": "ICO icon",
-        b"BM": "BMP image",
-        b"RIFF": "RIFF container (WAV, AVI, etc.)",
-        b"\x00\x00\x00 20ftyp": "MP4 video",
-        b"\x00\x00\x00 18ftyp": "MP4 video",
-        b"\x00\x00\x00 1cftyp": "MP4 video",
-        b"#!/": "Shell script",
-        b"#! ": "Script file",
-        b"<?php": "PHP script",
-        b"<?xml": "XML document",
-        b"<!DOCTYPE": "HTML document",
-        b"<html": "HTML document",
-        b"import ": "Python script",
-        b"function ": "JavaScript file",
-        b"package ": "Java file",
-        b"#include": "C/C++ source",
-    }
-
-    for signature, file_type in signatures.items():
-        if data.startswith(signature):
-            return file_type
-
-    # Try to decode and check content
-    try:
-        text_content = data.decode("utf-8")
-        if _is_reasonable_text(text_content):
-            # Count Chinese characters
-            chinese_chars = sum(1 for c in text_content if "\u4e00" <= c <= "\u9fff")
-            if chinese_chars > 0:
-                return f"Chinese text file ({chinese_chars} Chinese characters)"
-
-            # Try to detect text file type
-            text_start = text_content[:100].lower()
-
-            if any(keyword in text_start for keyword in ["json", "{", "["]):
-                return "JSON data"
-            elif any(keyword in text_start for keyword in ["xml", "<"]):
-                return "XML document"
-            elif any(keyword in text_start for keyword in ["yaml", "yml"]):
-                return "YAML document"
-            elif any(keyword in text_start for keyword in ["csv", ","]):
-                return "CSV data"
-            elif any(keyword in text_start for keyword in ["markdown", "# "]):
-                return "Markdown document"
-            else:
-                return "text file"
-    except UnicodeDecodeError:
-        pass
-
-    return "binary file"
+    binary_extensions = (
+        ".doc",
+        ".docx",
+        ".pdf",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".bin",
+    )
+    return path.lower().endswith(binary_extensions)

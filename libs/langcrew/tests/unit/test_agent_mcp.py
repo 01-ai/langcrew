@@ -47,29 +47,24 @@ class TestAgentMCP:
     def test_agent_mcp_initialization_basic(
         self, mock_llm, mock_mcp_servers
     ):
-        """Test basic MCP initialization in Agent."""
-        with patch.object(Agent, "_load_mcp_tools") as mock_load:
-            agent = Agent(
-                role="MCP Test Agent",
-                goal="Test MCP functionality",
-                backstory="An agent for testing MCP integration",
-                llm=mock_llm,
-                mcp_servers=mock_mcp_servers,
-                mcp_tool_filter=["test_tool"],
-            )
+        """Test basic MCP initialization in Agent (lazy loaded)."""
+        agent = Agent(
+            prompt="You are an MCP test agent.",
+            llm=mock_llm,
+            mcp_servers=mock_mcp_servers,
+            mcp_tool_filter=["test_tool"],
+        )
 
-            assert agent.mcp_servers == mock_mcp_servers
-            assert agent.mcp_tool_filter == ["test_tool"]
-            assert agent._mcp_adapter is None
-            assert agent._mcp_tools == []
-            mock_load.assert_called_once()
+        assert agent.mcp_servers == mock_mcp_servers
+        assert agent.mcp_tool_filter == ["test_tool"]
+        assert agent._mcp_adapter is None
+        assert agent._mcp_tools == []
+        assert agent._lazy_initialized is False
 
     def test_agent_mcp_initialization_without_config(self, mock_llm):
         """Test Agent initialization without MCP configuration."""
         agent = Agent(
-            role="No MCP Agent",
-            goal="Test without MCP",
-            backstory="An agent without MCP",
+            prompt="You are a test agent.",
             llm=mock_llm,
         )
 
@@ -83,9 +78,8 @@ class TestAgentMCP:
     def test_load_mcp_tools_in_async_context(
         self, mock_get_loop, mock_executor, mock_llm, mock_mcp_servers, mock_mcp_tools
     ):
-        """Test MCP tools loading in async context."""
-        # Setup mocks
-        mock_get_loop.return_value = Mock()  # Simulate running loop
+        """Test MCP tools loading in async context (triggered by _load_mcp_tools)."""
+        mock_get_loop.return_value = Mock()
         mock_thread_pool = Mock()
         mock_executor.return_value.__enter__.return_value = mock_thread_pool
 
@@ -93,21 +87,22 @@ class TestAgentMCP:
         mock_future.result.return_value = mock_mcp_tools
         mock_thread_pool.submit.return_value = mock_future
 
-        # Create agent with MCP servers
         agent = Agent(
-            role="MCP Agent",
-            goal="Test MCP",
-            backstory="MCP testing agent",
+            prompt="You are an MCP testing agent.",
             llm=mock_llm,
             mcp_servers=mock_mcp_servers,
             verbose=True,
         )
 
-        # Verify thread pool executor was used
+        # MCP not loaded yet (lazy)
+        assert agent._lazy_initialized is False
+        assert len(agent._mcp_tools) == 0
+
+        # Trigger lazy loading directly
+        agent._load_mcp_tools()
+
         mock_executor.assert_called_once()
         mock_thread_pool.submit.assert_called_once()
-
-        # Verify tools were added
         assert len(agent._mcp_tools) == 1
         assert isinstance(agent._mcp_tools[0], MockMCPTool)
         assert agent._mcp_tools[0] in agent.tools
@@ -122,34 +117,31 @@ class TestAgentMCP:
         mock_mcp_servers,
         mock_mcp_tools,
     ):
-        """Test MCP tools loading without async context."""
-        # Simulate no running loop
+        """Test MCP tools loading without async context (triggered by _load_mcp_tools)."""
         mock_get_loop.side_effect = RuntimeError("No running loop")
         mock_asyncio_run.return_value = mock_mcp_tools
 
+        agent = Agent(
+            prompt="You are an MCP testing agent.",
+            llm=mock_llm,
+            mcp_servers=mock_mcp_servers,
+            verbose=True,
+        )
+
+        # MCP not loaded yet (lazy)
+        assert len(agent._mcp_tools) == 0
+
         with patch.object(MCPToolAdapter, "from_servers", return_value=mock_mcp_tools):
-            agent = Agent(
-                role="MCP Agent",
-                goal="Test MCP",
-                backstory="MCP testing agent",
-                llm=mock_llm,
-                mcp_servers=mock_mcp_servers,
-                verbose=True,
-            )
+            agent._load_mcp_tools()
 
-        # Verify asyncio.run was used
         mock_asyncio_run.assert_called_once()
-
-        # Verify tools were added
         assert len(agent._mcp_tools) == 1
         assert isinstance(agent._mcp_tools[0], MockMCPTool)
 
     def test_setup_and_process_mcp_tools_with_tools(self, mock_llm, mock_mcp_tools):
         """Test processing MCP tools result with tools."""
         agent = Agent(
-            role="Test Agent",
-            goal="Test",
-            backstory="Test agent",
+            prompt="You are a test agent.",
             llm=mock_llm,
             verbose=True,
         )
@@ -165,9 +157,7 @@ class TestAgentMCP:
     def test_setup_and_process_mcp_tools_empty(self, mock_llm):
         """Test processing MCP tools result with empty tools."""
         agent = Agent(
-            role="Test Agent",
-            goal="Test",
-            backstory="Test agent",
+            prompt="You are a test agent.",
             llm=mock_llm,
             verbose=True,
         )
@@ -181,9 +171,7 @@ class TestAgentMCP:
 
     def test_setup_and_process_mcp_tools_none(self, mock_llm):
         """Test processing MCP tools result with None."""
-        agent = Agent(
-            role="Test Agent", goal="Test", backstory="Test agent", llm=mock_llm
-        )
+        agent = Agent(prompt="You are a test agent.", llm=mock_llm)
 
         # Process None tools
         agent._setup_and_process_mcp_tools(None)
@@ -203,9 +191,7 @@ class TestAgentMCP:
         mock_adapter_class.return_value = mock_adapter
 
         agent = Agent(
-            role="Async MCP Agent",
-            goal="Test async MCP",
-            backstory="Async MCP testing agent",
+            prompt="You are an async MCP testing agent.",
             llm=mock_llm,
             verbose=True,
         )
@@ -223,26 +209,21 @@ class TestAgentMCP:
         """Test that MCP tool filter is properly applied."""
         tool_filter = ["allowed_tool_1", "allowed_tool_2"]
 
-        with patch.object(Agent, "_load_mcp_tools") as mock_load:
-            agent = Agent(
-                role="Filtered MCP Agent",
-                goal="Test MCP filtering",
-                backstory="Agent with MCP tool filtering",
-                llm=mock_llm,
-                mcp_servers=mock_mcp_servers,
-                mcp_tool_filter=tool_filter,
-            )
+        agent = Agent(
+            prompt="You are a filtered MCP agent.",
+            llm=mock_llm,
+            mcp_servers=mock_mcp_servers,
+            mcp_tool_filter=tool_filter,
+        )
 
-            assert agent.mcp_tool_filter == tool_filter
-            mock_load.assert_called_once()
+        assert agent.mcp_tool_filter == tool_filter
+        assert agent._lazy_initialized is False
 
     @patch("langcrew.agent.logger")
     def test_mcp_verbose_logging(self, mock_logger, mock_llm, mock_mcp_tools):
         """Test verbose logging in MCP operations."""
         agent = Agent(
-            role="Verbose MCP Agent",
-            goal="Test verbose MCP",
-            backstory="Agent with verbose MCP logging",
+            prompt="You are a verbose MCP agent.",
             llm=mock_llm,
             verbose=True,
         )
@@ -259,14 +240,11 @@ class TestAgentMCP:
         self, mock_llm, mock_mcp_servers
     ):
         """Test that MCP servers config is properly stored and used."""
-        with patch.object(Agent, "_load_mcp_tools"):
-            agent = Agent(
-                role="Config MCP Agent",
-                goal="Test MCP config",
-                backstory="Agent with MCP config",
-                llm=mock_llm,
-                mcp_servers=mock_mcp_servers,
-            )
+        agent = Agent(
+            prompt="You are a config MCP agent.",
+            llm=mock_llm,
+            mcp_servers=mock_mcp_servers,
+        )
 
         # Verify the config was stored correctly
         assert agent.mcp_servers == mock_mcp_servers
@@ -282,9 +260,7 @@ class TestAgentMCP:
         mcp_tool = MockMCPTool()
 
         agent = Agent(
-            role="Integration Agent",
-            goal="Test tool integration",
-            backstory="Agent testing tool integration",
+            prompt="You are an integration testing agent.",
             llm=mock_llm,
             tools=[existing_tool],
         )
@@ -304,18 +280,19 @@ class TestAgentMCP:
         self, mock_get_loop, mock_llm, mock_mcp_servers
     ):
         """Test proper handling of runtime errors during MCP loading."""
-        # First call succeeds (async context), second raises error
-        mock_get_loop.side_effect = [Mock(), RuntimeError("No loop")]
+        mock_get_loop.side_effect = RuntimeError("No loop")
+
+        agent = Agent(
+            prompt="You are an error handling agent.",
+            llm=mock_llm,
+            mcp_servers=mock_mcp_servers,
+        )
+
+        # Lazy: agent created without error
+        assert agent is not None
+        assert agent._lazy_initialized is False
 
         with patch("langcrew.agent.asyncio.run", return_value=[]):
-            with patch("concurrent.futures.ThreadPoolExecutor"):
-                agent = Agent(
-                    role="Error Handling Agent",
-                    goal="Test error handling",
-                    backstory="Agent for error testing",
-                    llm=mock_llm,
-                    mcp_servers=mock_mcp_servers,
-                )
+            agent._load_mcp_tools()
 
-                # Should not raise error
-                assert agent is not None
+        assert len(agent._mcp_tools) == 0

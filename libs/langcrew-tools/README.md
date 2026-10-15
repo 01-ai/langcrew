@@ -1,6 +1,6 @@
 # LangCrew Tools
 
-> Official toolset for LangCrew: plug-and-play capabilities for multi‑agent applications (browser automation, cloud phone, code interpreter, command execution, data fetching, and more) with streaming events and human‑in‑the‑loop support.
+> Official toolset for LangCrew: plug-and-play capabilities for multi‑agent applications (browser automation, code interpreter, command execution, data fetching, and more) with streaming events and human‑in‑the‑loop support.
 
 ## What is this?
 
@@ -24,15 +24,13 @@ pip install langcrew-tools
 ## Tool Catalog
 
 ### E2B Sandbox Tools
-- **[Browser Automation](./langcrew_tools/browser/README.md)** - Streaming events, HITL support
+- **Browser Automation** - Streaming events, HITL support
 - **[Code Interpreter](./langcrew_tools/code_interpreter/README.md)** - Safe Python execution with isolation
-- **[Terminal Commands](./langcrew_tools/commands/README.md)** - Command execution and session management
-- **[Filesystem Operations](./langcrew_tools/filesystem/README.md)** - Comprehensive file and directory management
+- **Terminal Commands** - Command execution and session management
+- **Filesystem Operations** - Comprehensive file and directory management
 
 ### Information & Data Collection
-- **[Cloud Phone Automation](./langcrew_tools/cloud_phone/README.md)** - Control Android devices in the cloud
 - **[Data Fetching](./langcrew_tools/fetch/README.md)** - External data integration
-- **[Knowledge Management](./langcrew_tools/knowledge/README.md)** - Information storage and retrieval
 - **[Search Operations](./langcrew_tools/search/README.md)** - Advanced search capabilities
 
 ### Infrastructure & Utilities

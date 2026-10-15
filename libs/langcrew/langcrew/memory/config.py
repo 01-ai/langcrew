@@ -3,7 +3,32 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from langgraph.store.base import IndexConfig
+from typing_extensions import TypedDict
+
+
+# TODO(@wangjia): Python < 3.12 compatibility workaround
+# Pydantic 2.x requires typing_extensions.TypedDict, but langgraph uses typing.TypedDict.
+# Consider: wait for langgraph to fix, or upgrade min Python version to 3.12+
+class IndexConfig(TypedDict, total=False):
+    """Configuration for indexing documents for semantic search.
+
+    Local definition to ensure Pydantic compatibility on Python < 3.12.
+    API-compatible with langgraph.store.base.IndexConfig.
+
+    Attributes:
+        dims: Number of dimensions in the embedding vectors.
+            Common values: 1536 (OpenAI), 3072 (OpenAI large), 1024 (Cohere)
+        embed: Embedding function or model. Can be:
+            - LangChain Embeddings instance
+            - Synchronous/asynchronous embedding function
+            - Provider string (e.g., "openai:text-embedding-3-small")
+        fields: Fields to extract text from for embedding generation.
+            Uses JSON path syntax (e.g., ["$"], ["field1", "field2"], ["parent.child"])
+    """
+
+    dims: int
+    embed: Any
+    fields: list[str] | None
 
 
 @dataclass
@@ -100,8 +125,6 @@ class LongTermMemoryConfig:
         app_memory: Application-wide shared memories (disabled by default)
         provider: Storage override (inherits from global if None)
         connection_string: Database connection override (inherits from global if None)
-        search_response_format: Search result format ("content" or "content_and_artifact")
-
     MEMORY TYPES:
         - user_memory: Personal user preferences/info (enabled by default)
         - app_memory: ⚠️ EXPERIMENTAL - Shared application insights across all users (disabled by default)
@@ -181,9 +204,6 @@ class LongTermMemoryConfig:
         )
     )
 
-    # Search tool configuration
-    search_response_format: str = "content"
-
     def __post_init__(self):
         # Note: app_id is now optional but recommended for production use
         # When app_id is not provided, memories won't have app-level namespace isolation
@@ -195,11 +215,6 @@ class LongTermMemoryConfig:
         # Validate app_id not empty if provided
         if self.app_id is not None and not self.app_id.strip():
             raise ValueError("app_id cannot be empty string")
-
-        # Validate search_response_format
-        valid_formats = {"content", "content_and_artifact"}
-        if self.search_response_format not in valid_formats:
-            raise ValueError(f"search_response_format must be one of {valid_formats}")
 
 
 @dataclass

@@ -13,10 +13,6 @@ class MemoryContextManager:
     def __init__(
         self,
         memory_config=None,
-        user_checkpointer=None,
-        user_store=None,
-        user_async_checkpointer=None,
-        user_async_store=None,
     ):
         self.memory_config = memory_config
 
@@ -25,12 +21,6 @@ class MemoryContextManager:
         self._memory_store = None
         self._memory_instances_initialized = False
 
-        # User-provided instances (user manages lifecycle)
-        self._user_checkpointer = user_checkpointer
-        self._user_store = user_store
-        self._user_async_checkpointer = user_async_checkpointer
-        self._user_async_store = user_async_store
-
         # Don't initialize memory instances at init time, defer until needed
 
     def _initialize_memory_instances(self):
@@ -38,8 +28,8 @@ class MemoryContextManager:
         if not self.memory_config:
             return
 
-        # Create checkpointer instance (if memory provider AND user didn't provide equivalent)
-        if self.memory_config.short_term.enabled and not self._has_user_checkpointer():
+        # Create checkpointer instance (if memory provider)
+        if self.memory_config.short_term.enabled:
             short_term_provider = self.memory_config.get_short_term_provider()
             if short_term_provider == "memory":
                 checkpointer_config = self.memory_config.to_checkpointer_config()
@@ -47,8 +37,8 @@ class MemoryContextManager:
                     short_term_provider, checkpointer_config, is_async=False
                 )
 
-        # Create store instance (if memory provider AND user didn't provide equivalent)
-        if self.memory_config.long_term.enabled and not self._has_user_store():
+        # Create store instance (if memory provider)
+        if self.memory_config.long_term.enabled:
             long_term_provider = self.memory_config.get_long_term_provider()
             if long_term_provider == "memory":
                 store_config = self.memory_config.to_store_config()
@@ -63,35 +53,14 @@ class MemoryContextManager:
             self._memory_instances_initialized = True
         return self._memory_checkpointer, self._memory_store
 
-    def _has_user_checkpointer(self) -> bool:
-        """Check if user provided any checkpointer"""
-        return (
-            self._user_checkpointer is not None
-            or self._user_async_checkpointer is not None
-        )
-
-    def _has_user_store(self) -> bool:
-        """Check if user provided any store"""
-        return self._user_store is not None or self._user_async_store is not None
-
-    def _get_user_instances(self, is_async: bool = False):
-        """Get user-provided instances based on execution mode"""
-        if is_async:
-            return self._user_async_checkpointer, self._user_async_store
-        else:
-            return self._user_checkpointer, self._user_store
-
     def _get_database_context_managers(self, is_async: bool = False):
-        """Get database provider context managers, skip if user provided equivalent"""
+        """Get database provider context managers"""
         checkpointer_cm = None
         store_cm = None
 
         if self.memory_config:
-            # Only create database checkpointer if user didn't provide one
-            if (
-                self.memory_config.short_term.enabled
-                and not self._has_user_checkpointer()
-            ):
+            # Create database checkpointer
+            if self.memory_config.short_term.enabled:
                 short_term_provider = self.memory_config.get_short_term_provider()
                 if short_term_provider != "memory":  # Non-memory provider
                     checkpointer_config = self.memory_config.to_checkpointer_config()
@@ -101,8 +70,8 @@ class MemoryContextManager:
                         is_async=is_async,
                     )
 
-            # Only create database store if user didn't provide one
-            if self.memory_config.long_term.enabled and not self._has_user_store():
+            # Create database store
+            if self.memory_config.long_term.enabled:
                 long_term_provider = self.memory_config.get_long_term_provider()
                 if long_term_provider != "memory":  # Non-memory provider
                     store_config = self.memory_config.to_store_config()
@@ -115,22 +84,20 @@ class MemoryContextManager:
         return checkpointer_cm, store_cm
 
     def _has_memory_providers(self) -> bool:
-        """Check if any provider is memory type (considering user overrides)"""
+        """Check if any provider is memory type"""
         if not self.memory_config:
             return False
 
-        # If user provided checkpointer, we don't need memory checkpointer
+        # Check memory checkpointer
         has_memory_checkpointer = (
             self.memory_config.short_term.enabled
             and self.memory_config.get_short_term_provider() == "memory"
-            and not self._has_user_checkpointer()
         )
 
-        # If user provided store, we don't need memory store
+        # Check memory store
         has_memory_store = (
             self.memory_config.long_term.enabled
             and self.memory_config.get_long_term_provider() == "memory"
-            and not self._has_user_store()
         )
 
         return has_memory_checkpointer or has_memory_store
@@ -155,31 +122,26 @@ class MemoryContextManager:
         memory_store,
         db_checkpointer=None,
         db_store=None,
-        user_checkpointer=None,
-        user_store=None,
     ):
         """
         Resolve final checkpointer and store instances with clear priority.
 
-        Priority: user-provided > database provider > memory provider > None
+        Priority: database provider > memory provider > None
         """
-        final_checkpointer = user_checkpointer or db_checkpointer or memory_checkpointer
-        final_store = user_store or db_store or memory_store
+        final_checkpointer = db_checkpointer or memory_checkpointer
+        final_store = db_store or memory_store
         return final_checkpointer, final_store
 
     # ========== UNIFIED CONTEXT MANAGERS ==========
 
     @asynccontextmanager
     async def _get_async_context(self):
-        """Unified async context manager with user instance support"""
-        user_checkpointer, user_store = self._get_user_instances(is_async=True)
-
+        """Unified async context manager"""
         # Check if we need to manage any resources (memory or database)
         needs_managed_resources = self._has_memory_providers()
-        has_user_resources = user_checkpointer is not None or user_store is not None
 
-        if needs_managed_resources or has_user_resources:
-            # Mixed mode: managed resources + user-provided instances
+        if needs_managed_resources:
+            # Mixed mode: managed resources
             memory_checkpointer, memory_store = self._get_memory_instances()
             db_checkpointer_cm, db_store_cm = self._get_database_context_managers(
                 is_async=True
@@ -196,8 +158,6 @@ class MemoryContextManager:
                         memory_store,
                         db_checkpointer,
                         db_store,
-                        user_checkpointer,
-                        user_store,
                     )
                     yield final_checkpointer, final_store
             elif db_checkpointer_cm:
@@ -208,8 +168,6 @@ class MemoryContextManager:
                         memory_store,
                         db_checkpointer,
                         None,
-                        user_checkpointer,
-                        user_store,
                     )
                     yield final_checkpointer, final_store
             elif db_store_cm:
@@ -220,19 +178,15 @@ class MemoryContextManager:
                         memory_store,
                         None,
                         db_store,
-                        user_checkpointer,
-                        user_store,
                     )
                     yield final_checkpointer, final_store
             else:
-                # Pure memory provider or user-provided instances
+                # Pure memory provider
                 final_checkpointer, final_store = self._resolve_final_providers(
                     memory_checkpointer,
                     memory_store,
                     None,
                     None,
-                    user_checkpointer,
-                    user_store,
                 )
                 yield final_checkpointer, final_store
         else:
@@ -258,15 +212,12 @@ class MemoryContextManager:
 
     @contextmanager
     def _get_sync_context(self):
-        """Unified sync context manager with user instance support"""
-        user_checkpointer, user_store = self._get_user_instances(is_async=False)
-
+        """Unified sync context manager"""
         # Check if we need to manage any resources (memory or database)
         needs_managed_resources = self._has_memory_providers()
-        has_user_resources = user_checkpointer is not None or user_store is not None
 
-        if needs_managed_resources or has_user_resources:
-            # Mixed mode: managed resources + user-provided instances
+        if needs_managed_resources:
+            # Mixed mode: managed resources
             memory_checkpointer, memory_store = self._get_memory_instances()
             db_checkpointer_cm, db_store_cm = self._get_database_context_managers(
                 is_async=False
@@ -280,8 +231,6 @@ class MemoryContextManager:
                         memory_store,
                         db_checkpointer,
                         db_store,
-                        user_checkpointer,
-                        user_store,
                     )
                     yield final_checkpointer, final_store
             elif db_checkpointer_cm:
@@ -292,8 +241,6 @@ class MemoryContextManager:
                         memory_store,
                         db_checkpointer,
                         None,
-                        user_checkpointer,
-                        user_store,
                     )
                     yield final_checkpointer, final_store
             elif db_store_cm:
@@ -304,19 +251,15 @@ class MemoryContextManager:
                         memory_store,
                         None,
                         db_store,
-                        user_checkpointer,
-                        user_store,
                     )
                     yield final_checkpointer, final_store
             else:
-                # Pure memory provider or user-provided instances
+                # Pure memory provider
                 final_checkpointer, final_store = self._resolve_final_providers(
                     memory_checkpointer,
                     memory_store,
                     None,
                     None,
-                    user_checkpointer,
-                    user_store,
                 )
                 yield final_checkpointer, final_store
         else:

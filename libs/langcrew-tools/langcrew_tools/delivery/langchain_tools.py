@@ -2,9 +2,10 @@
 # Specialized tool for delivering final agent results with attachments
 
 import logging
+import os
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from langcrew_tools.base import SandboxS3ToolMixin
 from langcrew_tools.utils.sandbox.s3_integration import SandboxS3Toolkit
@@ -15,10 +16,18 @@ logger = logging.getLogger(__name__)
 class AgentResultInput(BaseModel):
     """Input for AgentResultDeliveryTool."""
 
-    attachments: list[str] | str = Field(
+    attachments: list[str] = Field(
         ...,
-        description="List of file paths or URLs to send as attachments (must be absolute paths within sandbox, ordered by importance). Can also be a JSON string containing an array of paths.",
+        description="List of absolute file paths within sandbox to send as attachments, ordered by importance (highest first).",
     )
+
+    @field_validator("attachments", mode="before")
+    @classmethod
+    def convert_str_to_list(cls, v):
+        """Convert string to list if provided as string."""
+        if isinstance(v, str):
+            return [v]
+        return v
 
 
 class AgentResultDeliveryTool(SandboxS3ToolMixin):
@@ -39,9 +48,7 @@ class AgentResultDeliveryTool(SandboxS3ToolMixin):
 
     name: ClassVar[str] = "agent_result_delivery"
     args_schema: type[BaseModel] = AgentResultInput
-    description: ClassVar[
-        str
-    ] = """Use this tool to deliver final results to the user when the task is complete and produces deliverables.
+    description: str = """Use this tool to deliver final results to the user when the task is complete and produces deliverables.
 
 Users can only see attachments after delivery.
 
@@ -54,7 +61,6 @@ When to Use:
 How to Use:
 - Always attach all relevant files (users cannot access the sandbox directly).
 - Order attachments by importance (highest first).
-- If delivering images, use the image_url from the generation tool.
 
 Notes:
 - Attachments must use absolute sandbox paths and can be provided as a list or JSON array.
@@ -67,7 +73,7 @@ Notes:
 
     async def _arun(
         self,
-        attachments: list[str] | str,
+        attachments: list[str],
     ) -> dict[str, Any]:
         """Deliver agent results to user."""
         logger.info("Delivering agent results with attachments")
@@ -79,10 +85,6 @@ Notes:
                 return {"status": "error", "message": "Attachments cannot be empty"}
 
             if attachments:
-                # Convert string to list if necessary
-                if isinstance(attachments, str):
-                    attachments = [attachments]
-
                 logger.info(f"Including {len(attachments)} attachments: {attachments}")
                 # Validate attachment paths are absolute
                 for attachment in attachments:
@@ -95,53 +97,55 @@ Notes:
                 processed_attachments = []
                 original_attachments = attachments or []
 
-                # Always upload to S3 to get full file list
-                s3_path_auto = await SandboxS3Toolkit.upload_directory_to_s3(
-                    async_sandbox=await self.get_sandbox(),
-                    dir_path="/workspace",
-                    s3_prefix="user_attachments",
-                    async_s3_client=await self.get_s3_client(),
+                # Get sandbox and S3 client
+                async_sandbox = await self.get_sandbox()
+                async_s3_client = await self.get_s3_client()
+                sandbox_id = async_sandbox.sandbox_id
+
+                # Upload only the specified attachment files (not the entire directory)
+                logger.info(
+                    f"Uploading {len(original_attachments)} specified attachment files"
                 )
 
-                # Get filenames from original attachments for comparison
-                original_filenames = []
-                if original_attachments:
-                    import os
+                for attachment_path in original_attachments:
+                    try:
+                        # Generate S3 key for this file
+                        relative_path = attachment_path.removeprefix("/workspace/")
+                        s3_key = (
+                            f"sandbox/{sandbox_id}/user_attachments/{relative_path}"
+                        )
 
-                    original_filenames = [
-                        os.path.basename(path) for path in original_attachments
-                    ]
+                        # Upload single file to S3
+                        file_info = await SandboxS3Toolkit._internal_upload_file_to_s3(
+                            sandbox=async_sandbox,
+                            file_path=attachment_path,
+                            s3_path=s3_key,
+                            async_s3_client=async_s3_client,
+                        )
 
-                # Generate structured attachment format for all s3_path_auto results
-                for file_info in s3_path_auto:
-                    import os
+                        if file_info:
+                            filename = os.path.basename(attachment_path)
+                            processed_attachments.append({
+                                "filename": filename,
+                                "path": attachment_path,
+                                "url": file_info["url"],
+                                "size": file_info["size"],
+                                "content_type": file_info["content_type"],
+                                "show_user": 1,  # All specified attachments should be shown to user
+                            })
+                            logger.info(
+                                f"Successfully uploaded attachment: {attachment_path}"
+                            )
+                        else:
+                            logger.error(
+                                f"Failed to upload attachment: {attachment_path}"
+                            )
 
-                    # Extract filename from S3 URL or path
-                    filename = (
-                        os.path.basename(file_info["url"].split("?")[0])
-                        if "?" in file_info["url"]
-                        else os.path.basename(file_info["url"])
-                    )
-
-                    # Determine show_user by comparing filename
-                    show_user = 1 if filename in original_filenames else 0
-
-                    # Find original path if exists
-                    original_path = ""
-                    if show_user == 1 and original_attachments:
-                        for orig_path in original_attachments:
-                            if os.path.basename(orig_path) == filename:
-                                original_path = orig_path
-                                break
-
-                    processed_attachments.append({
-                        "filename": filename,
-                        "path": original_path,
-                        "url": file_info["url"],
-                        "size": file_info["size"],
-                        "content_type": file_info["content_type"],
-                        "show_user": show_user,
-                    })
+                    except Exception as e:
+                        logger.error(
+                            f"Error uploading attachment {attachment_path}: {e}"
+                        )
+                        # Continue with other files even if one fails
 
                 logger.info("Results delivered to user")
                 if processed_attachments:
@@ -159,7 +163,7 @@ Notes:
 
     def _run(
         self,
-        attachments: list[str] | str,
+        attachments: list[str],
     ) -> dict[str, Any]:
         """Perform document parsing synchronously."""
         raise NotImplementedError(

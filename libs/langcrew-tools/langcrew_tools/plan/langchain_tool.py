@@ -40,33 +40,41 @@ class PlanTool(BaseTool):
     """
 
     name: ClassVar[str] = "plan"
-    description: str = """Create and manage a structured task list to track progress and organize work.
-        **When to use:**
-        - Complex task requiring 2+ steps
-        - User requests plans list or provides multiple tasks
-        - Before starting work (mark as 'running') and after completion (mark as 'done')
+    description: str = """
+Create and manage a structured task list to organize work and track progress.
 
-        **When NOT to use:**
-        - Single, straightforward task
-        - Simple task with <2 simple steps
-        - Purely conversational requests
+**When to use:**
+- Task requires 2+ steps or involves multiple subtasks
+- User requests a plan, list of tasks, or structured workflow
+- Before starting execution (mark first step as 'running') and after completion (mark as 'done')
 
-        **Task States:**
-        - pending: Not started
-        - running: Currently working (ONE plan item only)
-        - done: Completed successfully
+**When NOT to use:**
+- Single, straightforward task
+- Simple tasks with fewer than 2 steps
+- Pure conversation or non-actionable requests
 
-        **Key Rules:**
-        - IMPORTANT: Always set the FIRST STEP to 'running' state when creating a new plan
-        - Only ONE item can be 'running' at a time
-        - Must mark current 'running' as 'done' or 'pending' before starting another
-        - Only mark 'done' when fully accomplished
-        - Update status in real-time
-        - Break complex tasks into specific, actionable items
-        
-        **Example:**
-        {"plans":[{"id": "1", "content": "plan 1", "status": "pending"}, {"id": "2", "content": "plan 2", "status": "pending"}]}
-        """
+**Tool Priority Rule:**
+- If a specialized tool exists whose name includes `_skills_`, ALWAYS use that tool to perform the task.  
+
+**Task States:**
+- pending: Not started
+- running: Currently being worked on (ONLY ONE item may be running)
+- done: Fully completed
+
+**Key Rules:**
+- The FIRST task in a new plan must be set to 'running'
+- Only one item can be 'running' at any time
+- Must mark the current 'running' item as 'done' or 'pending' before switching
+- Only mark an item as 'done' when fully completed
+- Update task status in real time
+- Break complex requests into specific, actionable steps
+
+**Example:**
+{"plans":[
+    {"id": "1", "content": "plan 1", "status": "pending"},
+    {"id": "2", "content": "plan 2", "status": "pending"}
+]}
+"""
 
     args_schema: type[PlanInput] = PlanInput
 

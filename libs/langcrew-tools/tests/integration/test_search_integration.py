@@ -100,15 +100,3 @@ class TestSearchIntegration:
         # Test default brief value
         search_input_default = WebSearchInput(query="test")
         assert search_input_default.brief == ""
-
-    def test_tool_initialization_without_credentials(self, monkeypatch):
-        """Test that tool initialization fails gracefully without credentials."""
-        # Clear any existing environment variables
-        monkeypatch.delenv("LANGCREW_WEB_SEARCH_ENDPOINT", raising=False)
-        monkeypatch.delenv("LANGCREW_WEB_SEARCH_API_KEY", raising=False)
-
-        with pytest.raises(ValueError, match="Web search endpoint is required"):
-            WebSearchTool()
-
-        with pytest.raises(ValueError, match="API key is required"):
-            WebSearchTool(endpoint="http://test.com")

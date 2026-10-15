@@ -1,17 +1,13 @@
-from .langchain_tools import (
-    CreateDirectoryInput,
-    CreateDirectoryTool,
-    DeleteFileInput,
-    DeleteFileTool,
-    FileExistsInput,
-    FileExistsTool,
-    ListFilesInput,
-    ListFilesTool,
+# Re-export FilesystemBackend protocol from langcrew for convenience
+from langcrew.middleware.protocols import FilesystemBackend
+
+from .memory_backend import InMemoryFilesystemBackend
+from .sandbox_backend import SandboxFilesystemBackend
+from .tools import (
+    FileEditInput,
+    FileEditTool,
     ReadFileInput,
     ReadFileTool,
-    RenameFileInput,
-    RenameFileTool,
-    WatchDirectoryInput,
     WriteFileInput,
     WriteFileTool,
 )
@@ -21,21 +17,17 @@ from .langchain_tools import (
 # E2B Filesystem LangChain Tools
 # Provides filesystem operations for e2b sandbox environment
 __all__ = [
-    # LangChain tools
-    "WriteFileTool",
+    # Interface (for extension)
+    "FilesystemBackend",
+    # Implementation
+    "SandboxFilesystemBackend",
+    "InMemoryFilesystemBackend",
+    # Core tools (aligned with Claude Code: Read, Write, Edit)
     "ReadFileTool",
-    "ListFilesTool",
-    "DeleteFileTool",
-    "CreateDirectoryTool",
-    "FileExistsTool",
-    "RenameFileTool",
+    "WriteFileTool",
+    "FileEditTool",
     # Input schemas
-    "WriteFileInput",
     "ReadFileInput",
-    "ListFilesInput",
-    "DeleteFileInput",
-    "CreateDirectoryInput",
-    "FileExistsInput",
-    "RenameFileInput",
-    "WatchDirectoryInput",
+    "WriteFileInput",
+    "FileEditInput",
 ]

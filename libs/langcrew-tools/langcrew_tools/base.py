@@ -4,11 +4,17 @@ This module provides base classes that can be inherited by all tool input models
 to ensure consistency and reduce code duplication.
 """
 
-from typing import Any
+from typing import Annotated, Any, Union
 
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, InjectedToolArg
 from langcrew.utils.async_utils import run_async_wait
 from pydantic import BaseModel, Field
+
+try:
+    from langgraph.prebuilt import ToolRuntime
+except ImportError:
+    # Use Any if langgraph is not installed
+    ToolRuntime = Any
 
 try:
     from typing import override
@@ -31,6 +37,13 @@ class BaseToolInput(BaseModel):
     brief: str = Field(
         default="", description="One brief sentence to explain this action"
     )
+
+
+class RuntimeAwareInput(BaseToolInput):
+    """Base input for tools that require runtime injection."""
+
+    model_config = {"arbitrary_types_allowed": True}
+    runtime: Annotated[ToolRuntime, InjectedToolArg]
 
 
 class SandboxS3ToolMixin(BaseTool, SandboxMixin, S3ClientMixin):

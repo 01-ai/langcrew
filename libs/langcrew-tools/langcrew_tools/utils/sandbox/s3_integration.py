@@ -11,9 +11,8 @@ import mimetypes
 import os
 from typing import Any, Final
 
-from agentbox import AsyncSandbox
-
 from ..s3 import AsyncS3Client
+from . import AsyncSandbox
 
 # S3 Default Address
 SANDBOX_S3_ADDRESS: Final[str] = "sandbox/"
@@ -35,17 +34,25 @@ class SandboxS3Toolkit:
     async def upload_base64_image(
         async_s3_client: AsyncS3Client, base64_data: str, sandbox_id: str = "empty"
     ) -> str:
-        """Upload base64 image to S3"""
-        s3_path = f"{SANDBOX_S3_ADDRESS}{sandbox_id}/images"
-        data: bytes = base64.b64decode(base64_data)
+        """
+        Upload base64 image to S3 with public access
+
+        Note: Uses expires_in=None to enable permanent public-read access for:
+        - Real-time browser and cloud phone screen display
+        - Sharing scenarios requiring persistent image availability
+        """
         md5 = hashlib.md5(base64_data.encode()).hexdigest()
-        if await async_s3_client.object_exists(object_key=f"{s3_path}/{md5}.png"):
+        object_key = f"{SANDBOX_S3_ADDRESS}{sandbox_id}/images/{md5}.png"
+        data: bytes = base64.b64decode(base64_data)
+        if await async_s3_client.object_exists(object_key=object_key):
+            # Generate permanent public URL for existing image
             return await async_s3_client.generate_object_url(
-                object_key=f"{s3_path}/{md5}.png", expires_in=None
+                object_key, expires_in=None
             )
 
+        # Upload with permanent public access
         return await async_s3_client.put_object(
-            object_key=f"{s3_path}/{md5}.png",
+            object_key=object_key,
             content=data,
             content_type="image/png",
             expires_in=None,
@@ -101,6 +108,7 @@ class SandboxS3Toolkit:
             logger.info(f"Uploading file from sandbox: {file_path} -> S3: {s3_path}")
 
             # Check if file exists in sandbox
+            _ = await sandbox.is_running() or await sandbox.connect()
             file_exists = await sandbox.files.exists(file_path)
             if not file_exists:
                 logger.error(f"File not found in sandbox: {file_path}")
@@ -117,7 +125,7 @@ class SandboxS3Toolkit:
             content_type, _ = mimetypes.guess_type(file_path)
             if content_type in ["text/plain", "text/html", "text/markdown"]:
                 content_type = f"{content_type};charset=utf-8"
-                
+
             if not content_type:
                 logger.warning(f"{file_path} content type guess wrong -> {s3_path}")
                 content_type = "application/octet-stream"  # Default binary type
@@ -138,79 +146,6 @@ class SandboxS3Toolkit:
         except Exception as e:
             logger.error(f"Error uploading file to S3: {e}")
             return None
-
-    @staticmethod
-    async def _get_file_list(
-        async_sandbox: AsyncSandbox | None, dir_path: str
-    ) -> list[str]:
-        """Get file list from sandbox or local directory"""
-        if async_sandbox is not None:
-            # Sandbox file operations
-            # Check if directory exists
-            result = await async_sandbox.commands.run(f"test -d {dir_path}")
-            if result.exit_code != 0:
-                raise ValueError(f"Directory not found in sandbox: {dir_path}")
-
-            # Get file list
-            result = await async_sandbox.commands.run(f"find {dir_path} -type f")
-            if result.exit_code != 0:
-                raise ValueError(f"Failed to list files in directory: {dir_path}")
-
-            return result.stdout.strip().split("\n") if result.stdout.strip() else []
-        else:
-            # Local file operations
-            if not os.path.exists(dir_path):
-                raise ValueError(f"Directory not found on local server: {dir_path}")
-
-            if not os.path.isdir(dir_path):
-                raise ValueError(f"Path is not a directory: {dir_path}")
-
-            # Use os.walk to get file list
-            file_list = []
-            for root, dirs, files in os.walk(dir_path):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    file_list.append(file_path)
-            return file_list
-
-    @staticmethod
-    async def _upload_files_to_s3(
-        sandbox: AsyncSandbox | None,
-        file_list: list[str],
-        dir_path: str,
-        final_s3_path: str,
-        async_s3_client: AsyncS3Client,
-    ) -> int:
-        """Upload all files to S3 and return the count of successful uploads"""
-        uploaded_count = 0
-
-        for file_path in file_list:
-            # Calculate relative path and S3 key
-            relative_path = file_path.replace(dir_path, "").lstrip("/")
-            s3_key = f"{final_s3_path.rstrip('/')}/{relative_path}"
-
-            # Upload from sandbox
-            try:
-                if sandbox is not None:
-                    success = await SandboxS3Toolkit._internal_upload_file_to_s3(
-                        sandbox, file_path, s3_key, async_s3_client
-                    )
-                else:
-                    # Upload from local server
-                    success = await SandboxS3Toolkit._upload_local_file_to_s3(
-                        file_path, s3_key, async_s3_client
-                    )
-
-                if success:
-                    uploaded_count += 1
-                    logger.debug(f"Successfully uploaded file: {file_path} -> {s3_key}")
-                else:
-                    logger.error(f"Failed to upload file: {file_path}")
-
-            except Exception as e:
-                logger.error(f"Error uploading file {file_path}: {e}")
-
-        return uploaded_count
 
     @staticmethod
     async def _upload_local_file_to_s3(
@@ -262,27 +197,6 @@ class SandboxS3Toolkit:
             return False
 
     @staticmethod
-    async def _check_s3_path_exists(
-        async_s3_client: AsyncS3Client, s3_path: str
-    ) -> bool:
-        """
-        Check if S3 path exists by listing objects with the path as prefix
-
-        Args:
-            async_s3_client: S3 client instance
-            s3_path: S3 path to check
-
-        Returns:
-            bool: True if path exists (has objects), otherwise False
-        """
-        try:
-            objects = await async_s3_client.list_objects(prefix=s3_path, max_keys=1)
-            return len(objects) > 0
-        except Exception as e:
-            logger.debug(f"Error checking S3 path existence: {e}")
-            return False
-
-    @staticmethod
     async def upload_directory_to_s3(
         async_sandbox: AsyncSandbox,
         dir_path: str,
@@ -316,7 +230,10 @@ class SandboxS3Toolkit:
             )
 
             # For AsyncSandbox, use async command
-            result = await async_sandbox.commands.run(f"find {dir_path} -type f")
+            _ = await async_sandbox.is_running() or await async_sandbox.connect()
+            result = await async_sandbox.commands.run(
+                f"find {dir_path} -type f -not -path '*/node_modules/*'"
+            )
             if result.exit_code != 0:
                 logger.error(f"Failed to list files in directory: {dir_path}")
                 return []
@@ -359,7 +276,7 @@ class SandboxS3Toolkit:
 
     @staticmethod
     async def upload_s3_files_to_sandbox(
-        async_sandbox: AsyncSandbox,
+        sandbox: AsyncSandbox,
         files: list[dict[str, str]],
         client: AsyncS3Client,
         dir_path: str = "/workspace/upload",
@@ -392,13 +309,13 @@ class SandboxS3Toolkit:
                     if content is None:
                         logger.warning(f"Failed to read file content: {key}")
                         continue
-
+                    _ = await sandbox.is_running() or await sandbox.connect()
                     # Write file to sandbox using sync sandbox write method
                     path = f"{dir_path.rstrip('/')}/{key}"
-                    await async_sandbox.files.write(path, content)
+                    await sandbox.files.write(path, content)
 
                     # Verify file was written successfully
-                    if await async_sandbox.files.exists(path):
+                    if await sandbox.files.exists(path):
                         logger.info(f"Successfully sync file: {key} -> {path}")
                     else:
                         logger.error(f"File not found in sandbox: {key}")

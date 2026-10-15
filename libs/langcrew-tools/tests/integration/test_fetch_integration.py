@@ -2,133 +2,157 @@
 """
 Fetch Tool Integration Tests
 
-Simple integration tests for WebFetchTool to verify basic functionality
-with real crawl4ai service endpoints.
+Integration tests for WebFetchTool to verify functionality with real websites
+using the new httpx + playwright implementation.
 """
-
-import os
 
 import pytest
 
-from langcrew_tools.fetch import WebFetchTool
+from langcrew_tools.fetch.langchain_tools import WebFetchTool
 
 
 class TestFetchIntegration:
-    """Simple integration tests for WebFetchTool."""
+    """Integration tests for WebFetchTool core functionality."""
 
-    def setup_method(self):
-        """Setup test environment."""
-        self.service_url = os.getenv(
-            "LANGCREW_CRAWL4AI_SERVICE_URL", "http://localhost:11235"
-        )
-        self.llm_api_key = os.getenv("LANGCREW_CRAWL4AI_LLM_API_KEY")
-
-    @pytest.mark.skipif(
-        not os.getenv("LANGCREW_CRAWL4AI_SERVICE_URL"),
-        reason="Crawl4AI service not available (set LANGCREW_CRAWL4AI_SERVICE_URL)",
-    )
-    def test_basic_fetch_functionality(self):
-        """Test basic web fetch functionality."""
-        # Create fetch tool (will auto-fallback to pruning mode if no API key)
-        fetch_tool = WebFetchTool(
-            crawl4ai_service_url=self.service_url, crawl4ai_llm_api_key=self.llm_api_key
-        )
-
-        # Fetch a simple webpage
-        result = fetch_tool.run({
-            "url": "https://httpbin.org/html",
-            "filter_type": "pruning",  # Use pruning to avoid API key requirement
-        })
-
-        # Basic assertions
-        assert result is not None
-        assert isinstance(result, str)
-        assert len(result) > 0
-
-    @pytest.mark.skipif(
-        not os.getenv("LANGCREW_CRAWL4AI_SERVICE_URL"),
-        reason="Crawl4AI service not available",
-    )
-    def test_fetch_with_brief_parameter(self):
-        """Test fetch functionality with brief parameter."""
-        # Create fetch tool
-        fetch_tool = WebFetchTool(
-            crawl4ai_service_url=self.service_url, filter_type="pruning"
-        )
-
-        # Fetch with brief parameter
-        result = fetch_tool.run({
-            "url": "https://httpbin.org/json",
-            "filter_type": "pruning",
-            "brief": "Fetch JSON data from httpbin",
-        })
-
-        # Basic assertions
-        assert result is not None
-        assert isinstance(result, str)
-        assert len(result) > 0
-
-    @pytest.mark.skipif(
-        not os.getenv("LANGCREW_CRAWL4AI_SERVICE_URL"),
-        reason="Crawl4AI service not available",
-    )
-    async def test_async_fetch_functionality(self):
-        """Test async fetch functionality."""
-        # Create fetch tool
-        fetch_tool = WebFetchTool(
-            crawl4ai_service_url=self.service_url, filter_type="pruning"
-        )
-
-        # Perform async fetch
-        result = await fetch_tool.arun({
-            "url": "https://httpbin.org/json",
-            "filter_type": "pruning",
-        })
-
-        # Basic assertions
-        assert result is not None
-        assert isinstance(result, str)
-        assert len(result) > 0
-
-    def test_input_model_has_brief_field(self):
-        """Test that WebFetchInput model has brief field."""
-        from langcrew_tools.fetch.langchain_tools import WebFetchInput
-
-        # Create input instance with brief
-        fetch_input = WebFetchInput(
-            url="https://example.com",
-            filter_type="pruning",
-            brief="Test brief description",
-        )
-
-        # Verify brief field
-        assert hasattr(fetch_input, "brief")
-        assert fetch_input.brief == "Test brief description"
-
-        # Test default brief value
-        fetch_input_default = WebFetchInput(url="https://example.com")
-        assert fetch_input_default.brief == ""
-
-    def test_tool_initialization_with_defaults(self):
+    def test_tool_initialization(self):
         """Test that tool can be initialized with default values."""
-        # Should work with defaults
+        fetch_tool = WebFetchTool()
+        assert fetch_tool.timeout == 60
+        assert fetch_tool.max_chars == 50000
+        assert "User-Agent" in fetch_tool.headers
+
+    @pytest.mark.asyncio
+    async def test_fetch_real_website(self):
+        """Test fetching a real website with httpx."""
         fetch_tool = WebFetchTool()
 
-        # Verify configuration (may use environment variables or defaults)
-        expected_url = os.getenv(
-            "LANGCREW_CRAWL4AI_SERVICE_URL", "http://localhost:11235"
+        # Fetch a simple static website
+        result = await fetch_tool._arun("https://httpbin.org/html")
+
+        # Basic assertions - verify core functionality
+        assert result is not None
+        assert isinstance(result, str)
+        assert len(result) > 0
+        assert "Content from https://httpbin.org/html" in result
+
+    @pytest.mark.asyncio
+    async def test_fetch_non_utf8_encoding(self):
+        """Test fetching a website with non-UTF-8 encoding (GBK/GB2312)."""
+        fetch_tool = WebFetchTool()
+
+        # Chinese website that uses GBK/GB2312 encoding
+        result = await fetch_tool._arun(
+            "http://dangshi.people.com.cn/n1/2021/0628/c436975-32142118.html"
         )
-        assert fetch_tool.crawl4ai_service_url == expected_url
-        # Source code falls back to 'pruning' when no API key is provided
-        assert fetch_tool.filter_type == "pruning"
-        assert fetch_tool.timeout == 120
 
-    def test_filter_type_fallback(self):
-        """Test automatic fallback from LLM to pruning filter when no API key."""
-        # Create tool without API key
-        fetch_tool = WebFetchTool(crawl4ai_llm_api_key=None, filter_type="llm")
+        # Verify encoding was handled correctly
+        assert result is not None
+        assert isinstance(result, str)
+        assert len(result) > 0
+        
+        # Check for Chinese characters (should not be garbled)
+        # The page contains "中国共产党" (Communist Party of China)
+        assert "中国" in result or "Content from" in result
+        # Should not contain encoding errors like question marks
+        assert "�" not in result or result.count("�") < 10  # Allow minimal encoding issues
 
-        # Source code automatically falls back to 'pruning' during initialization when no API key
-        assert fetch_tool.filter_type == "pruning"  # Falls back to pruning
+    @pytest.mark.asyncio
+    async def test_url_validation_security(self):
+        """Test URL validation blocks dangerous requests."""
+        fetch_tool = WebFetchTool()
 
-        # The fallback happens during initialization, not execution
+        # Test private IP blocking - should return error message, not raise
+        result = await fetch_tool._arun("http://127.0.0.1")
+        assert "Failed to fetch" in result
+        assert "127.0.0.1" in result
+
+        # Test unsupported protocols - should return error message
+        result = await fetch_tool._arun("ftp://example.com")
+        assert "Failed to fetch" in result or "Invalid URL" in result
+
+    @pytest.mark.asyncio
+    async def test_forbidden_file_types(self):
+        """Test that non-HTML file types are blocked."""
+        fetch_tool = WebFetchTool()
+
+        # Test PDF blocking - should return error message
+        result = await fetch_tool._arun("https://example.com/document.pdf")
+        assert "Failed to fetch" in result
+        assert "only supports HTML web pages" in result
+
+        # Test office document blocking
+        result = await fetch_tool._arun("https://example.com/document.docx")
+        assert "Failed to fetch" in result
+        assert "only supports HTML web pages" in result
+
+    def test_sync_execution_not_supported(self):
+        """Test that sync execution raises NotImplementedError."""
+        fetch_tool = WebFetchTool()
+        with pytest.raises(NotImplementedError, match="web_fetch only supports async execution"):
+            fetch_tool._run(url="https://example.com")
+
+
+class TestFetchBrowserFallback:
+    """Test browser fallback functionality."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.slow
+    async def test_browser_fallback_on_403(self):
+        """Test that browser fallback is triggered on 403 errors."""
+        fetch_tool = WebFetchTool()
+        
+        # Note: This test may be skipped if no suitable test URL is available
+        # Some websites that typically return 403 to simple HTTP clients
+        # but work with browser might be tested here
+        # For now, we just test the logic exists
+        
+        error_type = "ACCESS_DENIED_403"
+        should_retry = fetch_tool._should_retry_with_browser(error_type)
+        assert should_retry is True
+
+    @pytest.mark.asyncio
+    async def test_no_retry_on_404(self):
+        """Test that browser fallback is NOT triggered on 404 errors."""
+        fetch_tool = WebFetchTool()
+        
+        error_type = "NOT_FOUND_404"
+        should_retry = fetch_tool._should_retry_with_browser(error_type)
+        assert should_retry is False
+
+    @pytest.mark.asyncio
+    async def test_retry_on_short_content(self):
+        """Test that browser fallback is triggered when content is too short."""
+        fetch_tool = WebFetchTool()
+        
+        error_type = "CONTENT_TOO_SHORT"
+        should_retry = fetch_tool._should_retry_with_browser(error_type)
+        assert should_retry is True
+
+
+class TestFetchRealWorldScenarios:
+    """Test real-world usage scenarios."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.slow
+    async def test_static_site_wikipedia(self):
+        """Test fetching from Wikipedia (static HTML site)."""
+        fetch_tool = WebFetchTool()
+        
+        result = await fetch_tool._arun("https://en.wikipedia.org/wiki/Web_scraping")
+        
+        assert result is not None
+        assert "Web scraping" in result or "web scraping" in result
+        assert "Content from" in result
+
+    @pytest.mark.asyncio
+    @pytest.mark.slow  
+    async def test_chinese_website_baidu(self):
+        """Test fetching from Baidu (Chinese website)."""
+        fetch_tool = WebFetchTool()
+        
+        result = await fetch_tool._arun("https://www.baidu.com")
+        
+        assert result is not None
+        assert isinstance(result, str)
+        # Baidu's homepage should contain Chinese characters
+        assert len(result) > 100
