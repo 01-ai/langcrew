@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import random
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any, ClassVar
 
@@ -51,15 +52,31 @@ class ImageGenerationTool(BaseTool, SandboxMixin, S3ClientMixin):
         description="The model to use for image generation. Default is doubao-seedream-4-0-250828.",
     )
 
-    def __init__(self, model: str = ARK_MODEL, **kwargs):
+    # Custom image generation function (optional)
+    # Expected signature: async def(prompt: str, path: str | None = None, **kwargs: Any) -> str
+    # Returns: Base64 encoded image data
+    custom_generator: Callable[..., Awaitable[str]] | None = Field(
+        default=None,
+        description="Custom image generation function",
+        exclude=True,
+    )
+
+    def __init__(
+        self,
+        model: str = ARK_MODEL,
+        custom_generator: Callable[..., Awaitable[str]] | None = None,
+        **kwargs: Any,
+    ):
         """Initialize the ImageGenerationTool.
 
         Args:
             model: The model to use for image generation
+            custom_generator: Custom async function with signature: async def(prompt: str, path: str | None = None, **kwargs) -> str
             **kwargs: Additional arguments for parent class
         """
         super().__init__(**kwargs)
         self.model = model
+        self.custom_generator = custom_generator
 
     def _run(
         self,
@@ -97,6 +114,40 @@ class ImageGenerationTool(BaseTool, SandboxMixin, S3ClientMixin):
             prompt += ", if there are any text in the image, please use simplified Chinese or English"
 
         logger.info(f"Starting image generation with prompt: {prompt[:100]}...")
+
+        # Check for custom generator first
+        if self.custom_generator:
+            try:
+                image_b64 = await self.custom_generator(prompt, path, **kwargs)
+                logger.info("Custom generator succeeded, processing result")
+
+                # Save to sandbox and upload to S3 using existing workflow
+                sandbox_path, sandbox_id = await self._save_to_sandbox(image_b64, path)
+                logger.info(
+                    f"Image saved to sandbox: {sandbox_path}, sandbox_id: {sandbox_id}"
+                )
+
+                s3_image_url = await SandboxS3Toolkit.upload_base64_image(
+                    async_s3_client=await self.get_s3_client(),
+                    base64_data=image_b64,
+                    sandbox_id=sandbox_id,
+                )
+                logger.info(f"Image uploaded to S3: {s3_image_url}")
+
+                result = {
+                    "image_url": s3_image_url,
+                    "sandbox_path": sandbox_path,
+                    "message": f"Image has been successfully generated with custom generator and saved to the sandbox at {sandbox_path}",
+                }
+
+                return json.dumps(result, ensure_ascii=False)
+            except Exception as e:
+                error_msg = str(e)
+                if not error_msg:
+                    error_msg = repr(e)
+
+                logger.error(f"Custom generator failed: {error_msg}", exc_info=True)
+                return f"[ERROR] Custom generator failed: {error_msg}"
 
         ark_api_key = os.environ.get("ARK_API_KEY")
         if ark_api_key:

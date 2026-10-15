@@ -38,24 +38,14 @@ class ClientFactory:
             bucket = os.getenv("S3_BUCKET")
             access_key = os.getenv("S3_AK")
             secret_key = os.getenv("S3_SK")
-            gateway = os.getenv("S3_GATEWAY", "")
-            region = os.getenv("S3_REGION", "us-east-1")
+            gateway = os.getenv("S3_GATEWAY")
+            region = os.getenv("S3_REGION")
 
-            # Validate required configuration
-            required_configs = {
-                "S3_ENDPOINT": endpoint,
-                "S3_BUCKET": bucket,
-                "S3_AK": access_key,
-                "S3_SK": secret_key,
-            }
-
-            missing_configs = [
-                key for key, value in required_configs.items() if not value
-            ]
-
-            if missing_configs:
-                raise ValueError(
-                    f"Missing required S3 environment variables: {missing_configs}"
+            # Log credential usage before creating client
+            if not access_key or not secret_key:
+                logger.warning(
+                    "S3_AK or S3_SK not provided. "
+                    "Will use default AWS credential chain (environment variables, IAM roles, etc.)"
                 )
 
             # Prepare client configuration
@@ -72,7 +62,7 @@ class ClientFactory:
             if config_override:
                 client_config.update(config_override)
 
-            logger.info(f"Creating S3 client for endpoint: {client_config['endpoint']}")
+            logger.info(f"Creating S3 client for endpoint: {endpoint}")
             return AsyncS3Client(S3ClientConfig(**client_config))
 
         except Exception as e:

@@ -152,7 +152,6 @@ The project uses several pytest markers to categorize tests:
 
 - `mock_llm`: Mock language model for testing
 - `mock_agent`: Mock agent instance
-- `mock_task`: Mock task instance
 - `mock_crew`: Mock crew instance
 - `mock_tool`: Mock tool instance
 - `mock_memory`: Mock memory system
@@ -209,22 +208,18 @@ class TestAgent:
         assert agent.role == "Test Role"
         assert agent.goal == "Test Goal"
 
-    @patch('langcrew.agent.Agent._execute_task')
-    def test_agent_execute_with_mock(self, mock_execute):
-        """Test agent execution using mocks."""
+    def test_agent_invoke_with_mock(self, mock_llm):
+        """Test agent invocation using mocks."""
         # Setup mock
-        mock_execute.return_value = "Task completed"
+        mock_llm.return_value = "Research completed"
         
-        agent = Agent(role="researcher", goal="research")
-        mock_task = Mock()
-        mock_task.description = "Research AI trends"
+        agent = Agent(role="researcher", goal="research", llm=mock_llm)
         
         # Execute test
-        result = agent.execute(mock_task)
+        result = agent.invoke({"messages": [HumanMessage(content="Research AI trends")]})
         
         # Verify
-        assert result == "Task completed"
-        mock_execute.assert_called_once_with(mock_task)
+        assert result is not None
 
     def test_agent_validation_errors(self):
         """Test agent parameter validation."""
@@ -242,14 +237,15 @@ They use real objects and test complete workflows.
 
 import pytest
 from langcrew.agent import Agent
-from langcrew.task import Task
+from langcrew.crew import Crew
+from langchain_core.messages import HumanMessage
 
 @pytest.mark.integration
 class TestCrewWorkflow:
     """Integration tests for crew execution."""
 
-    def test_agent_task_real_interaction(self):
-        """Test real Agent-Task interaction."""
+    def test_agent_real_interaction(self):
+        """Test real Agent interaction."""
         # Create real objects
         agent = Agent(
             role="Senior Research Analyst",
@@ -258,19 +254,15 @@ class TestCrewWorkflow:
             verbose=False
         )
         
-        task = Task(
-            description="Write a brief summary about AI trends",
-            expected_output="A 2-sentence summary",
-            agent=agent
-        )
+        crew = Crew(agents=[agent])
         
         # Test real execution
-        result = agent.execute(task)
+        result = crew.invoke(
+            {"messages": [HumanMessage(content="Write a brief summary about AI trends")]}
+        )
         
         # Verify real results
         assert result is not None
-        assert isinstance(result, str)
-        assert len(result.strip()) > 0
 
     def test_multi_agent_collaboration(self):
         """Test multiple agents working together."""
@@ -288,27 +280,16 @@ class TestCrewWorkflow:
             backstory="You're a renowned content strategist"
         )
         
-        # Create dependent tasks
-        research_task = Task(
-            description="Research latest AI trends",
-            expected_output="Research findings",
-            agent=researcher
-        )
-        
-        writing_task = Task(
-            description="Write blog post based on research",
-            expected_output="Blog post",
-            agent=writer,
-            context=[research_task]
-        )
+        # Create crew with both agents
+        crew = Crew(agents=[researcher, writer])
         
         # Execute workflow
-        research_result = researcher.execute(research_task)
-        writing_result = writer.execute(writing_task)
+        result = crew.invoke(
+            {"messages": [HumanMessage(content="Research and write about latest AI trends")]}
+        )
         
         # Verify collaboration
-        assert research_result is not None
-        assert writing_result is not None
+        assert result is not None
 ```
 
 ### Using Fixtures from files

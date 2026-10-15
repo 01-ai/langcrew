@@ -202,7 +202,7 @@ class TestExecutionPlan:
 
         context = plan.build_context_prompt()
 
-        assert "ALL TASKS COMPLETED" in context
+        assert "ALL STEPS COMPLETED" in context
         assert "All planned steps have been successfully executed" in context
 
     def test_build_context_prompt_final_step(self):

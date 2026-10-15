@@ -1,17 +1,15 @@
-"""LangCrew Web module for HTTP server and adapters.
-
-This module provides a clean API for web integration with LangCrew.
-The main entry points are the factory functions that create properly
-configured adapters and handlers.
-"""
+"""LangCrew Web - HTTP streaming for crews and compiled graphs."""
 
 from ..utils.message_utils import generate_message_id
 from .adapter import LangGraphAdapter
-from .factory import create_message_generator, create_sse_handler
-from .http_server import AdapterServer, create_langgraph_server, create_server
+from .citation import attach_citation_sources_to_request
+from .http_server import create_langgraph_server, create_server
 from .protocol import (
+    Action,
     ChatRequest,
     MessageType,
+    Request,
+    RequestType,
     StepStatus,
     StopRequest,
     StreamMessage,
@@ -19,28 +17,32 @@ from .protocol import (
     TaskInput,
     ToolResult,
 )
+from .server import AdapterServer
 from .tool_display import ToolDisplayManager
 
 __all__ = [
-    # Factory functions (recommended API)
-    "create_sse_handler",
-    "create_message_generator",
-    # HTTP Server
-    "AdapterServer",
+    # Standalone deployment
     "create_server",
     "create_langgraph_server",
-    # LangGraph Adapter (for advanced usage)
+    # Core server (for integration)
+    "AdapterServer",
+    # Advanced
     "LangGraphAdapter",
-    # Protocol types
-    "ChatRequest",
+    # Protocol
+    "Request",  # Primary request class
+    "ChatRequest",  # Backward compatibility alias
     "StopRequest",
-    "TaskInput",
+    "TaskInput",  # Deprecated, use Request instead
     "StreamMessage",
+    "Action",
     "MessageType",
+    "RequestType",
     "TaskExecutionStatus",
     "StepStatus",
     "ToolResult",
-    "generate_message_id",
     # Tool display
     "ToolDisplayManager",
+    # Utils
+    "generate_message_id",
+    "attach_citation_sources_to_request",
 ]

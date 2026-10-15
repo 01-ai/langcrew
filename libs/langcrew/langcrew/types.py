@@ -1,20 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from langgraph.graph import MessagesState
 from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    from langcrew.task import Task
-
-
-class OrderCallback(BaseModel):
-    order_id: int
-    callback: Callable
-
 
 # File type definitions
 class BaseFile(BaseModel):
@@ -95,14 +85,16 @@ class ExecutionPlan:
         if not self.steps:
             return ""
 
-        # Build current task section
+        # Build current step section
         if self.current_step >= len(self.steps):
-            current_task_section = "ALL TASKS COMPLETED\nAll planned steps have been successfully executed."
+            current_step_section = (
+                "ALL STEPS COMPLETED\nAll planned steps have been successfully executed."
+            )
         else:
-            current_task = self.steps[self.current_step]
-            current_task_section = f"""YOUR CURRENT TASK:
+            current_step_desc = self.steps[self.current_step]
+            current_step_section = f"""YOUR CURRENT STEP:
 {"━" * 50}
-Task: {current_task}
+Step: {current_step_desc}
 {"━" * 50}"""
 
         # Build execution history section
@@ -135,74 +127,64 @@ Overall objective: {self.overview}
 
 CURRENT PROGRESS: Step {self.current_step + 1} of {len(self.steps)}
 
-{current_task_section}{history_section}
+{current_step_section}{history_section}
 
-IMPORTANT: Focus on completing the current task before moving to the next step.{guidance_section}
+IMPORTANT: Focus on completing the current step before moving to the next step.{guidance_section}
 </execution_context>"""
 
 
 class CrewState(MessagesState):
-    """Crew state that includes task and agent outputs.
+    """Unified state for all Crew execution modes.
 
-    This state extends LangGraph's MessagesState to include additional
-    fields for tracking task and agent execution results.
+    This state supports agent and workflow execution.
+    Fields are categorized by mode, but all modes share the same state
+    to enable seamless composition (e.g., workflows calling agents).
+
+    Unused fields are lightweight (None or empty containers) and don't
+    impact performance.
     """
 
-    task_outputs: list[Any] = []
-    _continue_execution: bool = True  # Control flag for agent execution flow
+    # ===== Agent mode fields =====
 
-    # Execution plan management - now using ExecutionPlan class
+    _continue_execution: bool = True
+    """Control flag for agent execution flow (Agent mode)"""
+
     execution_plan: ExecutionPlan = field(default_factory=ExecutionPlan)
+    """Execution plan for multi-step agent coordination (Agent mode)"""
 
-    # Summary state management
-    running_summary: str | None = (
-        None  # Store conversation summary string for context management
-    )
+    running_summary: str | None = None
+    """Conversation summary for context management (Agent mode)"""
 
-
-@dataclass
-class TaskSpec:
-    """Task specification containing core task information.
-
-    This data class represents the essential specification of a task,
-    including what needs to be done (description) and what's expected
-    as output. Used for prompt generation and task execution.
+    # ===== Workflow mode fields =====
+    previous_node_output: dict[str, Any] = field(default_factory=dict)
+    """Previous node's output data (Workflow mode).
+    
+    Structure:
+        {
+            "output_text": str,         # Text output (from agent/workflow messages)
+            "output_parsed": dict,      # Structured output (for CEL conditions)
+            "output_display": str,      # Formatted display content (UI only, optional)
+            "safe_text": str,           # Guardrail sanitized text (optional)
+            "input_text": str,          # Guardrail original input (optional)
+            "guardrails": dict,         # Guardrail check results (optional)
+        }
+    
+    This field is automatically managed by WorkflowNode.create_handler().
+    Only the last executed node's output is kept to minimize state size
+    and reduce checkpoint/database storage.
+    
+    OpenAI-compatible: CEL expressions access via 'input.*' namespace.
+    
+    Example:
+        # In CEL expression (OpenAI-compatible)
+        input.output_text                    # Text output
+        input.output_parsed.classification   # Structured field
+        input.output_display                 # Display content (if set by node)
+        input.safe_text                      # Guardrail output
     """
 
-    description: str
-    expected_output: str | None = None
-    name: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-    context: Any | None = None
-    form_task: Task | None = None
+    workflow_input: str | None = None
+    """Initial user input for current workflow run (Workflow mode)"""
 
-    def __post_init__(self):
-        """Validate and set defaults."""
-        if not self.description:
-            raise ValueError("TaskSpec must have a description")
-
-        if self.expected_output is None:
-            self.expected_output = f"Result for: {self.description[:50]}..."
-
-    @classmethod
-    def from_string(cls, description: str) -> TaskSpec:
-        """Create from string description."""
-        return cls(description=description)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TaskSpec:
-        """Create from dictionary."""
-        # Only pass valid fields
-        valid_fields = {"description", "expected_output", "name", "metadata", "context"}
-        filtered = {k: v for k, v in data.items() if k in valid_fields}
-        return cls(**filtered)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "description": self.description,
-            "expected_output": self.expected_output,
-            "name": self.name,
-            "metadata": self.metadata,
-            "context": self.context,
-        }
+    user_state: dict[str, Any] = field(default_factory=dict)
+    """User-defined state variables from Start node (Workflow mode)"""

@@ -1,168 +1,106 @@
-"""
-Tool display field generator for web frontend.
+"""Tool display field generator with i18n support for concurrent requests.
 
-Generates display fields (action, action_content) based on
-tool name and parameters without modifying existing tool definitions.
+Stores i18n keys and translates in real-time based on request context,
+preventing language interference in concurrent scenarios.
 
-Usage Examples:
-    # Register action only
-    ToolDisplayManager.register_action("web_search", {
-        "zh": "正在搜索",
-        "en": "Searching"
-    })
+Usage:
+    # Setup at startup
+    ToolDisplayManager.set_translate_function(t)
 
-    # Register with parameter extraction
-    ToolDisplayManager.register_tool_display(
-        "read_file",
-        "path",
-        {"zh": "读取文件", "en": "Reading file"}
-    )
+    # Register tools
+    ToolDisplayManager.register("web_search", "agent.tool.display.web_search")
 
-    # Register with custom function
-    def extract_query_info(tool_input):
-        query = tool_input.get("query", "")
-        return query[:30] + "..." if len(query) > 30 else query
-
-    ToolDisplayManager.register_tool_display_with_func(
-        "advanced_search",
-        extract_query_info,
-        {"zh": "智能搜索", "en": "Smart Search"}
-    )
-
-    # Batch registration
-    ToolDisplayManager.register_actions_batch({
-        "tool1": {"zh": "工具1", "en": "Tool 1"},
-        "tool2": {"zh": "工具2", "en": "Tool 2"},
-    })
+    # Get translated display
+    display = ToolDisplayManager.get_display("web_search", {"query": "Python"})
 """
 
+import inspect
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 
-class ToolDisplayManager:
-    """Manager for tool display fields in web frontend."""
+@dataclass
+class ToolDisplayConfig:
+    """Tool display configuration."""
 
-    # Storage for configurations
-    _actions: dict[str, dict[str, str]] = {}  # {tool_name: {lang: action}}
-    _action_content_params: dict[str, str] = {}
-    _action_content_funcs: dict[str, Callable] = {}
+    display_name_i18n_key: str  # I18n key for display name
+    content_param: str | None = None  # Parameter to extract for content
+    content_func: Callable[[dict[str, Any]], str] | None = None  # Custom extractor
+
+
+class ToolDisplayManager:
+    """Manager for tool display with concurrent-safe i18n support."""
+
+    _configs: dict[str, ToolDisplayConfig] = {}  # tool_name -> config
+    _translate_func: Callable[[str], str] | None = None  # Translation function
+    DEFAULT_CALLING_I18N_KEY = "Calling"  # Default i18n key for unregistered tools
+
+    @classmethod
+    def set_translate_function(cls, func: Callable[[str], str]) -> None:
+        """Set translation function (call once at startup).
+
+        Args:
+            func: Function that translates i18n key to text based on current context.
+        """
+        cls._translate_func = func
 
     @classmethod
     def register(
         cls,
         tool_name: str,
-        display_names: dict[str, str],
-        display_content_param: str = None,
-    ):
-        """Register tool display configuration.
+        display_name_i18n_key: str,
+        content_param: str | None = None,
+        content_func: Callable[[dict[str, Any]], str] | None = None,
+    ) -> None:
+        """Register tool with i18n key (not translated text).
 
         Args:
             tool_name: Tool name
-            display_names: Display names for different languages {"zh": "正在搜索", "en": "Searching"}
-            display_content_param: Parameter name to extract for display content (optional)
-
-        Examples:
-            # Simple display only
-            ToolDisplayManager.register("browser-use", {
-                "zh": "使用浏览器",
-                "en": "Using browser"
-            })
-
-            # With content extraction
-            ToolDisplayManager.register("web_search", {
-                "zh": "正在搜索",
-                "en": "Searching"
-            }, display_content_param="query")
+            display_name_i18n_key: I18n key (e.g., "agent.tool.display.web_search")
+            content_param: Parameter name for content extraction
+            content_func: Custom content extractor function
         """
-        cls._actions[tool_name] = display_names
-        if display_content_param:
-            cls._action_content_params[tool_name] = display_content_param
+        cls._configs[tool_name] = ToolDisplayConfig(
+            display_name_i18n_key=display_name_i18n_key,
+            content_param=content_param,
+            content_func=content_func,
+        )
 
     @classmethod
-    def register_with_func(
-        cls,
-        tool_name: str,
-        display_names: dict[str, str],
-        display_content_func: Callable[[dict[str, Any]], str],
-    ):
-        """Register tool with custom display content extraction function.
-
-        Args:
-            tool_name: Tool name
-            display_names: Display names for different languages
-            display_content_func: Function to extract display content from tool input
-
-        Examples:
-            def extract_query_info(tool_input):
-                query = tool_input.get("query", "")
-                return query[:30] + "..." if len(query) > 30 else query
-
-            ToolDisplayManager.register_with_func(
-                "advanced_search",
-                {"zh": "智能搜索", "en": "Smart Search"},
-                extract_query_info
-            )
-        """
-        cls._actions[tool_name] = display_names
-        cls._action_content_funcs[tool_name] = display_content_func
-
-    @classmethod
-    def register_batch(cls, tools: list[dict]):
+    def register_batch(cls, tools: list[dict]) -> None:
         """Batch register tools.
 
         Args:
-            tools: List of tool configurations
-
-        Example:
-            ToolDisplayManager.register_batch([
-                {
-                    "name": "web_search",
-                    "display_names": {"zh": "正在搜索", "en": "Searching"},
-                    "display_content_param": "query"
-                },
-                {
-                    "name": "advanced_search",
-                    "display_names": {"zh": "智能搜索", "en": "Smart Search"},
-                    "display_content_func": lambda x: x.get("query", "")[:30] + "..."
-                },
-                {
-                    "name": "browser-use",
-                    "display_names": {"zh": "使用浏览器", "en": "Using browser"}
-                    # no display_content_param/display_content_func = no content extraction
-                }
-            ])
+            tools: List of dicts with 'name', 'display_name_i18n_key', etc.
         """
-        for tool_config in tools:
-            tool_name = tool_config["name"]
-            display_names = tool_config["display_names"]
-            display_content_param = tool_config.get("display_content_param")
-            display_content_func = tool_config.get("display_content_func")
-
-            if display_content_func:
-                cls.register_with_func(tool_name, display_names, display_content_func)
-            else:
-                cls.register(tool_name, display_names, display_content_param)
+        for config in tools:
+            cls.register(
+                tool_name=config["name"],
+                display_name_i18n_key=config["display_name_i18n_key"],
+                content_param=config.get("content_param"),
+                content_func=config.get("content_func"),
+            )
 
     @classmethod
     def get_display(
-        cls, tool_name: str, tool_input: dict[str, Any], language: str = None
+        cls,
+        tool_name: str,
+        tool_input: dict[str, Any],
+        ext: dict[str, Any] | None = None,
     ) -> dict[str, str]:
-        """Get tool display information.
+        """Get display info with real-time translation based on current context.
 
         Args:
-            tool_name: Name of the tool
+            tool_name: Tool name
             tool_input: Tool input parameters
-            language: Language to use ('zh' or 'en'). If None, defaults to 'zh'
+            ext: Extra information
 
         Returns:
-            Dict with frontend required fields: {"action": "正在搜索", "action_content": "Python教程"}
+            {"action": "translated_text", "action_content": "extracted_content"}
         """
-        if language is None:
-            language = "zh"  # Default to Chinese
-
-        action = cls._get_action(tool_name, language)
-        action_content = cls._get_action_content(tool_name, tool_input)
+        action = cls._get_action(tool_name)
+        action_content = cls._get_action_content(tool_name, tool_input, ext)
 
         return {
             "action": action,
@@ -170,38 +108,52 @@ class ToolDisplayManager:
         }
 
     @classmethod
-    def _get_action(cls, tool_name: str, language: str = "zh") -> str:
-        """Get action text for specified language."""
-        if tool_name in cls._actions:
-            actions = cls._actions[tool_name]
-            # Priority: specified language -> first available language
-            if language in actions:
-                return actions[language]
-            elif actions:  # If any language available, use the first one
-                return next(iter(actions.values()))
+    def _get_action(cls, tool_name: str) -> str:
+        """Get translated action text (registered tool or default "Calling {tool_name}")."""
+        if tool_name in cls._configs:
+            i18n_key = cls._configs[tool_name].display_name_i18n_key
+            return cls._translate(i18n_key)
 
-        # No registration found, generate default text
-        prefix = "正在调用" if language == "zh" else "Calling"
-        return f"{prefix} {tool_name}"
+        calling_text = cls._translate(cls.DEFAULT_CALLING_I18N_KEY)
+        return f"{calling_text} {tool_name}"
 
     @classmethod
-    def _get_action_content(cls, tool_name: str, tool_input: dict[str, Any]) -> str:
-        """Extract action content from tool input."""
+    def _get_action_content(
+        cls,
+        tool_name: str,
+        tool_input: dict[str, Any],
+        ext: dict[str, Any] | None = None,
+    ) -> str:
+        """Extract content using custom func or param name (truncated to 50 chars)."""
+        if tool_name not in cls._configs:
+            return ""
 
-        # 1. Check custom function
-        if tool_name in cls._action_content_funcs:
+        config = cls._configs[tool_name]
+
+        # Try custom function
+        if config.content_func:
             try:
-                return cls._action_content_funcs[tool_name](tool_input)
+                sig = inspect.signature(config.content_func)
+                if "ext" in sig.parameters:
+                    return config.content_func(tool_input, ext=ext)
+                else:
+                    return config.content_func(tool_input)
             except Exception:
                 return ""
 
-        # 2. Check custom parameter name
-        if tool_name in cls._action_content_params:
-            param_name = cls._action_content_params[tool_name]
-            if param_name in tool_input:
-                value = tool_input[param_name]
-                str_value = str(value)
-                return str_value[:50] + "..." if len(str_value) > 50 else str_value
+        # Try parameter extraction
+        if config.content_param and config.content_param in tool_input:
+            value = str(tool_input[config.content_param])
+            return value[:50] + "..." if len(value) > 50 else value
 
-        # 3. No registration found, return empty
         return ""
+
+    @classmethod
+    def _translate(cls, i18n_key: str) -> str:
+        """Translate i18n key using injected function (fallback to key if fails)."""
+        if cls._translate_func:
+            try:
+                return cls._translate_func(i18n_key)
+            except Exception:
+                pass
+        return i18n_key

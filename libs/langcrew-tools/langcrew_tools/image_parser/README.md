@@ -85,7 +85,7 @@ The `ImageParserTool` provides comprehensive image analysis capabilities using v
 - `vision_base_url`: Base URL for vision model API
 - `vision_api_key`: API key for vision model
 - `request_timeout`: Request timeout in seconds (default: 60)
-- `max_image_size`: Maximum image size in bytes (default: 20MB)
+- `max_image_resolution`: Maximum image dimension (default: 1024)
 - `max_tokens`: Maximum tokens for response (default: 4096)
 - `temperature`: Temperature for model responses (default: 0.0)
 
@@ -136,7 +136,7 @@ result = await tool.arun(
 - `VISION_TIMEOUT`: Request timeout in seconds
 - `VISION_MAX_TOKENS`: Maximum tokens for response
 - `VISION_TEMPERATURE`: Temperature for model responses
-- `VISION_MAX_IMAGE_SIZE`: Maximum image size in bytes
+- `VISION_MAX_IMAGE_RESOLUTION`: Maximum image dimension (default: 1024)
 
 ## Supported Image Formats
 
@@ -175,7 +175,7 @@ The tool provides robust error handling for various scenarios:
 ## Performance Considerations
 
 - **Timeout Configuration** - Adjustable request timeouts for different network conditions
-- **Image Size Limits** - Configurable maximum image size to prevent memory issues
+- **Image Resolution Limits** - Configurable maximum image dimension to prevent excessive payload
 - **Async Operation** - Non-blocking image processing for better performance
 - **Caching** - Images are downloaded fresh for each request (no caching by default)
 

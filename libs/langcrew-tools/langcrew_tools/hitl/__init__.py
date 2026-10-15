@@ -14,15 +14,21 @@ Usage example:
 """
 
 from .langchain_tools import (
-    UserInputTool,
+    DynamicFormUserInputRequest,
     DynamicFormUserInputTool,
-    FormSchema,
     FormFieldSchema,
+    FormSchema,
+    UserInputQuestion,
+    UserInputRequest,
+    UserInputTool,
 )
 
 __all__ = [
     "UserInputTool",
+    "UserInputRequest",
+    "UserInputQuestion",
     "DynamicFormUserInputTool",
+    "DynamicFormUserInputRequest",
     "FormSchema",
     "FormFieldSchema",
 ]

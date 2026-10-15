@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import functools
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any, TypeAlias
 
-# Type definition for guardrail functions
-GuardrailFunc: TypeAlias = Callable[[Any], tuple[bool, str]]
+# Type definition for guardrail functions (supports both sync and async)
+GuardrailFunc: TypeAlias = Callable[
+    [Any], tuple[bool, str] | Awaitable[tuple[bool, str]]
+]
 
 
 class GuardrailError(Exception):
@@ -57,7 +59,7 @@ def _check_guardrails_impl(guardrails: list[GuardrailFunc], data: Any) -> None:
 
             if not is_valid:
                 raise GuardrailError(
-                    f"{guard_type} guardrail '{guard_name}' failed: {message}",
+                    message=message,
                     guardrail_name=guard_name,
                 )
         except GuardrailError:
@@ -85,14 +87,48 @@ def check_guardrails_sync(guardrails: list[GuardrailFunc], data: Any) -> None:
 async def check_guardrails(guardrails: list[GuardrailFunc], data: Any) -> None:
     """Async version: Check a list of guardrails and raise GuardrailError if any fail
 
+    Supports both sync and async guardrail functions.
+
     Args:
-        guardrails: List of guardrail functions to check
+        guardrails: List of guardrail functions to check (sync or async)
         data: The data to check (input or output)
 
     Raises:
         GuardrailError: If any guardrail check fails
     """
-    _check_guardrails_impl(guardrails, data)
+    for guard in guardrails:
+        guard_name = getattr(guard, "__name__", "unnamed")
+
+        # Auto-detect guard type from decorator attributes
+        if hasattr(guard, "_is_input_guard") and guard._is_input_guard:
+            guard_type = "input"
+        elif hasattr(guard, "_is_output_guard") and guard._is_output_guard:
+            guard_type = "output"
+        else:
+            guard_type = "guardrail"
+
+        try:
+            # Call guardrail function
+            result = guard(data)
+
+            # Handle async guardrails
+            if asyncio.iscoroutine(result):
+                is_valid, message = await result
+            else:
+                is_valid, message = result
+
+            if not is_valid:
+                raise GuardrailError(
+                    message=message,
+                    guardrail_name=guard_name,
+                )
+        except GuardrailError:
+            raise
+        except Exception as e:
+            raise GuardrailError(
+                f"{guard_type} guardrail '{guard_name}' error: {str(e)}",
+                guardrail_name=guard_name,
+            ) from e
 
 
 def with_guardrails(func: Callable) -> Callable:

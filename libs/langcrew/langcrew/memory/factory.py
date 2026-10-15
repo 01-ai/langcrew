@@ -19,7 +19,7 @@ def get_checkpointer(
     - database: Context manager (use with 'with' or 'async with' statement)
 
     Args:
-        provider: Storage provider ('memory', 'postgres', 'redis', 'mongodb', 'mysql')
+        provider: Storage provider ('memory', 'sqlite', 'postgres', 'redis', 'mongodb', 'mysql')
         config: Provider configuration (connection_string, etc.)
         is_async: Whether to return async-compatible version
 
@@ -119,6 +119,24 @@ def get_checkpointer(
                 return PyMySQLSaver.from_conn_string(conn_str)
         except ImportError:
             raise ImportError("MySQL support requires additional package")
+
+    # SQLite checkpointer
+    elif provider == "sqlite":
+        if not conn_str:
+            raise ValueError("SQLite checkpointer requires connection_string in config")
+        try:
+            if is_async:
+                from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+                return AsyncSqliteSaver.from_conn_string(conn_str)
+            else:
+                from langgraph.checkpoint.sqlite import SqliteSaver
+
+                return SqliteSaver.from_conn_string(conn_str)
+        except ImportError:
+            raise ImportError(
+                "SQLite checkpointer requires: pip install 'langcrew[sqlite]'"
+            )
 
     else:
         raise ValueError(f"Unsupported checkpointer provider: {provider}")

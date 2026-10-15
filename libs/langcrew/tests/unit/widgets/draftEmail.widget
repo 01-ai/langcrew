@@ -1,0 +1,133 @@
+{
+  "version": "1.0",
+  "name": "draftEmail",
+  "template": "{\"type\":\"Card\",\"size\":\"lg\",\"confirm\":{\"action\":{\"type\":\"email.send\"},\"label\":\"Send email\"},\"cancel\":{\"action\":{\"type\":\"email.discard\"},\"label\":\"Discard\"},\"children\":[{\"type\":\"Row\",\"children\":[{\"type\":\"Text\",\"value\":\"FROM\",\"width\":80,\"weight\":\"semibold\",\"color\":\"tertiary\",\"size\":\"xs\"},{\"type\":\"Text\",\"value\":{{ (emailFrom) | tojson }},\"color\":\"tertiary\"}]},{\"type\":\"Divider\",\"flush\":true},{\"type\":\"Row\",\"children\":[{\"type\":\"Text\",\"value\":\"TO\",\"width\":80,\"weight\":\"semibold\",\"color\":\"tertiary\",\"size\":\"xs\"},{\"type\":\"Text\",\"value\":{{ (defaultTo) | tojson }},\"editable\":{\"name\":\"email.to\",\"required\":true,\"placeholder\":\"name@example.com\"}}]},{\"type\":\"Divider\",\"flush\":true},{\"type\":\"Row\",\"children\":[{\"type\":\"Text\",\"value\":\"SUBJECT\",\"width\":80,\"weight\":\"semibold\",\"color\":\"tertiary\",\"size\":\"xs\"},{\"type\":\"Text\",\"value\":{{ (defaultSubject) | tojson }},\"editable\":{\"name\":\"email.subject\",\"required\":true,\"placeholder\":\"Email subject\"}}]},{\"type\":\"Divider\",\"flush\":true},{\"type\":\"Text\",\"value\":{{ (defaultBody) | tojson }},\"minLines\":9,\"editable\":{\"name\":\"email.body\",\"required\":true,\"placeholder\":\"Write your message…\"}}]}",
+  "jsonSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "emailFrom": {
+        "type": "string"
+      },
+      "defaultTo": {
+        "type": "string"
+      },
+      "defaultSubject": {
+        "type": "string"
+      },
+      "defaultBody": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "emailFrom",
+      "defaultTo",
+      "defaultSubject",
+      "defaultBody"
+    ],
+    "additionalProperties": false
+  },
+  "outputJsonPreview": {
+    "type": "Card",
+    "size": "lg",
+    "confirm": {
+      "action": {
+        "type": "email.send"
+      },
+      "label": "Send email"
+    },
+    "cancel": {
+      "action": {
+        "type": "email.discard"
+      },
+      "label": "Discard"
+    },
+    "children": [
+      {
+        "type": "Row",
+        "children": [
+          {
+            "type": "Text",
+            "value": "FROM",
+            "width": 80,
+            "weight": "semibold",
+            "color": "tertiary",
+            "size": "xs"
+          },
+          {
+            "type": "Text",
+            "value": "zj@openai.com",
+            "color": "tertiary"
+          }
+        ]
+      },
+      {
+        "type": "Divider",
+        "flush": true
+      },
+      {
+        "type": "Row",
+        "children": [
+          {
+            "type": "Text",
+            "value": "TO",
+            "width": 80,
+            "weight": "semibold",
+            "color": "tertiary",
+            "size": "xs"
+          },
+          {
+            "type": "Text",
+            "value": "weedon@openai.com",
+            "editable": {
+              "name": "email.to",
+              "required": true,
+              "placeholder": "name@example.com"
+            }
+          }
+        ]
+      },
+      {
+        "type": "Divider",
+        "flush": true
+      },
+      {
+        "type": "Row",
+        "children": [
+          {
+            "type": "Text",
+            "value": "SUBJECT",
+            "width": 80,
+            "weight": "semibold",
+            "color": "tertiary",
+            "size": "xs"
+          },
+          {
+            "type": "Text",
+            "value": "ChatKit Roadmap",
+            "editable": {
+              "name": "email.subject",
+              "required": true,
+              "placeholder": "Email subject"
+            }
+          }
+        ]
+      },
+      {
+        "type": "Divider",
+        "flush": true
+      },
+      {
+        "type": "Text",
+        "value": "Hey David, \n\nHope you're doing well! Just wanted to check in and see if there are any updates on the ChatKit roadmap. We're excited to see what's coming next and how we can make the most of the upcoming features.\n\nEspecially curious to see how you support widgets!\n\nBest, Zach",
+        "minLines": 9,
+        "editable": {
+          "name": "email.body",
+          "required": true,
+          "placeholder": "Write your message…"
+        }
+      }
+    ]
+  },
+  "encodedWidget": "eyJpZCI6IndpZ180aHQ2Y2NnZiIsIm5hbWUiOiJkcmFmdEVtYWlsIiwidmlldyI6IjxDYXJkXG4gIHNpemU9XCJsZ1wiXG4gIGNvbmZpcm09e3tcbiAgICBhY3Rpb246IHsgdHlwZTogXCJlbWFpbC5zZW5kXCIgfSxcbiAgICBsYWJlbDogXCJTZW5kIGVtYWlsXCIsXG4gIH19XG4gIGNhbmNlbD17e1xuICAgIGFjdGlvbjogeyB0eXBlOiBcImVtYWlsLmRpc2NhcmRcIiB9LFxuICAgIGxhYmVsOiBcIkRpc2NhcmRcIixcbiAgfX1cbj5cbiAgPFJvdz5cbiAgICA8VGV4dFxuICAgICAgdmFsdWU9XCJGUk9NXCJcbiAgICAgIHdpZHRoPXs4MH1cbiAgICAgIHdlaWdodD1cInNlbWlib2xkXCJcbiAgICAgIGNvbG9yPVwidGVydGlhcnlcIlxuICAgICAgc2l6ZT1cInhzXCJcbiAgICAvPlxuICAgIDxUZXh0IHZhbHVlPXtlbWFpbEZyb219IGNvbG9yPVwidGVydGlhcnlcIiAvPlxuICA8L1Jvdz5cblxuICA8RGl2aWRlciBmbHVzaCAvPlxuXG4gIDxSb3c-XG4gICAgPFRleHQgdmFsdWU9XCJUT1wiIHdpZHRoPXs4MH0gd2VpZ2h0PVwic2VtaWJvbGRcIiBjb2xvcj1cInRlcnRpYXJ5XCIgc2l6ZT1cInhzXCIgLz5cbiAgICA8VGV4dFxuICAgICAgdmFsdWU9e2RlZmF1bHRUb31cbiAgICAgIGVkaXRhYmxlPXt7XG4gICAgICAgIG5hbWU6IFwiZW1haWwudG9cIixcbiAgICAgICAgcmVxdWlyZWQ6IHRydWUsXG4gICAgICAgIHBsYWNlaG9sZGVyOiBcIm5hbWVAZXhhbXBsZS5jb21cIixcbiAgICAgIH19XG4gICAgLz5cbiAgPC9Sb3c-XG5cbiAgPERpdmlkZXIgZmx1c2ggLz5cblxuICA8Um93PlxuICAgIDxUZXh0XG4gICAgICB2YWx1ZT1cIlNVQkpFQ1RcIlxuICAgICAgd2lkdGg9ezgwfVxuICAgICAgd2VpZ2h0PVwic2VtaWJvbGRcIlxuICAgICAgY29sb3I9XCJ0ZXJ0aWFyeVwiXG4gICAgICBzaXplPVwieHNcIlxuICAgIC8-XG4gICAgPFRleHRcbiAgICAgIHZhbHVlPXtkZWZhdWx0U3ViamVjdH1cbiAgICAgIGVkaXRhYmxlPXt7XG4gICAgICAgIG5hbWU6IFwiZW1haWwuc3ViamVjdFwiLFxuICAgICAgICByZXF1aXJlZDogdHJ1ZSxcbiAgICAgICAgcGxhY2Vob2xkZXI6IFwiRW1haWwgc3ViamVjdFwiLFxuICAgICAgfX1cbiAgICAvPlxuICA8L1Jvdz5cbiAgPERpdmlkZXIgZmx1c2ggLz5cbiAgPFRleHRcbiAgICB2YWx1ZT17ZGVmYXVsdEJvZHl9XG4gICAgbWluTGluZXM9ezl9XG4gICAgZWRpdGFibGU9e3tcbiAgICAgIG5hbWU6IFwiZW1haWwuYm9keVwiLFxuICAgICAgcmVxdWlyZWQ6IHRydWUsXG4gICAgICBwbGFjZWhvbGRlcjogXCJXcml0ZSB5b3VyIG1lc3NhZ2XigKZcIixcbiAgICB9fVxuICAvPlxuPC9DYXJkPiIsImRlZmF1bHRTdGF0ZSI6eyJlbWFpbEZyb20iOiJ6akBvcGVuYWkuY29tIiwiZGVmYXVsdFRvIjoid2VlZG9uQG9wZW5haS5jb20iLCJkZWZhdWx0U3ViamVjdCI6IkNoYXRLaXQgUm9hZG1hcCIsImRlZmF1bHRCb2R5IjoiSGV5IERhdmlkLCBcblxuSG9wZSB5b3UncmUgZG9pbmcgd2VsbCEgSnVzdCB3YW50ZWQgdG8gY2hlY2sgaW4gYW5kIHNlZSBpZiB0aGVyZSBhcmUgYW55IHVwZGF0ZXMgb24gdGhlIENoYXRLaXQgcm9hZG1hcC4gV2UncmUgZXhjaXRlZCB0byBzZWUgd2hhdCdzIGNvbWluZyBuZXh0IGFuZCBob3cgd2UgY2FuIG1ha2UgdGhlIG1vc3Qgb2YgdGhlIHVwY29taW5nIGZlYXR1cmVzLlxuXG5Fc3BlY2lhbGx5IGN1cmlvdXMgdG8gc2VlIGhvdyB5b3Ugc3VwcG9ydCB3aWRnZXRzIVxuXG5CZXN0LCBaYWNoIn0sInNjaGVtYSI6ImltcG9ydCB7IHogfSBmcm9tIFwiem9kXCJcblxuY29uc3QgV2lkZ2V0U3RhdGUgPSB6Lm9iamVjdCh7XG4gIGVtYWlsRnJvbTogei5zdHJpbmcoKSxcbiAgZGVmYXVsdFRvOiB6LnN0cmluZygpLFxuICBkZWZhdWx0U3ViamVjdDogei5zdHJpbmcoKSxcbiAgZGVmYXVsdEJvZHk6IHouc3RyaW5nKCksXG59KVxuXG5leHBvcnQgZGVmYXVsdCBXaWRnZXRTdGF0ZSIsInN0YXRlcyI6W10sInNjaGVtYVZhbGlkaXR5IjoidmFsaWQiLCJ2aWV3VmFsaWRpdHkiOiJ2YWxpZCIsImRlZmF1bHRTdGF0ZVZhbGlkaXR5IjoidmFsaWQifQ"
+}

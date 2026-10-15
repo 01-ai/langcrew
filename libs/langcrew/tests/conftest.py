@@ -85,22 +85,7 @@ def mock_agent():
     """Create a mock agent for testing."""
     mock = Mock()
     mock.name = "test_agent"
-    mock.role = "Test Agent"
-    mock.goal = "Perform test operations"
-    mock.backstory = "A test agent for unit testing"
     mock.verbose = False
-    mock.allow_delegation = False
-    return mock
-
-
-@pytest.fixture
-def mock_task():
-    """Create a mock task for testing."""
-    mock = Mock()
-    mock.description = "Test task description"
-    mock.expected_output = "Test output"
-    mock.agent = None
-    mock.tools = []
     return mock
 
 
@@ -108,10 +93,8 @@ def mock_task():
 def mock_crew():
     """Create a mock crew for testing."""
     mock = Mock()
-    mock.agents = []
-    mock.tasks = []
+    mock.agent = None
     mock.verbose = False
-    mock.process = "sequential"
     return mock
 
 
@@ -192,27 +175,8 @@ def sample_agent_config():
     """Sample agent configuration for testing."""
     return {
         "name": "test_agent",
-        "role": "Test Specialist",
-        "goal": "Execute test operations efficiently",
-        "backstory": "An experienced agent specialized in testing scenarios",
+        "prompt": "You are a helpful test agent.",
         "verbose": True,
-        "allow_delegation": False,
-        "max_iter": 5,
-        "max_rpm": 10,
-        "system_template": "You are a helpful test agent.",
-    }
-
-
-@pytest.fixture
-def sample_task_config():
-    """Sample task configuration for testing."""
-    return {
-        "description": "Analyze the test data and provide insights",
-        "expected_output": "A detailed analysis report with key findings",
-        "agent": "test_agent",
-        "tools": ["test_tool"],
-        "context": ["previous_task"],
-        "output_file": "test_output.txt",
     }
 
 
@@ -228,11 +192,9 @@ async def async_temp_dir() -> AsyncGenerator[Path, None]:
 async def async_mock_crew():
     """Create an async mock crew for testing."""
     mock = Mock()
-    mock.agents = []
-    mock.tasks = []
+    mock.agent = None
     mock.verbose = False
-    mock.process = "sequential"
-    mock.kickoff = Mock(return_value="Async crew execution result")
+    mock.invoke = Mock(return_value={"messages": []})
     return mock
 
 
@@ -349,6 +311,41 @@ def json_content_messages():
         AIMessage(content=json.dumps(json_data)),
         ToolMessage(content='{"result": "' + "C" * 1000 + '"}', tool_call_id="1"),
     ]
+
+
+# Widget testing fixtures
+@pytest.fixture
+def draft_email_widget_path() -> Path:
+    """Get path to draftEmail.widget test file."""
+    return Path(__file__).parent / "unit" / "widgets" / "draftEmail.widget"
+
+
+@pytest.fixture
+def draft_email_widget_format(draft_email_widget_path):
+    """Create WidgetFormat instance from real draftEmail.widget file."""
+    from langcrew.chatkit.widgets.formats import Widget as WidgetFormat
+    return WidgetFormat.from_file(str(draft_email_widget_path))
+
+
+@pytest.fixture
+def valid_draft_email_data():
+    """Valid test data matching draftEmail.widget schema."""
+    return {
+        "emailFrom": "test@example.com",
+        "defaultTo": "recipient@example.com", 
+        "defaultSubject": "Test Subject",
+        "defaultBody": "Test email body content"
+    }
+
+
+@pytest.fixture
+def invalid_draft_email_data():
+    """Invalid test data that doesn't match draftEmail.widget schema."""
+    return {
+        "emailFrom": "test@example.com",
+        # Missing required fields: defaultTo, defaultSubject, defaultBody
+        "extraField": "should not be here"
+    }
 
 
 # Test markers

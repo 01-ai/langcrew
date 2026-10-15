@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import aiobotocore.session
 from botocore.config import Config
@@ -27,11 +28,11 @@ class S3ObjectInfo:
 class S3Config:
     """S3 client configuration"""
 
-    endpoint: str
-    bucket: str
-    access_key: str
-    secret_key: str
-    gateway: str
+    endpoint: str | None = None
+    bucket: str | None = None
+    access_key: str | None = None
+    secret_key: str | None = None
+    gateway: str | None = None
     region: str | None = None
     use_ssl: bool = True
     timeout: int = 30
@@ -77,6 +78,7 @@ class AsyncS3Client:
         self._client_context = None
         self._client = None
         self._is_closed = False
+        self.is_oss = self.config.endpoint and "aliyuncs" in self.config.endpoint
 
         logger.info(f"Initialized S3 client for endpoint: {self.config.endpoint}")
 
@@ -103,21 +105,52 @@ class AsyncS3Client:
 
         if self._client_context is None:
             try:
-                self._client_context = self.session.create_client(
-                    "s3",
-                    region_name=self.config.region,
-                    aws_access_key_id=self.config.access_key,
-                    aws_secret_access_key=self.config.secret_key,
-                    endpoint_url=self.config.endpoint,
-                    use_ssl=self.config.use_ssl,
-                    config=Config(
-                        retries={"max_attempts": 0},  # We handle retries ourselves
-                        read_timeout=self.config.timeout,
-                        connect_timeout=self.config.timeout,
-                    ),
-                )
+                # Log credential status before creating client
+                if not self.config.access_key or not self.config.secret_key:
+                    logger.warning(
+                        "S3 credentials not provided. "
+                        "Creating client with default AWS credential chain..."
+                    )
+
+                # Build botocore config
+                config_args = {
+                    "retries": {"max_attempts": 0},  # We handle retries ourselves
+                    "read_timeout": self.config.timeout,
+                    "connect_timeout": self.config.timeout,
+                }
+
+                # Aliyun OSS requires virtual-hosted style access and works best with s3 (v2) signature to avoid chunked encoding issues
+                if self.is_oss:
+                    config_args["signature_version"] = "s3"  # Use v2 signature
+                    config_args["s3"] = {"addressing_style": "virtual"}
+                    logger.info(
+                        "Aliyun OSS detected, enabling virtual-hosted style and using v2 signature"
+                    )
+
+                # Build client kwargs, only include credentials if provided
+                client_kwargs = {
+                    "use_ssl": self.config.use_ssl,
+                    "config": Config(**config_args),
+                }
+
+                # Add optional parameters only if provided
+                if self.config.region is not None:
+                    client_kwargs["region_name"] = self.config.region
+                if self.config.endpoint is not None:
+                    client_kwargs["endpoint_url"] = self.config.endpoint
+
+                # Only add credentials if both are provided
+                # Otherwise, aiobotocore will use default credential chain
+                if self.config.access_key and self.config.secret_key:
+                    client_kwargs["aws_access_key_id"] = self.config.access_key
+                    client_kwargs["aws_secret_access_key"] = self.config.secret_key
+
+                self._client_context = self.session.create_client("s3", **client_kwargs)
                 self._client = await self._client_context.__aenter__()
-                logger.debug("S3 client connection established")
+                logger.info(
+                    f"S3 client initialized successfully for endpoint: {self.config.endpoint}, "
+                    f"bucket: {self.config.bucket}"
+                )
             except Exception as e:
                 logger.error(f"Failed to initialize S3 client: {e}")
                 raise S3ClientError(f"Failed to initialize S3 client: {e}", e)
@@ -316,7 +349,7 @@ class AsyncS3Client:
                 "Bucket": bucket_name,
                 "Key": object_key,
                 "Body": content,
-                "ContentType": content_type
+                "ContentType": content_type,
             }
 
             if metadata:
@@ -534,9 +567,11 @@ class AsyncS3Client:
             return S3ObjectInfo(
                 key=object_key,
                 size=response.get("ContentLength", 0),
-                last_modified=response.get("LastModified", "").isoformat()
-                if response.get("LastModified")
-                else "",
+                last_modified=(
+                    response.get("LastModified", "").isoformat()
+                    if response.get("LastModified")
+                    else ""
+                ),
                 etag=response.get("ETag", "").strip('"'),
                 storage_class=response.get("StorageClass", "STANDARD"),
             )
@@ -672,61 +707,26 @@ class AsyncS3Client:
         """
         bucket_name = bucket_name or self.config.bucket
 
+        logger.info(f"Generating URL for {bucket_name}:{object_key}")
         if expires_in is None:
             # Generate permanent direct URL (object has public-read ACL)
-            # Prioritize gateway over endpoint
-            base_url = (
-                self.config.gateway if self.config.gateway else self.config.endpoint
-            )
-            url = f"{base_url.rstrip('/')}/{bucket_name}/{object_key}"
-            logger.info(
-                f"Generated permanent public URL for {bucket_name}:{object_key}"
-            )
+            u = urlparse(self.config.gateway or self.config.endpoint or "")
+            if self.is_oss:
+                url = f"{u.scheme}://{bucket_name}.{u.netloc}/{object_key}"
+            else:
+                url = f"{u.scheme}://{u.netloc}/{bucket_name}/{object_key}"
+            logger.info(f"Generated permanent URL: {url}")
             return url
         else:
             # Generate presigned URL with expiration
-            url = await self.generate_presigned_url(
-                object_key=object_key,
-                expires_in=expires_in,
-                method="get_object",
-                bucket_name=bucket_name,
-            )
-            logger.info(
-                f"Generated presigned URL (expires in {expires_in}s) for {bucket_name}:{object_key}"
-            )
-            return url
-
-    async def generate_presigned_url(
-        self,
-        object_key: str,
-        expires_in: int = 7200,
-        method: str = "get_object",
-        bucket_name: str | None = None,
-    ) -> str:
-        """
-        Generate presigned URL for object access
-
-        Args:
-            object_key: S3 object key
-            expires_in: URL expiration time in seconds
-            method: S3 method ('get_object', 'put_object', etc.)
-            bucket_name: Bucket name, defaults to configured bucket
-
-        Returns:
-            Presigned URL
-        """
-        bucket_name = bucket_name or self.config.bucket
-
-        async def _generate_url():
             client = await self._ensure_client()
             url = await client.generate_presigned_url(
-                ClientMethod=method,
+                ClientMethod="get_object",
                 Params={"Bucket": bucket_name, "Key": object_key},
                 ExpiresIn=expires_in,
             )
+            logger.info(f"Generated presigned URL: {url}")
             return url
-
-        return await self._retry_operation(_generate_url)
 
     # ========== Resource Management ==========
 

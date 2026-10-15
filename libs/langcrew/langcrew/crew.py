@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import logging
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
@@ -11,234 +10,126 @@ from typing import (
 
 from langchain_core.runnables import RunnableConfig, ensure_config
 from langchain_core.tools import BaseTool
-from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.store.base import BaseStore
 from langgraph.types import All, StreamMode
-from langgraph_supervisor.handoff import create_handoff_tool
 
 from .agent import Agent
-from .hitl import HITLConfig
+from .citation import CitationMiddleware
+from .citation.config import (
+    CitationConfigValue,
+    resolve_citation_config,
+)
+from .controllable import ControllableCrew
 from .memory import MemoryConfig
 from .memory.context import MemoryContextManager
-from .task import Task
-from .tools import ToolCallback
-from .types import CrewState, OrderCallback
+from .memory.rewind import rewind_compiled_graph
+from .types import CrewState
 
 logger = logging.getLogger(__name__)
 
 
-class Crew:
-    """LangCrew main orchestration class.
+class Crew(ControllableCrew):
+    """LangCrew main orchestration class with controllable capabilities.
 
     Args:
         # Core configuration (most users only need these)
-        agents: List of agents to execute tasks
-        tasks: List of tasks to be executed
+        agent: Agent to execute
+        workflow: Workflow configuration dict (for visual workflow builder)
 
-        # Memory & persistence (choose one approach)
+        # Memory & persistence
         memory: Simple memory setup - use True for defaults, MemoryConfig for advanced setup
-        checkpointer: Advanced - provide your own checkpointer (you manage lifecycle)
-        store: Advanced - provide your own store (you manage lifecycle)
-        async_checkpointer: Advanced - async version of checkpointer for better performance
-        async_store: Advanced - async version of store for better performance
+        citation: Crew-wide citation defaults for programmatic and workflow agents
 
         # Advanced configuration (for experts)
-        graph: Custom LangGraph StateGraph (overrides agents/tasks)
-        hitl: Human-in-the-loop configuration
+        graph: Custom LangGraph StateGraph (overrides agent/workflow)
         verbose: Enable detailed logging and debug output
 
     Usage patterns:
         # Beginner: Just use memory=True
-        crew = Crew(agents=[agent], tasks=[task], memory=True)
+        crew = Crew(agent=agent, memory=True)
 
         # Intermediate: Configure memory details
-        crew = Crew(agents=[agent], tasks=[task],
+        crew = Crew(agent=agent,
                    memory=MemoryConfig(provider="postgres", connection_string="..."))
 
-        # Advanced: Provide your own checkpointer (you manage it)
-        crew = Crew(agents=[agent], tasks=[task], checkpointer=my_checkpointer)
+        # Workflow mode: Visual workflow builder
+        crew = Crew(workflow=workflow_config, memory=True)
     """
 
     def __init__(
         self,
-        # Core configuration - most commonly used
-        agents: list[Agent] | None = None,
-        tasks: list[Task] | None = None,
-        # Memory & persistence - unified configuration
-        memory: MemoryConfig | bool | None = None,
-        checkpointer: BaseCheckpointSaver | None = None,
-        store: BaseStore | None = None,
-        async_checkpointer: BaseCheckpointSaver | None = None,
-        async_store: BaseStore | None = None,
-        # Advanced configuration - less commonly used
+        # Core
+        agent: Agent | None = None,
+        workflow: dict | None = None,
         graph: StateGraph | None = None,
-        hitl: HITLConfig | None = None,
+        # Runtime
+        memory: MemoryConfig | bool | None = None,
+        citation: CitationConfigValue = None,
         verbose: bool = False,
     ):
-        self.agents = agents or []
-        self.tasks = tasks or []
-        self.verbose = verbose
+        """
+        Initialize Crew.
+
+        Core (choose one):
+            - agent: Programmatic agent workflow
+            - workflow: Declarative workflow configuration
+            - graph: Custom LangGraph StateGraph
+
+        Runtime (optional):
+            - memory: State persistence across conversations
+            - citation: Source citation defaults
+            - verbose: Detailed logging and debug output
+        """
+
+        # ===== Validate configuration =====
+        if graph is None and workflow is None and agent is None:
+            raise ValueError("Must provide at least one of: graph, workflow, or agent")
+
+        # ===== Initialize core =====
+        self.agent = agent
+        self.workflow = workflow
         self.graph = graph
-        self._is_registered_tools = False
 
-        # Memory configuration
-        # Handle memory parameter conversion
+        self.citation_config = resolve_citation_config(citation)
+        if agent is not None:
+            middleware = tuple(
+                item
+                for item in agent.middleware
+                if not isinstance(item, CitationMiddleware)
+            )
+            if self.citation_config.enabled:
+                # Agent middleware wraps in declaration order. Citation must be
+                # the innermost Tool-result transformer so outer middleware
+                # (for example LargeToolResultMiddleware) sees final content.
+                middleware = (*middleware, CitationMiddleware(self.citation_config))
+            agent.middleware = middleware
+
+        # ===== Initialize runtime =====
+        # 1. Verbose
+        self.verbose = verbose
+
+        # 2. Memory
         if isinstance(memory, bool):
-            if memory:
-                # memory=True: use default MemoryConfig
-                from .memory import MemoryConfig
+            from .memory import MemoryConfig
 
-                self.memory_config = MemoryConfig()
-            else:
-                # memory=False: disable memory
-                self.memory_config = None
+            self.memory_config = MemoryConfig() if memory else None
         else:
-            # memory is MemoryConfig instance or None
             self.memory_config = memory
 
-        # User-provided instances (user manages lifecycle)
-        self._user_checkpointer = checkpointer
-        self._user_store = store
-        self._user_async_checkpointer = async_checkpointer
-        self._user_async_store = async_store
-
-        # Validate user-provided instances
-        self._validate_user_providers()
-
+        # 3. Memory manager
         self._memory_manager = MemoryContextManager(
             self.memory_config,
-            user_checkpointer=self._user_checkpointer,
-            user_store=self._user_store,
-            user_async_checkpointer=self._user_async_checkpointer,
-            user_async_store=self._user_async_store,
         )
 
-        # Setup agents memory configuration
-        self._setup_agents_memory()
+        # ===== Setup =====
+        # Setup agent memory
+        if self.agent is not None:
+            self._setup_agent_memory()
 
-        # tools for crew
-        self._tools: list[BaseTool] = []
-        self.register_after_execute_callback: list[OrderCallback] = []
-
-        # HITL configuration
-        if hitl is None:
-            self.hitl_config = None
-        elif isinstance(hitl, HITLConfig):
-            self.hitl_config = hitl
-        else:
-            raise ValueError(
-                f"Invalid hitl parameter type: {type(hitl)}. Use HITLConfig instance."
-            )
-
-        # Setup HITL if configured
-        if self.hitl_config is not None:
-            self._setup_hitl()
-
-        if self.graph is None and not self.tasks and not self.agents:
-            raise ValueError("Either tasks, agents, or graph must be provided")
-
-        # Setup handoff if needed (automatically detect based on agent configuration)
-        self._setup_handoff_if_needed()
-
-    def _validate_user_providers(self):
-        """Validate user-provided checkpointer and store instances"""
-        # Check if any user instances are provided
-        has_user_instances = (
-            self._user_checkpointer is not None
-            or self._user_store is not None
-            or self._user_async_checkpointer is not None
-            or self._user_async_store is not None
-        )
-
-        if has_user_instances:
-            import warnings
-
-            # Check if both memory config and user instances are configured
-            if self.memory_config is not None:
-                warnings.warn(
-                    "Using both memory config and custom checkpointer/store. "
-                    "Custom instances take precedence. Consider using one approach.",
-                    UserWarning,
-                    stacklevel=3,
-                )
-
-            # Warn user about resource management responsibility
-            warnings.warn(
-                "Custom checkpointer/store detected. You are responsible for managing their lifecycle (setup/teardown).",
-                UserWarning,
-                stacklevel=3,
-            )
-
-    def add_after_execute_callbacks(self, callbacks: list[Callable | OrderCallback]):
-        """Add after execute callbacks to the crew"""
-        register_callback = self.register_after_execute_callback.copy()
-        for callback in callbacks:
-            if isinstance(callback, OrderCallback):
-                register_callback.append(callback)
-            else:
-                register_callback.append(
-                    OrderCallback(order_id=len(register_callback), callback=callback)
-                )
-
-        register_callback.sort(key=lambda x: x.order_id)
-        self.register_after_execute_callback = register_callback
-
-    async def _aprocess_output(self, output: Any) -> Any:
-        """
-        Asynchronously process output data through callback functions
-
-        This method processes any output data through registered callback functions.
-        It can handle both final results and streaming data.
-
-        Args:
-            output: Output data to be processed
-
-        Returns:
-            Processed output data
-        """
-        if not isinstance(output, dict):
-            return output
-
-        result = output
-        prev_result = result
-        callbacks = [c.callback for c in self.register_after_execute_callback]
-        # Execute function callbacks
-        for callback_fn in callbacks:
-            try:
-                if prev_result:
-                    # Handle the case where prev_result might be a list
-                    if isinstance(prev_result, list):
-                        # Process each item in the list through the callback
-                        processed_items = []
-                        for item in prev_result:
-                            if inspect.iscoroutinefunction(callback_fn):
-                                processed_item = await callback_fn(item)
-                            else:
-                                processed_item = callback_fn(item)
-                            if processed_item:
-                                # If processed_item is also a list, extend instead of append
-                                if isinstance(processed_item, list):
-                                    processed_items.extend(processed_item)
-                                else:
-                                    processed_items.append(processed_item)
-                        prev_result = processed_items
-                    else:
-                        # Original logic for dict input
-                        if inspect.iscoroutinefunction(callback_fn):
-                            prev_result = await callback_fn(prev_result)
-                        else:
-                            prev_result = callback_fn(prev_result)
-                    if not prev_result:
-                        logger.info(
-                            f"Prev result is None, callback: {callback_fn.__self__.__class__.__name__}"
-                        )
-            except Exception as e:
-                logger.error(f"Error in output processing callback: {e}")
-
-        return prev_result
+        # Initialize Controllable (stop control)
+        super().__init__()
 
     def _sync_subgraph_message_deletions(
         self, state: CrewState, result: dict[str, Any]
@@ -255,7 +146,7 @@ class Crew:
         Args:
             state: Current CrewState
             result: Result dictionary returned from ainvoke/invoke
-            item: The executing Task or Agent instance
+            item: The executing component instance
 
         Returns:
             Processed result dictionary with synchronized message deletion operations
@@ -291,90 +182,24 @@ class Crew:
 
         return {**result, "messages": final_messages}
 
-    def _get_task_node_name(self, task: Task, index: int) -> str:
-        """Unified task node naming rule with namespace isolation"""
-        base_name = task.name if task.name else f"task_{index}"
-        return f"task__{base_name}"
-
-    def _get_agent_node_name(self, agent: Agent, index: int) -> str:
+    def _get_agent_node_name(self, agent: Agent) -> str:
         """Unified agent node naming rule with namespace isolation"""
-        base_name = agent.name if agent.name else f"agent_{index}"
+        base_name = agent.name if agent.name else "agent"
         return f"agent__{base_name}"
-
-    def _collect_interrupt_config(self) -> tuple[list[str], list[str]]:
-        """Collect all interrupt configurations and convert to node-level interrupts"""
-        interrupt_before = []
-        interrupt_after = []
-
-        if not self.hitl_config:
-            return interrupt_before, interrupt_after
-
-        # Task-level interrupts -> Node-level interrupts
-        for i, task in enumerate(self.tasks):
-            node_name = self._get_task_node_name(task, i)
-            if task.name:
-                if self.hitl_config.should_interrupt_before_task(task.name):
-                    interrupt_before.append(node_name)
-                if self.hitl_config.should_interrupt_after_task(task.name):
-                    interrupt_after.append(node_name)
-
-        # Agent-level interrupts -> Node-level interrupts
-        for i, agent in enumerate(self.agents):
-            node_name = self._get_agent_node_name(agent, i)
-            if agent.name:
-                if self.hitl_config.should_interrupt_before_agent(agent.name):
-                    interrupt_before.append(node_name)
-                if self.hitl_config.should_interrupt_after_agent(agent.name):
-                    interrupt_after.append(node_name)
-
-        # Add user-specified node-level interrupts
-        interrupt_before.extend(self.hitl_config.get_interrupt_before_nodes())
-        interrupt_after.extend(self.hitl_config.get_interrupt_after_nodes())
-
-        return interrupt_before, interrupt_after
 
     def _compile_graph(
         self, builder: StateGraph, checkpointer=None, store=None
     ) -> CompiledStateGraph:
-        """Compile graph with memory components and interrupt configuration applied"""
-        interrupt_before, interrupt_after = self._collect_interrupt_config()
-        if not self._is_registered_tools:
-            self._register_tools()
-        self._is_registered_tools = True
-
-        compiled = builder.compile(
+        """Compile graph with memory components."""
+        return builder.compile(
             checkpointer=checkpointer,
             store=store,
-            interrupt_before=interrupt_before,
-            interrupt_after=interrupt_after,
         )
-
-        if self.verbose and (interrupt_before or interrupt_after):
-            logger.info(
-                f"Applied interrupts - Before: {interrupt_before}, After: {interrupt_after}"
-            )
-
-        return compiled
-
-    def _register_tools(self):
-        """Register tools to the crew"""
-        after_execute_callbacks = []
-        for tool in self._tools:
-            if isinstance(tool, ToolCallback):
-                order_id, callback = tool.tool_order_callback()
-                if order_id:
-                    after_execute_callbacks.append(
-                        OrderCallback(order_id=order_id, callback=callback)
-                    )
-                else:
-                    after_execute_callbacks.append(callback)
-        # order by order_id
-        self.add_after_execute_callbacks(after_execute_callbacks)
 
     def _create_generic_node_factory(
         self,
         is_async: bool,
-        item_type: str,  # "task" or "agent"
+        item_type: str,
         get_invoke_args_fn: Callable,
         process_result_fn: Callable | None = None,
     ):
@@ -382,7 +207,7 @@ class Crew:
 
         Args:
             is_async: Whether to create async nodes
-            item_type: Type of item ("task" or "agent")
+            item_type: Type of item
             get_invoke_args_fn: Function to get invoke arguments
             process_result_fn: Optional function to process results
         """
@@ -394,10 +219,7 @@ class Crew:
                     invoke_args = get_invoke_args_fn(item, state, is_async=True)
 
                     # Invoke the item
-                    if item_type == "task":
-                        result = await item.ainvoke(*invoke_args)
-                    else:  # agent
-                        result = await item.ainvoke(*invoke_args)
+                    result = await item.ainvoke(*invoke_args)
 
                     # Process result if needed
                     if process_result_fn:
@@ -416,10 +238,7 @@ class Crew:
                     invoke_args = get_invoke_args_fn(item, state, is_async=False)
 
                     # Invoke the item
-                    if item_type == "task":
-                        result = item.invoke(*invoke_args)
-                    else:  # agent
-                        result = item.invoke(*invoke_args)
+                    result = item.invoke(*invoke_args)
 
                     # Process result if needed
                     if process_result_fn:
@@ -430,70 +249,6 @@ class Crew:
                 return sync_node
 
             return create_sync_node
-
-    def _create_task_node_factory(self, is_async: bool = False):
-        """Factory for creating task node functions"""
-
-        def get_task_invoke_args(task: Task, state: CrewState, is_async: bool):
-            """Get invoke arguments for task"""
-            # Basic validation - task must have an agent
-            if not hasattr(task, "agent") or task.agent is None:
-                raise ValueError("Task must have an agent to create executor")
-            config = ensure_config()
-            # Create config with langcrew metadata
-            if "metadata" not in config:
-                config["metadata"] = {}
-            config["metadata"]["langcrew_agent"] = task.agent.name
-            config["metadata"]["langcrew_task"] = (
-                task.name or f"task_{self.tasks.index(task)}"
-            )
-
-            return (state, config)
-
-        def process_result_fn(state: CrewState, result: dict[str, Any], task: Task):
-            # Process message synchronization (resolves subgraph message sync issues)
-            result_with_cleanup = self._sync_subgraph_message_deletions(state, result)
-
-            # Maintain original task_outputs functionality
-            return {
-                **result_with_cleanup,
-                "task_outputs": state.get("task_outputs", []),
-            }
-
-        return self._create_generic_node_factory(
-            is_async=is_async,
-            item_type="task",
-            get_invoke_args_fn=get_task_invoke_args,
-            process_result_fn=process_result_fn,
-        )
-
-    def _build_task_sequential_graph(
-        self, checkpointer=None, store=None, is_async=False
-    ) -> CompiledStateGraph:
-        """Build a sequential graph from tasks with native interrupt support
-
-        Args:
-            checkpointer: Optional checkpointer to use for state persistence
-            store: Optional store to use for data persistence
-            is_async: Whether to create async task nodes
-        """
-        builder = StateGraph(CrewState)
-        prev_node = START
-        create_task_node = self._create_task_node_factory(is_async=is_async)
-
-        for i, task in enumerate(self.tasks):
-            node_name = self._get_task_node_name(task, i)  # Use unified naming
-            # Prepare tools with state manager
-            if hasattr(task, "agent") and hasattr(task.agent, "tools"):
-                task.agent.tools = self._prepare_tools(task.agent.tools)
-            builder.add_node(node_name, create_task_node(task))
-            builder.add_edge(prev_node, node_name)
-            prev_node = node_name
-
-        builder.add_edge(prev_node, END)
-        return self._compile_graph(
-            builder, checkpointer, store
-        )  # Use interrupt-aware compilation
 
     def _create_agent_node_factory(self, is_async: bool = False):
         """Factory for creating agent node functions"""
@@ -521,501 +276,78 @@ class Crew:
     def _build_agent_sequential_graph(
         self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
-        """Build a sequential graph from agents with native interrupt support
+        """Build a graph from a single agent.
 
         Args:
-            checkpointer: Optional checkpointer to use for state persistence
-            store: Optional store to use for data persistence
+            checkpointer: Optional checkpointer for state persistence
+            store: Optional store for data persistence
             is_async: Whether to create async agent nodes
         """
         builder = StateGraph(CrewState)
         create_agent_node = self._create_agent_node_factory(is_async=is_async)
 
-        # Add nodes and conditional edges
-        prev_node = START
+        if self.agent is None:
+            raise ValueError("No agent provided to build graph")
 
-        for i, agent in enumerate(self.agents):
-            node_name = self._get_agent_node_name(agent, i)  # Use unified naming
-            # Prepare tools with state manager
-            agent.tools = self._prepare_tools(agent.tools)
-
-            builder.add_node(node_name, create_agent_node(agent))
-
-            if prev_node == START:
-                # First agent always executes
-                builder.add_edge(prev_node, node_name)
-            else:
-                # Add conditional edge based on previous agent's decision
-                # Use default parameter to capture current node_name value
-                builder.add_conditional_edges(
-                    prev_node,
-                    lambda state, next_node=node_name: (
-                        next_node if state.get("_continue_execution", True) else END
-                    ),
-                    {node_name: node_name, END: END},
-                )
-
-            prev_node = node_name
-
-        # Last agent connects to END
-        builder.add_edge(prev_node, END)
-        return self._compile_graph(
-            builder, checkpointer, store
-        )  # Use interrupt-aware compilation
-
-    def _has_agent_handoffs(self) -> bool:
-        """Check if any agents are configured for handoff and validate configuration
-
-        Returns:
-            bool: True if any agents have handoff_to configured, False otherwise
-
-        Raises:
-            ValueError: If no agents are configured in the crew
-        """
-        if not self.agents:
-            # If there are no agents, we can't have handoffs
-            raise ValueError(
-                "Cannot check for agent handoffs: No agents configured in the crew."
-            )
-
-        """Check if any agents are configured for handoff"""
-        return any(agent.handoff_to for agent in self.agents)
-
-    def _infer_entry_agent(self) -> str | None:
-        """Infer entry agent using intelligent logic.
-
-        Priority:
-        1. Agent explicitly marked with is_entry=True
-        2. First agent with handoff_to configuration
-        3. None if no suitable candidate found
-        """
-        # Priority 1: Look for agents explicitly marked as entry points
-        for agent in self.agents:
-            if hasattr(agent, "is_entry") and agent.is_entry and agent.name:
-                return agent.name
-
-        # Priority 2: Use first agent with handoff_to configuration
-        for agent in self.agents:
-            if agent.handoff_to and agent.name:
-                return agent.name
-
-        # No suitable candidate found
-        return None
-
-    def _has_task_handoffs(self) -> bool:
-        """Validate handoff configuration and return whether any tasks have handoff_to configured
-
-        Returns:
-            bool: True if any tasks have handoff_to configured, False otherwise
-        """
-        if not self.tasks:
-            return False
-
-        # Check if any tasks have handoff configuration
-        has_handoff = any(task.handoff_to for task in self.tasks)
-
-        if not has_handoff:
-            return False
-
-        # Validate all handoff targets using enhanced lookup
-        for task in self.tasks:
-            if not task.handoff_to:
-                continue
-
-            for target_task_name in task.handoff_to:
-                self.get_task_by_name(target_task_name)
-
-        return has_handoff
-
-    def _setup_handoff_if_needed(self):
-        """Setup handoff functionality if any agents or tasks have handoff configuration"""
-        has_agent_handoff = self._has_agent_handoffs()
-        has_task_handoff = self._has_task_handoffs()
-
-        # Check for conflicting configurations
-        if has_agent_handoff and has_task_handoff:
-            raise ValueError(
-                "Cannot configure both agent-level and task-level handoff in the same crew. "
-                "Please choose one handoff mode:\n"
-                "- Agent handoff: Configure handoff_to on Agent instances\n"
-                "- Task handoff: Configure handoff_to on Task instances\n"
-                f"Found agent handoff on: {[a.name for a in self.agents if a.handoff_to]}\n"
-                f"Found task handoff on: {[t.name or f'task_{i}' for i, t in enumerate(self.tasks) if t.handoff_to]}"
-            )
-
-        if has_agent_handoff:
-            self._setup_agent_handoff_tools()
-            if self.verbose:
-                logger.info("Agent handoff functionality enabled for crew")
-        elif has_task_handoff:
-            self._setup_task_handoff_tools()
-            if self.verbose:
-                logger.info("Task handoff functionality enabled for crew")
-
-    def _setup_agent_handoff_tools(self):
-        """Create handoff tools for agents based on their handoff_to configuration"""
-        # Create mapping of agent names to agent objects and their indices
-        agent_map = {}
-        agent_node_map = {}  # Maps agent name to node name
-
-        for i, agent in enumerate(self.agents):
-            if agent.name:
-                agent_map[agent.name] = agent
-                agent_node_map[agent.name] = self._get_agent_node_name(agent, i)
-
-        for agent in self.agents:
-            if not agent.handoff_to:
-                continue
-
-            # Create handoff tools for each target agent
-            for target_name in agent.handoff_to:
-                if target_name not in agent_map:
-                    if self.verbose:
-                        logger.warning(
-                            f"Handoff target '{target_name}' not found for agent '{agent.name}'"
-                        )
-                    continue
-
-                target_agent = agent_map[target_name]
-                target_node_name = agent_node_map[
-                    target_name
-                ]  # Use node name for routing
-
-                # Create description using target agent's role, goal and backstory
-                description_parts = []
-                if target_agent.role:
-                    description_parts.append(f"Role: {target_agent.role}")
-                if target_agent.goal:
-                    description_parts.append(f"Goal: {target_agent.goal}")
-                if target_agent.backstory:
-                    description_parts.append(f"Backstory: {target_agent.backstory}")
-
-                description = (
-                    f"Transfer to {target_name} - {'; '.join(description_parts)}"
-                    if description_parts
-                    else f"Transfer to {target_name}"
-                )
-
-                # Create handoff tool with node name for correct routing
-                handoff_tool = create_handoff_tool(
-                    agent_name=target_node_name, description=description
-                )
-
-                # Add tool to agent
-                agent.tools.append(handoff_tool)
-
-                if self.verbose:
-                    logger.info(
-                        f"Created handoff tool: {agent.name} -> {target_name} (node: {target_node_name})"
-                    )
-
-    def _setup_task_handoff_tools(self):
-        """Create handoff tools for tasks based on their handoff_to configuration"""
-
-        def create_handoff_tool_description(target_task):
-            """Create description for handoff tool"""
-            parts = []
-            if target_task.description:
-                parts.append(f"Description: {target_task.description}")
-            if target_task.expected_output:
-                parts.append(f"Expected output: {target_task.expected_output}")
-
-            return (
-                f"Transfer to task '{target_task.name}' - {'; '.join(parts)}"
-                if parts
-                else f"Transfer to task '{target_task.name}'"
-            )
-
-        for task in self.tasks:
-            if not task.handoff_to:
-                continue
-
-            for target_name in task.handoff_to:
-                target_task = self.get_task_by_name(target_name)
-                # Find the target task's node name
-                target_node_name = self._get_task_node_name(
-                    target_task, self.tasks.index(target_task)
-                )
-
-                # Create and add handoff tool with node name for correct routing
-                handoff_tool = create_handoff_tool(
-                    agent_name=target_node_name,  # Use node name for routing
-                    description=create_handoff_tool_description(target_task),
-                )
-
-                # Check if tool already exists to avoid duplicates
-                existing_tool_names = {tool.name for tool in task.agent.tools}
-                if handoff_tool.name not in existing_tool_names:
-                    task.agent.tools.append(handoff_tool)
-
-                    if self.verbose:
-                        source_name = task.name or f"task_{self.tasks.index(task)}"
-                        logger.info(
-                            f"Created task handoff tool: {source_name} -> {target_name}"
-                        )
-
-    def _create_handoff_aware_agent_node(self, agent, is_async=False):
-        """Create an agent node that can handle handoff Commands using generic factory
-
-        Args:
-            agent: The agent to create node for
-            is_async: Whether to create async node
-        """
-
-        def get_handoff_invoke_args(agent: Agent, state: CrewState, is_async: bool):
-            """Get invoke arguments for handoff agent"""
-            # Create config with langcrew metadata
-            config = ensure_config()
-            # Create config with langcrew metadata
-            if "metadata" not in config:
-                config["metadata"] = {}
-            config["metadata"]["langcrew_agent"] = agent.name
-            return (state, config)
-
-        def process_result_fn(state: CrewState, result: dict[str, Any], agent: Agent):
-            """Process Handoff Agent execution result with message synchronization functionality"""
-            return self._sync_subgraph_message_deletions(state, result)
-
-        return self._create_generic_node_factory(
-            is_async=is_async,
-            item_type="agent",
-            get_invoke_args_fn=get_handoff_invoke_args,
-            process_result_fn=process_result_fn,
-        )(agent)
+        node_name = self._get_agent_node_name(self.agent)
+        self.agent.tools = self._prepare_tools(self.agent.tools)
+        builder.add_node(node_name, create_agent_node(self.agent))
+        builder.add_edge(START, node_name)
+        builder.add_edge(node_name, END)
+        return self._compile_graph(builder, checkpointer, store)
 
     def _prepare_tools(self, tools: list[BaseTool]) -> list[BaseTool]:
         """Prepare tools for execution"""
-        if tools:
-            for tool in tools:
-                if tool not in self._tools:
-                    self._tools.append(tool)
         return tools
-
-    def _build_agent_handoff_graph(
-        self, checkpointer=None, store=None, is_async=False
-    ) -> CompiledStateGraph:
-        """Build a graph that supports handoff with dynamic routing
-
-        Args:
-            checkpointer: Optional checkpointer to use
-            store: Optional store to use
-            is_async: Whether to create async nodes
-        """
-        builder = StateGraph(CrewState)
-
-        # Add all agent nodes using unified naming
-        for i, agent in enumerate(self.agents):
-            # Prepare tools with state manager for each agent
-            agent.tools = self._prepare_tools(agent.tools)
-
-            node_name = self._get_agent_node_name(agent, i)
-            builder.add_node(
-                node_name, self._create_handoff_aware_agent_node(agent, is_async)
-            )
-
-        # Set entry point using inferred entry agent
-        entry_agent_name = self._infer_entry_agent()
-        if not entry_agent_name:
-            # Fallback to error if inference fails
-            available_agents = [agent.name for agent in self.agents if agent.name]
-            raise ValueError(
-                "No entry agent found. Please mark an agent with is_entry=True or ensure at least one agent has handoff_to configured. "
-                f"Available agents: {available_agents}"
-            )
-
-        # Find the node name for the entry agent
-        entry_node_name = None
-        for i, agent in enumerate(self.agents):
-            if agent.name == entry_agent_name:
-                entry_node_name = self._get_agent_node_name(agent, i)
-                break
-
-        if entry_node_name:
-            builder.add_edge(START, entry_node_name)
-        else:
-            raise ValueError(
-                f"Entry agent '{entry_agent_name}' not found in agents list"
-            )
-
-        # No conditional edges needed - LangGraph's Command mechanism handles routing
-        # The handoff tools return Command(goto=agent_name) which LangGraph processes automatically
-
-        return self._compile_graph(builder, checkpointer, store)
-
-    def _build_task_handoff_graph(
-        self, checkpointer=None, store=None, is_async=False
-    ) -> CompiledStateGraph:
-        """Build a graph that supports task-to-task handoff with backbone+router architecture
-
-        This method creates a graph with:
-        1. Backbone tasks: non-handoff targets that execute sequentially
-        2. Handoff subgraph tasks: handoff targets reachable via transfer commands
-        3. Central router: checks for handoff commands and manages backbone flow
-
-        Args:
-            checkpointer: Optional checkpointer to use
-            store: Optional store to use
-            is_async: Whether to create async nodes
-        """
-        builder = StateGraph(CrewState)
-        create_task_node = self._create_task_node_factory(is_async=is_async)
-
-        # Use unified task naming
-        def get_task_identifier(task):
-            """Get consistent task identifier using unified naming"""
-            return self._get_task_node_name(task, self.tasks.index(task))
-
-        # Identify all handoff targets for validation
-        handoff_target_names = set()
-        for task in self.tasks:
-            if task.handoff_to:
-                for target_name in task.handoff_to:
-                    self.get_task_by_name(target_name)  # Validates target exists
-                    handoff_target_names.add(target_name)
-
-        if self.verbose:
-            logger.info(f"Handoff target tasks: {sorted(handoff_target_names)}")
-
-        # Classify tasks into backbone and handoff subgraph
-        backbone_tasks = []  # Main sequential execution chain
-        handoff_subgraph_tasks = []  # Tasks reachable only via handoff
-
-        for task in self.tasks:
-            task_name = get_task_identifier(task)
-            # Check if task's original name (not node name) is a handoff target
-            if task.name and task.name in handoff_target_names:
-                # This task is a handoff target → goes to handoff subgraph
-                handoff_subgraph_tasks.append(task)
-            else:
-                # This task is not a handoff target → backbone task
-                backbone_tasks.append(task)
-
-            task.agent.tools = self._prepare_tools(task.agent.tools)
-            builder.add_node(task_name, create_task_node(task))
-
-        if self.verbose:
-            backbone_names = [get_task_identifier(t) for t in backbone_tasks]
-            subgraph_names = [get_task_identifier(t) for t in handoff_subgraph_tasks]
-            logger.info(f"Backbone tasks: {backbone_names}")
-            logger.info(f"Handoff subgraph tasks: {subgraph_names}")
-
-        # Backbone task execution tracking
-        backbone_execution_state = {"current_index": 0}
-
-        # Central router node
-        def router_node(state: CrewState):
-            """Router: checks handoff commands in recent messages or continues backbone execution"""
-            from langchain_core.messages import ToolMessage
-            from langgraph.types import Command
-
-            # Check for handoff commands in recent messages
-            # We don't return a Command here to avoid conflicts with commands from handoff tools
-            # In LangGraph, multiple Commands in the same step are grouped by task_id
-            # When multiple Commands use the same NULL_TASK_ID, later ones override earlier ones
-            # By having the router detect handoffs and avoid returning a Command, we ensure handoff commands aren't overridden
-            if state.get("messages") and len(state["messages"]) > 0:
-                # Check the last 2 messages for handoff commands
-                # This handles race conditions between router_node and handoff tool calls
-                # If handoff tool call executes first, it may add a HumanMessage after the ToolMessage
-                # So we need to check both the last and second-to-last messages
-                messages_to_check = min(2, len(state["messages"]))
-
-                # Start from the last message and check backwards
-                for i in range(messages_to_check):
-                    message_index = -1 - i  # -1 for last message, -2 for second-to-last
-                    message = state["messages"][message_index]
-                    if isinstance(message, ToolMessage):
-                        handoff_destination = message.response_metadata.get(
-                            "__handoff_destination"
-                        )
-                        if handoff_destination:
-                            if self.verbose:
-                                logger.info(
-                                    f"Router: handoff detected to {handoff_destination}, letting handoff handle routing"
-                                )
-                            return state
-
-            # No handoff detected, continue backbone execution
-            if backbone_execution_state["current_index"] < len(backbone_tasks):
-                current_task = backbone_tasks[backbone_execution_state["current_index"]]
-                task_name = get_task_identifier(current_task)
-                backbone_execution_state["current_index"] += 1
-
-                if self.verbose:
-                    logger.info(
-                        f"Router: continuing backbone execution with {task_name}"
-                    )
-                return Command(goto=task_name)
-
-            # All backbone tasks completed
-            if self.verbose:
-                logger.info("Router: all backbone tasks completed")
-            return Command(goto=END)
-
-        builder.add_node("router", router_node)
-
-        # Simple connections: START -> router, all tasks -> router
-        builder.add_edge(START, "router")
-        for task in self.tasks:
-            node_name = get_task_identifier(task)
-            builder.add_edge(node_name, "router")
-
-        if self.verbose:
-            logger.info(
-                f"Task handoff graph built: {len(backbone_tasks)} backbone + {len(handoff_subgraph_tasks)} handoff + 1 router"
-            )
-
-        return self._compile_graph(builder, checkpointer, store)
 
     def _get_compiled_graph(
         self, checkpointer=None, store=None, is_async=False
     ) -> CompiledStateGraph:
-        """Get the compiled graph for execution (unified sync/async version)"""
-        # Handle custom graph if provided
+        """
+        Get the compiled graph for execution.
+
+        Priority (highest to lowest):
+        1. graph - Custom StateGraph (most specific)
+        2. workflow - Declarative configuration
+        3. agent - Programmatic configuration
+        """
+        # Priority 1: Custom graph (highest - most specific)
         if self.graph is not None:
-            # User provided StateGraph, compile it with passed checkpointer and store
             return self._compile_graph(self.graph, checkpointer, store)
 
-        # Build graph based on configuration
-        if any(task.handoff_to for task in self.tasks):
-            # Build task-based handoff graph
-            return self._build_task_handoff_graph(
-                checkpointer, store, is_async=is_async
+        # Priority 2: Workflow configuration
+        if self.workflow is not None:
+            from .workflow.builder import WorkflowBuilder
+
+            builder = WorkflowBuilder(
+                self.workflow,
+                is_async=is_async,
+                citation=self.citation_config,
             )
-        elif any(agent.handoff_to for agent in self.agents):
-            # Build handoff-aware graph
-            return self._build_agent_handoff_graph(
-                checkpointer, store, is_async=is_async
-            )
-        elif self.tasks:
-            # Build task-based sequential graph
-            return self._build_task_sequential_graph(
-                checkpointer, store, is_async=is_async
-            )
-        elif self.agents:
-            # Build agent-based sequential graph
+            graph = builder.build_graph()
+            return self._compile_graph(graph, checkpointer, store)
+
+        # Priority 3: Build from agent (lowest)
+        if self.agent is not None:
             return self._build_agent_sequential_graph(
                 checkpointer, store, is_async=is_async
             )
         else:
-            raise ValueError("No tasks or agents provided to build graph")
+            raise ValueError("No workflow, agent, or graph provided to build graph")
 
-    def _setup_agents_memory(self):
-        """Setup memory configuration for agents"""
-        if self.memory_config is None:
+    def _setup_agent_memory(self):
+        """Push Crew's memory configuration down to the agent."""
+        if self.memory_config is None or self.agent is None:
             return
 
-        # Setup agents memory configuration
-        for agent in self.agents:
-            if not hasattr(agent, "memory_config") or agent.memory_config is None:
-                agent.memory_config = self.memory_config
-                # Only setup memory if agent hasn't been initialized yet
-                if not agent.memory_tools:
-                    agent._setup_memory(self.memory_config)
+        if self.agent.memory_config is None:
+            self.agent.memory_config = self.memory_config
+            if not self.agent.memory_tools:
+                self.agent._setup_memory(self.memory_config)
 
         if self.verbose:
             logger.info(
-                f"Memory configuration applied to agents with provider: {self.memory_config.provider}"
+                f"Memory configuration applied to agent with provider: {self.memory_config.provider}"
             )
 
     def invoke(
@@ -1095,6 +427,20 @@ class Crew:
             )
 
         return await self._memory_manager.execute_async(execute_with_memory)
+
+    async def rewind_thread(self, thread_id: str) -> None:
+        """Rewind this Crew before its latest HumanMessage.
+
+        Uses LangGraph time travel on the compiled graph so nested subgraph
+        state stays aligned with the kept prefix. Persistent callers can
+        recreate a Crew with the same MemoryConfig and call this method.
+        """
+
+        async def operation(checkpointer, store):
+            compiled = self._get_compiled_graph(checkpointer, store, is_async=True)
+            await rewind_compiled_graph(compiled, thread_id)
+
+        await self._memory_manager.execute_async(operation)
 
     def stream(
         self,
@@ -1200,13 +546,7 @@ class Crew:
         async for chunk in self._memory_manager.execute_async_generator(
             execute_with_memory
         ):
-            processed_event = await self._aprocess_output(chunk)
-            if processed_event:
-                if isinstance(processed_event, list):
-                    for item in processed_event:
-                        yield item
-                else:
-                    yield processed_event
+            yield chunk
 
     async def astream_events(
         self,
@@ -1226,7 +566,7 @@ class Crew:
         Generate a stream of fine-grained events during crew execution.
 
         This method provides detailed insights into the execution process, including
-        events from LLMs, tools, agents, tasks, and other components. Useful for
+        events from LLMs, tools, agents, and other components. Useful for
         debugging, monitoring, and building real-time UIs.
 
         Args:
@@ -1267,10 +607,10 @@ class Crew:
             # Custom crew monitoring
             async for event in crew.astream_events(
                 input_data,
-                include_tags=["crew", "agent", "task"]
+                include_tags=["crew", "agent"]
             ):
-                if event["event"] == "on_crew_task_start":
-                    print(f"Starting task: {event['data']['task_name']}")
+                if event["event"] == "on_crew_agent_start":
+                    print(f"Starting agent: {event['data']['agent_name']}")
         """
 
         async def execute_with_memory(checkpointer, store):
@@ -1294,187 +634,9 @@ class Crew:
         async for event in self._memory_manager.execute_async_generator(
             execute_with_memory
         ):
-            processed_event = await self._aprocess_output(event)
-            if processed_event:
-                if isinstance(processed_event, list):
-                    for item in processed_event:
-                        yield item
-                else:
-                    yield processed_event
+            yield event
 
-    # CrewAI compatibility methods
-    def kickoff(
-        self,
-        inputs: dict[str, Any] | None = None,
-        config: RunnableConfig | None = None,
-    ) -> Any:
-        """CrewAI compatible execution method.
-
-        Args:
-            inputs: Input data for the crew. Placeholders in task descriptions will be replaced.
-            config: Optional RunnableConfig for runtime settings.
-                   - Set thread_id via config={"configurable": {"thread_id": "your-id"}}
-                   - Set recursion_limit, callbacks, tags, metadata, etc.
-
-        Returns:
-            Execution result
-
-        Examples:
-            # Simple execution without persistence
-            result = crew.kickoff(inputs={"topic": "AI"})
-
-            # With thread_id for conversation continuity
-            result = crew.kickoff(
-                inputs={"topic": "AI"},
-                config={"configurable": {"thread_id": "conversation-123"}}
-            )
-
-            # Advanced config with multiple settings
-            result = crew.kickoff(
-                inputs={"topic": "AI"},
-                config={
-                    "configurable": {"thread_id": "conversation-123"},
-                    "recursion_limit": 100
-                }
-            )
-        """
-        # Replace all placeholders in tasks if inputs provided
-        if inputs:
-            self._replace_all_placeholders(inputs)
-
-        # Execute with empty state (task_outputs initialized by CrewState default)
-        return self.invoke({}, config)
-
-    async def akickoff(
-        self,
-        inputs: dict[str, Any] | None = None,
-        config: RunnableConfig | None = None,
-    ) -> Any:
-        """Async version of kickoff.
-
-        Args:
-            inputs: Input data for the crew. Placeholders in task descriptions will be replaced.
-            config: Optional RunnableConfig for runtime settings.
-                   - Set thread_id via config={"configurable": {"thread_id": "your-id"}}
-                   - Set recursion_limit, callbacks, tags, metadata, etc.
-
-        Returns:
-            Execution result
-
-        Examples:
-            # Simple execution without persistence
-            result = await crew.akickoff(inputs={"topic": "AI"})
-
-            # With thread_id for conversation continuity
-            result = await crew.akickoff(
-                inputs={"topic": "AI"},
-                config={"configurable": {"thread_id": "conversation-123"}}
-            )
-
-            # Advanced config with multiple settings
-            result = await crew.akickoff(
-                inputs={"topic": "AI"},
-                config={
-                    "configurable": {"thread_id": "conversation-123"},
-                    "recursion_limit": 100
-                }
-            )
-        """
-        # Replace all placeholders in tasks if inputs provided
-        if inputs:
-            self._replace_all_placeholders(inputs)
-
-        # Execute with empty state (task_outputs initialized by CrewState default)
-        return await self.ainvoke({}, config)
-
-    def _replace_all_placeholders(self, inputs: dict[str, Any]) -> None:
-        """Replace all placeholders in task descriptions and expected outputs, and agent backstories.
-
-        Args:
-            inputs: Input parameters to substitute into task templates
-        """
-        if not inputs:
-            return
-
-        for task in self.tasks:
-            if task._spec:
-                # Replace placeholders in description
-                if task._spec.description:
-                    task._spec.description = self._replace_placeholders(
-                        task._spec.description, inputs
-                    )
-
-                # Replace placeholders in expected_output
-                if task._spec.expected_output:
-                    task._spec.expected_output = self._replace_placeholders(
-                        task._spec.expected_output, inputs
-                    )
-
-        # Replace placeholders in agent backstories
-        for agent in self.agents:
-            if agent.backstory:
-                agent.backstory = self._replace_placeholders(agent.backstory, inputs)
-
-    def _replace_placeholders(self, text: str, inputs: dict[str, Any]) -> str:
-        """Replace placeholders in text with input values.
-
-        Args:
-            text: Text containing placeholders like {placeholder_name}
-            inputs: Dictionary of input values
-
-        Returns:
-            Text with placeholders replaced
-        """
-        if not text or not inputs:
-            return text
-
-        result = text
-        for key, value in inputs.items():
-            placeholder = f"{{{key}}}"
-            result = result.replace(placeholder, str(value))
-
-        return result
-
-    def _setup_hitl(self):
-        """Setup HITL (Human-in-the-Loop) for all agents with configuration validation"""
-        if self.verbose:
-            logger.info("Setting up HITL tool approval for crew")
-
-        # Determine execution mode and validate HITL configuration
-        execution_mode = self._get_execution_mode()
-
-        # Validate HITL configuration against execution mode
-        if self.hitl_config:
-            self.hitl_config.validate_config(execution_mode)
-
-            if self.verbose:
-                logger.info("HITL Configuration:")
-                print(self.hitl_config.get_configuration_summary())
-
-        # Apply crew-level HITL configuration to agents that don't have their own config
-        for agent in self.agents:
-            if not hasattr(agent, "hitl_config") or agent.hitl_config is None:
-                agent.hitl_config = self.hitl_config
-                agent._setup_hitl()
-
-    def _get_execution_mode(self) -> str:
-        """Determine the execution mode based on crew configuration
-
-        Returns:
-            "task_mode" if crew has tasks (regardless of agents or handoff)
-            "agent_mode" if crew has only agents without tasks
-        """
-        if self.tasks:
-            # Task mode takes priority when tasks are present (regardless of handoff)
-            return "task_mode"
-        elif self.agents:
-            return "agent_mode"
-        else:
-            raise ValueError(
-                "Cannot determine execution mode: no tasks or agents provided"
-            )
-
-    # Agent and task lookup methods
+    # Agent lookup methods
 
     def get_agent_by_name(self, name: str) -> Agent:
         """Get an agent by name
@@ -1488,29 +650,10 @@ class Crew:
         Raises:
             ValueError: When the agent with the specified name is not found
         """
-        for agent in self.agents:
-            if agent.name == name:
-                return agent
+        if self.agent is not None and self.agent.name == name:
+            return self.agent
 
         raise ValueError(f"Agent with name '{name}' not found")
-
-    def get_task_by_name(self, name: str) -> Task:
-        """Get a task by name
-
-        Args:
-            name: The name of the task
-
-        Returns:
-            Task instance
-
-        Raises:
-            ValueError: When the task with the specified name is not found
-        """
-        for task in self.tasks:
-            if task.name == name:
-                return task
-
-        raise ValueError(f"Task with name '{name}' not found")
 
     @contextmanager
     def get_sync_compiled_graph(self):
@@ -1551,3 +694,44 @@ class Crew:
         async with self._memory_manager._get_async_context() as (checkpointer, store):
             compiled = self._get_compiled_graph(checkpointer, store, is_async=True)
             yield compiled
+
+    @asynccontextmanager
+    async def get_checkpointer_for_migration(self):
+        """Get checkpointer for legacy data migration (application layer only).
+
+        This method provides access to the underlying checkpointer for reading
+        old session_state data before migrating to LangGraph State.
+
+        Example:
+            ```python
+            # Create migration helper in your app layer (app/helpers/legacy_state_migration.py)
+            async def read_legacy_state(checkpointer, session_id):
+                config = {"configurable": {"thread_id": session_id, "checkpoint_ns": ""}}
+                checkpoint_tuple = await checkpointer.aget_tuple(config)
+                if checkpoint_tuple and checkpoint_tuple.checkpoint:
+                    channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})
+                    return channel_values.get("session_state", {})
+                return {}
+
+            # Use it in your application
+            crew = Crew(agent=..., memory=True)
+
+            async with crew.get_checkpointer_for_migration() as checkpointer:
+                old_data = await read_legacy_state(checkpointer, session_id)
+
+                # Migrate old data to new State
+                result = await crew.ainvoke(
+                    {
+                        "sandbox_id": old_data.get("sandbox_id"),
+                        "upload_files": old_data.get("upload_files", []),
+                    },
+                    config={"configurable": {"thread_id": session_id}}
+                )
+            ```
+
+        Note:
+            This is intended for one-time data migration only. Tools should
+            read data from runtime.state, not directly access the checkpointer.
+        """
+        async with self._memory_manager._get_async_context() as (checkpointer, store):
+            yield checkpointer

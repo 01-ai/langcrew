@@ -47,16 +47,16 @@ class TestSetup:
         except ImportError as e:
             pytest.fail(f"Import failed: {e}")
 
-    def test_fixtures_available(self, mock_config, mock_agent, mock_task):
+    def test_fixtures_available(self, mock_config, mock_agent, mock_tool):
         """Test that fixtures are available and working."""
         assert mock_config is not None
         assert mock_agent is not None
-        assert mock_task is not None
+        assert mock_tool is not None
 
         # Test fixture content
         assert "llm" in mock_config
         assert mock_agent.name == "test_agent"
-        assert mock_task.description == "Test task description"
+        assert mock_tool.name == "test_tool"
 
     @pytest.mark.asyncio
     async def test_async_support(self):

@@ -4,17 +4,26 @@ Unit tests for PgVectorSearchTool.
 Tests the configuration functionality and behavior of the PgVector knowledge search tool.
 """
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
 
 import pytest
+from pydantic import BaseModel, Field
 
 
 # Mock classes for testing since the actual modules don't exist yet
 class EmbeddingResult:
     """Mock embedding result for testing"""
-    def __init__(self, id: str, text: str, score: float, metadata: Dict[str, Any], knowledge_id: str, file_md5: str):
+
+    def __init__(
+        self,
+        id: str,
+        text: str,
+        score: float,
+        metadata: dict[str, Any],
+        knowledge_id: str,
+        file_md5: str,
+    ):
         self.id = id
         self.text = text
         self.score = score
@@ -25,10 +34,20 @@ class EmbeddingResult:
 
 class VectorConfig:
     """Mock vector config for testing"""
-    def __init__(self, database_url: Optional[str] = None, pool_size: int = 10, max_overflow: int = 20,
-                 pool_timeout: int = 30, index_name: str = "vector_store", kb_index_name: str = "embeddings",
-                 embedding_model: str = "BAAI/bge-m3", embedding_chunk_size: int = 100,
-                 request_timeout: int = 180, batch_size: int = 100):
+
+    def __init__(
+        self,
+        database_url: str | None = None,
+        pool_size: int = 10,
+        max_overflow: int = 20,
+        pool_timeout: int = 30,
+        index_name: str = "vector_store",
+        kb_index_name: str = "embeddings",
+        embedding_model: str = "BAAI/bge-m3",
+        embedding_chunk_size: int = 100,
+        request_timeout: int = 180,
+        batch_size: int = 100,
+    ):
         self.database_url = database_url
         self.pool_size = pool_size
         self.max_overflow = max_overflow
@@ -44,6 +63,7 @@ class VectorConfig:
     def from_env(cls):
         """Mock from_env method"""
         import os
+
         return cls(
             database_url=os.environ.get("PGVECTOR_DATABASE_URL"),
             pool_size=int(os.environ.get("PGVECTOR_POOL_SIZE", 10)),
@@ -54,31 +74,41 @@ class VectorConfig:
 
 class SiliconFlowClient:
     """Mock SiliconFlow client"""
+
     pass
 
 
 class KnowledgeSearchInput(BaseModel):
     """Mock knowledge search input model"""
+
     query: str = Field(..., description="Search query")
-    knowledge_ids: List[str] = Field(..., description="List of knowledge base IDs")
+    knowledge_ids: list[str] = Field(..., description="List of knowledge base IDs")
     top_k: int = Field(default=20, description="Number of results to return")
 
 
 class PgVectorSearchTool:
     """Mock PgVector search tool"""
-    def __init__(self, vector_config: Optional[VectorConfig] = None, siliconflow_client: Optional[SiliconFlowClient] = None):
+
+    def __init__(
+        self,
+        vector_config: VectorConfig | None = None,
+        siliconflow_client: SiliconFlowClient | None = None,
+    ):
         self.name = "pgvector_search"
-        self.description = "PgVector knowledge search tool with embedding and reranking capabilities"
+        self.description = (
+            "PgVector knowledge search tool with embedding and reranking capabilities"
+        )
         self.args_schema = KnowledgeSearchInput
         self.vector_config = vector_config
         self.siliconflow_client = siliconflow_client
 
-    def _run(self, query: str, knowledge_ids: List[str], top_k: int) -> str:
+    def _run(self, query: str, knowledge_ids: list[str], top_k: int) -> str:
         """Sync run method"""
         import asyncio
+
         return asyncio.run(self._arun(query, knowledge_ids, top_k))
 
-    async def _arun(self, query: str, knowledge_ids: List[str], top_k: int) -> str:
+    async def _arun(self, query: str, knowledge_ids: list[str], top_k: int) -> str:
         """Async run method"""
         if not query or query.strip() == "":
             return "No query provided"

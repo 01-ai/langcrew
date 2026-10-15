@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langcrew-tools"
-version = "0.1.0"
+version = "0.6.18"
 description = "Tool collection for LangCrew - Building multi-agent applications"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
@@ -27,28 +27,27 @@ dependencies = [
     # Core data validation and modeling
     "pydantic>=2.7.4",
     # LangChain framework and components
-    "langchain>=0.3.27",
-    "langchain-core>=0.3.81",
-    "langchain-text-splitters>=0.3.9",
-    "langcrew>=0.1.0",
-    "langgraph>=0.6.0",
+    "langchain>=1.0.2,<3.0.0",
+    "langchain-core>=1.3.3,<3.0.0",
+    "langgraph>=1.0.0,<3.0.0",
+    "langcrew>=0.6.0",
     # HTTP and API clients
     "aiohttp>=3.12.15",
     "httpx>=0.28.1",
-    "requests>=2.32.4",
     # AWS integration
     "aiobotocore>=2.23.1",
     # Database and storage
     "sqlalchemy>=2.0.42",
-    # Browser automation
-    "browser-use==0.5.5; python_version >= '3.11'",
     # Execution environments
-    "agentbox-python-sdk>=0.2.9",
+    "agentbox-python-sdk>=1.0.6",
     "playwright==1.54.0",
-    "pytest-dotenv>=0.5.2",
-    "langmem",
     "volcengine-python-sdk[ark]>=4.0.11",
     "beautifulsoup4>=4.13.5",
+    "trafilatura>=2.0.0",
+    "markdownify>=0.13.0",
+    "playwright-stealth>=2.0.0",
+    "chardet>=5.0.0",
+    "pillow>=10.0.0",
 ]
 
 
@@ -69,7 +68,6 @@ testing = [
 ]
 development = [
     "pytest-watcher",
-    "mypy>=1.0.0",
     "ruff>=0.1.0",
     "codespell",
     "types-requests>=2.31.0",
@@ -82,7 +80,6 @@ all = [
     "pytest-asyncio>=0.21.0",
     "pytest-xdist[psutil]",
     "pytest-watcher",
-    "mypy>=1.0.0",
     "ruff>=0.1.0",
     "codespell",
     "types-requests>=2.31.0",
@@ -92,7 +89,13 @@ all = [
 # Note: If you need to use internal PyPI sources, please set via environment variables:
 # UV_EXTRA_INDEX_URL=https://your-private-pypi.example.com/simple
 prerelease = "allow"
-dev-dependencies = [
+environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]
+
+[tool.uv.sources]
+langcrew = { path = "../langcrew" }
+
+[dependency-groups]
+dev = [
     "pytest>=7.0.0",
     "pytest-cov",
     "pytest-dotenv>=0.5.0",
@@ -100,11 +103,9 @@ dev-dependencies = [
     "pytest-asyncio>=0.21.0",
     "pytest-xdist[psutil]",
     "pytest-watcher",
-    "mypy>=1.0.0",
     "ruff>=0.1.0",
     "codespell",
     "types-requests>=2.31.0",
-    "langmem"
 ]
 
 [tool.ruff]
@@ -130,17 +131,13 @@ docstring-code-line-length = "dynamic"
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
 
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-explicit_package_bases = true
-warn_no_return = false
-warn_unused_ignores = true
-warn_redundant_casts = true
-allow_redefinition = true
-disable_error_code = "typeddict-item, return-value, override, has-type"
+[tool.ty]
+
+[tool.ty.rules]
+unresolved-import = "warn"
+
+[tool.ty.environment]
+python-version = "3.10"
 
 [tool.coverage.run]
 source = ["langcrew_tools"]

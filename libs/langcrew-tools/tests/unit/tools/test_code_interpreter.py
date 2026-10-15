@@ -1,8 +1,6 @@
 """Tests for the code interpreter tool."""
 
-import asyncio
-import base64
-import re
+import shlex
 from textwrap import dedent
 
 import pytest
@@ -11,14 +9,17 @@ from langcrew_tools.code_interpreter.langchain_tools import CodeInterpreterTool
 
 
 def _decode_code_from_command(command: str) -> str:
-    match = re.search(r"base64\.b64decode\('([^']+)'\)", command)
-    if not match:
-        return ""
-    encoded = match.group(1)
-    try:
-        return base64.b64decode(encoded).decode()
-    except Exception:
-        return ""
+
+    if command.startswith("python3 -c "):
+        try:
+            # shlex.split will handle the quoted code argument
+            # command is roughly: python3 -c 'code'
+            parts = shlex.split(command)
+            if len(parts) >= 3 and parts[0] == "python3" and parts[1] == "-c":
+                return parts[2]
+        except Exception:
+            return ""
+    return ""
 
 
 class _MockResult:
@@ -78,6 +79,9 @@ def sandbox_code_tool() -> CodeInterpreterTool:
         def __init__(self):
             self.commands = _MockCommands()
 
+        async def connect(self, **_: object):
+            return self
+
     async def provider():
         return _MockSandbox()
 
@@ -126,7 +130,9 @@ async def test_code_interpreter_errors(sandbox_code_tool: CodeInterpreterTool) -
 
 
 @pytest.mark.asyncio
-async def test_code_interpreter_safe_modules(sandbox_code_tool: CodeInterpreterTool) -> None:
+async def test_code_interpreter_safe_modules(
+    sandbox_code_tool: CodeInterpreterTool,
+) -> None:
     """Test allowed modules."""
 
     # Test math module

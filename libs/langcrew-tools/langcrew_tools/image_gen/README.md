@@ -2,9 +2,9 @@
 
 ## Description
 
-The `image_gen` module in LangCrew provides tools for generating images from text descriptions using AI models. These tools enable AI agents to create visual content based on natural language prompts, supporting various image generation models with improved timeout handling and retry mechanisms.
+The `image_gen` module in LangCrew provides tools for generating images from text descriptions using AI models. These tools enable AI agents to create visual content based on natural language prompts using the Doubao Seedream model from Volcano Engine.
 
-The image generation tools support multiple models, automatic fallback strategies, and flexible storage options including local file system and sandbox workspace integration.
+The image generation tools support custom generators for flexible implementations, sandbox workspace integration, and S3 storage for persistent image persistence.
 
 ## Installation
 
@@ -17,14 +17,13 @@ pip install langcrew-tools
 2. Install additional dependencies for image generation:
 
 ```shell
-pip install openai httpx
+pip install httpx volcenginesdkarkruntime
 ```
 
 3. Set up required API keys and environment variables:
 
 ```shell
-export LANGCREW_IMAGE_GEN_API_KEY="your_api_key_here"
-export LANGCREW_IMAGE_GEN_BASE_URL="https://api.aimlapi.com/v1/"
+export ARK_API_KEY="your_ark_api_key_here"
 ```
 
 ## Usage
@@ -33,11 +32,7 @@ export LANGCREW_IMAGE_GEN_BASE_URL="https://api.aimlapi.com/v1/"
 from langcrew_tools.image_gen import ImageGenerationTool
 
 # Initialize the image generation tool
-image_tool = ImageGenerationTool(
-    api_key="your_api_key",
-    default_size="1024x1024",
-    default_quality="medium"
-)
+image_tool = ImageGenerationTool()
 
 # Generate an image
 result = await image_tool.arun(
@@ -47,7 +42,7 @@ result = await image_tool.arun(
 print(result)
 ```
 
-The initialization parameters and usage may vary depending on your specific requirements. Please refer to the tool's docstring or source code for details.
+The tool requires the `ARK_API_KEY` environment variable to be set for image generation via the ARK API.
 
 ## Example: Integrating with a LangCrew Agent
 
@@ -70,28 +65,25 @@ def creative_designer(self) -> Agent:
 
 ### ImageGenerationTool
 
-The `ImageGenerationTool` provides comprehensive image generation capabilities with multiple model support and automatic fallback strategies.
+The `ImageGenerationTool` provides image generation capabilities using the Doubao Seedream model from Volcano Engine ARK API, with optional support for custom image generators.
 
 **Features:**
-- Multiple model support (flux/schnell, flux-pro/v1.1, DALL-E 3)
-- Automatic model fallback with timeout handling
-- Configurable image size, quality, and quantity
-- Local file system and sandbox workspace storage
-- S3 integration for cloud storage
-- Proxy support for network configuration
-- Chinese character detection and validation
-- Asynchronous and synchronous operation
+- ARK API integration (Volcano Engine, Doubao Seedream model)
+- Custom image generator support for flexible implementations
+- Sandbox workspace integration for cloud-based storage
+- S3 integration for persistent image storage
+- Chinese character detection and prompt enhancement
+- Automatic file path handling with unique filename generation
+- Asynchronous execution only
 
 **Configuration Options:**
-- `api_key`: API key for image generation service
-- `base_url`: Base URL for the API (defaults to AIML API)
-- `proxy_url`: HTTP proxy URL for network requests
-- `default_size`: Default image size (e.g., "1024x1024")
-- `default_quality`: Default image quality ("low", "medium", "high")
-- `default_n`: Number of images to generate (default: 1)
-- `enable_sandbox`: Enable sandbox workspace integration
-- `sandbox_id`: Connect to existing sandbox
-- `sandbox_config`: Custom sandbox configuration
+- `model`: The image generation model to use (defaults to `doubao-seedream-4-0-250828`)
+- `custom_generator`: Optional custom async image generation function with signature:
+  ```python
+  async def custom_generator(prompt: str, path: str | None = None, **kwargs) -> str
+  ```
+  Should return base64 encoded image data. If provided, the tool will automatically
+  handle saving to sandbox and S3 upload.
 
 **Usage Examples:**
 
@@ -107,19 +99,21 @@ result = await tool.arun(
 )
 ```
 
-Advanced configuration:
+With custom generator:
 ```python
 from langcrew_tools.image_gen import ImageGenerationTool
 
+async def my_image_generator(prompt: str, path: str | None = None, **kwargs) -> str:
+    # Custom image generation logic that returns base64 encoded image
+    # ... your implementation ...
+    return base64_image_data
+
 tool = ImageGenerationTool(
-    api_key="your_api_key",
-    default_size="1792x1024",
-    default_quality="high",
-    default_n=2,
-    enable_sandbox=True
+    model="doubao-seedream-4-0-250828",
+    custom_generator=my_image_generator
 )
 
-# Generate multiple high-quality images
+# Generate image using custom generator
 result = await tool.arun(
     prompt="cute kitten playing with yarn, photorealistic",
     path="images/kitten.png"
@@ -127,28 +121,20 @@ result = await tool.arun(
 ```
 
 **Environment Variables:**
-- `LANGCREW_IMAGE_GEN_API_KEY`: API key for image generation
-- `LANGCREW_IMAGE_GEN_BASE_URL`: Base URL for API
-- `LANGCREW_IMAGE_GEN_PROXY_URL`: HTTP proxy URL
-- `LANGCREW_IMAGE_GEN_DEFAULT_SIZE`: Default image size
-- `LANGCREW_IMAGE_GEN_DEFAULT_QUALITY`: Default image quality
-- `LANGCREW_IMAGE_GEN_DEFAULT_N`: Default number of images
-- `LANGCREW_IMAGE_GEN_SANDBOX_ID`: Sandbox ID for integration
+- `ARK_API_KEY`: API key for ARK image generation service (required for default behavior)
 
 ## Model Support
 
-The tool supports multiple image generation models with automatic fallback:
+The tool uses the **Doubao Seedream** model from Volcano Engine (ARK API) for image generation:
 
-1. **flux/schnell** - Fast generation with 60s timeout
-2. **flux-pro/v1.1** - High-quality generation with 90s timeout
-3. **DALL-E 3** - OpenAI's latest model (commented out by default)
+- **doubao-seedream-4-0-250828** - Default high-quality image generation model
 
-The tool automatically tries models in order and falls back to the next if one fails.
+If a `custom_generator` is provided, it will be used instead of the ARK API.
 
 ## Storage Options
 
-### Local Storage
-Images can be saved to the local file system with custom paths:
+Generated images are automatically saved to the E2B sandbox workspace. The `path` parameter allows you to specify a custom relative path:
+
 ```python
 result = await tool.arun(
     prompt="landscape painting",
@@ -156,21 +142,18 @@ result = await tool.arun(
 )
 ```
 
-### Sandbox Integration
-Enable sandbox integration for cloud-based storage and collaboration:
-```python
-tool = ImageGenerationTool(enable_sandbox=True)
-result = await tool.arun(prompt="abstract art")
-```
+If no path is provided, images are saved with an auto-generated filename in the format:
+`image_generation_{timestamp}_{random}.png`
+
+All images are also uploaded to S3 for persistent storage.
 
 ## Error Handling
 
 The tool includes comprehensive error handling:
 - Empty prompt validation
-- Chinese character detection (requires English prompts)
+- Chinese character detection with automatic prompt enhancement (adds instructions for text rendering in Chinese/English)
 - Prompt length validation (max 4000 characters)
-- Model timeout handling
-- Automatic retry with different models
+- Custom generator error handling with fallback to ARK API
 - Detailed error logging
 
 ## License

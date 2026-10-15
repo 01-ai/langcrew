@@ -22,7 +22,7 @@ class ImageParserConfig:
     request_timeout: int = 60
 
     # Image processing settings
-    max_image_size: int = 20 * 1024 * 1024  # 20MB
+    max_image_resolution: int = 1024
     supported_formats: list | None = None
 
     # Response settings
@@ -56,10 +56,10 @@ class ImageParserConfig:
             except ValueError:
                 pass
 
-        # Image size configuration
-        if max_size_env := os.getenv("VISION_MAX_IMAGE_SIZE"):
+        # Image resolution configuration
+        if max_res_env := os.getenv("VISION_MAX_IMAGE_RESOLUTION"):
             try:
-                self.max_image_size = int(max_size_env)
+                self.max_image_resolution = int(max_res_env)
             except ValueError:
                 pass
 

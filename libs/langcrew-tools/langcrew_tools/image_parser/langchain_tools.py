@@ -3,19 +3,21 @@
 
 import asyncio
 import base64
+import io
 import logging
 import time
 from pathlib import Path
 from typing import ClassVar
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, unquote, urlparse
 
 import httpx
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
-from langchain_core.tools import BaseTool
+from PIL import Image
 from pydantic import BaseModel, Field
 
-from ..base import BaseToolInput
+from ..base import BaseToolInput, SandboxS3ToolMixin
+from ..utils.sandbox.s3_integration import SandboxS3Toolkit
 from .config import ImageParserConfig, default_config
 
 logger = logging.getLogger(__name__)
@@ -24,21 +26,21 @@ logger = logging.getLogger(__name__)
 class ImageParserInput(BaseToolInput):
     """Input for ImageParserTool."""
 
-    image_url: str = Field(..., description="URL of the image to analyze")
+    image_url: str = Field(..., description="URL or local path of the image to analyze")
     question: str = Field(
         ..., description="Question or prompt about the image to ask the vision model"
     )
 
 
-class ImageParserTool(BaseTool):
+class ImageParserTool(SandboxS3ToolMixin):
     """Tool for analyzing images using vision models."""
 
     name: ClassVar[str] = "image_parser"
     args_schema: type[BaseModel] = ImageParserInput
     description: ClassVar[str] = (
         "Analyze images using vision models to answer questions about image content. "
-        "Supports various image formats (JPG, PNG, GIF, WEBP, etc.) from URLs. "
-        "The tool downloads the image, validates it, and sends it to a vision model "
+        "Supports various image formats (JPG, PNG, GIF, WEBP, etc.) from URLs, local paths, or sandbox files. "
+        "The tool downloads or reads the image, validates it, and sends it to a vision model "
         "along with your question to get detailed analysis and answers."
     )
 
@@ -113,20 +115,49 @@ class ImageParserTool(BaseTool):
         image_url: str,
         question: str,
         **kwargs,
-    ) -> str:
-        """Perform image analysis asynchronously."""
+    ) -> dict[str, str | None]:
+        """Perform image analysis asynchronously.
+
+        Returns:
+            Dict containing analysis result and image URL for access.
+            Format: {"analysis": str, "image_url": str | None}
+        """
         logger.info(f"Starting image analysis for URL: {image_url}")
         logger.info(f"Question: {question[:100]}...")
 
         if not image_url or not image_url.strip():
-            return "Error: No image URL provided"
+            return {"analysis": "Error: No image URL provided", "image_url": None}
 
         if not question or not question.strip():
-            return "Error: No question provided"
+            return {"analysis": "Error: No question provided", "image_url": None}
 
         try:
-            # Validate and download image
-            image_data, mime_type = await self._download_and_validate_image(image_url)
+            # load image source and validate image data
+            (
+                image_data,
+                content_type,
+                reference,
+            ) = await self._load_image_source(image_url)
+            image_data, mime_type = self._validate_image_data(
+                image_data, content_type, reference, image_url
+            )
+
+            # Determine image URL for access
+            image_url = None
+            if reference and not reference.startswith(("http://", "https://")):
+                # Local file detected, upload to S3 and use S3 URL
+                # Convert bytes to base64 for SandboxS3Toolkit
+                image_b64 = base64.b64encode(image_data).decode("utf-8")
+                async_sandbox = await self.get_sandbox()
+                s3_client = await self.get_s3_client()
+                image_url = await SandboxS3Toolkit.upload_base64_image(
+                    async_s3_client=s3_client,
+                    base64_data=image_b64,
+                    sandbox_id=async_sandbox.sandbox_id,
+                )
+            else:
+                # Remote URL, use the original URL
+                image_url = reference
 
             # Create vision model message
             message = self._create_vision_message(image_data, mime_type, question)
@@ -134,25 +165,192 @@ class ImageParserTool(BaseTool):
             # Send to vision model
             response = await self._query_vision_model(message)
 
-            return response
+            # Return structured result with image URL
+            result = {
+                "analysis": response,
+                "image_url": image_url,
+            }
+            return result
 
         except Exception as e:
             logger.error(f"Image analysis failed: {e}")
-            return f"Analysis failed: {str(e)}"
+            return {"analysis": f"Analysis failed: {str(e)}", "image_url": None}
 
-    async def _download_and_validate_image(self, image_url: str) -> tuple[bytes, str]:
-        """Download and validate image from URL."""
-        logger.info(f"Downloading image from: {image_url}")
+    async def _load_image_source(self, image_url: str) -> tuple[bytes, str | None, str]:
+        """Load raw image bytes plus metadata from URL or local path."""
+        logger.info(f"Resolving image source: {image_url}")
 
-        # Validate URL format
         try:
             parsed_url = urlparse(image_url)
-            if not parsed_url.scheme or not parsed_url.netloc:
-                raise ValueError("Invalid URL format")
         except Exception as e:
-            raise ValueError(f"Invalid URL format: {e}")
+            raise ValueError(f"Invalid image reference: {e}")
 
-        # Download image
+        # check if the image is a local path or a remote URL
+        scheme = (parsed_url.scheme or "").lower()
+        if self._is_local_reference(parsed_url):
+            return await self._read_local_image(parsed_url, image_url)
+
+        if scheme not in ("http", "https"):
+            raise ValueError(
+                "Unsupported image source: only http(s) URLs or local file paths are allowed"
+            )
+
+        return await self._download_remote_image(image_url, parsed_url)
+
+    def _validate_image_data(
+        self,
+        image_data: bytes,
+        content_type: str | None,
+        reference: str,
+        original_url: str,
+    ) -> tuple[bytes, str]:
+        """Validate image bytes, preprocess if needed, and determine MIME type."""
+        if not image_data:
+            raise ValueError("Image data is empty")
+
+        mime_type = self._validate_content_type(content_type or "", reference)
+
+        # Preprocess image (resize if needed)
+        processed_data = self._preprocess_image(image_data, mime_type)
+
+        logger.info(
+            f"Image validation passed for source: {original_url}, mime: {mime_type}, final size: {len(processed_data)} bytes"
+        )
+        return processed_data, mime_type
+
+    def _preprocess_image(self, image_data: bytes, mime_type: str) -> bytes:
+        """Resize image to fit within max_image_resolution if needed."""
+        # Skip processing for SVG as it's vector-based
+        if mime_type == "image/svg+xml":
+            return image_data
+
+        try:
+            with Image.open(io.BytesIO(image_data)) as img:
+                # Handle animated GIFs - skip resizing for now to preserve animation
+                if mime_type == "image/gif" and getattr(img, "is_animated", False):
+                    logger.info("Skipping resize for animated GIF")
+                    return image_data
+
+                original_width, original_height = img.size
+                max_res = self.config.max_image_resolution
+
+                # Check if resizing is necessary
+                if original_width <= max_res and original_height <= max_res:
+                    return image_data
+
+                logger.info(
+                    f"Resizing image from {original_width}x{original_height} to fit within {max_res}x{max_res}"
+                )
+
+                # Resize using thumbnail to preserve aspect ratio
+                img.thumbnail((max_res, max_res), Image.Resampling.LANCZOS)
+                new_width, new_height = img.size
+
+                # Save back to bytes
+                output = io.BytesIO()
+                # Use original format if possible, otherwise default to JPEG
+                img_format = img.format if img.format else "JPEG"
+                img.save(output, format=img_format)
+                processed_data = output.getvalue()
+
+                logger.info(
+                    f"Resized image successfully: {original_width}x{original_height} -> {new_width}x{new_height}. "
+                    f"Bytes: {len(image_data)} -> {len(processed_data)}"
+                )
+                return processed_data
+
+        except Exception as e:
+            logger.error(
+                f"Failed to preprocess image with PIL: {e}. Using original data."
+            )
+            return image_data
+
+    def _is_local_reference(self, parsed_url: ParseResult) -> bool:
+        """Determine if the provided reference points to a local file."""
+        scheme = (parsed_url.scheme or "").lower()
+        if scheme in ("", "file"):
+            return True
+
+        raw_scheme = parsed_url.scheme or ""
+        if len(raw_scheme) == 1 and parsed_url.path.startswith("\\"):
+            return True
+
+        return False
+
+    def _resolve_local_path(
+        self, parsed_url: ParseResult, original_reference: str
+    ) -> Path:
+        """Resolve the absolute local path from different reference formats."""
+        if parsed_url.scheme == "file":
+            netloc = parsed_url.netloc
+            if netloc and netloc not in ("localhost", "127.0.0.1"):
+                raw_path = f"//{netloc}{parsed_url.path}"
+            else:
+                raw_path = parsed_url.path or netloc
+        elif len(parsed_url.scheme) == 1 and parsed_url.path.startswith("\\"):
+            raw_path = f"{parsed_url.scheme}:{parsed_url.path}"
+        else:
+            raw_path = original_reference
+
+        if not raw_path:
+            raise ValueError("Invalid local image path")
+
+        decoded_path = unquote(raw_path)
+        return Path(decoded_path).expanduser()
+
+    async def _read_local_image(
+        self, parsed_url: ParseResult, original_reference: str
+    ) -> tuple[bytes, str | None, str]:
+        """Read and validate image data from a local path or sandbox."""
+        file_path = self._resolve_local_path(parsed_url, original_reference).resolve()
+        logger.info(f"Attempting to read local image from: {file_path}")
+
+        # First try to read from local filesystem
+        if file_path.exists() and file_path.is_file():
+            try:
+                image_data = file_path.read_bytes()
+                logger.info(
+                    f"Successfully loaded local image bytes: {len(image_data)} bytes from {file_path}"
+                )
+                return image_data, None, file_path.as_posix()
+            except OSError as e:
+                logger.warning(
+                    f"Failed to read local image: {e}, trying sandbox fallback"
+                )
+        else:
+            logger.info(f"Local image not found: {file_path}, trying sandbox fallback")
+
+        # If local file doesn't exist or couldn't be read, try sandbox
+        try:
+            async_sandbox = await self.get_sandbox()
+            sandbox_path = file_path.as_posix()  # Use the resolved path as sandbox path
+
+            logger.info(f"Attempting to read from sandbox: {sandbox_path}")
+            image_data = await async_sandbox.files.read(sandbox_path, format="bytes")
+
+            logger.info(
+                f"Successfully loaded sandbox image bytes: {len(image_data)} bytes from {sandbox_path}"
+            )
+            return image_data, None, sandbox_path
+
+        except Exception as e:
+            logger.error(f"Failed to read from sandbox: {e}")
+            if file_path.exists():
+                raise ValueError(f"Local image exists but could not be read: {e}")
+            else:
+                raise ValueError(
+                    f"Image not found in local filesystem or sandbox: {file_path}"
+                )
+
+    async def _download_remote_image(
+        self, image_url: str, parsed_url: ParseResult
+    ) -> tuple[bytes, str | None, str]:
+        """Download image bytes from remote URL."""
+        if not parsed_url.scheme or not parsed_url.netloc:
+            raise ValueError("Invalid URL format")
+
+        logger.info(f"Downloading image from remote URL: {image_url}")
+
         try:
             async with httpx.AsyncClient(timeout=self.config.request_timeout) as client:
                 response = await client.get(image_url)
@@ -166,19 +364,10 @@ class ImageParserTool(BaseTool):
         except httpx.HTTPStatusError as e:
             raise ValueError(f"HTTP error downloading image: {e.response.status_code}")
 
-        # Validate image size
-        if len(image_data) > self.config.max_image_size:
-            size_mb = len(image_data) / (1024 * 1024)
-            max_mb = self.config.max_image_size / (1024 * 1024)
-            raise ValueError(f"Image too large: {size_mb:.1f}MB (max: {max_mb}MB)")
-
-        # Validate content type
-        mime_type = self._validate_content_type(content_type, image_url)
-
         logger.info(
-            f"Successfully downloaded image: {len(image_data)} bytes, type: {mime_type}"
+            f"Successfully downloaded image bytes: {len(image_data)} bytes from remote URL"
         )
-        return image_data, mime_type
+        return image_data, content_type or None, image_url
 
     def _validate_content_type(self, content_type: str, image_url: str) -> str:
         """Validate and determine image MIME type."""
@@ -235,16 +424,14 @@ class ImageParserTool(BaseTool):
         # Create content list with image and text
         content = [
             {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{mime_type};base64,{base64_image}",
-                    "detail": "high",
-                },
+                "type": "image",
+                "base64": base64_image,
+                "mime_type": mime_type,
             },
             {"type": "text", "text": question},
         ]
 
-        return HumanMessage(content=content)
+        return HumanMessage(content_blocks=content)
 
     async def _query_vision_model(self, message: HumanMessage) -> str:
         """Send message to vision model and get response."""

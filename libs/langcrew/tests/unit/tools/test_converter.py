@@ -2,36 +2,27 @@
 Unit tests for langcrew.tools.tool_converter module.
 
 This module tests the ToolConverter functionality including:
-- CrewAI ↔ LangChain tool conversion
-- Function-based tool creation
+- CrewAI tools to LangChain tool conversion
+- Callable function conversion
 - Universal tool detection and conversion
 - Batch conversion capabilities
 - Error handling and edge cases
 """
 
-import asyncio
 from unittest.mock import Mock, patch
 
 import pytest
-from crewai.tools import BaseTool as CrewAIBaseTool
 from langchain_core.tools import BaseTool as LangChainBaseTool
 from pydantic import BaseModel, Field
 
-from langcrew.tools.converter import (
-    ToolConverter,
-    convert_crewai_tools,
-    convert_langchain_tool,
-    convert_langchain_tools,
-    convert_tools,
-    create_crewai_tool_from_function,
-)
+from langcrew.tools.converter import ToolConverter, convert_tools
 
 # =====================================
 # Mock Tool Classes for Testing
 # =====================================
 
 
-class MockCrewAITool(CrewAIBaseTool):
+class MockCrewAITool:
     """Mock CrewAI tool for testing synchronous operations."""
 
     name: str = "mock_crewai_tool"
@@ -41,7 +32,7 @@ class MockCrewAITool(CrewAIBaseTool):
         return f"CrewAI result: {query}"
 
 
-class MockCrewAIToolNoParams(CrewAIBaseTool):
+class MockCrewAIToolNoParams:
     """Mock CrewAI tool with no parameters."""
 
     name: str = "mock_crewai_no_params"
@@ -51,7 +42,7 @@ class MockCrewAIToolNoParams(CrewAIBaseTool):
         return "No params result"
 
 
-class MockCrewAIToolMultiParams(CrewAIBaseTool):
+class MockCrewAIToolMultiParams:
     """Mock CrewAI tool with multiple parameters."""
 
     name: str = "mock_crewai_multi_params"
@@ -61,7 +52,7 @@ class MockCrewAIToolMultiParams(CrewAIBaseTool):
         return f"Multi params result: {query} x {count}"
 
 
-class AsyncMockCrewAITool(CrewAIBaseTool):
+class AsyncMockCrewAITool:
     """Mock async CrewAI tool for testing asynchronous operations."""
 
     name: str = "async_mock_crewai_tool"
@@ -74,7 +65,7 @@ class AsyncMockCrewAITool(CrewAIBaseTool):
         return f"Async CrewAI result: {query}"
 
 
-class MockCrewAIToolWithArgsSchema(CrewAIBaseTool):
+class MockCrewAIToolWithArgsSchema:
     """Mock CrewAI tool with explicit args schema."""
 
     class ArgsSchema(BaseModel):
@@ -246,7 +237,8 @@ class TestToolConverterCrewAIConversion:
         assert isinstance(result, LangChainBaseTool)
 
         # Test execution with default input schema
-        output = result.run({})
+        # ToolConverter adds 'input' field for no-parameter tools
+        output = result.run({"input": ""})
         assert "No params result" in output
 
     def test_convert_crewai_tool_multi_params(self, mock_crewai_tool_multi_params):
@@ -439,77 +431,6 @@ class TestToolConverterUniversal:
         assert isinstance(result, LangChainBaseTool)
 
 
-class TestToolConverterLangChainConversion:
-    """Test LangChain to CrewAI conversion functionality."""
-
-    def test_convert_langchain_tool_basic(self, mock_langchain_tool):
-        """Test basic LangChain to CrewAI conversion."""
-        result = ToolConverter.convert_langchain_tool(mock_langchain_tool)
-
-        assert result is not None
-        assert isinstance(result, CrewAIBaseTool)
-        assert result.name == "mock_langchain_tool"
-
-        # Test execution - the converted tool wraps the LangChain tool
-        output = result._run(query="test")
-        # The output should contain either the result or an error message
-        assert "test" in output.lower()
-
-    @pytest.mark.asyncio
-    async def test_convert_langchain_tool_async(self, async_mock_langchain_tool):
-        """Test async LangChain tool conversion and execution."""
-        result = ToolConverter.convert_langchain_tool(async_mock_langchain_tool)
-
-        assert result is not None
-        assert isinstance(result, CrewAIBaseTool)
-
-        # Test async execution - the converted tool wraps the LangChain tool
-        output = await result._arun(query="test")
-        # The output should contain either the result or test keyword
-        assert "test" in output.lower()
-
-    def test_convert_langchain_tool_name_sanitization(self):
-        """Test tool name sanitization."""
-
-        class SpecialNameTool(LangChainBaseTool):
-            name: str = "special-name with spaces!"
-            description: str = "Tool with special characters in name"
-
-            def _run(self, query: str) -> str:
-                return "result"
-
-        tool = SpecialNameTool()
-        result = ToolConverter.convert_langchain_tool(tool)
-
-        assert result is not None
-        # Name should be sanitized
-        assert " " not in result.name
-        assert "!" not in result.name
-
-    def test_convert_langchain_tool_error_handling(self):
-        """Test error handling in LangChain conversion."""
-
-        class ErrorLangChainTool(LangChainBaseTool):
-            name: str = "error_tool"
-            description: str = "Tool that raises errors"
-
-            def _run(self, query: str) -> str:
-                raise ValueError("Test error")
-
-        tool = ErrorLangChainTool()
-        result = ToolConverter.convert_langchain_tool(tool)
-
-        assert result is not None
-        # Test that errors are caught and handled
-        output = result._run(query="test")
-        assert "error" in output.lower()
-
-    def test_convert_langchain_tool_none_input(self):
-        """Test LangChain conversion with None input."""
-        result = ToolConverter.convert_langchain_tool(None)
-        assert result is None
-
-
 class TestToolConverterUtilities:
     """Test utility methods."""
 
@@ -590,7 +511,7 @@ class TestToolConverterUtilities:
         class NoSignatureTool(LangChainBaseTool):
             name: str = "no_sig_tool"
             description: str = "Tool without _run method"
-            
+
             def _run(self, input: str = "") -> str:
                 """Default _run implementation"""
                 return input
@@ -651,232 +572,9 @@ class TestConvenienceFunctions:
         # Should have at least one successful conversion
         assert len(results) >= 1
 
-    def test_convert_crewai_tools_batch(
-        self, mock_crewai_tool, mock_crewai_tool_no_params
-    ):
-        """Test batch conversion of CrewAI tools."""
-        tools = [mock_crewai_tool, mock_crewai_tool_no_params]
-        results = convert_crewai_tools(tools)
-
-        assert len(results) == 2
-        for result in results:
-            assert isinstance(result, LangChainBaseTool)
-
-    def test_convert_langchain_tool_single(self, mock_langchain_tool):
-        """Test single LangChain tool conversion."""
-        result = convert_langchain_tool(mock_langchain_tool)
-
-        assert result is not None
-        assert isinstance(result, CrewAIBaseTool)
-        assert result.name == "mock_langchain_tool"
-
-    def test_convert_langchain_tool_single_none(self):
-        """Test single LangChain tool conversion with None."""
-        result = convert_langchain_tool(None)
-        assert result is None
-
-    def test_convert_langchain_tools_batch(
-        self, mock_langchain_tool, async_mock_langchain_tool
-    ):
-        """Test batch conversion of LangChain tools."""
-        tools = [mock_langchain_tool, async_mock_langchain_tool]
-        results = convert_langchain_tools(tools)
-
-        assert len(results) == 2
-        for result in results:
-            assert isinstance(result, CrewAIBaseTool)
-
-    def test_convert_langchain_tools_empty(self):
-        """Test batch conversion of empty LangChain tools list."""
-        results = convert_langchain_tools([])
-        assert results == []
-
-    def test_convert_langchain_tools_with_failures(self, mock_langchain_tool):
-        """Test batch conversion with some failures."""
-        # Mock a tool that will fail conversion
-        failing_tool = Mock()
-        failing_tool.name = "failing_tool"
-
-        tools = [mock_langchain_tool, failing_tool]
-
-        with patch.object(ToolConverter, "convert_langchain_tool") as mock_convert:
-            mock_convert.side_effect = [
-                Mock(spec=CrewAIBaseTool),  # Success for first tool
-                None,  # Failure for second tool
-            ]
-
-            results = convert_langchain_tools(tools)
-
-            assert len(results) == 1  # Only successful conversion
-
-    def test_create_crewai_tool_from_function_basic(self, sample_function):
-        """Test creating CrewAI tool from function."""
-        result = create_crewai_tool_from_function(
-            sample_function, name="test_tool", description="Test description"
-        )
-
-        assert result is not None
-        assert isinstance(result, CrewAIBaseTool)
-        assert result.name == "test_tool"
-        assert "Test description" in result.description
-
-        # Test execution
-        output = result._run(query="test")
-        assert "Function result: test" in output
-
-    def test_create_crewai_tool_from_function_name_sanitization(self, sample_function):
-        """Test name sanitization in function tool creation."""
-        result = create_crewai_tool_from_function(
-            sample_function, name="tool with spaces!", description="Test description"
-        )
-
-        assert result is not None
-        assert " " not in result.name
-        assert "!" not in result.name
-
-    @pytest.mark.asyncio
-    async def test_create_crewai_tool_from_async_function(self, async_sample_function):
-        """Test creating CrewAI tool from async function."""
-        result = create_crewai_tool_from_function(
-            async_sample_function,
-            name="async_test_tool",
-            description="Async test description",
-        )
-
-        assert result is not None
-        assert isinstance(result, CrewAIBaseTool)
-
-        # Test sync execution of async function - should get error
-        output = result._run(query="test")
-        # Sync context cannot call async functions
-        assert "error" in output.lower() or "async" in output.lower()
-
-        # Test async execution
-        output = await result._arun(query="test")
-        assert "Async function result: test" in output
-
-    def test_create_crewai_tool_from_function_with_schema(self, sample_function):
-        """Test creating tool with explicit args schema."""
-
-        class CustomSchema(BaseModel):
-            query: str = Field(description="Custom query field")
-
-        result = create_crewai_tool_from_function(
-            sample_function,
-            name="custom_schema_tool",
-            description="Tool with custom schema",
-            args_schema=CustomSchema,
-        )
-
-        assert result is not None
-        assert result.args_schema is CustomSchema
-
-    def test_create_crewai_tool_from_function_complex_params(self, complex_function):
-        """Test creating tool from function with complex parameters."""
-        result = create_crewai_tool_from_function(
-            complex_function, name="complex_tool", description="Complex function tool"
-        )
-
-        assert result is not None
-
-        # Test with all parameters
-        output = result._run(query="test", limit=5, enabled=False)
-        assert "Complex result: test (limit=5, enabled=False)" in output
-
-    def test_create_crewai_tool_from_function_no_params(self, no_param_function):
-        """Test creating tool from function with no parameters."""
-        result = create_crewai_tool_from_function(
-            no_param_function, name="no_param_tool", description="No parameter tool"
-        )
-
-        assert result is not None
-
-        # Function has no parameters, but tool schema has default 'input' parameter
-        # Calling with input parameter should either work or return error
-        try:
-            output = result._run(input="ignored")
-            # If it works, should have the result or error message
-            assert "No param result" in output or "error" in output.lower()
-        except TypeError:
-            # If it raises TypeError, that's also acceptable for no-param functions
-            pass
-
-
-# =====================================
-# Test Integration Scenarios
-# =====================================
-
-
-class TestBidirectionalConversion:
-    """Test bidirectional tool conversion scenarios."""
-
-    def test_crewai_to_langchain_to_crewai(self, mock_crewai_tool):
-        """Test CrewAI → LangChain → CrewAI conversion chain."""
-        # Convert CrewAI to LangChain
-        langchain_tool = ToolConverter.convert_crewai_tool(mock_crewai_tool)
-        assert langchain_tool is not None
-        assert isinstance(langchain_tool, LangChainBaseTool)
-
-        # Convert back to CrewAI
-        crewai_tool = ToolConverter.convert_langchain_tool(langchain_tool)
-        assert crewai_tool is not None
-        assert isinstance(crewai_tool, CrewAIBaseTool)
-
-        # Test that tool is callable (functionality may be wrapped with errors)
-        final_result = crewai_tool._run(query="test")
-        assert final_result is not None
-        # Result should contain test keyword or error message
-        assert "test" in final_result.lower() or "error" in final_result.lower()
-
-    def test_langchain_to_crewai_to_langchain(self, mock_langchain_tool):
-        """Test LangChain → CrewAI → LangChain conversion chain."""
-        # Convert LangChain to CrewAI
-        crewai_tool = ToolConverter.convert_langchain_tool(mock_langchain_tool)
-        assert crewai_tool is not None
-        assert isinstance(crewai_tool, CrewAIBaseTool)
-
-        # Convert back to LangChain
-        langchain_tool = ToolConverter.convert_crewai_tool(crewai_tool)
-        assert langchain_tool is not None
-        assert isinstance(langchain_tool, LangChainBaseTool)
-
-        # Test that functionality is preserved
-        final_result = langchain_tool.run({"query": "test"})
-
-        # Should contain the test keyword (possibly wrapped)
-        assert "test" in final_result.lower()
-
-    def test_function_to_crewai_conversion_chain(self, sample_function):
-        """Test function → CrewAI tool conversion."""
-        # Create CrewAI tool from function
-        crewai_tool = create_crewai_tool_from_function(
-            sample_function, name="func_tool", description="Function tool"
-        )
-
-        assert crewai_tool is not None
-        assert isinstance(crewai_tool, CrewAIBaseTool)
-
-        # Test execution matches original function
-        original_result = sample_function("test")
-        tool_result = crewai_tool._run(query="test")
-
-        assert original_result in tool_result
-
-    @pytest.mark.asyncio
-    async def test_async_conversion_chain(self, async_mock_crewai_tool):
-        """Test async tool conversion chain."""
-        # Convert async CrewAI to LangChain
-        langchain_tool = ToolConverter.convert_crewai_tool(async_mock_crewai_tool)
-        assert langchain_tool is not None
-
-        # Convert back to CrewAI
-        crewai_tool = ToolConverter.convert_langchain_tool(langchain_tool)
-        assert crewai_tool is not None
-
-        # Test async execution (may have errors due to wrapping)
-        async_result = await crewai_tool._arun(query="test")
-        assert async_result is not None
-        assert "test" in async_result.lower() or "error" in async_result.lower()
+    # =====================================
+    # Test Integration Scenarios
+    # =====================================
 
     def test_batch_mixed_conversion(
         self, mock_crewai_tool, mock_langchain_tool, sample_function
@@ -889,18 +587,8 @@ class TestBidirectionalConversion:
             sample_function,
         ])
         assert len(langchain_tools) == 3
-
-        # Convert all to CrewAI format
-        crewai_tools = convert_langchain_tools(langchain_tools)
-        assert len(crewai_tools) == 3
-
-        # Test all tools are callable (may have errors due to wrapping)
-        for tool in crewai_tools:
-            assert isinstance(tool, CrewAIBaseTool)
-            result = tool._run(query="test")
-            assert result is not None
-            # Result should contain test keyword or error message
-            assert "test" in result.lower() or "error" in result.lower()
+        for result in langchain_tools:
+            assert isinstance(result, LangChainBaseTool)
 
 
 # =====================================
@@ -914,7 +602,7 @@ class TestEdgeCases:
     def test_empty_tool_names(self):
         """Test tools with empty names."""
 
-        class EmptyNameTool(CrewAIBaseTool):
+        class EmptyNameTool:
             name: str = ""
             description: str = "Tool with empty name"
 
@@ -931,7 +619,7 @@ class TestEdgeCases:
     def test_special_characters_in_names(self):
         """Test tools with special characters in names."""
 
-        class SpecialCharTool(CrewAIBaseTool):
+        class SpecialCharTool:
             name: str = "tool-name_with!special@chars#$%"
             description: str = "Tool with special characters"
 
@@ -947,38 +635,6 @@ class TestEdgeCases:
         # Should not contain problematic characters
         assert "@" not in result.name
         assert "#" not in result.name
-
-    @pytest.mark.asyncio
-    async def test_async_function_in_sync_context(self, async_sample_function):
-        """Test async function execution in sync context."""
-        result = create_crewai_tool_from_function(
-            async_sample_function,
-            name="async_sync_test",
-            description="Async function in sync",
-        )
-
-        assert result is not None
-
-        # Async function in sync context should return error
-        output = result._run(query="test")
-        assert "error" in output.lower() or "async" in output.lower()
-
-    def test_sync_function_in_async_context(self, sample_function):
-        """Test sync function execution in async context."""
-        result = create_crewai_tool_from_function(
-            sample_function,
-            name="sync_async_test",
-            description="Sync function in async",
-        )
-
-        assert result is not None
-
-        async def test_async_execution():
-            output = await result._arun(query="test")
-            assert "Function result: test" in output
-
-        # Run the async test
-        asyncio.run(test_async_execution())
 
     def test_malformed_tool_objects(self):
         """Test handling of malformed tool objects."""
@@ -998,9 +654,9 @@ class TestEdgeCases:
     def test_tools_with_none_attributes(self):
         """Test tools with None attributes."""
 
-        class NoneAttributesTool(CrewAIBaseTool):
+        class NoneAttributesTool:
             name: str = "none_attrs_tool"
-            description: str = "Valid description"  # Pydantic requires string type
+            description: str | None = "Valid description"
 
             def _run(self) -> str:
                 return "result"
@@ -1015,39 +671,18 @@ class TestEdgeCases:
         assert result.description is not None
         assert len(result.description) > 0
 
-    def test_circular_conversion_stability(self, mock_crewai_tool):
-        """Test that multiple conversions don't degrade functionality."""
-        original_tool = mock_crewai_tool
-
-        # Multiple conversion cycles
-        for i in range(3):
-            # CrewAI → LangChain
-            langchain_tool = ToolConverter.convert_crewai_tool(original_tool)
-            assert langchain_tool is not None
-
-            # LangChain → CrewAI
-            crewai_tool = ToolConverter.convert_langchain_tool(langchain_tool)
-            assert crewai_tool is not None
-
-            # Test tool is callable (may have errors due to wrapping)
-            result = crewai_tool._run(query="stability_test")
-            assert result is not None
-            # Result should contain test keyword or error message
-            assert "stability_test" in result.lower() or "error" in result.lower()
-
-            original_tool = crewai_tool
-
     def test_exception_propagation_and_logging(self, mock_crewai_tool):
         """Test that exceptions are properly handled and logged."""
         with patch("langcrew.tools.converter.logger"):
-            # Force an exception during conversion
+            # Create the tool first while signature is intact
+            result = ToolConverter.convert_crewai_tool(mock_crewai_tool)
+            assert result is not None
+
+            # Force an exception during execution
             with patch.object(
                 mock_crewai_tool, "_run", side_effect=Exception("Test exception")
             ):
-                result = ToolConverter.convert_crewai_tool(mock_crewai_tool)
-                assert result is not None
-
-                # Test that execution error is handled
+                # Now use the original 'query' parameter
                 output = result.run({"query": "test"})
                 assert "error" in output.lower()
 
@@ -1057,7 +692,7 @@ class TestEdgeCases:
         tools = []
         for i in range(100):
 
-            class BatchTool(CrewAIBaseTool):
+            class BatchTool:
                 name: str = f"batch_tool_{i}"
                 description: str = f"Batch tool number {i}"
 
@@ -1157,7 +792,7 @@ class TestPerformance:
         tools = []
         for i in range(50):
 
-            class PerfTool(CrewAIBaseTool):
+            class PerfTool:
                 name: str = f"perf_tool_{i}"
                 description: str = f"Performance test tool {i}"
 
